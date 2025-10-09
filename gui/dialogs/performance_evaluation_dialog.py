@@ -23,6 +23,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate, QTimer
 from PyQt5.QtGui import QFont, QPixmap, QPalette, QIcon
 
+
 class PerformanceEvaluationDialog(QDialog):
     """性能评估对话框"""
 
@@ -735,29 +736,29 @@ class PerformanceEvaluationDialog(QDialog):
 
             # 基于结果生成建议
             if results['accuracy'] < 85:
-                recommendations.append(" 建议优化形态识别算法，提高准确率")
-                recommendations.append(" 考虑增加训练样本数量")
+                recommendations.append("建议优化形态识别算法，提高准确率")
+                recommendations.append("考虑增加训练样本数量")
 
             if results['response_time'] > 150:
-                recommendations.append(" 建议优化代码性能，减少响应时间")
-                recommendations.append(" 考虑使用缓存机制")
+                recommendations.append("建议优化代码性能，减少响应时间")
+                recommendations.append("考虑使用缓存机制")
 
             if results['memory_usage'] > 400:
-                recommendations.append(" 建议优化内存使用，避免内存泄漏")
-                recommendations.append(" 考虑使用更高效的数据结构")
+                recommendations.append("建议优化内存使用，避免内存泄漏")
+                recommendations.append("考虑使用更高效的数据结构")
 
             if results['cpu_usage'] > 80:
-                recommendations.append(" 建议优化CPU使用率，避免过度计算")
-                recommendations.append(" 考虑使用多线程优化")
+                recommendations.append("建议优化CPU使用率，避免过度计算")
+                recommendations.append("考虑使用多线程优化")
 
             if not recommendations:
-                recommendations.append(" 系统性能表现良好，无需特别优化")
-                recommendations.append(" 建议定期进行性能评估")
+                recommendations.append("系统性能表现良好，无需特别优化")
+                recommendations.append("建议定期进行性能评估")
 
             recommendations.append("\n系统优化建议:")
-            recommendations.append(" 定期清理缓存和临时文件")
-            recommendations.append(" 保持数据库索引的最新状态")
-            recommendations.append(" 监控系统资源使用情况")
+            recommendations.append("定期清理缓存和临时文件")
+            recommendations.append("保持数据库索引的最新状态")
+            recommendations.append("监控系统资源使用情况")
 
             self.recommendations_text.setPlainText('\n'.join(recommendations))
 
@@ -874,6 +875,7 @@ class PerformanceEvaluationDialog(QDialog):
     def set_evaluator(self, evaluator):
         """设置性能评估器"""
         self.evaluator = evaluator
+
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

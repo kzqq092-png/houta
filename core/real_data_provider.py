@@ -18,7 +18,6 @@ import time
 from core.adapters import get_config, get_data_validator
 from core.services.unified_data_manager import UnifiedDataManager
 
-
 class RealDataProvider:
     """真实数据提供器 - 提供真实的市场数据"""
 
@@ -953,11 +952,9 @@ class RealDataProvider:
                 'error': str(e)
             }
 
-
 # 全局真实数据提供器实例
 _real_data_provider: Optional[RealDataProvider] = None
 _provider_lock = threading.RLock()
-
 
 def get_real_data_provider() -> RealDataProvider:
     """获取全局真实数据提供器实例
@@ -973,7 +970,6 @@ def get_real_data_provider() -> RealDataProvider:
 
         return _real_data_provider
 
-
 def initialize_real_data_provider() -> RealDataProvider:
     """初始化真实数据提供器
 
@@ -988,30 +984,25 @@ def initialize_real_data_provider() -> RealDataProvider:
 
 # 便捷函数
 
-
 def get_real_kdata(code: str, **kwargs) -> pd.DataFrame:
     """获取真实K线数据的便捷函数"""
     provider = get_real_data_provider()
     return provider.get_real_kdata(code, **kwargs)
-
 
 def create_real_test_data(pattern_name: str = "test", count: int = 5) -> List[Dict[str, Any]]:
     """创建真实测试数据的便捷函数"""
     provider = get_real_data_provider()
     return provider.create_real_test_datasets(pattern_name, count)
 
-
 def get_real_stock_list(**kwargs) -> List[str]:
     """获取真实股票列表的便捷函数"""
     provider = get_real_data_provider()
     return provider.get_real_stock_list(**kwargs)
 
-
 def import_stock_data_with_validation(codes: List[str], **kwargs) -> Dict[str, Any]:
     """批量导入股票数据的便捷函数"""
     provider = get_real_data_provider()
     return provider.import_stock_data_with_validation(codes, **kwargs)
-
 
 def check_data_exists(code: str, **kwargs) -> Dict[str, Any]:
     """检查数据存在性的便捷函数"""

@@ -26,7 +26,6 @@ from plotly.subplots import make_subplots
 import plotly.express as px
 from backtest.unified_backtest_engine import UnifiedRiskMetrics, BacktestLevel
 
-
 class MonitoringLevel(Enum):
     """监控级别"""
     BASIC = "basic"              # 基础监控
@@ -34,14 +33,12 @@ class MonitoringLevel(Enum):
     ADVANCED = "advanced"        # 高级监控
     REAL_TIME = "real_time"      # 实时监控
 
-
 class AlertLevel(Enum):
     """预警级别"""
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
     EMERGENCY = "emergency"
-
 
 @dataclass
 class RealTimeMetrics:
@@ -64,7 +61,6 @@ class RealTimeMetrics:
     memory_usage: float
     cpu_usage: float
 
-
 @dataclass
 class AlertMessage:
     """预警消息数据类"""
@@ -76,7 +72,6 @@ class AlertMessage:
     current_value: float
     threshold_value: float
     recommendation: str
-
 
 class RealTimeBacktestMonitor:
     """
@@ -878,13 +873,11 @@ class RealTimeBacktestMonitor:
 
 # 便捷函数
 
-
 def create_real_time_monitor(
         monitoring_level: MonitoringLevel = MonitoringLevel.REAL_TIME,
         update_interval: float = 1.0) -> RealTimeBacktestMonitor:
     """创建实时监控器"""
     return RealTimeBacktestMonitor(monitoring_level, update_interval)
-
 
 def start_monitoring_session(
     backtest_engine: Any,

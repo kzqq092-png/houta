@@ -9,7 +9,6 @@
 import pandas as pd
 import numpy as np
 
-
 def calculate_emotion_index(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
     """
     计算市场情绪指标
@@ -56,7 +55,6 @@ def calculate_emotion_index(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFr
     result['EMOTION'] = result['EMOTION'].clip(-1, 1)  # 限制在-1到1之间
 
     return result
-
 
 def calculate_vwap(df: pd.DataFrame) -> pd.DataFrame:
     """

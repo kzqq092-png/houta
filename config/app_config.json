@@ -1,13 +1,28 @@
 {
-  "app": {
-    "name": "FactorWeave-Quant ‌",
-    "version": "1.0.0",
-    "language": "zh_CN",
-    "auto_save": true,
-    "auto_save_interval": 300
+  "system": {
+    "debug_mode": false,
+    "log_level": "DEBUG",
+    "max_workers": 10,
+    "timeout_seconds": 30,
+    "auto_backup": true
+  },
+  "data_sources": {
+    "primary_source": "akshare",
+    "backup_sources": [
+      "eastmoney",
+      "sina"
+    ],
+    "update_interval": 300,
+    "cache_enabled": false
   },
   "ui": {
-    "theme": "default",
+    "theme": "light",
+    "language": "en_US",
+    "window_size": [
+      1200,
+      800
+    ],
+    "auto_save_layout": true,
     "window": {
       "width": 1200,
       "height": 800,
@@ -22,6 +37,34 @@
       "show_right_panel": true,
       "show_bottom_panel": true
     }
+  },
+  "trading": {
+    "commission_rate": 0.0002,
+    "slippage": 0.001,
+    "min_trade_amount": 100,
+    "max_position_ratio": 0.8
+  },
+  "performance": {
+    "enable_gpu": false,
+    "max_memory_mb": 4096,
+    "cache_size_mb": 512,
+    "parallel_processing": true,
+    "max_threads": 4,
+    "memory_limit": 2048
+  },
+  "plugins": {
+    "auto_load": true,
+    "scan_directories": [
+      "plugins/"
+    ],
+    "enable_third_party": false
+  },
+  "app": {
+    "name": "FactorWeave-Quant ‌",
+    "version": "1.0.0",
+    "language": "zh_CN",
+    "auto_save": true,
+    "auto_save_interval": 300
   },
   "data": {
     "source": "tdx",
@@ -47,13 +90,16 @@
     ],
     "alert_enabled": true
   },
-  "performance": {
-    "max_threads": 4,
-    "memory_limit": 2048,
-    "enable_gpu": false
-  },
   "_meta": {
     "last_saved": "2025-07-07T21:20:49.133331",
     "version": "1.0"
+  },
+  "test": {
+    "port": 8080,
+    "verification_flag": true,
+    "verification_port": 8080
+  },
+  "business": {
+    "processing_enabled": true
   }
 }

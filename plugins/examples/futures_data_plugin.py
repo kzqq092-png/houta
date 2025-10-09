@@ -46,7 +46,6 @@ except ImportError:
     REQUESTS_AVAILABLE = False
     logger.error("requests 库未安装，插件无法工作")
 
-
 class FuturesDataPlugin(IDataSourcePlugin):
     """期货数据源插件"""
 
@@ -898,11 +897,9 @@ class FuturesDataPlugin(IDataSourcePlugin):
             self.logger.error(traceback.format_exc())
             return pd.DataFrame()
 
-
 def create_plugin() -> IDataSourcePlugin:
     """创建插件实例"""
     return FuturesDataPlugin()
-
 
 # 插件元数据
 PLUGIN_METADATA = {

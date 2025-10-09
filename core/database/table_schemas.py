@@ -15,14 +15,12 @@ DuckDB表结构定义
 from typing import Dict, List, Optional
 from enum import Enum
 
-
 class TableStructureType(Enum):
     """表结构类型"""
     FINANCIAL_STATEMENT = "financial_statement"
     MACRO_ECONOMIC = "macro_economic"
     KLINE_DATA = "kline_data"
     STOCK_BASIC_INFO = "stock_basic_info"
-
 
 class DuckDBTableSchemas:
     """DuckDB表结构定义类"""

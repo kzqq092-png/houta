@@ -16,7 +16,6 @@ from analysis.pattern_base import (
     PatternAlgorithmFactory, SignalType
 )
 
-
 class PatternManager:
     """形态管理器 - 增强版，支持数据库算法和统一接口"""
 

@@ -14,7 +14,6 @@ from collections import defaultdict
 
 logger = logger
 
-
 @dataclass
 class UpdateRequest:
     """更新请求"""
@@ -29,7 +28,6 @@ class UpdateRequest:
         if self.priority != other.priority:
             return self.priority < other.priority
         return self.created_time < other.created_time
-
 
 class UpdateThrottler:
     """更新节流器"""
@@ -480,10 +478,8 @@ class UpdateThrottler:
         """设置最大批量更新大小"""
         self.max_batch_size = max(1, batch_size)
 
-
 # 全局实例
 _update_throttler = None
-
 
 def get_update_throttler() -> UpdateThrottler:
     """获取全局更新节流器实例"""
@@ -492,7 +488,6 @@ def get_update_throttler() -> UpdateThrottler:
         _update_throttler = UpdateThrottler()
         _update_throttler.start()
     return _update_throttler
-
 
 def initialize_throttler(min_interval_ms: int = 150, max_batch_size: int = 50):
     """初始化全局更新节流器"""
@@ -503,7 +498,6 @@ def initialize_throttler(min_interval_ms: int = 150, max_batch_size: int = 50):
     _update_throttler.start()
     return _update_throttler
 
-
 def shutdown_throttler():
     """关闭全局更新节流器"""
     global _update_throttler
@@ -511,19 +505,16 @@ def shutdown_throttler():
         _update_throttler.stop()
         _update_throttler = None
 
-
 # 便捷函数
 def throttle_update(update_id: str, update_func: Callable, data: Any,
                     priority: int = 1, force: bool = False) -> bool:
     """节流更新便捷函数"""
     return get_update_throttler().request_update(update_id, update_func, data, priority, force)
 
-
 def debounce_update(update_id: str, update_func: Callable, data: Any,
                     delay_ms: int = 300) -> bool:
     """防抖更新便捷函数"""
     return get_update_throttler().debounce_update(update_id, update_func, data, delay_ms)
-
 
 def batch_update(batch_id: str, update_func: Callable, data: Any,
                  max_wait_ms: int = 100) -> bool:

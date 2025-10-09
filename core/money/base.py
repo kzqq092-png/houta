@@ -3,7 +3,6 @@ from typing import Dict, Any, Optional
 from hikyuu import MoneyManagerBase
 from loguru import logger
 
-
 class BaseMoneyManager(MoneyManagerBase):
     """资金管理系统基类"""
 

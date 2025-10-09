@@ -4,7 +4,6 @@
 from enum import Enum, auto
 from typing import Dict, Any
 
-
 class Theme(Enum):
     """主题枚举类型"""
     LIGHT = auto()  # 浅色主题
@@ -48,7 +47,6 @@ class Theme(Enum):
             return Theme.LIGHT  # 默认返回浅色主题
 
         return theme_map[theme_str]
-
 
 class ThemeConfig:
     """主题配置类"""

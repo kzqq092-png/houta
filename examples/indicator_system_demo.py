@@ -25,7 +25,6 @@ sys.path.insert(0, parent_dir)
 
 # 导入指标计算模块
 
-
 def load_sample_data():
     """加载示例数据"""
     # 尝试加载测试数据，如果不存在则创建随机数据
@@ -64,7 +63,6 @@ def load_sample_data():
     }, index=dates)
 
     return df
-
 
 def plot_indicators(df):
     """绘制指标图表"""
@@ -117,7 +115,6 @@ def plot_indicators(df):
 
     plt.tight_layout()
     plt.show()
-
 
 def main():
     """主函数"""
@@ -207,7 +204,6 @@ def main():
     # 绘制指标图表
     logger.info("绘制指标图表...")
     plot_indicators(df_kdj)
-
 
 if __name__ == "__main__":
     main()

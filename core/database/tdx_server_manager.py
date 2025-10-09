@@ -12,7 +12,6 @@ import json
 
 logger = logging.getLogger(__name__)
 
-
 class TdxServerDatabaseManager:
     """TDX服务器数据库管理器"""
 
@@ -486,10 +485,8 @@ class TdxServerDatabaseManager:
             logger.error(f"导入服务器列表失败: {e}")
             return 0
 
-
 # 全局数据库管理器实例
 _db_manager = None
-
 
 def get_tdx_db_manager() -> TdxServerDatabaseManager:
     """获取TDX服务器数据库管理器实例"""

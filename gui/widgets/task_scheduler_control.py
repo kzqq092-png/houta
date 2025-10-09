@@ -44,13 +44,16 @@ from PyQt5.QtGui import (
 
 # 导入核心服务
 try:
-    from core.services.import_orchestration_service import ImportOrchestrationService
+    # ImportOrchestrationService 不存在，暂时注释掉
+    # from core.services.import_orchestration_service import ImportOrchestrationService
     from core.ui_integration.ui_business_logic_adapter import get_ui_adapter
     from loguru import logger
     CORE_AVAILABLE = True
+    ImportOrchestrationService = None  # 标记为不可用
 except ImportError as e:
     logger = logging.getLogger(__name__)
     CORE_AVAILABLE = False
+    ImportOrchestrationService = None
     logger.warning(f"核心服务不可用: {e}")
 
 logger = logger.bind(module=__name__) if hasattr(logger, 'bind') else logging.getLogger(__name__)
@@ -132,7 +135,7 @@ class PriorityControlWidget(QWidget):
         layout = QVBoxLayout(self)
 
         # 优先级设置区域
-        priority_group = QGroupBox("⭐ 任务优先级设置")
+        priority_group = QGroupBox("[STAR] 任务优先级设置")
         priority_layout = QGridLayout(priority_group)
 
         # 优先级级别
@@ -174,7 +177,7 @@ class PriorityControlWidget(QWidget):
         self.duration_spin = QSpinBox()
         self.duration_spin.setRange(1, 1440)  # 1分钟到24小时
         self.duration_spin.setValue(60)
-        self.duration_spin.setSuffix(" 分钟")
+        self.duration_spin.setSuffix("分钟")
         duration_layout.addWidget(self.duration_spin)
         priority_layout.addLayout(duration_layout, 3, 1)
 
@@ -217,7 +220,7 @@ class PriorityControlWidget(QWidget):
         layout.addWidget(resource_group)
 
         # 高级选项
-        advanced_group = QGroupBox("⚙️ 高级选项")
+        advanced_group = QGroupBox("高级选项")
         advanced_layout = QFormLayout(advanced_group)
 
         # 最大重试次数
@@ -319,7 +322,7 @@ class SchedulingConfigWidget(QWidget):
         layout = QVBoxLayout(self)
 
         # 调度策略
-        strategy_group = QGroupBox("📋 调度策略")
+        strategy_group = QGroupBox("调度策略")
         strategy_layout = QVBoxLayout(strategy_group)
 
         # 策略选择
@@ -343,7 +346,7 @@ class SchedulingConfigWidget(QWidget):
         layout.addWidget(strategy_group)
 
         # 并发控制
-        concurrency_group = QGroupBox("🔄 并发控制")
+        concurrency_group = QGroupBox("并发控制")
         concurrency_layout = QFormLayout(concurrency_group)
 
         # 最大并发任务数
@@ -356,20 +359,20 @@ class SchedulingConfigWidget(QWidget):
         self.time_slice_spin = QSpinBox()
         self.time_slice_spin.setRange(100, 10000)
         self.time_slice_spin.setValue(1000)
-        self.time_slice_spin.setSuffix(" ms")
+        self.time_slice_spin.setSuffix("ms")
         concurrency_layout.addRow("时间片大小:", self.time_slice_spin)
 
         # 优先级提升间隔
         self.priority_boost_spin = QSpinBox()
         self.priority_boost_spin.setRange(60, 3600)
         self.priority_boost_spin.setValue(300)
-        self.priority_boost_spin.setSuffix(" 秒")
+        self.priority_boost_spin.setSuffix("秒")
         concurrency_layout.addRow("优先级提升间隔:", self.priority_boost_spin)
 
         layout.addWidget(concurrency_group)
 
         # 资源限制
-        resource_group = QGroupBox("💾 资源限制")
+        resource_group = QGroupBox("资源限制")
         resource_layout = QFormLayout(resource_group)
 
         # CPU限制
@@ -396,7 +399,7 @@ class SchedulingConfigWidget(QWidget):
         layout.addWidget(resource_group)
 
         # 高级设置
-        advanced_group = QGroupBox("🔧 高级设置")
+        advanced_group = QGroupBox("高级设置")
         advanced_layout = QFormLayout(advanced_group)
 
         # 启用抢占
@@ -412,14 +415,14 @@ class SchedulingConfigWidget(QWidget):
         self.queue_timeout_spin = QSpinBox()
         self.queue_timeout_spin.setRange(5, 240)
         self.queue_timeout_spin.setValue(60)
-        self.queue_timeout_spin.setSuffix(" 分钟")
+        self.queue_timeout_spin.setSuffix("分钟")
         advanced_layout.addRow("队列超时:", self.queue_timeout_spin)
 
         # 重试延迟
         self.retry_delay_spin = QSpinBox()
         self.retry_delay_spin.setRange(5, 300)
         self.retry_delay_spin.setValue(30)
-        self.retry_delay_spin.setSuffix(" 秒")
+        self.retry_delay_spin.setSuffix("秒")
         advanced_layout.addRow("重试延迟:", self.retry_delay_spin)
 
         layout.addWidget(advanced_group)
@@ -503,7 +506,7 @@ class ScheduleQueueWidget(QWidget):
         toolbar = QHBoxLayout()
 
         # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新")
+        refresh_btn = QPushButton("刷新")
         refresh_btn.clicked.connect(self.refresh_queue)
         toolbar.addWidget(refresh_btn)
 
@@ -723,19 +726,19 @@ class TaskSchedulerControl(QWidget):
 
         # 优先级控制选项卡
         priority_tab = PriorityControlWidget()
-        self.tab_widget.addTab(priority_tab, "⭐ 优先级控制")
+        self.tab_widget.addTab(priority_tab, "[STAR] 优先级控制")
 
         # 调度配置选项卡
         config_tab = SchedulingConfigWidget()
-        self.tab_widget.addTab(config_tab, "📋 调度配置")
+        self.tab_widget.addTab(config_tab, "调度配置")
 
         # 调度队列选项卡
         queue_tab = ScheduleQueueWidget()
-        self.tab_widget.addTab(queue_tab, "📊 调度队列")
+        self.tab_widget.addTab(queue_tab, "调度队列")
 
         # 监控面板选项卡
         monitor_tab = self.create_monitor_tab()
-        self.tab_widget.addTab(monitor_tab, "📈 监控面板")
+        self.tab_widget.addTab(monitor_tab, "监控面板")
 
         layout.addWidget(self.tab_widget)
 
@@ -750,7 +753,7 @@ class TaskSchedulerControl(QWidget):
         layout = QVBoxLayout(widget)
 
         # 实时统计
-        stats_group = QGroupBox("📊 实时统计")
+        stats_group = QGroupBox("实时统计")
         stats_layout = QGridLayout(stats_group)
 
         # 任务统计
@@ -790,7 +793,7 @@ class TaskSchedulerControl(QWidget):
         layout.addWidget(resource_group)
 
         # 调度器状态
-        scheduler_group = QGroupBox("⚙️ 调度器状态")
+        scheduler_group = QGroupBox("调度器状态")
         scheduler_layout = QFormLayout(scheduler_group)
 
         self.scheduler_status_label = QLabel("运行中")

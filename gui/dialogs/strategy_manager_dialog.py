@@ -322,7 +322,7 @@ def strategy_logic(data, params):
         self.initial_capital_spin = QDoubleSpinBox()
         self.initial_capital_spin.setRange(1000, 10000000)
         self.initial_capital_spin.setValue(100000)
-        self.initial_capital_spin.setSuffix(" 元")
+        self.initial_capital_spin.setSuffix("元")
         settings_layout.addRow("初始资金:", self.initial_capital_spin)
 
         # 手续费率

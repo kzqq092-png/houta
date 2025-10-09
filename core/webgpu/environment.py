@@ -18,7 +18,6 @@ import json
 
 logger = logger
 
-
 class GPUSupportLevel(Enum):
     """GPU支持级别"""
     NONE = "none"           # 无GPU支持
@@ -26,7 +25,6 @@ class GPUSupportLevel(Enum):
     WEBGL = "webgl"         # WebGL支持
     WEBGPU = "webgpu"       # WebGPU支持
     NATIVE = "native"       # 原生GPU支持
-
 
 @dataclass
 class GPUCapabilities:
@@ -47,7 +45,6 @@ class GPUCapabilities:
         if self.webgl_extensions is None:
             self.webgl_extensions = []
 
-
 @dataclass
 class EnvironmentInfo:
     """环境信息"""
@@ -60,7 +57,6 @@ class EnvironmentInfo:
     device_pixel_ratio: float = 1.0
     supports_webworkers: bool = False
     supports_offscreen_canvas: bool = False
-
 
 class WebGPUEnvironment:
     """WebGPU环境管理器"""
@@ -475,11 +471,9 @@ class WebGPUEnvironment:
         logger.info("创建OpenGL渲染上下文")
         return {"type": "opengl", "capabilities": self._gpu_capabilities}
 
-
 # 全局环境实例
 _webgpu_environment = None
 _env_lock = threading.Lock()
-
 
 def get_webgpu_environment() -> WebGPUEnvironment:
     """获取WebGPU环境实例"""
@@ -489,7 +483,6 @@ def get_webgpu_environment() -> WebGPUEnvironment:
         if _webgpu_environment is None:
             _webgpu_environment = WebGPUEnvironment()
         return _webgpu_environment
-
 
 def initialize_webgpu_environment() -> bool:
     """初始化WebGPU环境"""

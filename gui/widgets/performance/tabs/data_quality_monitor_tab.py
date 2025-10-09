@@ -24,7 +24,6 @@ from loguru import logger
 
 logger = logger
 
-
 class ModernDataQualityMonitorTab(QWidget):
     """现代化数据质量监控标签页 - 量化交易专用"""
 

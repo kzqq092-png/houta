@@ -1,0 +1,66 @@
+{
+  "timestamp": "2025-09-27T02:09:40.543846",
+  "component_analysis": [
+    {
+      "category": "核心服务",
+      "old_count": 73,
+      "new_count": 88,
+      "reduction_count": -15,
+      "reduction_percentage": -20.54794520547945,
+      "complexity_score": 0.0
+    },
+    {
+      "category": "管理器组件",
+      "old_count": 91,
+      "new_count": 3,
+      "reduction_count": 88,
+      "reduction_percentage": 96.7032967032967,
+      "complexity_score": 0.0
+    },
+    {
+      "category": "总体组件",
+      "old_count": 164,
+      "new_count": 91,
+      "reduction_count": 73,
+      "reduction_percentage": 44.51219512195122,
+      "complexity_score": 0.0
+    },
+    {
+      "category": "代码行数",
+      "old_count": 150000,
+      "new_count": 139060,
+      "reduction_count": 10940,
+      "reduction_percentage": 7.293333333333334,
+      "complexity_score": 0.0
+    }
+  ],
+  "performance_old": {
+    "startup_time": 17.5,
+    "memory_usage_mb": 800.0,
+    "response_time_ms": 150.0,
+    "concurrent_capacity": 50,
+    "thread_count": 25,
+    "cpu_usage_percent": 15.0
+  },
+  "performance_new": {
+    "startup_time": 15.90595531463623,
+    "memory_usage_mb": 509.9609375,
+    "response_time_ms": 27.75035000013304,
+    "concurrent_capacity": 48,
+    "thread_count": 11,
+    "cpu_usage_percent": 0.0
+  },
+  "quality_metrics": {
+    "code_coverage": 85.0,
+    "cyclomatic_complexity": 7.1095211391220285,
+    "maintainability_index": 75.0,
+    "technical_debt_hours": 120.0,
+    "bug_density": 0.05
+  },
+  "overall_score": 65.53780774668573,
+  "recommendations": [
+    "架构精简重构需要进一步优化",
+    "建议进一步优化组件架构，提高精简程度",
+    "建议进一步降低系统复杂度，提高可维护性"
+  ]
+}

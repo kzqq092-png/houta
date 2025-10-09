@@ -49,7 +49,6 @@ from PyQt5.QtGui import (
 try:
     from core.ai.config_recommendation_engine import ConfigRecommendationEngine
     from core.ai.config_impact_analyzer import ConfigImpactAnalyzer
-    from core.importdata.intelligent_config_manager import IntelligentConfigManager
     from core.ui_integration.ui_business_logic_adapter import get_ui_adapter
     from loguru import logger
     CORE_AVAILABLE = True
@@ -253,7 +252,7 @@ class RecommendationCard(QWidget):
         buttons_layout.addWidget(preview_btn)
 
         # 应用按钮
-        apply_btn = QPushButton("✅ 应用推荐")
+        apply_btn = QPushButton("应用推荐")
         if self.recommendation.applied:
             apply_btn.setText("✓ 已应用")
             apply_btn.setEnabled(False)
@@ -635,8 +634,7 @@ class ConfigRecommendationPanel(QWidget):
         if CORE_AVAILABLE:
             try:
                 self.ui_adapter = get_ui_adapter()
-                self.config_manager = IntelligentConfigManager()
-                self.recommendation_engine = ConfigRecommendationEngine(self.config_manager)
+                self.config_manager = None                  self.recommendation_engine = ConfigRecommendationEngine(self.config_manager)
                 self.impact_analyzer = ConfigImpactAnalyzer()
             except Exception as e:
                 logger.warning(f"核心服务初始化失败: {e}")
@@ -659,7 +657,7 @@ class ConfigRecommendationPanel(QWidget):
         # 标题和控制区域
         header_layout = QHBoxLayout()
 
-        title_label = QLabel("💡 智能配置推荐")
+        title_label = QLabel("[INFO] 智能配置推荐")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -673,7 +671,7 @@ class ConfigRecommendationPanel(QWidget):
         header_layout.addStretch()
 
         # 获取推荐按钮
-        get_recommendations_btn = QPushButton("🔄 获取新推荐")
+        get_recommendations_btn = QPushButton("获取新推荐")
         get_recommendations_btn.clicked.connect(self.get_recommendations)
         get_recommendations_btn.setStyleSheet("""
             QPushButton {
@@ -722,7 +720,7 @@ class ConfigRecommendationPanel(QWidget):
         filter_layout.addStretch()
 
         # 批量操作
-        batch_apply_btn = QPushButton("✅ 批量应用")
+        batch_apply_btn = QPushButton("批量应用")
         batch_apply_btn.clicked.connect(self.batch_apply)
         batch_apply_btn.setStyleSheet("""
             QPushButton {
@@ -756,7 +754,7 @@ class ConfigRecommendationPanel(QWidget):
         layout.addWidget(self.scroll_area)
 
         # 统计信息
-        stats_group = QGroupBox("📊 推荐统计")
+        stats_group = QGroupBox("推荐统计")
         stats_layout = QGridLayout(stats_group)
 
         # 总推荐数
@@ -1084,7 +1082,7 @@ class ConfigRecommendationPanel(QWidget):
         layout.addWidget(list_widget)
 
         # 警告
-        warning_label = QLabel("⚠️ 批量应用将同时修改多个系统配置，请确保您了解所有变更的影响。")
+        warning_label = QLabel("批量应用将同时修改多个系统配置，请确保您了解所有变更的影响。")
         warning_label.setStyleSheet("color: #e67e22; font-weight: bold;")
         warning_label.setWordWrap(True)
         layout.addWidget(warning_label)

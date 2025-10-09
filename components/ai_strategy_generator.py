@@ -10,7 +10,6 @@ from core.services.trading_service import TradingService
 
 logger = logger
 
-
 def run_backtest(params):
     """
     运行回测 - 使用服务架构

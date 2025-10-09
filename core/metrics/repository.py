@@ -20,7 +20,6 @@ except IndexError:
 DB_FILE = PROJECT_ROOT / "db" / "metrics.sqlite"
 DB_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-
 class MetricsRepository:
     """
     指标数据仓储

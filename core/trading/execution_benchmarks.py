@@ -11,7 +11,6 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from loguru import logger
 
-
 class ExecutionBenchmarks:
     """交易执行基准计算器"""
 
@@ -286,9 +285,9 @@ class ExecutionBenchmarks:
         """
         try:
             # 尝试从数据管理器获取K线数据
-            from core.services.unified_data_manager import UnifiedDataManager
+            from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
 
-            data_manager = UnifiedDataManager()
+            data_manager = get_unified_data_manager()
             kdata = data_manager.get_kdata(
                 symbol=symbol,
                 start_date=start_time.strftime('%Y-%m-%d'),
@@ -343,10 +342,8 @@ class ExecutionBenchmarks:
                 'low': 0.0
             }
 
-
 # 全局实例
 _execution_benchmarks = None
-
 
 def get_execution_benchmarks() -> ExecutionBenchmarks:
     """获取执行基准计算器实例"""

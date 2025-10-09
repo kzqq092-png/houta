@@ -29,7 +29,6 @@ from PyQt5.QtGui import QFont, QColor, QPalette, QIcon, QPixmap
 
 logger = logger.bind(module=__name__)
 
-
 class ServerDiscoveryWorker(QThread):
     """服务器发现工作线程"""
 
@@ -103,7 +102,6 @@ class ServerDiscoveryWorker(QThread):
         """停止发现"""
         self.running = False
 
-
 class ServerTestWorker(QThread):
     """服务器测试工作线程"""
 
@@ -156,7 +154,6 @@ class ServerTestWorker(QThread):
         """停止测试"""
         self.running = False
 
-
 class AddServerDialog(QDialog):
     """添加服务器对话框"""
 
@@ -197,7 +194,6 @@ class AddServerDialog(QDialog):
     def get_server_info(self):
         """获取服务器信息"""
         return self.host_edit.text().strip(), self.port_spinbox.value()
-
 
 class TdxServerManagerWidget(QWidget):
     """TDX服务器管理器widget"""

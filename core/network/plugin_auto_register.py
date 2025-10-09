@@ -12,7 +12,6 @@ from core.network.plugin_network_registry import get_plugin_network_registry, au
 
 logger = logging.getLogger(__name__)
 
-
 class PluginAutoRegister:
     """插件自动注册器"""
     
@@ -214,10 +213,8 @@ class PluginAutoRegister:
         
         return recommendations
 
-
 # 全局自动注册器实例
 _plugin_auto_register = None
-
 
 def get_plugin_auto_register() -> PluginAutoRegister:
     """获取插件自动注册器实例"""
@@ -226,18 +223,15 @@ def get_plugin_auto_register() -> PluginAutoRegister:
         _plugin_auto_register = PluginAutoRegister()
     return _plugin_auto_register
 
-
 def initialize_plugin_network_configs() -> Dict[str, bool]:
     """初始化所有插件的网络配置"""
     auto_register = get_plugin_auto_register()
     return auto_register.register_all_plugins()
 
-
 async def initialize_plugin_network_configs_async() -> Dict[str, bool]:
     """异步初始化所有插件的网络配置"""
     auto_register = get_plugin_auto_register()
     return await auto_register.register_all_plugins_async()
-
 
 def get_network_config_summary() -> Dict[str, Any]:
     """获取网络配置摘要信息"""

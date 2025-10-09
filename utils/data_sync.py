@@ -7,7 +7,6 @@ This module provides classes for managing data synchronization.
 from typing import Dict, Any, Optional
 from PyQt5.QtCore import QObject, pyqtSignal, QMutex, QMutexLocker, QWaitCondition
 
-
 class DataSynchronizer(QObject):
     """Manages data synchronization between components"""
 
@@ -53,7 +52,6 @@ class DataSynchronizer(QObject):
             self.data_store.clear()
             self.sync_complete = False
 
-
 class SyncManager:
     """High-level manager for data synchronization"""
 
@@ -90,7 +88,6 @@ class SyncManager:
         with QMutexLocker(self.mutex):
             for synchronizer in self.synchronizers.values():
                 synchronizer.clear_data()
-
 
 class SyncComponent:
     """Base class for components that need synchronization"""

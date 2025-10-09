@@ -13,7 +13,6 @@ from dataclasses import dataclass
 import warnings
 # 纯Loguru架构，移除旧的日志导入
 
-
 class BacktestValidationLevel(Enum):
     """回测验证级别枚举"""
     BASIC = "basic"              # 基础验证
@@ -21,14 +20,12 @@ class BacktestValidationLevel(Enum):
     STRICT = "strict"            # 严格验证
     PROFESSIONAL = "professional"  # 专业级验证
 
-
 class BacktestDataQuality(Enum):
     """回测数据质量等级"""
     EXCELLENT = "excellent"      # 优秀 (95-100%)
     GOOD = "good"               # 良好 (85-94%)
     FAIR = "fair"               # 一般 (70-84%)
     POOR = "poor"               # 较差 (<70%)
-
 
 @dataclass
 class BacktestValidationResult:
@@ -41,7 +38,6 @@ class BacktestValidationResult:
     suggestions: List[str]
     metrics: Dict[str, Any]
     validation_time: datetime
-
 
 class ProfessionalBacktestValidator:
     """
@@ -572,7 +568,6 @@ class ProfessionalBacktestValidator:
 
 # 便捷函数
 
-
 def create_backtest_validator(validation_level: BacktestValidationLevel = BacktestValidationLevel.PROFESSIONAL) -> ProfessionalBacktestValidator:
     """
     创建回测验证器实例
@@ -584,7 +579,6 @@ def create_backtest_validator(validation_level: BacktestValidationLevel = Backte
         ProfessionalBacktestValidator: 回测验证器实例
     """
     return ProfessionalBacktestValidator(validation_level=validation_level)
-
 
 def validate_backtest_data(data: pd.DataFrame, signal_col: str = 'signal',
                            stock_code: str = None) -> BacktestValidationResult:
@@ -601,7 +595,6 @@ def validate_backtest_data(data: pd.DataFrame, signal_col: str = 'signal',
     """
     validator = create_backtest_validator()
     return validator.validate_backtest_data(data, signal_col, stock_code)
-
 
 def validate_backtest_parameters(params: Dict[str, Any]) -> BacktestValidationResult:
     """

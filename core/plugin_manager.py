@@ -44,9 +44,9 @@ except ImportError:
     # 如果直接导入失败，尝试使用相对路径
     try:
         sys.path.append(str(project_root))
-        from hikyuu_ui.plugins.plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
-        from hikyuu_ui.plugins.plugin_market import PluginMarket
-        logger.info("使用hikyuu_ui前缀成功导入插件接口和市场模块")
+        from plugins.plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
+        from plugins.plugin_market import PluginMarket
+        logger.info("成功导入插件接口和市场模块")
     except ImportError:
         # 尝试使用绝对路径
         try:
@@ -224,7 +224,7 @@ class PluginManager(QObject):
         try:
             from core.services.plugin_database_service import PluginDatabaseService
             self.db_service = PluginDatabaseService()
-            logger.info(" 插件数据库服务初始化成功")
+            logger.info("插件数据库服务初始化成功")
 
             # 加载数据库中已启用的插件
             self._load_enabled_plugins_from_db()
@@ -282,7 +282,7 @@ class PluginManager(QObject):
             if enabled_count > 0:
                 logger.info(f" 从数据库加载了 {enabled_count} 个已启用的插件")
             else:
-                logger.info(" 数据库中没有已启用的插件")
+                logger.info("数据库中没有已启用的插件")
 
         except Exception as e:
             logger.error(f" 从数据库加载插件失败: {e}")
@@ -334,7 +334,8 @@ class PluginManager(QObject):
         # 数据源插件需要加载真实实例
         data_source_keywords = [
             'akshare', 'wind', 'tushare', 'yahoo', 'bond', 'forex',
-            'mysteel', 'wenhua', 'tongdaxin', 'custom_data', 'hikyuu_data'
+            'mysteel', 'wenhua', 'tongdaxin', 'custom_data', 'hikyuu_data',
+            'eastmoney', 'sina'  # 添加eastmoney和sina关键字
         ]
 
         plugin_name_lower = plugin_name.lower()
@@ -711,7 +712,7 @@ class PluginManager(QObject):
             if registered_count > 0:
                 logger.info(f" 成功注册了 {registered_count} 个数据源插件到统一数据管理器")
             else:
-                logger.info(" 未发现可注册的数据源插件")
+                logger.info("未发现可注册的数据源插件")
 
         except Exception as e:
             logger.error(f"注册数据源插件到管理器失败: {e}")
@@ -2016,7 +2017,8 @@ class PluginManager(QObject):
         try:
             # 需要排除的类型名称
             excluded_class_names = [
-                "IPlugin", "PluginType", "PluginCategory", "PluginMetadata", "PluginContext"]
+                "IPlugin", "PluginType", "PluginCategory", "PluginMetadata", "PluginContext",
+                "PluginConfig", "EastMoneyConfig", "SinaConfig", "StandardDataSourcePlugin"]
 
             # 首先检查是否有使用装饰器标记的插件类
             for attr_name in dir(module):
@@ -2737,6 +2739,5 @@ class PluginManager(QObject):
         except Exception as e:
             logger.error(f"同步插件状态到数据库失败: {e}")
             return {}
-
 
 # BasePlugin 类已移除 - 未被使用，请使用 IPlugin 接口

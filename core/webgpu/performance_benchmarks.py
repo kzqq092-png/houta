@@ -28,7 +28,6 @@ import numpy as np
 
 logger = logger
 
-
 class BenchmarkType(Enum):
     """基准测试类型"""
     RENDERING = "rendering"      # 渲染性能
@@ -37,7 +36,6 @@ class BenchmarkType(Enum):
     FRAME_RATE = "framerate"    # 帧率
     COMPARISON = "comparison"   # 对比测试
 
-
 class RenderingEngine(Enum):
     """渲染引擎类型"""
     WEBGPU = "webgpu"
@@ -45,7 +43,6 @@ class RenderingEngine(Enum):
     CANVAS2D = "canvas2d"
     MATPLOTLIB = "matplotlib"
     SOFTWARE = "software"
-
 
 @dataclass
 class PerformanceMetrics:
@@ -75,7 +72,6 @@ class PerformanceMetrics:
     avg_frame_time: float = 0.0
     frame_time_std: float = 0.0
 
-
 @dataclass
 class BenchmarkConfig:
     """基准测试配置"""
@@ -88,7 +84,6 @@ class BenchmarkConfig:
     enable_gpu_monitoring: bool = True
     warm_up_time: int = 5
     cooldown_time: int = 2
-
 
 @dataclass
 class BenchmarkResult:
@@ -104,7 +99,6 @@ class BenchmarkResult:
     success: bool = True
     error_message: str = ""
 
-
 @dataclass
 class ComparisonResult:
     """对比测试结果"""
@@ -113,7 +107,6 @@ class ComparisonResult:
     performance_improvement: float  # 百分比改进
     memory_improvement: float
     detailed_comparison: Dict[str, float] = field(default_factory=dict)
-
 
 class MemoryMonitor:
     """内存监控器"""
@@ -200,7 +193,6 @@ class MemoryMonitor:
         # TODO: 添加AMD和Intel GPU内存监控支持
         return None
 
-
 class FrameRateMonitor:
     """帧率监控器"""
 
@@ -251,7 +243,6 @@ class FrameRateMonitor:
 
         logger.info(f"帧率监控已停止，统计结果: {stats}")
         return stats
-
 
 class GPUMonitor:
     """GPU监控器"""
@@ -346,7 +337,6 @@ class GPUMonitor:
 
         # TODO: 添加AMD和Intel GPU监控支持
         return stats
-
 
 class RenderingBenchmark:
     """渲染性能基准测试"""
@@ -477,7 +467,6 @@ class RenderingBenchmark:
             render_function()
             time.sleep(0.016)  # ~60 FPS
 
-
 class ComparisonBenchmark:
     """对比基准测试"""
 
@@ -567,7 +556,6 @@ class ComparisonBenchmark:
             improvement = -improvement
 
         return improvement
-
 
 class PerformanceBenchmarkSuite:
     """性能基准测试套件"""
@@ -739,7 +727,6 @@ class PerformanceBenchmarkSuite:
         except Exception as e:
             logger.error(f"保存性能报告失败: {e}")
 
-
 # 快捷函数
 def run_quick_performance_test(render_function: Callable[[], None],
                                engine: RenderingEngine = RenderingEngine.WEBGPU) -> BenchmarkResult:
@@ -747,7 +734,6 @@ def run_quick_performance_test(render_function: Callable[[], None],
     config = BenchmarkConfig(test_duration_seconds=10, warm_up_time=2)
     benchmark = RenderingBenchmark(config)
     return benchmark.run_rendering_test(engine, render_function)
-
 
 def compare_webgpu_vs_traditional(webgpu_function: Callable[[], None],
                                   traditional_function: Callable[[], None]) -> ComparisonResult:
@@ -758,7 +744,6 @@ def compare_webgpu_vs_traditional(webgpu_function: Callable[[], None],
         RenderingEngine.MATPLOTLIB, RenderingEngine.WEBGPU,
         traditional_function, webgpu_function
     )
-
 
 if __name__ == "__main__":
     # 性能测试示例

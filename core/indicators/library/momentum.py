@@ -19,7 +19,6 @@ except ImportError:
     talib = None
     TALIB_AVAILABLE = False
 
-
 def calculate_ema(df: pd.DataFrame, timeperiod: int = 20) -> pd.DataFrame:
     """
     计算指数移动平均线(EMA)
@@ -47,7 +46,6 @@ def calculate_ema(df: pd.DataFrame, timeperiod: int = 20) -> pd.DataFrame:
         result['EMA'] = pd.Series([float('nan')] * len(df), index=df.index)
 
     return result
-
 
 def calculate_roc(df: pd.DataFrame, timeperiod: int = 10) -> pd.DataFrame:
     """

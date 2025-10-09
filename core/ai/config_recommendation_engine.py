@@ -34,7 +34,6 @@ warnings.filterwarnings('ignore')
 from ..importdata.import_config_manager import ImportTaskConfig, DataFrequency, ImportMode
 from ..services.ai_prediction_service import AIPredictionService
 
-
 class RecommendationStrategy(Enum):
     """推荐策略类型"""
     PERFORMANCE_FIRST = "performance_first"    # 性能优先
@@ -44,7 +43,6 @@ class RecommendationStrategy(Enum):
     CONSERVATIVE = "conservative"               # 保守策略
     AGGRESSIVE = "aggressive"                   # 激进策略
 
-
 class OptimizationObjective(Enum):
     """优化目标"""
     MINIMIZE_TIME = "minimize_time"             # 最小化执行时间
@@ -52,7 +50,6 @@ class OptimizationObjective(Enum):
     MINIMIZE_ERROR_RATE = "minimize_error_rate" # 最小化错误率
     MAXIMIZE_SUCCESS_RATE = "maximize_success_rate" # 最大化成功率
     MINIMIZE_RESOURCE_USAGE = "minimize_resource_usage" # 最小化资源使用
-
 
 @dataclass
 class ConfigRecommendation:
@@ -64,7 +61,6 @@ class ConfigRecommendation:
     alternative_configs: List[Dict[str, Any]] = field(default_factory=list)
     risk_assessment: Dict[str, float] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-
 
 @dataclass
 class PerformanceFeatures:
@@ -82,7 +78,6 @@ class PerformanceFeatures:
     time_of_day: int
     is_business_hours: bool
 
-
 @dataclass
 class PerformanceTarget:
     """性能目标"""
@@ -92,7 +87,6 @@ class PerformanceTarget:
     throughput: float
     cpu_utilization: float
     memory_utilization: float
-
 
 class ConfigRecommendationEngine:
     """
@@ -1114,7 +1108,6 @@ class ConfigRecommendationEngine:
             self.recommendation_cache.clear()
         logger.info("推荐缓存已清空")
 
-
 def main():
     """测试配置推荐引擎"""
     from ..importdata.import_config_manager import DataFrequency, ImportMode
@@ -1196,7 +1189,6 @@ def main():
     model_performance = engine.get_model_performance()
     for target, metrics in model_performance.items():
         logger.info(f"{target} 模型性能: R²={metrics['r2']:.3f}, MSE={metrics['mse']:.3f}, 样本数={metrics['samples']}")
-
 
 if __name__ == "__main__":
     main()

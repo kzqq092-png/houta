@@ -62,7 +62,6 @@ html_css_files = [
     'style.css',
 ]
 
-
 html_use_index = True
 html_search_language = 'zh'
 htmlhelp_basename = 'Hikyuudoc'

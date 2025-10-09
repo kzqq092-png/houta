@@ -21,7 +21,6 @@ from core.plugin_types import PluginType, PluginCategory
 from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
-
 class MultiSourceSentimentPlugin(BaseSentimentPlugin):
     """多源情绪数据插件"""
 
@@ -413,12 +412,10 @@ class MultiSourceSentimentPlugin(BaseSentimentPlugin):
             "加密市场情绪"
         ]
 
-
 # 插件工厂函数
 def create_multi_source_sentiment_plugin() -> MultiSourceSentimentPlugin:
     """创建多源情绪数据插件实例"""
     return MultiSourceSentimentPlugin()
-
 
 if __name__ == "__main__":
     # 测试插件

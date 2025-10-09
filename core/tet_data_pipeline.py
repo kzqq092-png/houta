@@ -23,7 +23,6 @@ from .data.field_mapping_engine import FieldMappingEngine
 
 logger = logger
 
-
 @dataclass
 class StandardQuery:
     """标准化查询请求"""
@@ -48,7 +47,6 @@ class StandardQuery:
         if self.extra_params is None:
             self.extra_params = {}
 
-
 @dataclass
 class StandardData:
     """标准化数据输出"""
@@ -57,7 +55,8 @@ class StandardData:
     source_info: Dict[str, Any]
     query: StandardQuery
     processing_time_ms: float = 0.0
-
+    success: bool = True  # 处理是否成功
+    error_message: Optional[str] = None  # 错误信息（如有）
 
 @dataclass
 class FailoverResult:
@@ -68,7 +67,6 @@ class FailoverResult:
     successful_source: Optional[str]
     error_messages: List[str]
     total_time_ms: float
-
 
 class TETDataPipeline:
     """
@@ -1060,7 +1058,6 @@ class TETDataPipeline:
 
         self.logger.info("TET数据管道已清理完成")
 
-
 class HistoryDataStrategy:
     """历史数据加载策略"""
 
@@ -1077,7 +1074,6 @@ class HistoryDataStrategy:
         except Exception as e:
             logger.error(f"Error loading historical data: {e}")
             return None
-
 
 class RealtimeDataStrategy:
     """实时数据加载策略"""

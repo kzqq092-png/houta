@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-09-28T21:43:44.106466",
+  "backup_location": "deployment/backup_20250928_214344",
+  "rollback_steps": [
+    "1. 停止当前运行的服务",
+    "2. 恢复备份的配置文件",
+    "3. 恢复备份的代码文件",
+    "4. 重新安装之前的依赖版本",
+    "5. 重启服务并验证功能"
+  ],
+  "rollback_script": "rollback_deployment.sh",
+  "emergency_contacts": [
+    "系统管理员: admin@company.com",
+    "开发团队: dev@company.com"
+  ]
+}

@@ -14,7 +14,6 @@ from PyQt5.QtCore import Qt, pyqtSignal
 
 logger = logger
 
-
 class Converter(QDialog):
     """单位转换器对话框"""
 
@@ -258,7 +257,6 @@ class Converter(QDialog):
         """显示转换器对话框"""
         converter = Converter(parent)
         converter.exec_()
-
 
 if __name__ == "__main__":
     import sys

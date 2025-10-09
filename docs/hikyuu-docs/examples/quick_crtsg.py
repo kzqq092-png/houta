@@ -10,7 +10,6 @@
 from hikyuu import *
 from loguru import logger
 
-
 def TurtleSG(self, k):
     n = self.get_param("n")
     c = CLOSE(k)
@@ -21,7 +20,6 @@ def TurtleSG(self, k):
             self._add_buy_signal(k[i].datetime)
         elif (c[i] <= L[i]):
             self._add_sell_signal(k[i].datetime)
-
 
 if __name__ == "__main__":
     from examples_init import *

@@ -683,7 +683,7 @@ class AutoTuner:
                 "history_count": len(self.tuning_history),
                 "parameters": {}
             }
-            
+
             # 添加每个参数的状态
             for param_name, tuning_state in self.tuning_params.items():
                 status["parameters"][param_name] = {
@@ -694,15 +694,15 @@ class AutoTuner:
                     "direction": tuning_state.direction.value if hasattr(tuning_state, 'direction') else "stable",
                     "momentum": getattr(tuning_state, 'momentum', 0)
                 }
-            
+
             # 计算调优进度
             if status["total_params"] > 0:
                 status["progress"] = (status["tuned_params"] / status["total_params"]) * 100
             else:
                 status["progress"] = 0
-                
+
             return status
-            
+
         except Exception as e:
             logger.error(f"获取AutoTuner状态失败: {e}")
             return {

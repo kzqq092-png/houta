@@ -11,7 +11,6 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-
 def show_missing_table_types():
     """显示量化系统中缺失的重要表类型"""
 
@@ -139,7 +138,6 @@ def show_missing_table_types():
     print("3. 考虑表之间的关联关系和数据一致性")
     print("4. 针对高频数据优化索引和分区策略")
 
-
 def show_existing_table_issues():
     """显示现有表结构的问题"""
 
@@ -210,7 +208,6 @@ def show_existing_table_issues():
             print(f"   - {issue}")
         print()
 
-
 def show_datatype_mapping_issues():
     """显示DataType映射不一致问题"""
 
@@ -248,7 +245,6 @@ def show_datatype_mapping_issues():
     print("2. 统一命名规范（单数vs复数）")
     print("3. 确保DataType到TableType的映射完整性")
 
-
 def main():
     """主函数"""
     print("🎯 量化系统表结构深度分析工具")
@@ -278,7 +274,6 @@ def main():
     print("3. 完善DataType到TableType的映射")
     print("4. 添加表关系约束和业务逻辑")
     print("5. 优化索引和分区策略")
-
 
 if __name__ == "__main__":
     main()

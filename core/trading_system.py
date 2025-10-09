@@ -16,7 +16,6 @@ from core.performance import measure_performance as monitor_performance
 
 logger = logger
 
-
 class TradingSystem:
     """
     交易系统类 - 重构版本
@@ -54,8 +53,7 @@ class TradingSystem:
             self._trading_service = self.service_container.resolve(TradingService)
 
             # 获取指标服务
-            from .services.unified_indicator_service import UnifiedIndicatorService
-            self._unified_indicator_service = self.service_container.resolve(UnifiedIndicatorService)
+                        self._unified_indicator_service = self.service_container.resolve(UnifiedIndicatorService)
 
             logger.info("交易系统服务依赖初始化完成")
 
@@ -366,22 +364,18 @@ class TradingSystem:
             logger.error(f"获取资金流向失败: {str(e)}")
             return {}
 
-
 # 创建全局交易系统实例的工厂函数
 def create_trading_system(service_container: ServiceContainer = None) -> TradingSystem:
     """创建交易系统实例"""
     return TradingSystem(service_container)
 
-
 # 保持向后兼容性的全局实例
 trading_system = None
-
 
 def get_trading_system() -> Optional[TradingSystem]:
     """获取全局交易系统实例"""
     global trading_system
     return trading_system
-
 
 def initialize_trading_system(service_container: ServiceContainer) -> TradingSystem:
     """初始化全局交易系统实例"""

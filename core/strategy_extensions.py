@@ -16,7 +16,6 @@ from datetime import datetime
 
 logger = logger
 
-
 class StrategyType(Enum):
     """策略类型"""
     TREND_FOLLOWING = "trend_following"
@@ -31,7 +30,6 @@ class StrategyType(Enum):
     HIGH_FREQUENCY = "high_frequency"
     CUSTOM = "custom"
 
-
 class SignalType(Enum):
     """信号类型"""
     BUY = "buy"
@@ -40,7 +38,6 @@ class SignalType(Enum):
     CLOSE_LONG = "close_long"
     CLOSE_SHORT = "close_short"
 
-
 class TradeAction(Enum):
     """交易动作"""
     OPEN_LONG = "open_long"
@@ -48,7 +45,6 @@ class TradeAction(Enum):
     CLOSE_LONG = "close_long"
     CLOSE_SHORT = "close_short"
     ADJUST = "adjust"
-
 
 class TradeStatus(Enum):
     """交易状态"""
@@ -60,7 +56,6 @@ class TradeStatus(Enum):
     REJECTED = "rejected"
     ERROR = "error"
 
-
 class StrategyLifecycle(Enum):
     """策略生命周期"""
     CREATED = "created"
@@ -70,14 +65,12 @@ class StrategyLifecycle(Enum):
     STOPPED = "stopped"
     ERROR = "error"
 
-
 class RiskLevel(Enum):
     """风险等级"""
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     EXTREME = "extreme"
-
 
 class AssetType(Enum):
     """资产类型"""
@@ -90,7 +83,6 @@ class AssetType(Enum):
     CRYPTO = "crypto"
     FUTURES = "futures"
     OPTIONS = "options"
-
 
 class TimeFrame(Enum):
     """时间周期"""
@@ -106,7 +98,6 @@ class TimeFrame(Enum):
     WEEK_1 = "1w"
     MONTH_1 = "1M"
 
-
 @dataclass
 class ParameterDef:
     """策略参数定义"""
@@ -118,7 +109,6 @@ class ParameterDef:
     max_value: Optional[Union[int, float]] = None
     choices: Optional[List[Any]] = None
     required: bool = True
-
 
 @dataclass
 class StrategyInfo:
@@ -137,7 +127,6 @@ class StrategyInfo:
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-
 @dataclass
 class Signal:
     """交易信号"""
@@ -154,7 +143,6 @@ class Signal:
     position_size: Optional[float] = None
     confidence: float = 1.0
 
-
 @dataclass
 class Position:
     """持仓信息"""
@@ -167,7 +155,6 @@ class Position:
     realized_pnl: float
     timestamp: datetime
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class TradeResult:
@@ -182,7 +169,6 @@ class TradeResult:
     status: TradeStatus
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class PerformanceMetrics:
@@ -201,7 +187,6 @@ class PerformanceMetrics:
     start_date: datetime
     end_date: datetime
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class StandardMarketData:
@@ -251,7 +236,6 @@ class StandardMarketData:
         df = pd.DataFrame(data, index=self.datetime)
         return df
 
-
 @dataclass
 class StrategyContext:
     """策略执行上下文"""
@@ -264,7 +248,6 @@ class StrategyContext:
     slippage: float = 0.001
     benchmark: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 class IStrategyPlugin(ABC):
     """策略插件接口"""
@@ -342,7 +325,6 @@ class IStrategyPlugin(ABC):
 
         return True, ""
 
-
 class StrategyPluginAdapter:
     """策略插件适配器"""
 
@@ -418,7 +400,6 @@ class StrategyPluginAdapter:
             'error_count': self._error_count,
             'last_activity': self._last_activity.isoformat() if self._last_activity else None
         }
-
 
 def validate_strategy_plugin_interface(plugin_instance) -> bool:
     """验证插件是否实现了必要的IStrategyPlugin接口"""

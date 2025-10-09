@@ -15,7 +15,6 @@ from PyQt5.QtGui import QFont
 
 logger = logger
 
-
 class Calculator(QDialog):
     """计算器对话框"""
 
@@ -228,7 +227,6 @@ class Calculator(QDialog):
         """显示计算器对话框"""
         calculator = Calculator(parent)
         calculator.exec_()
-
 
 if __name__ == "__main__":
     import sys

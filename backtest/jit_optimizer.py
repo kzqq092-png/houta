@@ -11,7 +11,6 @@ from typing import Tuple
 import os
 from pathlib import Path
 
-
 class JITOptimizer:
     """JIT编译优化器"""
 
@@ -87,7 +86,6 @@ class JITOptimizer:
         """获取预编译的函数"""
         return self._compiled_functions.get(name)
 
-
 # 优化的回测核心函数
 @njit(cache=True, fastmath=True, parallel=False)  # 序列依赖，不能并行
 def optimized_backtest_core(prices: np.ndarray, signals: np.ndarray,
@@ -136,7 +134,6 @@ def optimized_backtest_core(prices: np.ndarray, signals: np.ndarray,
 
     return positions, capital, returns
 
-
 # 并行优化的风险指标计算
 @njit(cache=True, fastmath=True, parallel=True)
 def calculate_sharpe_ratio_jit(returns: np.ndarray, risk_free_rate: float = 0.02) -> float:
@@ -156,7 +153,6 @@ def calculate_sharpe_ratio_jit(returns: np.ndarray, risk_free_rate: float = 0.02
 
     return (annualized_return - risk_free_rate) / annualized_std
 
-
 @njit(cache=True, fastmath=True)
 def calculate_max_drawdown_jit(returns: np.ndarray) -> float:
     """计算最大回撤（JIT优化）"""
@@ -175,7 +171,6 @@ def calculate_max_drawdown_jit(returns: np.ndarray) -> float:
 
     return np.min(drawdown)
 
-
 @njit(cache=True, fastmath=True, parallel=True)
 def calculate_volatility_jit(returns: np.ndarray) -> float:
     """计算波动率（JIT优化）"""
@@ -183,7 +178,6 @@ def calculate_volatility_jit(returns: np.ndarray) -> float:
         return 0.0
 
     return np.std(returns) * np.sqrt(252)
-
 
 # 技术指标函数
 @njit(cache=True, fastmath=True, parallel=True)
@@ -196,7 +190,6 @@ def moving_average_jit(prices: np.ndarray, window: int) -> np.ndarray:
         ma[i] = np.mean(prices[i-window+1:i+1])
 
     return ma
-
 
 @njit(cache=True, fastmath=True)
 def rsi_jit(prices: np.ndarray, window: int = 14) -> np.ndarray:
@@ -231,7 +224,6 @@ def rsi_jit(prices: np.ndarray, window: int = 14) -> np.ndarray:
 
     return rsi
 
-
 # 批量计算优化
 @njit(cache=True, fastmath=True, parallel=True)
 def batch_calculate_metrics(returns_matrix: np.ndarray) -> np.ndarray:
@@ -255,7 +247,6 @@ def batch_calculate_metrics(returns_matrix: np.ndarray) -> np.ndarray:
         metrics[i, 3] = np.prod(1 + returns) - 1
 
     return metrics
-
 
 # 全局JIT优化器实例
 jit_optimizer = JITOptimizer()

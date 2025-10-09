@@ -18,13 +18,11 @@ import threading
 
 logger = logger
 
-
 class WorkloadType(Enum):
     """工作负载类型"""
     OLAP = "olap"      # 分析型工作负载
     OLTP = "oltp"      # 事务型工作负载
     MIXED = "mixed"    # 混合工作负载
-
 
 @dataclass
 class DuckDBConfig:
@@ -50,7 +48,6 @@ class DuckDBConfig:
             'checkpoint_threshold': self.checkpoint_threshold,
             'wal_autocheckpoint': self.wal_autocheckpoint
         }
-
 
 class DuckDBPerformanceOptimizer:
     """DuckDB性能优化器"""
@@ -111,57 +108,106 @@ class DuckDBPerformanceOptimizer:
 
     def _generate_config_for_workload(self, workload_type: WorkloadType) -> DuckDBConfig:
         """为工作负载生成配置"""
+        try:
+            # 基础内存配置（保守策略，使用70%系统内存）
+            # 添加安全检查
+            if not hasattr(self, 'system_memory_gb') or self.system_memory_gb <= 0:
+                logger.warning("系统内存信息无效，使用默认值")
+                self.system_memory_gb = 16.0  # 默认16GB
+            
+            if not hasattr(self, 'cpu_cores') or self.cpu_cores <= 0:
+                logger.warning("CPU核心数无效，使用默认值")
+                self.cpu_cores = 4  # 默认4核
+            
+            memory_limit_gb = max(2.0, self.system_memory_gb * 0.7)
+            max_memory_gb = max(4.0, self.system_memory_gb * 0.8)
 
-        # 基础内存配置（保守策略，使用70%系统内存）
-        memory_limit_gb = max(2.0, self.system_memory_gb * 0.7)
-        max_memory_gb = max(4.0, self.system_memory_gb * 0.8)
+            # 线程配置
+            if workload_type == WorkloadType.OLAP:
+                # OLAP: 使用更多线程进行并行分析
+                threads = min(self.cpu_cores, 16)  # 最多16线程
+            elif workload_type == WorkloadType.OLTP:
+                # OLTP: 使用较少线程减少竞争
+                threads = min(self.cpu_cores // 2, 8)  # 最多8线程
+            else:  # MIXED
+                # 混合: 平衡配置
+                threads = min(self.cpu_cores, 12)  # 最多12线程
 
-        # 线程配置
-        if workload_type == WorkloadType.OLAP:
-            # OLAP: 使用更多线程进行并行分析
-            threads = min(self.cpu_cores, 16)  # 最多16线程
-        elif workload_type == WorkloadType.OLTP:
-            # OLTP: 使用较少线程减少竞争
-            threads = min(self.cpu_cores // 2, 8)  # 最多8线程
-        else:  # MIXED
-            # 混合: 平衡配置
-            threads = min(self.cpu_cores, 12)  # 最多12线程
+            # 临时目录配置
+            try:
+                temp_dir = str(self.db_path.parent / "temp")
+                Path(temp_dir).mkdir(exist_ok=True, parents=True)
+            except Exception as e:
+                logger.warning(f"创建临时目录失败: {e}，使用默认路径")
+                temp_dir = "temp"
 
-        # 临时目录配置
-        temp_dir = str(self.db_path.parent / "temp")
-        Path(temp_dir).mkdir(exist_ok=True)
+            # 检查点配置
+            if workload_type == WorkloadType.OLAP:
+                checkpoint_threshold = "1GB"  # OLAP较大的检查点
+                wal_autocheckpoint = 10000
+            elif workload_type == WorkloadType.OLTP:
+                checkpoint_threshold = "256MB"  # OLTP较小的检查点
+                wal_autocheckpoint = 1000
+            else:  # MIXED
+                checkpoint_threshold = "512MB"
+                wal_autocheckpoint = 5000
 
-        # 检查点配置
-        if workload_type == WorkloadType.OLAP:
-            checkpoint_threshold = "1GB"  # OLAP较大的检查点
-            wal_autocheckpoint = 10000
-        elif workload_type == WorkloadType.OLTP:
-            checkpoint_threshold = "256MB"  # OLTP较小的检查点
-            wal_autocheckpoint = 1000
-        else:  # MIXED
-            checkpoint_threshold = "512MB"
-            wal_autocheckpoint = 5000
+            # 确保配置值不为空
+            memory_limit_str = f"{memory_limit_gb:.1f}GB"
+            max_memory_str = f"{max_memory_gb:.1f}GB"
+            
+            # 验证生成的字符串
+            if not memory_limit_str or memory_limit_str.strip() == 'GB':
+                logger.error(f"内存限制生成异常: {memory_limit_str}，使用默认值")
+                memory_limit_str = "4GB"
+            
+            if not max_memory_str or max_memory_str.strip() == 'GB':
+                logger.error(f"最大内存生成异常: {max_memory_str}，使用默认值")
+                max_memory_str = "8GB"
 
-        config = DuckDBConfig(
-            memory_limit=f"{memory_limit_gb:.1f}GB",
-            threads=threads,
-            max_memory=f"{max_memory_gb:.1f}GB",
-            temp_directory=temp_dir,
-            enable_object_cache=True,
-            enable_progress_bar=True,
-            checkpoint_threshold=checkpoint_threshold,
-            wal_autocheckpoint=wal_autocheckpoint
-        )
+            config = DuckDBConfig(
+                memory_limit=memory_limit_str,
+                threads=threads,
+                max_memory=max_memory_str,
+                temp_directory=temp_dir,
+                enable_object_cache=True,
+                enable_progress_bar=True,
+                checkpoint_threshold=checkpoint_threshold,
+                wal_autocheckpoint=wal_autocheckpoint
+            )
 
-        logger.info(f"内存配置: {config.memory_limit} (系统内存: {self.system_memory_gb:.1f}GB)")
-        logger.info(f"线程配置: {config.threads} (CPU核心: {self.cpu_cores})")
+            logger.info(f"内存配置: {config.memory_limit} (系统内存: {self.system_memory_gb:.1f}GB)")
+            logger.info(f"线程配置: {config.threads} (CPU核心: {self.cpu_cores})")
 
-        return config
+            return config
+            
+        except Exception as e:
+            logger.error(f"生成配置失败: {e}，使用默认配置")
+            # 返回安全的默认配置
+            return DuckDBConfig(
+                memory_limit="4GB",
+                threads=4,
+                max_memory="8GB",
+                temp_directory="temp",
+                enable_object_cache=True,
+                enable_progress_bar=True,
+                checkpoint_threshold="512MB",
+                wal_autocheckpoint=5000
+            )
 
     def _apply_config(self, config: DuckDBConfig) -> bool:
         """应用配置到DuckDB"""
         try:
             conn = self.get_connection()
+
+            # 验证配置参数
+            if not config.memory_limit or config.memory_limit.strip() == '':
+                logger.warning("内存限制配置为空，使用默认值 4GB")
+                config.memory_limit = "4GB"
+            
+            if not config.checkpoint_threshold or config.checkpoint_threshold.strip() == '':
+                logger.warning("检查点阈值配置为空，使用默认值 512MB")
+                config.checkpoint_threshold = "512MB"
 
             # 应用配置参数
             config_commands = [
@@ -331,7 +377,6 @@ class DuckDBPerformanceOptimizer:
                 finally:
                     self.conn = None
 
-
 def get_optimized_duckdb_connection(
     db_path: str,
     workload_type: WorkloadType = WorkloadType.OLAP
@@ -340,7 +385,6 @@ def get_optimized_duckdb_connection(
     optimizer = DuckDBPerformanceOptimizer(db_path)
     optimizer.optimize_for_workload(workload_type)
     return optimizer.get_connection()
-
 
 def create_performance_optimized_config(
     workload_type: WorkloadType = WorkloadType.OLAP,

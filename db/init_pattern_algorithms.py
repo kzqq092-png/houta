@@ -11,7 +11,6 @@ import pandas as pd
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'factorweave_system.sqlite')
 
-
 def init_pattern_algorithms():
     """初始化形态算法到数据库"""
     conn = sqlite3.connect(DB_PATH)
@@ -806,7 +805,6 @@ for i in range(2, len(kdata)):
     conn.commit()
     conn.close()
     logger.info(f"成功初始化 {len(algorithms)} 个形态算法到数据库")
-
 
 if __name__ == '__main__':
     init_pattern_algorithms()

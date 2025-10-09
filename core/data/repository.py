@@ -46,8 +46,9 @@ class BaseRepository(ABC):
 class StockRepository(BaseRepository):
     """股票信息仓库"""
 
-    def __init__(self, data_manager=None):
+    def __init__(self, data_manager=None, uni_plugin_manager=None):
         super().__init__()
+        self.uni_plugin_manager = uni_plugin_manager
         self.data_manager = data_manager
         self._stock_cache = {}
 
@@ -310,9 +311,10 @@ class StockRepository(BaseRepository):
 class KlineRepository(BaseRepository):
     """K线数据仓库（现代化TET模式）"""
 
-    def __init__(self, asset_service=None):
+    def __init__(self, asset_service=None, uni_plugin_manager=None):
         super().__init__()
         self.asset_service = asset_service
+        self.uni_plugin_manager = uni_plugin_manager
         self.data_manager = None  # 备用兼容
         self._cache = {}
 
@@ -326,14 +328,14 @@ class KlineRepository(BaseRepository):
                     from ..services import AssetService
                     container = get_service_container()
                     self.asset_service = container.resolve(AssetService)
-                    self.logger.info(" KlineRepository使用TET模式（AssetService）")
+                    self.logger.info("KlineRepository使用TET模式（AssetService）")
 
                     # 即使TET模式成功，也要准备传统模式的备用
                     if self.data_manager is None:
                         try:
                             from core.services.unified_data_manager import get_unified_data_manager
                             self.data_manager = get_unified_data_manager()
-                            self.logger.debug(" KlineRepository同时准备统一数据管理器作为备用")
+                            self.logger.debug("KlineRepository同时准备统一数据管理器作为备用")
                         except Exception as dm_e:
                             self.logger.warning(f" 无法创建备用统一数据管理器: {dm_e}")
 
@@ -350,9 +352,9 @@ class KlineRepository(BaseRepository):
                 try:
                     from core.services.unified_data_manager import get_unified_data_manager
                     self.data_manager = get_unified_data_manager()
-                    self.logger.info(" KlineRepository使用统一数据管理器")
+                    self.logger.info("KlineRepository使用统一数据管理器")
                 except ImportError:
-                    self.logger.error(" 无法导入DataManager类")
+                    self.logger.error("无法导入DataManager类")
                     return False
                 except Exception as dm_e:
                     self.logger.error(f" 创建DataManager失败: {dm_e}")
@@ -505,9 +507,10 @@ class KlineRepository(BaseRepository):
 class MarketRepository(BaseRepository):
     """市场数据仓库"""
 
-    def __init__(self, data_manager=None):
+    def __init__(self, data_manager=None, uni_plugin_manager=None):
         super().__init__()
         self.data_manager = data_manager
+        self.uni_plugin_manager = uni_plugin_manager
         self._market_cache = {}
 
     def connect(self) -> bool:
@@ -586,3 +589,57 @@ class MarketRepository(BaseRepository):
         except Exception as e:
             self.logger.error(f"Failed to get market indices: {e}")
             return []
+
+
+class FallbackDataManager:
+    """备用数据管理器 - 提供基本的数据获取功能"""
+
+    def __init__(self):
+        self.logger = logger
+        self.logger.info("FallbackDataManager初始化")
+
+    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+        """获取K线数据"""
+        self.logger.warning(f"FallbackDataManager: 无法获取K线数据 {stock_code}")
+        return pd.DataFrame()
+
+    def get_k_data(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+        """获取K线数据（兼容接口）"""
+        return self.get_kdata(stock_code, period, count)
+
+    def get_stock_info(self, stock_code: str) -> Dict[str, Any]:
+        """获取股票信息"""
+        self.logger.warning(f"FallbackDataManager: 无法获取股票信息 {stock_code}")
+        return {}
+
+    def get_stock_list(self, market: str = 'all') -> List[Dict[str, Any]]:
+        """获取股票列表"""
+        self.logger.warning("FallbackDataManager: 无法获取股票列表")
+        return []
+
+
+class MinimalDataManager:
+    """最小数据管理器 - 最后的备用方案"""
+
+    def __init__(self):
+        self.logger = logger
+        self.logger.info("MinimalDataManager初始化")
+
+    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+        """获取K线数据"""
+        self.logger.error(f"MinimalDataManager: 系统无法获取数据 {stock_code}")
+        return pd.DataFrame()
+
+    def get_k_data(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+        """获取K线数据（兼容接口）"""
+        return self.get_kdata(stock_code, period, count)
+
+    def get_stock_info(self, stock_code: str) -> Dict[str, Any]:
+        """获取股票信息"""
+        self.logger.error(f"MinimalDataManager: 系统无法获取股票信息 {stock_code}")
+        return {}
+
+    def get_stock_list(self, market: str = 'all') -> List[Dict[str, Any]]:
+        """获取股票列表"""
+        self.logger.error("MinimalDataManager: 系统无法获取股票列表")
+        return []

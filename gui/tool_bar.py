@@ -19,7 +19,6 @@ from gui.widgets.log_widget import LogWidget
 from utils.theme import get_theme_manager
 # log_structured已替换为直接的logger调用
 
-
 class MainToolBar(QToolBar):
     """主工具栏"""
 

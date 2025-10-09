@@ -129,17 +129,17 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
         quick_layout = QHBoxLayout(quick_group)
 
         # 艾略特波浪分析
-        elliott_btn = QPushButton(" 艾略特波浪")
+        elliott_btn = QPushButton("艾略特波浪")
         elliott_btn.setStyleSheet(self._get_button_style('#007bff'))
         elliott_btn.clicked.connect(self.elliott_wave_analysis)
 
         # 江恩分析
-        gann_btn = QPushButton(" 江恩分析")
+        gann_btn = QPushButton("江恩分析")
         gann_btn.setStyleSheet(self._get_button_style('#28a745'))
         gann_btn.clicked.connect(self.gann_analysis)
 
         # 斐波那契分析
-        fibonacci_btn = QPushButton(" 斐波那契")
+        fibonacci_btn = QPushButton("斐波那契")
         fibonacci_btn.setStyleSheet(self._get_button_style('#ffc107'))
         fibonacci_btn.clicked.connect(self.fibonacci_analysis)
 
@@ -153,12 +153,12 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
         advanced_layout = QHBoxLayout(advanced_group)
 
         # 综合分析
-        comprehensive_btn = QPushButton(" 综合分析")
+        comprehensive_btn = QPushButton("综合分析")
         comprehensive_btn.setStyleSheet(self._get_button_style('#6f42c1'))
         comprehensive_btn.clicked.connect(self.comprehensive_wave_analysis)
 
         # 波浪预测
-        prediction_btn = QPushButton(" 波浪预测")
+        prediction_btn = QPushButton("波浪预测")
         prediction_btn.setStyleSheet(self._get_button_style('#17a2b8'))
         prediction_btn.clicked.connect(self.wave_prediction)
 
@@ -220,7 +220,7 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
         self.min_wave_spin = QDoubleSpinBox()
         self.min_wave_spin.setRange(1.0, 20.0)
         self.min_wave_spin.setValue(5.0)
-        self.min_wave_spin.setSuffix(" %")
+        self.min_wave_spin.setSuffix("%")
         params_layout.addRow("最小波浪幅度:", self.min_wave_spin)
 
         # 置信度阈值
@@ -262,23 +262,23 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
 
         # 艾略特波浪结果
         elliott_tab = self._create_elliott_results_tab()
-        self.results_tabs.addTab(elliott_tab, " 艾略特波浪")
+        self.results_tabs.addTab(elliott_tab, "艾略特波浪")
 
         # 江恩分析结果
         gann_tab = self._create_gann_results_tab()
-        self.results_tabs.addTab(gann_tab, " 江恩分析")
+        self.results_tabs.addTab(gann_tab, "江恩分析")
 
         # 斐波那契分析
         fibonacci_tab = self._create_fibonacci_results_tab()
-        self.results_tabs.addTab(fibonacci_tab, " 斐波那契")
+        self.results_tabs.addTab(fibonacci_tab, "斐波那契")
 
         # 波浪预测
         prediction_tab = self._create_prediction_results_tab()
-        self.results_tabs.addTab(prediction_tab, " 波浪预测")
+        self.results_tabs.addTab(prediction_tab, "波浪预测")
 
         # 综合报告
         report_tab = self._create_comprehensive_report_tab()
-        self.results_tabs.addTab(report_tab, " 综合报告")
+        self.results_tabs.addTab(report_tab, "综合报告")
 
         layout.addWidget(self.results_tabs)
         return panel

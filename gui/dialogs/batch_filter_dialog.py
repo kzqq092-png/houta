@@ -139,7 +139,7 @@ class CompactAdvancedFilterDialog(QDialog):
         toolbar_layout.addStretch()
 
         # 保存筛选方案按钮
-        save_filter_btn = QPushButton(" 保存方案")
+        save_filter_btn = QPushButton("保存方案")
         save_filter_btn.setToolTip("保存当前筛选条件为快速筛选方案")
         save_filter_btn.clicked.connect(self._save_filter_scheme)
         toolbar_layout.addWidget(save_filter_btn)
@@ -156,15 +156,15 @@ class CompactAdvancedFilterDialog(QDialog):
 
         # 基础筛选标签页
         basic_tab = self._create_basic_filter_tab()
-        self.filter_tabs.addTab(basic_tab, " 基础筛选")
+        self.filter_tabs.addTab(basic_tab, "基础筛选")
 
         # 技术指标标签页
         technical_tab = self._create_technical_filter_tab()
-        self.filter_tabs.addTab(technical_tab, " 技术指标")
+        self.filter_tabs.addTab(technical_tab, "技术指标")
 
         # 高级筛选标签页
         advanced_tab = self._create_advanced_filter_tab()
-        self.filter_tabs.addTab(advanced_tab, " 高级条件")
+        self.filter_tabs.addTab(advanced_tab, "高级条件")
 
         return panel
 
@@ -226,7 +226,7 @@ class CompactAdvancedFilterDialog(QDialog):
         volume_layout = QHBoxLayout()
         self.volume_min_spin = QSpinBox()
         self.volume_min_spin.setRange(0, 999999999)
-        self.volume_min_spin.setSuffix(" 万")
+        self.volume_min_spin.setSuffix("万")
         self.volume_min_spin.valueChanged.connect(self._on_filter_changed)
         volume_layout.addWidget(self.volume_min_spin)
 
@@ -235,7 +235,7 @@ class CompactAdvancedFilterDialog(QDialog):
         self.volume_max_spin = QSpinBox()
         self.volume_max_spin.setRange(0, 999999999)
         self.volume_max_spin.setValue(100000)
-        self.volume_max_spin.setSuffix(" 万")
+        self.volume_max_spin.setSuffix("万")
         self.volume_max_spin.valueChanged.connect(self._on_filter_changed)
         volume_layout.addWidget(self.volume_max_spin)
         form_layout.addRow("成交量范围:", volume_layout)
@@ -292,12 +292,12 @@ class CompactAdvancedFilterDialog(QDialog):
 
         # 添加指标条件按钮
         add_btn_layout = QHBoxLayout()
-        add_indicator_btn = QPushButton(" 添加指标条件")
+        add_indicator_btn = QPushButton("添加指标条件")
         add_indicator_btn.clicked.connect(self._add_indicator_condition)
         add_btn_layout.addWidget(add_indicator_btn)
         add_btn_layout.addStretch()
 
-        clear_indicators_btn = QPushButton(" 清空条件")
+        clear_indicators_btn = QPushButton("清空条件")
         clear_indicators_btn.clicked.connect(self._clear_indicator_conditions)
         add_btn_layout.addWidget(clear_indicators_btn)
 
@@ -442,12 +442,12 @@ class CompactAdvancedFilterDialog(QDialog):
         button_layout.setContentsMargins(12, 8, 12, 8)
 
         # 左侧：重置和帮助按钮
-        reset_btn = QPushButton(" 重置")
+        reset_btn = QPushButton("重置")
         reset_btn.setToolTip("重置所有筛选条件")
         reset_btn.clicked.connect(self._reset_filters)
         button_layout.addWidget(reset_btn)
 
-        help_btn = QPushButton(" 帮助")
+        help_btn = QPushButton("帮助")
         help_btn.setToolTip("查看筛选条件设置帮助")
         help_btn.clicked.connect(self._show_help)
         button_layout.addWidget(help_btn)
@@ -455,7 +455,7 @@ class CompactAdvancedFilterDialog(QDialog):
         button_layout.addStretch()
 
         # 右侧：确定和取消按钮
-        self.apply_btn = QPushButton(" 应用筛选")
+        self.apply_btn = QPushButton("应用筛选")
         self.apply_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
@@ -472,7 +472,7 @@ class CompactAdvancedFilterDialog(QDialog):
         self.apply_btn.clicked.connect(self._apply_filters)
         button_layout.addWidget(self.apply_btn)
 
-        cancel_btn = QPushButton(" 取消")
+        cancel_btn = QPushButton("取消")
         cancel_btn.setStyleSheet("""
             QPushButton {
                 background-color: #6c757d;

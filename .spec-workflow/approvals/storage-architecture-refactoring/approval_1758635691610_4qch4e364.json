@@ -1,0 +1,27 @@
+{
+  "id": "approval_1758635691610_4qch4e364",
+  "title": "FactorWeave-Quant存储架构重构设计文档审批",
+  "filePath": ".spec-workflow/specs/storage-architecture-refactoring/design.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-23T13:54:51.610Z",
+  "category": "spec",
+  "categoryName": "storage-architecture-refactoring",
+  "response": "Feedback Summary (2 comments):\n\nGeneral Comments:\n1. 不需要迁移脚本 Duckdb 本来就没有数据\n2. 再一次深度分析系统现有功能和架构，结合上述重构官方案分析是否有重复实现的内容或者可以增强的内容，再次输出新的方案，不要包含代码\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"不需要迁移脚本 Duckdb 本来就没有数据\",\n      \"timestamp\": \"2025-09-23T13:57:48.203Z\",\n      \"id\": \"comment_1758635868203_e67f72pb4\"\n    },\n    {\n      \"type\": \"general\",\n      \"comment\": \"再一次深度分析系统现有功能和架构，结合上述重构官方案分析是否有重复实现的内容或者可以增强的内容，再次输出新的方案，不要包含代码\",\n      \"timestamp\": \"2025-09-23T14:01:06.998Z\",\n      \"id\": \"comment_1758636066998_my4odwegz\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (2 comments):\\n\\nGeneral Comments:\\n1. 不需要迁移脚本 Duckdb 本来就没有数据\\n2. 再一次深度分析系统现有功能和架构，结合上述重构官方案分析是否有重复实现的内容或者可以增强的内容，再次输出新的方案，不要包含代码\\n\\n\",\n  \"timestamp\": \"2025-09-23T14:01:08.446Z\"\n}",
+  "respondedAt": "2025-09-23T14:01:08.757Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "不需要迁移脚本 Duckdb 本来就没有数据",
+      "timestamp": "2025-09-23T13:57:48.203Z",
+      "id": "comment_1758635868203_e67f72pb4"
+    },
+    {
+      "type": "general",
+      "comment": "再一次深度分析系统现有功能和架构，结合上述重构官方案分析是否有重复实现的内容或者可以增强的内容，再次输出新的方案，不要包含代码",
+      "timestamp": "2025-09-23T14:01:06.998Z",
+      "id": "comment_1758636066998_my4odwegz"
+    }
+  ]
+}

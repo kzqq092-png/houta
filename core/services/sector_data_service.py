@@ -17,9 +17,9 @@ import traceback
 
 from ..database.table_manager import TableType, get_table_manager
 from ..database.duckdb_manager import initialize_duckdb_manager
-from ..performance.cache_manager import MultiLevelCacheManager
 from ..plugin_types import AssetType, DataType
 from ..tet_data_pipeline import TETDataPipeline, StandardQuery, StandardData
+from ..performance.cache_manager import MultiLevelCacheManager
 
 
 class SectorCacheKeys:

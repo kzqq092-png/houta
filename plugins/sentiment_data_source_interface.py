@@ -20,7 +20,6 @@ import hashlib
 from enum import Enum
 from core.plugin_types import PluginType, PluginCategory
 
-
 class SentimentStatus(Enum):
     """情绪状态枚举"""
     EXTREMELY_BULLISH = "极度看涨"
@@ -30,7 +29,6 @@ class SentimentStatus(Enum):
     EXTREMELY_BEARISH = "极度看跌"
     UNKNOWN = "未知"
 
-
 class TradingSignal(Enum):
     """交易信号枚举"""
     STRONG_BUY = "强烈买入"
@@ -39,7 +37,6 @@ class TradingSignal(Enum):
     SELL = "卖出"
     STRONG_SELL = "强烈卖出"
     NO_SIGNAL = "无信号"
-
 
 @dataclass
 class SentimentData:
@@ -56,7 +53,6 @@ class SentimentData:
     color: str = "#808080"  # 显示颜色
     metadata: Dict[str, Any] = field(default_factory=dict)  # 额外元数据
 
-
 @dataclass
 class SentimentResponse:
     """情绪数据查询响应"""
@@ -67,7 +63,6 @@ class SentimentResponse:
     data_quality: str = "unknown"  # 数据质量评级
     update_time: datetime = field(default_factory=datetime.now)  # 更新时间
     cache_used: bool = False  # 是否使用了缓存
-
 
 class ISentimentDataSource(ABC):
     """情绪数据源插件接口"""
@@ -251,7 +246,6 @@ class ISentimentDataSource(ABC):
             return "#88AA00"  # 绿色：悲观
         else:
             return "#00AA44"  # 深绿色：极度悲观（可能是机会）
-
 
 class BaseSentimentPlugin(ISentimentDataSource):
     """情绪数据源插件基础类"""

@@ -15,7 +15,6 @@ import numpy as np
 from datetime import datetime
 import json
 
-
 class SignalType(Enum):
     """信号类型"""
     TECHNICAL = "technical"
@@ -25,7 +24,6 @@ class SignalType(Enum):
     NEWS = "news"
     VOLUME = "volume"
 
-
 class SignalStrength(Enum):
     """信号强度"""
     VERY_WEAK = 1
@@ -34,14 +32,12 @@ class SignalStrength(Enum):
     STRONG = 4
     VERY_STRONG = 5
 
-
 class AlertLevel(Enum):
     """提醒级别"""
     INFO = "info"          # 信息提示
     WARNING = "warning"    # 警告
     DANGER = "danger"      # 危险
     SUCCESS = "success"    # 成功信号
-
 
 @dataclass
 class TradingSignal:
@@ -56,7 +52,6 @@ class TradingSignal:
     timestamp: datetime
     source_data: Dict[str, Any]
 
-
 @dataclass
 class AggregatedAlert:
     """聚合警报数据类"""
@@ -69,7 +64,6 @@ class AggregatedAlert:
     recommended_action: str
     timestamp: datetime
     expires_at: Optional[datetime] = None
-
 
 class TechnicalSignalDetector:
     """技术信号检测器"""
@@ -266,7 +260,6 @@ class TechnicalSignalDetector:
 
         return None
 
-
 class SentimentSignalDetector:
     """情绪信号检测器"""
 
@@ -394,7 +387,6 @@ class SentimentSignalDetector:
                 source_data={"indicator": "money_flow", "value": money_flow}
             )
         return None
-
 
 class SignalAggregator(QObject):
     """信号聚合器 - 核心组件"""

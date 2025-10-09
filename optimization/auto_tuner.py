@@ -9,7 +9,6 @@ from loguru import logger
 from analysis.pattern_manager import PatternManager
 from optimization.database_schema import OptimizationDatabaseManager
 from optimization.version_manager import VersionManager
-from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 from optimization.algorithm_optimizer import AlgorithmOptimizer, OptimizationConfig
 import time
 import threading
@@ -79,7 +78,7 @@ class AutoTuner:
         Returns:
             优化结果摘要
         """
-        logger.info(" 启动一键优化...")
+        logger.info("启动一键优化...")
 
         # 获取要优化的形态列表
         if pattern_names is None:
@@ -112,7 +111,7 @@ class AutoTuner:
         # 生成优化报告
         report = self._generate_optimization_report(results)
 
-        logger.info(" 一键优化完成！")
+        logger.info("一键优化完成！")
         return report
 
     def smart_optimize(self, performance_threshold: float = 0.7,
@@ -127,7 +126,7 @@ class AutoTuner:
         Returns:
             优化结果
         """
-        logger.info(" 启动智能优化...")
+        logger.info("启动智能优化...")
 
         # 评估所有形态的当前性能
         pattern_names = self._get_all_pattern_names()
@@ -308,7 +307,7 @@ class AutoTuner:
         conn = self.db_manager.db_path
         # 这里可以实现定时任务的数据库存储
 
-        logger.info(f"⏰ 已调度优化任务: {pattern_name} 在 {schedule_time}")
+        logger.info(f"[TIME] 已调度优化任务: {pattern_name} 在 {schedule_time}")
         return True
 
     def get_optimization_status(self) -> Dict[str, Any]:
@@ -358,7 +357,7 @@ class AutoTuner:
                 "error": str(e),
                 "last_update": datetime.now().isoformat()
             }
-    
+
     def get_status(self) -> Dict[str, Any]:
         """获取自动调优状态 - get_optimization_status的别名，用于兼容性"""
         status = self.get_optimization_status()
@@ -591,7 +590,7 @@ if __name__ == "__main__":
     # 测试一键优化（仅优化几个形态）
     test_patterns = ["hammer", "doji"]
 
-    logger.info(" 测试一键优化...")
+    logger.info("测试一键优化...")
     result = tuner.one_click_optimize(
         pattern_names=test_patterns,
         optimization_method="random",  # 使用快速的随机优化进行测试

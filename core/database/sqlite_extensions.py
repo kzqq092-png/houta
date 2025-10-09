@@ -738,6 +738,5 @@ def get_sqlite_extension_manager(db_path: str = "db/factorweave_system.sqlite") 
 
     with _manager_lock:
         if _sqlite_extension_manager is None:
-            _sqlite_extension_manager = SQLiteExtensionManager(db_path)
-
+            _sqlite_extension_manager = SQLiteExtensionManager()
         return _sqlite_extension_manager

@@ -15,11 +15,11 @@ logger = logger
 try:
     talib = importlib.import_module('talib')
     TALIB_AVAILABLE = True
-    logger.info(" Ta-lib 库可用")
+    logger.info("Ta-lib 库可用")
 except ImportError:
     talib = None
     TALIB_AVAILABLE = False
-    logger.warning(" Ta-lib 库不可用，使用自定义实现")
+    logger.warning("Ta-lib 库不可用，使用自定义实现")
 
 
 def get_talib_indicator_list():
@@ -75,8 +75,9 @@ def get_talib_category():
         ]
     }
 
-
 # --- MA ---
+
+
 def calc_ma(close: pd.Series, n: int) -> pd.Series:
     """计算移动平均线，优先用ta-lib，自动回退pandas实现"""
     try:
@@ -90,8 +91,9 @@ def calc_ma(close: pd.Series, n: int) -> pd.Series:
         logger.error(f"计算MA指标失败: {e}")
         return pd.Series([float('nan')] * len(close), index=close.index, name=f"MA{n}")
 
-
 # --- MACD ---
+
+
 def calc_macd(close: pd.Series, fast=12, slow=26, signal=9):
     """计算MACD指标"""
     try:
@@ -123,8 +125,9 @@ def calc_macd(close: pd.Series, fast=12, slow=26, signal=9):
                 empty_series.rename("MACD_signal"),
                 empty_series.rename("MACD_hist"))
 
-
 # --- RSI ---
+
+
 def calc_rsi(close: pd.Series, n: int = 14) -> pd.Series:
     """计算RSI指标"""
     try:
@@ -145,8 +148,9 @@ def calc_rsi(close: pd.Series, n: int = 14) -> pd.Series:
         logger.error(f"计算RSI指标失败: {e}")
         return pd.Series([float('nan')] * len(close), index=close.index, name=f"RSI{n}")
 
-
 # --- KDJ ---
+
+
 def calc_kdj(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 9, m1: int = 3, m2: int = 3):
     """计算KDJ指标"""
     try:

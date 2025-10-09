@@ -511,7 +511,7 @@ class CacheHotspotWidget(QWidget):
         control_layout.addWidget(self.level_filter_combo)
 
         # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新")
+        refresh_btn = QPushButton("刷新")
         refresh_btn.clicked.connect(self.refresh_hotspots)
         control_layout.addWidget(refresh_btn)
 
@@ -537,7 +537,7 @@ class CacheHotspotWidget(QWidget):
         layout.addWidget(self.hotspots_table)
 
         # 统计信息
-        stats_group = QGroupBox("📊 热点统计")
+        stats_group = QGroupBox("热点统计")
         stats_layout = QGridLayout(stats_group)
 
         # 总热点数
@@ -745,7 +745,7 @@ class CacheStatusMonitor(QWidget):
         # 标题和控制区域
         header_layout = QHBoxLayout()
 
-        title_label = QLabel("💾 缓存状态监控")
+        title_label = QLabel("缓存状态监控")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -777,7 +777,7 @@ class CacheStatusMonitor(QWidget):
         """)
         header_layout.addWidget(clear_cache_btn)
 
-        optimize_btn = QPushButton("⚡ 优化缓存")
+        optimize_btn = QPushButton("优化缓存")
         optimize_btn.clicked.connect(self.optimize_cache)
         optimize_btn.setStyleSheet("""
             QPushButton {
@@ -802,19 +802,19 @@ class CacheStatusMonitor(QWidget):
 
         # 缓存概览选项卡
         overview_tab = self.create_overview_tab()
-        self.tab_widget.addTab(overview_tab, "📊 缓存概览")
+        self.tab_widget.addTab(overview_tab, "缓存概览")
 
         # 性能指标选项卡
         metrics_tab = self.create_metrics_tab()
-        self.tab_widget.addTab(metrics_tab, "📈 性能指标")
+        self.tab_widget.addTab(metrics_tab, "性能指标")
 
         # 热点数据选项卡
         self.hotspot_widget = CacheHotspotWidget()
-        self.tab_widget.addTab(self.hotspot_widget, "🔥 热点数据")
+        self.tab_widget.addTab(self.hotspot_widget, "[HOT] 热点数据")
 
         # 策略配置选项卡
         strategy_tab = self.create_strategy_tab()
-        self.tab_widget.addTab(strategy_tab, "⚙️ 策略配置")
+        self.tab_widget.addTab(strategy_tab, "策略配置")
 
         layout.addWidget(self.tab_widget)
 
@@ -846,7 +846,7 @@ class CacheStatusMonitor(QWidget):
         layout = QVBoxLayout(widget)
 
         # 缓存仪表盘区域
-        gauges_group = QGroupBox("📊 缓存性能仪表盘")
+        gauges_group = QGroupBox("缓存性能仪表盘")
         gauges_layout = QGridLayout(gauges_group)
 
         # 创建各种仪表盘
@@ -863,7 +863,7 @@ class CacheStatusMonitor(QWidget):
         layout.addWidget(gauges_group)
 
         # 缓存内存使用图表
-        memory_group = QGroupBox("💾 内存使用分布")
+        memory_group = QGroupBox("内存使用分布")
         memory_layout = QVBoxLayout(memory_group)
 
         self.memory_chart = CacheMemoryChart()
@@ -872,7 +872,7 @@ class CacheStatusMonitor(QWidget):
         layout.addWidget(memory_group)
 
         # 快速统计信息
-        stats_group = QGroupBox("📋 快速统计")
+        stats_group = QGroupBox("快速统计")
         stats_layout = QGridLayout(stats_group)
 
         # 总缓存项数
@@ -908,7 +908,7 @@ class CacheStatusMonitor(QWidget):
         layout = QVBoxLayout(widget)
 
         # 命中率趋势图
-        hit_rate_group = QGroupBox("📈 命中率趋势")
+        hit_rate_group = QGroupBox("命中率趋势")
         hit_rate_layout = QVBoxLayout(hit_rate_group)
 
         self.hit_rate_chart = CacheHitRateChart()
@@ -917,7 +917,7 @@ class CacheStatusMonitor(QWidget):
         layout.addWidget(hit_rate_group)
 
         # 详细指标表格
-        details_group = QGroupBox("📊 详细指标")
+        details_group = QGroupBox("详细指标")
         details_layout = QVBoxLayout(details_group)
 
         self.metrics_table = QTableWidget()
@@ -944,7 +944,7 @@ class CacheStatusMonitor(QWidget):
         layout = QVBoxLayout(widget)
 
         # 当前策略状态
-        current_group = QGroupBox("📋 当前策略状态")
+        current_group = QGroupBox("当前策略状态")
         current_layout = QFormLayout(current_group)
 
         # L1策略
@@ -962,7 +962,7 @@ class CacheStatusMonitor(QWidget):
         layout.addWidget(current_group)
 
         # 策略配置
-        config_group = QGroupBox("⚙️ 策略配置")
+        config_group = QGroupBox("策略配置")
         config_layout = QFormLayout(config_group)
 
         # 自适应开关
@@ -974,7 +974,7 @@ class CacheStatusMonitor(QWidget):
         self.adjustment_interval_spin = QSpinBox()
         self.adjustment_interval_spin.setRange(10, 3600)
         self.adjustment_interval_spin.setValue(300)
-        self.adjustment_interval_spin.setSuffix(" 秒")
+        self.adjustment_interval_spin.setSuffix("秒")
         config_layout.addRow("调整频率:", self.adjustment_interval_spin)
 
         # 命中率阈值
@@ -988,28 +988,28 @@ class CacheStatusMonitor(QWidget):
         self.memory_limit_spin = QSpinBox()
         self.memory_limit_spin.setRange(100, 10000)
         self.memory_limit_spin.setValue(2048)
-        self.memory_limit_spin.setSuffix(" MB")
+        self.memory_limit_spin.setSuffix("MB")
         config_layout.addRow("内存限制:", self.memory_limit_spin)
 
         layout.addWidget(config_group)
 
         # 策略效果评估
-        evaluation_group = QGroupBox("📈 策略效果评估")
+        evaluation_group = QGroupBox("策略效果评估")
         evaluation_layout = QVBoxLayout(evaluation_group)
 
         self.strategy_evaluation = QTextEdit()
         self.strategy_evaluation.setReadOnly(True)
         self.strategy_evaluation.setMaximumHeight(150)
         self.strategy_evaluation.setText("""
-📊 当前策略效果评估：
+ 当前策略效果评估：
 
-• 自适应策略启用状态: ✅ 已启用
+• 自适应策略启用状态:已启用
 • L1内存缓存效率: 87.3% (目标: >85%)
 • L2磁盘缓存效率: 72.1% (目标: >70%)
 • 策略调整次数: 23次（过去24小时）
 • 性能提升效果: +15.2%（相比固定策略）
 
-💡 优化建议:
+[INFO] 优化建议:
 • L1内存命中率良好，建议保持当前策略
 • L2磁盘可考虑增加缓存大小
 • 自适应调整频率可适当降低到5分钟
@@ -1021,11 +1021,11 @@ class CacheStatusMonitor(QWidget):
         # 操作按钮
         buttons_layout = QHBoxLayout()
 
-        apply_btn = QPushButton("✅ 应用配置")
+        apply_btn = QPushButton("应用配置")
         apply_btn.clicked.connect(self.apply_strategy_config)
         buttons_layout.addWidget(apply_btn)
 
-        reset_btn = QPushButton("🔄 重置为默认")
+        reset_btn = QPushButton("重置为默认")
         reset_btn.clicked.connect(self.reset_strategy_config)
         buttons_layout.addWidget(reset_btn)
 

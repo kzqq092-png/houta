@@ -8,7 +8,6 @@
 from typing import Dict, Any, Optional
 from core.plugin_types import PluginType, PluginCategory
 
-
 class PluginDisplayUtils:
     """插件显示工具类"""
 
@@ -196,12 +195,10 @@ class PluginDisplayUtils:
 
         return True, ""
 
-
 # 便捷函数
 def get_plugin_display_name(plugin_type: str) -> str:
     """获取插件类型显示名称的便捷函数"""
     return PluginDisplayUtils.get_plugin_type_display(plugin_type)
-
 
 def format_plugin_for_ui(metadata: Dict[str, Any]) -> Dict[str, Any]:
     """为UI显示格式化插件信息的便捷函数"""

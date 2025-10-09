@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
+from core.services.unified_data_manager import get_unified_data_manager
 数据缺失智能处理UI组件
 提供数据缺失时的智能提示和引导功能
 """
@@ -174,7 +175,7 @@ class DataMissingPromptWidget(QWidget):
         # 标题区域
         title_layout = QHBoxLayout()
 
-        self.icon_label = QLabel("⚠️")
+        self.icon_label = QLabel("")
         self.icon_label.setFont(QFont("Arial", 16))
         title_layout.addWidget(self.icon_label)
 
@@ -229,7 +230,7 @@ class DataMissingPromptWidget(QWidget):
         # 操作按钮区域
         button_layout = QHBoxLayout()
 
-        self.data_management_btn = QPushButton("📊 数据管理")
+        self.data_management_btn = QPushButton("数据管理")
         self.data_management_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
@@ -245,7 +246,7 @@ class DataMissingPromptWidget(QWidget):
         """)
         self.data_management_btn.clicked.connect(self.data_management_requested.emit)
 
-        self.plugin_config_btn = QPushButton("🔧 插件配置")
+        self.plugin_config_btn = QPushButton("插件配置")
         self.plugin_config_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
@@ -280,7 +281,7 @@ class DataMissingPromptWidget(QWidget):
         try:
             self.asset_identifier = AssetTypeIdentifier()
             self.data_router = DataRouter()
-            self.data_manager = AssetAwareUnifiedDataManager()
+            self.data_manager = AssetAwareget_unified_data_manager()
 
             if logger:
                 logger.info("数据缺失处理组件初始化完成")
@@ -389,7 +390,7 @@ class DataMissingPromptWidget(QWidget):
         # 标题行
         title_layout = QHBoxLayout()
 
-        symbol_label = QLabel(f"📈 {info.symbol}")
+        symbol_label = QLabel(f"{info.symbol}")
         symbol_label.setFont(QFont("Arial", 11, QFont.Bold))
         symbol_label.setStyleSheet("color: #495057;")
         title_layout.addWidget(symbol_label)
@@ -471,7 +472,7 @@ class DataMissingPromptWidget(QWidget):
             )
         )
 
-        ignore_btn = QPushButton("❌ 忽略")
+        ignore_btn = QPushButton("[ERROR] 忽略")
         ignore_btn.setStyleSheet("""
             QPushButton {
                 background-color: #6c757d;

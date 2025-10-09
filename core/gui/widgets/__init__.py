@@ -17,7 +17,6 @@ from dataclasses import dataclass
 # 基础日志配置
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class WidgetPerformanceConfig:
     """Widget性能配置"""
@@ -25,7 +24,6 @@ class WidgetPerformanceConfig:
     max_cache_size: int = 1000
     update_interval: int = 100
     enable_lazy_loading: bool = True
-
 
 class WidgetPerformanceOptimizer:
     """Widget性能优化器"""
@@ -56,10 +54,8 @@ class WidgetPerformanceOptimizer:
             'is_enabled': self.is_enabled
         }
 
-
 # 全局优化器实例
 _widget_optimizer = None
-
 
 def get_widget_optimizer() -> WidgetPerformanceOptimizer:
     """获取Widget性能优化器实例"""
@@ -67,7 +63,6 @@ def get_widget_optimizer() -> WidgetPerformanceOptimizer:
     if _widget_optimizer is None:
         _widget_optimizer = WidgetPerformanceOptimizer()
     return _widget_optimizer
-
 
 # 导出的公共接口
 __all__ = [

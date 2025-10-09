@@ -15,7 +15,6 @@ from dataclasses import dataclass
 
 # 扩展后的插件类型枚举
 
-
 class PluginType(Enum):
     """
     插件类型枚举
@@ -42,7 +41,6 @@ class PluginType(Enum):
     DATA_SOURCE_COMMODITY = "data_source_commodity"  # 商品数据源插件
     DATA_SOURCE_CUSTOM = "data_source_custom"    # 自定义数据源插件
     DATA_SOURCE_WIND = "data_source_wind"        # Wind万得数据源插件
-
 
 class AssetType(Enum):
     """
@@ -78,7 +76,6 @@ class AssetType(Enum):
     # 扩展：宏观经济数据类型
     MACRO = "macro"                          # 宏观经济数据
 
-
 class DataType(Enum):
     """
     数据类型枚举
@@ -89,6 +86,9 @@ class DataType(Enum):
     HISTORICAL_KLINE = "historical_kline"    # 历史K线
     MARKET_DEPTH = "market_depth"            # 盘口深度
     TRADE_TICK = "trade_tick"                # 逐笔成交
+    TICK_DATA = "tick_data"                  # Tick数据
+    ORDER_BOOK = "order_book"                # 委托账本
+    LEVEL2_DATA = "level2_data"              # Level2行情数据
     FUNDAMENTAL = "fundamental"              # 基本面数据
     NEWS = "news"                            # 新闻数据
     ANNOUNCEMENT = "announcement"            # 公告数据
@@ -131,7 +131,6 @@ class DataType(Enum):
     EVENT_DATA = "event_data"                      # 事件数据
     FACTOR_DATA = "factor_data"                    # 因子数据
 
-
 class DataSourceProvider(Enum):
     """
     数据源提供商枚举
@@ -166,7 +165,6 @@ class DataSourceProvider(Enum):
     WIND = "wind"                        # 万得
     CUSTOM = "custom"                    # 自定义
 
-
 class PluginCategory(Enum):
     """
     插件分类枚举
@@ -183,7 +181,6 @@ class PluginCategory(Enum):
     UTILITY = "utility"                  # 工具类插件
     THIRD_PARTY = "third_party"          # 第三方插件
 
-
 class PluginPriority(Enum):
     """
     插件优先级枚举
@@ -195,7 +192,6 @@ class PluginPriority(Enum):
     NORMAL = 3                           # 普通优先级
     LOW = 4                              # 低优先级
     BACKGROUND = 5                       # 后台优先级
-
 
 @dataclass
 class PluginTypeInfo:
@@ -212,7 +208,6 @@ class PluginTypeInfo:
     default_priority: PluginPriority
     config_schema: Optional[Dict[str, Any]] = None
     supported_asset_types: Optional[List[AssetType]] = None
-
 
 # 插件类型配置映射表
 PLUGIN_TYPE_CONFIGS = {
@@ -335,7 +330,6 @@ PLUGIN_TYPE_CONFIGS = {
     )
 }
 
-
 def get_plugin_type_info(plugin_type: PluginType) -> Optional[PluginTypeInfo]:
     """
     获取插件类型信息
@@ -347,7 +341,6 @@ def get_plugin_type_info(plugin_type: PluginType) -> Optional[PluginTypeInfo]:
         PluginTypeInfo: 插件类型信息，如果类型不存在则返回None
     """
     return PLUGIN_TYPE_CONFIGS.get(plugin_type)
-
 
 def get_data_source_plugin_types() -> List[PluginType]:
     """
@@ -366,7 +359,6 @@ def get_data_source_plugin_types() -> List[PluginType]:
         PluginType.DATA_SOURCE_COMMODITY
     ]
 
-
 def is_data_source_plugin(plugin_type: PluginType) -> bool:
     """
     判断是否为数据源插件类型
@@ -378,7 +370,6 @@ def is_data_source_plugin(plugin_type: PluginType) -> bool:
         bool: 是否为数据源插件
     """
     return plugin_type in get_data_source_plugin_types()
-
 
 def get_supported_asset_types(plugin_type: PluginType) -> List[AssetType]:
     """
@@ -394,7 +385,6 @@ def get_supported_asset_types(plugin_type: PluginType) -> List[AssetType]:
     if type_info and type_info.supported_asset_types:
         return type_info.supported_asset_types
     return []
-
 
 def validate_plugin_type_compatibility(plugin_type: PluginType,
                                        asset_types: List[AssetType]) -> bool:
@@ -417,7 +407,6 @@ def validate_plugin_type_compatibility(plugin_type: PluginType,
 
     # 检查是否有交集
     return bool(set(asset_types) & set(supported_types))
-
 
 def get_default_provider_for_asset_type(asset_type: AssetType) -> DataSourceProvider:
     """
@@ -443,7 +432,6 @@ def get_default_provider_for_asset_type(asset_type: AssetType) -> DataSourceProv
     }
 
     return provider_mapping.get(asset_type, DataSourceProvider.CUSTOM)
-
 
 # 导出的公共接口
 __all__ = [

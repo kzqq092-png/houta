@@ -59,12 +59,12 @@ class RuntimeCallChainAnalyzer:
         self.enabled = True
         if target_modules:
             self.target_modules = set(target_modules)
-        logger.info(" 运行时调用链分析已启用")
+        logger.info("运行时调用链分析已启用")
 
     def disable(self):
         """禁用调用链分析"""
         self.enabled = False
-        logger.info(" 运行时调用链分析已禁用")
+        logger.info("运行时调用链分析已禁用")
 
     def should_trace(self, module_name: str) -> bool:
         """判断是否应该追踪此模块"""
@@ -492,7 +492,7 @@ def patch_backtest_methods(analyzer: RuntimeCallChainAnalyzer):
 
 def main():
     """主函数 - 演示如何使用运行时调用链分析器"""
-    logger.info(" 运行时调用链分析器演示")
+    logger.info("运行时调用链分析器演示")
     logger.info("=" * 50)
 
     # 创建分析器
@@ -500,9 +500,9 @@ def main():
 
     # 尝试装饰回测系统的方法
     if patch_backtest_methods(analyzer):
-        logger.info(" 回测系统方法装饰完成")
+        logger.info("回测系统方法装饰完成")
     else:
-        logger.info(" 回测系统方法装饰失败")
+        logger.info("回测系统方法装饰失败")
 
     # 模拟一些调用来演示功能
     @analyzer.trace_calls
@@ -566,8 +566,8 @@ def main():
     # 保存原始数据
     analyzer.save_raw_data()
 
-    logger.info(" 运行时调用链分析报告已保存到 runtime_call_chain_analysis.md")
-    logger.info(" 原始调用数据已保存到 call_chain_raw_data.json")
+    logger.info("运行时调用链分析报告已保存到 runtime_call_chain_analysis.md")
+    logger.info("原始调用数据已保存到 call_chain_raw_data.json")
 
     return analyzer
 

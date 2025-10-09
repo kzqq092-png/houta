@@ -41,14 +41,12 @@ except ImportError as e:
     print(f"导入组件失败: {e}")
     logger = None
 
-
 class IntegrationMode(Enum):
     """集成模式"""
     PASSIVE = "passive"  # 被动模式，仅在请求时检查
     ACTIVE = "active"  # 主动模式，实时监控
     SMART = "smart"  # 智能模式，根据使用模式自适应
     PREDICTIVE = "predictive"  # 预测模式，基于使用模式预加载数据
-
 
 class DataSourcePriority(Enum):
     """数据源优先级"""
@@ -57,7 +55,6 @@ class DataSourcePriority(Enum):
     FALLBACK = "fallback"   # 降级数据源
     EXPERIMENTAL = "experimental"  # 实验性数据源
 
-
 class DataQuality(Enum):
     """数据质量等级"""
     EXCELLENT = "excellent"  # 优秀
@@ -65,7 +62,6 @@ class DataQuality(Enum):
     FAIR = "fair"           # 一般
     POOR = "poor"           # 较差
     UNKNOWN = "unknown"     # 未知
-
 
 @dataclass
 class DataSourceInfo:
@@ -84,7 +80,6 @@ class DataSourceInfo:
     supported_assets: List[str] = field(default_factory=list)
     supported_data_types: List[str] = field(default_factory=list)
 
-
 @dataclass
 class CacheEntry:
     """缓存条目"""
@@ -97,7 +92,6 @@ class CacheEntry:
     source: str = ""
     expires_at: Optional[datetime] = None
 
-
 @dataclass
 class PredictionModel:
     """预测模型"""
@@ -106,7 +100,6 @@ class PredictionModel:
     time_based_patterns: Dict[int, float] = field(default_factory=dict)  # 小时 -> 使用概率
     seasonal_patterns: Dict[str, float] = field(default_factory=dict)
     last_updated: datetime = field(default_factory=datetime.now)
-
 
 @dataclass
 class UIIntegrationConfig:
@@ -131,7 +124,6 @@ class UIIntegrationConfig:
     quality_threshold: float = 0.8         # 质量阈值
     performance_monitoring: bool = True     # 性能监控
     auto_source_switching: bool = True      # 自动数据源切换
-
 
 class SmartDataIntegration(QObject if PYQT5_AVAILABLE else object):
     """智能数据集成管理器"""
@@ -1435,10 +1427,8 @@ class SmartDataIntegration(QObject if PYQT5_AVAILABLE else object):
             if logger:
                 logger.error(f"关闭集成管理器失败: {e}")
 
-
 # 全局实例
 _smart_data_integration = None
-
 
 def get_smart_data_integration(config: Optional[UIIntegrationConfig] = None) -> SmartDataIntegration:
     """获取智能数据集成管理器单例"""

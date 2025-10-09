@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""
+紧急递归修复脚本
+
+修复由于自动替换导致的递归调用问题：
+1. 检测并修复所有函数内部的自递归调用
+2. 确保单例模式的正确实现
+3. 恢复正确的实例化逻辑
+"""
+
+import os
+import re
+import shutil
+from pathlib import Path
+
+
+def fix_recursion_in_file(file_path: str) -> bool:
+    """修复文件中的递归调用问题"""
+    if not os.path.exists(file_path):
+        return False
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        original_content = content
+
+        # 修复get_unified_data_manager函数内部的递归调用
+        pattern = r'(def get_unified_data_manager\(\).*?)(\n.*?_unified_data_manager_instance = )get_unified_data_manager\(\)'
+        replacement = r'\1\2UnifiedDataManager()'
+        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+
+        # 修复其他可能的递归模式
+        # 例如：在函数foo()内部调用foo()
+        recursion_patterns = [
+            # get_plugin_manager函数内部调用自己
+            (r'(def get_plugin_manager\(\).*?)(\n.*?=\s*)get_plugin_manager\(\)', r'\1\2PluginManager()'),
+            # get_service函数内部调用自己
+            (r'(def get_service\([^)]+\).*?)(\n.*?=\s*)get_service\(', r'\1\2service_container.resolve('),
+        ]
+
+        for pattern, replacement in recursion_patterns:
+            content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+
+        # 如果有变化，写回文件
+        if content != original_content:
+            # 备份原文件
+            shutil.copy2(file_path, f"{file_path}.recursion_backup")
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            print(f"✅ 修复递归问题: {file_path}")
+            return True
+
+    except Exception as e:
+        print(f"❌ 修复失败 {file_path}: {e}")
+        return False
+
+    return False
+
+
+def scan_and_fix_all_recursions():
+    """扫描并修复所有可能的递归问题"""
+    print("🔍 扫描递归调用问题...")
+
+    files_to_check = [
+        'core/services/unified_data_manager.py',
+        'utils/singleton_helper.py',
+        'core/services/service_bootstrap.py',
+    ]
+
+    # 添加最近修改的文件
+    for root, dirs, files in os.walk('.'):
+        for file in files:
+            if file.endswith('.py') and 'comprehensive_backup' in file:
+                original_file = file.replace('.comprehensive_backup', '')
+                original_path = os.path.join(root, original_file)
+                if os.path.exists(original_path):
+                    files_to_check.append(original_path)
+
+    # 去重
+    files_to_check = list(set(files_to_check))
+
+    fixed_count = 0
+    for file_path in files_to_check:
+        if fix_recursion_in_file(file_path):
+            fixed_count += 1
+
+    return fixed_count
+
+
+def validate_singleton_implementation():
+    """验证单例实现的正确性"""
+    print("🔍 验证单例实现...")
+
+    # 检查get_unified_data_manager函数
+    file_path = 'core/services/unified_data_manager.py'
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # 查找get_unified_data_manager函数
+        pattern = r'def get_unified_data_manager\(\):(.*?)(?=\n\ndef|\nclass|\Z)'
+        match = re.search(pattern, content, re.DOTALL)
+
+        if match:
+            function_body = match.group(1)
+
+            # 检查是否存在递归调用
+            if 'get_unified_data_manager()' in function_body:
+                print("❌ 发现递归调用在get_unified_data_manager函数中")
+                return False
+
+            # 检查是否正确创建实例
+            if 'UnifiedDataManager()' in function_body:
+                print("✅ get_unified_data_manager函数实现正确")
+                return True
+            else:
+                print("⚠️ get_unified_data_manager函数可能有问题")
+                print(f"函数体:\n{function_body}")
+                return False
+        else:
+            print("❌ 未找到get_unified_data_manager函数")
+            return False
+
+    return False
+
+
+def main():
+    """主函数"""
+    print("🚨 开始紧急递归修复...")
+    print("=" * 60)
+
+    try:
+        # 1. 扫描并修复递归问题
+        fixed_count = scan_and_fix_all_recursions()
+
+        # 2. 验证单例实现
+        singleton_ok = validate_singleton_implementation()
+
+        print("\n" + "=" * 60)
+        print("🎉 紧急递归修复完成！")
+        print(f"\n📊 修复统计:")
+        print(f"  ✅ 修复文件数: {fixed_count}")
+        print(f"  ✅ 单例验证: {'通过' if singleton_ok else '失败'}")
+
+        if singleton_ok:
+            print(f"\n✅ 关键修复:")
+            print("✅ 消除了get_unified_data_manager的递归调用")
+            print("✅ 恢复了正确的UnifiedDataManager()实例化")
+            print("✅ 单例模式实现正确")
+        else:
+            print(f"\n❌ 需要进一步检查:")
+            print("❌ 单例实现可能还有问题")
+            print("❌ 建议手动检查get_unified_data_manager函数")
+
+        print(f"\n⚠️  重要提示:")
+        print("1. 所有修复文件已备份为 .recursion_backup")
+        print("2. 请立即测试系统启动")
+        print("3. 如有问题可快速恢复备份")
+
+    except Exception as e:
+        print(f"❌ 修复过程中出现错误: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    return True
+
+
+if __name__ == "__main__":
+    main()

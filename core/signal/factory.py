@@ -5,7 +5,6 @@ from typing import Dict, Any, Optional, Type
 from core.data_manager import data_manager
 from loguru import logger
 
-
 class SignalFactory:
     """信号系统工厂类"""
 

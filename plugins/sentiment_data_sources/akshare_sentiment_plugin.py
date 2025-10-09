@@ -15,6 +15,7 @@ from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPl
 from core.network.akshare_network_config import get_akshare_network_config
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 from core.network.universal_network_config import INetworkConfigurable, NetworkEndpoint, PluginNetworkConfig
+from core.network.universal_network_config import network_config
 
 
 class AkShareSentimentPlugin(BaseSentimentPlugin, INetworkConfigurable):
@@ -179,6 +180,80 @@ class AkShareSentimentPlugin(BaseSentimentPlugin, INetworkConfigurable):
 
         except Exception as e:
             self._safe_log("error", f"应用网络配置失败: {e}")
+            return False
+
+    def get_network_config(self) -> PluginNetworkConfig:
+        """获取网络配置"""
+        try:
+            return PluginNetworkConfig(
+                plugin_name="AkShareSentimentPlugin",
+                endpoints=self.get_default_endpoints(),
+                rate_limit_enabled=True,
+                request_delay=2.0,
+                requests_per_minute=20,
+                proxy_enabled=False,
+                proxy_list=[],
+                timeout=30,
+                retry_count=3
+            )
+        except Exception as e:
+            self._safe_log("error", f"获取网络配置失败: {e}")
+            # 返回默认配置
+            return PluginNetworkConfig(
+                plugin_name="AkShareSentimentPlugin",
+                endpoints=[],
+                rate_limit_enabled=True,
+                request_delay=2.0,
+                requests_per_minute=20
+            )
+
+    def update_network_config(self, config: PluginNetworkConfig) -> bool:
+        """更新网络配置"""
+        try:
+            # 更新频率限制
+            if config.rate_limit_enabled:
+                self.network_config.set_rate_limit(
+                    config.request_delay,
+                    config.requests_per_minute
+                )
+
+            # 更新代理设置
+            if config.proxy_enabled and config.proxy_list:
+                self.network_config.load_proxy_list(config.proxy_list)
+
+            self._safe_log("info", f"网络配置已更新: {config.plugin_name}")
+            return True
+
+        except Exception as e:
+            self._safe_log("error", f"更新网络配置失败: {e}")
+            return False
+
+    def test_network_connectivity(self) -> bool:
+        """测试网络连通性"""
+        try:
+            # 简单的网络连通性测试
+            import requests
+
+            # 测试访问AkShare相关的网站
+            test_urls = [
+                "https://akshare.akfamily.xyz",
+                "https://github.com/akfamily/akshare"
+            ]
+
+            for url in test_urls:
+                try:
+                    response = requests.get(url, timeout=10)
+                    if response.status_code == 200:
+                        self._safe_log("info", f"网络连通性测试成功: {url}")
+                        return True
+                except Exception:
+                    continue
+
+            self._safe_log("warning", "网络连通性测试失败，所有测试URL都无法访问")
+            return False
+
+        except Exception as e:
+            self._safe_log("error", f"网络连通性测试异常: {e}")
             return False
 
     @property

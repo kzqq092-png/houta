@@ -118,7 +118,7 @@ class AIModelType:
     ENSEMBLE = "ensemble"
     STATISTICAL = "statistical"
     RULE_BASED = "rule_based"
-    
+
     # 新增模型类型
     TRANSFORMER = "transformer"  # Transformer模型
     LSTM = "lstm"              # LSTM模型
@@ -142,7 +142,7 @@ class PredictionType:
     RISK_FORECAST = "risk_forecast"  # 风险趋势预测
     EXECUTION_TIME = "execution_time"  # 执行时间预测
     PARAMETER_OPTIMIZATION = "parameter_optimization"  # 参数优化预测
-    
+
     # 新增预测类型
     VOLATILITY = "volatility"  # 波动率预测
     CORRELATION = "correlation"  # 相关性预测
@@ -171,8 +171,23 @@ class AIPredictionService(BaseService):
         self._predictions_cache = {}
         self._last_update = {}
 
+        # 警告频率限制
+        self._last_warning_time = {}  # 记录每种预测类型的最后警告时间
+        self._warning_interval = 60  # 警告间隔（秒）
+
         # 初始化模型
         self._initialize_models()
+
+    def _should_warn(self, prediction_type: str) -> bool:
+        """检查是否应该输出警告（避免重复警告）"""
+        import time
+        current_time = time.time()
+        last_time = self._last_warning_time.get(prediction_type, 0)
+
+        if current_time - last_time > self._warning_interval:
+            self._last_warning_time[prediction_type] = current_time
+            return True
+        return False
 
         # 缓存ML库导入状态
         self._ml_libs_cache = None
@@ -262,8 +277,12 @@ class AIPredictionService(BaseService):
             elif prediction_type == PredictionType.SEASONALITY:
                 if 'kdata' in data:
                     return self.predict_seasonality(data['kdata'])
+            elif prediction_type == PredictionType.RISK_FORECAST:
+                if 'kdata' in data:
+                    return self.predict_risk_forecast(data['kdata'])
             else:
-                logger.warning(f"不支持的预测类型: {prediction_type}")
+                if self._should_warn(prediction_type):
+                    logger.warning(f"不支持的预测类型: {prediction_type}")
                 return None
 
         except Exception as e:
@@ -546,7 +565,7 @@ class AIPredictionService(BaseService):
                 'cache_ttl': 300,
                 'max_cache_size': 1000
             }
-            
+
             # 新增配置
             self.algorithm_config = config_manager.get_config('algorithm_config') or {
                 'enable_advanced_algorithms': True,
@@ -555,7 +574,7 @@ class AIPredictionService(BaseService):
                 'model_update_frequency': 'daily',
                 'performance_threshold': 0.7
             }
-            
+
             self.prediction_config = config_manager.get_config('prediction_config') or {
                 'default_confidence_threshold': 0.6,
                 'max_prediction_horizon': 30,
@@ -569,7 +588,7 @@ class AIPredictionService(BaseService):
                 'detailed_errors': True
             }
 
-            logger.info(" AI预测配置已从数据库加载")
+            logger.info("AI预测配置已从数据库加载")
 
         except Exception as e:
             logger.warning(f"从数据库加载配置失败，使用默认配置: {e}")
@@ -604,7 +623,7 @@ class AIPredictionService(BaseService):
                 'cache_ttl': 300,
                 'max_cache_size': 1000
             }
-            
+
             # 新增默认配置
             self.algorithm_config = {
                 'enable_advanced_algorithms': True,
@@ -613,7 +632,7 @@ class AIPredictionService(BaseService):
                 'model_update_frequency': 'daily',
                 'performance_threshold': 0.7
             }
-            
+
             self.prediction_config = {
                 'default_confidence_threshold': 0.6,
                 'max_prediction_horizon': 30,
@@ -739,15 +758,15 @@ class AIPredictionService(BaseService):
             model_dir.mkdir(exist_ok=True)
 
             if DL_AVAILABLE:
-                logger.info(" 深度学习模块可用，初始化AI预测模型")
+                logger.info("深度学习模块可用，初始化AI预测模型")
                 self._load_or_create_models()
             else:
-                logger.warning(" 深度学习模块不可用，使用统计模型")
+                logger.warning("深度学习模块不可用，使用统计模型")
                 self._initialize_statistical_models()
 
         except Exception as e:
             logger.error(f" 模型初始化失败: {e}")
-            logger.warning("🤖 AI模型文件缺失或损坏，这是正常的初次运行状态")
+            logger.warning("AI模型文件缺失或损坏，这是正常的初次运行状态")
             logger.info("💡 系统将使用内置的统计模型作为回退方案，功能完全正常")
             logger.info("📁 如需使用深度学习模型，请确保 'models/trained/' 目录下有相应的模型文件")
             self._initialize_fallback_models()
@@ -840,7 +859,7 @@ class AIPredictionService(BaseService):
         """
         # === 详细调试日志开始 ===
         logger.info("="*80)
-        logger.info(" AI预测服务 - predict_patterns 开始")
+        logger.info("AI预测服务 - predict_patterns 开始")
         logger.info(f" 输入数据: K线长度={len(kdata)}, 形态数量={len(patterns)}")
         logger.info(f" 当前模型配置: {self.model_config}")
         logger.info(f" 当前模型类型: {self.model_config.get('model_type', 'N/A')}")
@@ -1044,11 +1063,11 @@ class AIPredictionService(BaseService):
     def _generate_pattern_prediction(self, kdata: pd.DataFrame, patterns: List[Dict]) -> Dict[str, Any]:
         """生成形态预测"""
         # === 详细调试日志 ===
-        logger.info(" _generate_pattern_prediction 开始")
+        logger.info("_generate_pattern_prediction 开始")
         logger.info(f" 形态数量: {len(patterns)}")
 
         if not patterns:
-            logger.warning(" 形态列表为空，调用 _predict_without_patterns")
+            logger.warning("形态列表为空，调用 _predict_without_patterns")
             logger.info(f" 即将使用模型类型: {self.model_config.get('model_type', 'N/A')}")
             result = self._predict_without_patterns(kdata)
             logger.info(f" _predict_without_patterns 返回结果: {result}")
@@ -1102,16 +1121,16 @@ class AIPredictionService(BaseService):
         # 根据模型类型进行不同的预测处理
         try:
             if model_type == AIModelType.DEEP_LEARNING:
-                logger.info(" 使用深度学习模型处理形态预测...")
+                logger.info("使用深度学习模型处理形态预测...")
                 result = self._predict_with_patterns_deep_learning(kdata, valid_patterns, pattern_analysis)
             elif model_type == AIModelType.STATISTICAL:
-                logger.info(" 使用统计模型处理形态预测...")
+                logger.info("使用统计模型处理形态预测...")
                 result = self._predict_with_patterns_statistical(kdata, valid_patterns, pattern_analysis)
             elif model_type == AIModelType.RULE_BASED:
-                logger.info(" 使用规则模型处理形态预测...")
+                logger.info("使用规则模型处理形态预测...")
                 result = self._predict_with_patterns_rule_based(kdata, valid_patterns, pattern_analysis)
             else:  # ENSEMBLE
-                logger.info(" 使用集成模型处理形态预测...")
+                logger.info("使用集成模型处理形态预测...")
                 result = self._predict_with_patterns_ensemble(kdata, valid_patterns, pattern_analysis)
 
             # 添加形态分析信息
@@ -1139,7 +1158,7 @@ class AIPredictionService(BaseService):
     def _predict_without_patterns(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """当形态列表为空时，根据模型类型进行预测"""
         # === 详细调试日志 ===
-        logger.info(" _predict_without_patterns 开始执行")
+        logger.info("_predict_without_patterns 开始执行")
         model_type = self.model_config.get('model_type', AIModelType.ENSEMBLE)
         logger.info(f" 使用模型类型: {model_type}")
         logger.info(f" 完整模型配置: {self.model_config}")
@@ -1148,19 +1167,19 @@ class AIPredictionService(BaseService):
         try:
             # 根据模型类型选择预测方法
             if model_type == AIModelType.DEEP_LEARNING:
-                logger.info(" 调用深度学习模型预测...")
+                logger.info("调用深度学习模型预测...")
                 result = self._predict_with_deep_learning(kdata)
                 result['model_path'] = 'deep_learning_without_patterns'
             elif model_type == AIModelType.STATISTICAL:
-                logger.info(" 调用统计模型预测...")
+                logger.info("调用统计模型预测...")
                 result = self._predict_with_statistical_method(kdata)
                 result['model_path'] = 'statistical_without_patterns'
             elif model_type == AIModelType.RULE_BASED:
-                logger.info(" 调用规则模型预测...")
+                logger.info("调用规则模型预测...")
                 result = self._predict_with_rule_based_method(kdata)
                 result['model_path'] = 'rule_based_without_patterns'
             else:  # ENSEMBLE
-                logger.info(" 调用集成模型预测...")
+                logger.info("调用集成模型预测...")
                 result = self._predict_with_ensemble_method(kdata)
                 result['model_path'] = 'ensemble_without_patterns'
 
@@ -1221,7 +1240,7 @@ class AIPredictionService(BaseService):
 
     def _predict_with_deep_learning(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """深度学习模型预测"""
-        logger.info(" === 深度学习模型预测开始 ===")
+        logger.info("=== 深度学习模型预测开始 ===")
 
         try:
             # 提取特征
@@ -1268,7 +1287,7 @@ class AIPredictionService(BaseService):
 
     def _predict_with_statistical_method(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """统计模型预测"""
-        logger.info(" === 统计模型预测开始 ===")
+        logger.info("=== 统计模型预测开始 ===")
 
         try:
             # 计算统计指标
@@ -1309,7 +1328,7 @@ class AIPredictionService(BaseService):
 
     def _predict_with_rule_based_method(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """规则模型预测"""
-        logger.info(" === 规则模型预测开始 ===")
+        logger.info("=== 规则模型预测开始 ===")
 
         try:
             features = self._extract_pattern_features(kdata)
@@ -1366,17 +1385,17 @@ class AIPredictionService(BaseService):
 
     def _predict_with_ensemble_method(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """集成模型预测"""
-        logger.info(" === 集成模型预测开始 ===")
+        logger.info("=== 集成模型预测开始 ===")
 
         try:
             # 调用所有子模型
-            logger.info(" 调用深度学习子模型...")
+            logger.info("调用深度学习子模型...")
             dl_result = self._predict_with_deep_learning(kdata)
 
-            logger.info(" 调用统计模型子模型...")
+            logger.info("调用统计模型子模型...")
             stat_result = self._predict_with_statistical_method(kdata)
 
-            logger.info(" 调用规则模型子模型...")
+            logger.info("调用规则模型子模型...")
             rule_result = self._predict_with_rule_based_method(kdata)
 
             # 加权投票
@@ -1899,7 +1918,7 @@ class AIPredictionService(BaseService):
             },
             'performance_metrics': self._get_model_performance_metrics()
         }
-    
+
     def _get_model_performance_metrics(self) -> Dict[str, Any]:
         """获取模型性能指标"""
         try:
@@ -1916,7 +1935,7 @@ class AIPredictionService(BaseService):
         except Exception as e:
             logger.error(f"获取性能指标失败: {e}")
             return {}
-    
+
     def get_model_info(self) -> Dict[str, Any]:
         """获取模型信息（保持向后兼容）"""
         return {
@@ -2005,16 +2024,16 @@ class AIPredictionService(BaseService):
                 PredictionType.PARAMETER_OPTIMIZATION
             ]
         }
-    
+
     def batch_predict(self, requests: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """批量预测"""
         results = []
-        
+
         for request in requests:
             try:
                 prediction_type = request.get('type')
                 data = request.get('data', {})
-                
+
                 result = self.predict(prediction_type, data)
                 if result:
                     result['request_id'] = request.get('id', len(results))
@@ -2025,7 +2044,7 @@ class AIPredictionService(BaseService):
                         'error': f'预测失败: {prediction_type}',
                         'prediction_type': prediction_type
                     })
-                    
+
             except Exception as e:
                 logger.error(f"批量预测中的单个请求失败: {e}")
                 results.append({
@@ -2033,9 +2052,9 @@ class AIPredictionService(BaseService):
                     'error': str(e),
                     'prediction_type': request.get('type', 'unknown')
                 })
-        
+
         return results
-    
+
     def validate_prediction_request(self, prediction_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """验证预测请求"""
         validation_result = {
@@ -2043,27 +2062,27 @@ class AIPredictionService(BaseService):
             'errors': [],
             'warnings': []
         }
-        
+
         # 检查预测类型
         supported_types = [
             PredictionType.PATTERN, PredictionType.TREND, PredictionType.SENTIMENT,
-            PredictionType.PRICE, PredictionType.RISK, PredictionType.EXECUTION_TIME,
+            PredictionType.PRICE, PredictionType.RISK, PredictionType.RISK_FORECAST, PredictionType.EXECUTION_TIME,
             PredictionType.PARAMETER_OPTIMIZATION, PredictionType.VOLATILITY,
             PredictionType.CORRELATION, PredictionType.ANOMALY, PredictionType.MARKET_REGIME,
             PredictionType.LIQUIDITY, PredictionType.MOMENTUM, PredictionType.REVERSAL,
             PredictionType.SUPPORT_RESISTANCE, PredictionType.VOLUME_PROFILE, PredictionType.SEASONALITY
         ]
-        
+
         if prediction_type not in supported_types:
             validation_result['valid'] = False
             validation_result['errors'].append(f"不支持的预测类型: {prediction_type}")
-        
+
         # 检查数据要求
-        if prediction_type in [PredictionType.PATTERN, PredictionType.TREND, PredictionType.SENTIMENT, 
-                              PredictionType.PRICE, PredictionType.VOLATILITY, PredictionType.ANOMALY,
-                              PredictionType.MARKET_REGIME, PredictionType.LIQUIDITY, PredictionType.MOMENTUM,
-                              PredictionType.REVERSAL, PredictionType.SUPPORT_RESISTANCE, 
-                              PredictionType.VOLUME_PROFILE, PredictionType.SEASONALITY]:
+        if prediction_type in [PredictionType.PATTERN, PredictionType.TREND, PredictionType.SENTIMENT,
+                               PredictionType.PRICE, PredictionType.VOLATILITY, PredictionType.ANOMALY,
+                               PredictionType.MARKET_REGIME, PredictionType.LIQUIDITY, PredictionType.MOMENTUM,
+                               PredictionType.REVERSAL, PredictionType.SUPPORT_RESISTANCE,
+                               PredictionType.VOLUME_PROFILE, PredictionType.SEASONALITY]:
             if 'kdata' not in data:
                 validation_result['valid'] = False
                 validation_result['errors'].append("缺少必需的kdata参数")
@@ -2073,14 +2092,14 @@ class AIPredictionService(BaseService):
             elif data['kdata'].empty:
                 validation_result['valid'] = False
                 validation_result['errors'].append("kdata不能为空")
-        
+
         if prediction_type == PredictionType.CORRELATION:
             if 'kdata1' not in data or 'kdata2' not in data:
                 validation_result['valid'] = False
                 validation_result['errors'].append("相关性预测需要kdata1和kdata2参数")
-        
+
         return validation_result
-    
+
     def dispose(self):
         """清理资源"""
         self.clear_cache()
@@ -2089,7 +2108,7 @@ class AIPredictionService(BaseService):
 
     def _predict_with_patterns_deep_learning(self, kdata: pd.DataFrame, patterns: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """深度学习模型的形态预测"""
-        logger.info(" === 深度学习形态预测开始 ===")
+        logger.info("=== 深度学习形态预测开始 ===")
 
         # 提取形态特征
         pattern_features = self._extract_pattern_features_from_patterns(patterns)
@@ -2146,7 +2165,7 @@ class AIPredictionService(BaseService):
 
     def _predict_with_patterns_statistical(self, kdata: pd.DataFrame, patterns: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """统计模型的形态预测"""
-        logger.info(" === 统计模型形态预测开始 ===")
+        logger.info("=== 统计模型形态预测开始 ===")
 
         # 统计分析方法
         pattern_confidence_std = np.std([p.get('confidence', 0.5) for p in patterns])
@@ -2195,7 +2214,7 @@ class AIPredictionService(BaseService):
 
     def _predict_with_patterns_rule_based(self, kdata: pd.DataFrame, patterns: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """规则模型的形态预测"""
-        logger.info(" === 规则模型形态预测开始 ===")
+        logger.info("=== 规则模型形态预测开始 ===")
 
         rules_score = 0
         rules_applied = []
@@ -2256,7 +2275,7 @@ class AIPredictionService(BaseService):
 
     def _predict_with_patterns_ensemble(self, kdata: pd.DataFrame, patterns: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """集成模型的形态预测"""
-        logger.info(" === 集成模型形态预测开始 ===")
+        logger.info("=== 集成模型形态预测开始 ===")
 
         # 调用所有子模型
         dl_result = self._predict_with_patterns_deep_learning(kdata, patterns, pattern_analysis)
@@ -2322,7 +2341,7 @@ class AIPredictionService(BaseService):
 
     def _fallback_pattern_analysis(self, valid_patterns: List[Dict], buy_signals: List[Dict], sell_signals: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """降级后备形态分析"""
-        logger.warning(" 使用后备形态分析")
+        logger.warning("使用后备形态分析")
 
         # 基于形态信号强度的简单预测
         if len(buy_signals) > len(sell_signals):
@@ -2525,36 +2544,36 @@ class AIPredictionService(BaseService):
     def predict_volatility(self, kdata: pd.DataFrame, horizon: int = 5) -> Dict[str, Any]:
         """
         预测波动率
-        
+
         Args:
             kdata: K线数据
             horizon: 预测时间范围（天数）
-            
+
         Returns:
             波动率预测结果
         """
         try:
             if not self._validate_kdata(kdata):
                 raise ValueError("无效的K线数据")
-            
+
             # 计算历史波动率
             returns = kdata['close'].pct_change().dropna()
-            
+
             # GARCH模型预测（简化版）
             historical_vol = returns.rolling(window=20).std() * np.sqrt(252)
             current_vol = historical_vol.iloc[-1]
-            
+
             # 使用EWMA预测未来波动率
             lambda_param = 0.94
             ewma_vol = returns.ewm(alpha=1-lambda_param).std() * np.sqrt(252)
             predicted_vol = ewma_vol.iloc[-1]
-            
+
             # 波动率聚类检测
             vol_regime = "高波动" if predicted_vol > current_vol * 1.2 else "低波动" if predicted_vol < current_vol * 0.8 else "正常波动"
-            
+
             # 计算VIX指数（简化版）
             vix_estimate = predicted_vol * 100
-            
+
             return {
                 'predicted_volatility': float(predicted_vol),
                 'current_volatility': float(current_vol),
@@ -2566,7 +2585,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.VOLATILITY,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"波动率预测失败: {e}")
             return {
@@ -2578,16 +2597,16 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def predict_correlation(self, kdata1: pd.DataFrame, kdata2: pd.DataFrame, window: int = 20) -> Dict[str, Any]:
         """
         预测相关性
-        
+
         Args:
             kdata1: 第一个资产的K线数据
             kdata2: 第二个资产的K线数据
             window: 滚动窗口大小
-            
+
         Returns:
             相关性预测结果
         """
@@ -2595,24 +2614,24 @@ class AIPredictionService(BaseService):
             # 计算收益率
             returns1 = kdata1['close'].pct_change().dropna()
             returns2 = kdata2['close'].pct_change().dropna()
-            
+
             # 对齐时间序列
             aligned_returns = pd.concat([returns1, returns2], axis=1, join='inner')
             aligned_returns.columns = ['asset1', 'asset2']
-            
+
             # 滚动相关性
             rolling_corr = aligned_returns['asset1'].rolling(window=window).corr(aligned_returns['asset2'])
             current_corr = rolling_corr.iloc[-1]
-            
+
             # DCC-GARCH模型预测（简化版）
             # 使用指数加权移动平均预测未来相关性
             ewma_corr = rolling_corr.ewm(alpha=0.1).mean()
             predicted_corr = ewma_corr.iloc[-1]
-            
+
             # 相关性稳定性分析
             corr_volatility = rolling_corr.rolling(window=10).std().iloc[-1]
             stability = "稳定" if corr_volatility < 0.1 else "不稳定"
-            
+
             # 相关性强度分类
             if abs(predicted_corr) > 0.7:
                 strength = "强相关"
@@ -2620,7 +2639,7 @@ class AIPredictionService(BaseService):
                 strength = "中等相关"
             else:
                 strength = "弱相关"
-            
+
             return {
                 'predicted_correlation': float(predicted_corr),
                 'current_correlation': float(current_corr),
@@ -2633,7 +2652,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.CORRELATION,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"相关性预测失败: {e}")
             return {
@@ -2644,41 +2663,41 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def detect_anomalies(self, kdata: pd.DataFrame, threshold: float = 2.0) -> Dict[str, Any]:
         """
         异常检测
-        
+
         Args:
             kdata: K线数据
             threshold: 异常阈值（标准差倍数）
-            
+
         Returns:
             异常检测结果
         """
         try:
             # 计算收益率
             returns = kdata['close'].pct_change().dropna()
-            
+
             # Z-score异常检测
             z_scores = np.abs((returns - returns.mean()) / returns.std())
             anomalies = z_scores > threshold
-            
+
             # 成交量异常检测
             if 'volume' in kdata.columns:
                 volume_z = np.abs((kdata['volume'] - kdata['volume'].mean()) / kdata['volume'].std())
                 volume_anomalies = volume_z > threshold
             else:
                 volume_anomalies = pd.Series([False] * len(kdata))
-            
+
             # 价格跳空检测
             price_gaps = np.abs(kdata['open'] - kdata['close'].shift(1)) / kdata['close'].shift(1)
             gap_anomalies = price_gaps > 0.05  # 5%以上跳空
-            
+
             # 综合异常评分
             anomaly_count = anomalies.sum() + volume_anomalies.sum() + gap_anomalies.sum()
             anomaly_ratio = anomaly_count / len(kdata)
-            
+
             # 异常类型分析
             anomaly_types = []
             if anomalies.any():
@@ -2687,7 +2706,7 @@ class AIPredictionService(BaseService):
                 anomaly_types.append("成交量异常")
             if gap_anomalies.any():
                 anomaly_types.append("价格跳空")
-            
+
             # 风险等级
             if anomaly_ratio > 0.1:
                 risk_level = "高风险"
@@ -2695,7 +2714,7 @@ class AIPredictionService(BaseService):
                 risk_level = "中风险"
             else:
                 risk_level = "低风险"
-            
+
             return {
                 'anomaly_count': int(anomaly_count),
                 'anomaly_ratio': float(anomaly_ratio),
@@ -2708,7 +2727,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.ANOMALY,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"异常检测失败: {e}")
             return {
@@ -2719,14 +2738,14 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def predict_market_regime(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """
         预测市场状态
-        
+
         Args:
             kdata: K线数据
-            
+
         Returns:
             市场状态预测结果
         """
@@ -2734,16 +2753,16 @@ class AIPredictionService(BaseService):
             # 计算市场指标
             returns = kdata['close'].pct_change().dropna()
             volatility = returns.rolling(window=20).std()
-            
+
             # 趋势强度
             ma_short = kdata['close'].rolling(window=5).mean()
             ma_long = kdata['close'].rolling(window=20).mean()
             trend_strength = (ma_short - ma_long) / ma_long
-            
+
             # 市场状态分类
             current_vol = volatility.iloc[-1]
             current_trend = trend_strength.iloc[-1]
-            
+
             # 使用隐马尔可夫模型的简化版本
             if current_vol > volatility.quantile(0.8):
                 if abs(current_trend) > 0.02:
@@ -2762,14 +2781,14 @@ class AIPredictionService(BaseService):
                 else:
                     regime = "正常震荡市"
                     regime_code = 1
-            
+
             # 状态持续性预测
             regime_history = []
             for i in range(min(10, len(kdata))):
                 idx = -(i+1)
                 vol = volatility.iloc[idx]
                 trend = trend_strength.iloc[idx]
-                
+
                 if vol > volatility.quantile(0.8):
                     if abs(trend) > 0.02:
                         regime_history.append(3)
@@ -2779,11 +2798,11 @@ class AIPredictionService(BaseService):
                     regime_history.append(0)
                 else:
                     regime_history.append(1)
-            
+
             # 状态稳定性
             regime_changes = sum(1 for i in range(1, len(regime_history)) if regime_history[i] != regime_history[i-1])
             stability = "稳定" if regime_changes < 3 else "不稳定"
-            
+
             return {
                 'current_regime': regime,
                 'regime_code': regime_code,
@@ -2796,7 +2815,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.MARKET_REGIME,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"市场状态预测失败: {e}")
             return {
@@ -2806,20 +2825,20 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def predict_liquidity(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """
         预测流动性
-        
+
         Args:
             kdata: K线数据
-            
+
         Returns:
             流动性预测结果
         """
         try:
             # 计算流动性指标
-            
+
             # Amihud非流动性比率
             if 'volume' in kdata.columns and (kdata['volume'] > 0).any():
                 returns = kdata['close'].pct_change().abs()
@@ -2827,14 +2846,14 @@ class AIPredictionService(BaseService):
                 current_amihud = amihud_ratio.iloc[-1]
             else:
                 current_amihud = 0.001
-            
+
             # 买卖价差估计（使用高低价差）
             bid_ask_spread = ((kdata['high'] - kdata['low']) / kdata['close']).rolling(window=20).mean()
             current_spread = bid_ask_spread.iloc[-1]
-            
+
             # 价格冲击成本
             price_impact = np.sqrt(current_amihud * 10000)  # 标准化
-            
+
             # 流动性等级分类
             if current_amihud < amihud_ratio.quantile(0.2):
                 liquidity_level = "高流动性"
@@ -2851,10 +2870,10 @@ class AIPredictionService(BaseService):
             else:
                 liquidity_level = "低流动性"
                 liquidity_score = 1
-            
+
             # 流动性风险评估
             liquidity_risk = "低风险" if liquidity_score >= 4 else "中风险" if liquidity_score >= 3 else "高风险"
-            
+
             return {
                 'liquidity_level': liquidity_level,
                 'liquidity_score': liquidity_score,
@@ -2867,7 +2886,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.LIQUIDITY,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"流动性预测失败: {e}")
             return {
@@ -2877,15 +2896,15 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def predict_momentum(self, kdata: pd.DataFrame, period: int = 14) -> Dict[str, Any]:
         """
         预测动量
-        
+
         Args:
             kdata: K线数据
             period: 动量计算周期
-            
+
         Returns:
             动量预测结果
         """
@@ -2896,61 +2915,61 @@ class AIPredictionService(BaseService):
             loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
             rs = gain / loss
             rsi = 100 - (100 / (1 + rs))
-            
+
             # MACD动量指标
             ema_12 = kdata['close'].ewm(span=12).mean()
             ema_26 = kdata['close'].ewm(span=26).mean()
             macd = ema_12 - ema_26
             signal = macd.ewm(span=9).mean()
             histogram = macd - signal
-            
+
             # 价格动量
             price_momentum = (kdata['close'] / kdata['close'].shift(period) - 1) * 100
-            
+
             # 成交量动量
             if 'volume' in kdata.columns:
                 volume_momentum = (kdata['volume'] / kdata['volume'].rolling(window=period).mean() - 1) * 100
             else:
                 volume_momentum = pd.Series([0] * len(kdata))
-            
+
             # 综合动量评分
             current_rsi = rsi.iloc[-1]
             current_macd = macd.iloc[-1]
             current_signal = signal.iloc[-1]
             current_price_momentum = price_momentum.iloc[-1]
             current_volume_momentum = volume_momentum.iloc[-1]
-            
+
             # 动量强度分类
             momentum_signals = []
             if current_rsi > 70:
                 momentum_signals.append("RSI超买")
             elif current_rsi < 30:
                 momentum_signals.append("RSI超卖")
-            
+
             if current_macd > current_signal:
                 momentum_signals.append("MACD金叉")
             else:
                 momentum_signals.append("MACD死叉")
-            
+
             if current_price_momentum > 5:
                 momentum_signals.append("价格强势上涨")
             elif current_price_momentum < -5:
                 momentum_signals.append("价格强势下跌")
-            
+
             # 动量方向和强度
             momentum_score = (
                 (current_rsi - 50) / 50 * 0.3 +
                 np.sign(current_macd - current_signal) * 0.3 +
                 np.tanh(current_price_momentum / 10) * 0.4
             )
-            
+
             if momentum_score > 0.3:
                 momentum_direction = "上涨动量"
             elif momentum_score < -0.3:
                 momentum_direction = "下跌动量"
             else:
                 momentum_direction = "动量平衡"
-            
+
             return {
                 'momentum_direction': momentum_direction,
                 'momentum_score': float(momentum_score),
@@ -2966,7 +2985,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.MOMENTUM,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"动量预测失败: {e}")
             return {
@@ -2976,14 +2995,14 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def predict_reversal(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """
         预测反转
-        
+
         Args:
             kdata: K线数据
-            
+
         Returns:
             反转预测结果
         """
@@ -2991,7 +3010,7 @@ class AIPredictionService(BaseService):
             # 反转信号检测
             reversal_signals = []
             reversal_score = 0
-            
+
             # 1. 背离检测
             close_prices = kdata['close'].values
             if len(close_prices) >= 20:
@@ -3000,24 +3019,24 @@ class AIPredictionService(BaseService):
                 gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                 rsi = 100 - (100 / (1 + gain / loss))
-                
+
                 recent_price_high = close_prices[-5:].max()
                 recent_rsi_high = rsi.iloc[-5:].max()
-                
-                if (recent_price_high == close_prices[-1] and 
-                    recent_rsi_high < rsi.iloc[-10:-5].max()):
+
+                if (recent_price_high == close_prices[-1] and
+                        recent_rsi_high < rsi.iloc[-10:-5].max()):
                     reversal_signals.append("顶背离")
                     reversal_score -= 2
-                
+
                 # 价格新低但RSI未创新低（底背离）
                 recent_price_low = close_prices[-5:].min()
                 recent_rsi_low = rsi.iloc[-5:].min()
-                
-                if (recent_price_low == close_prices[-1] and 
-                    recent_rsi_low > rsi.iloc[-10:-5].min()):
+
+                if (recent_price_low == close_prices[-1] and
+                        recent_rsi_low > rsi.iloc[-10:-5].min()):
                     reversal_signals.append("底背离")
                     reversal_score += 2
-            
+
             # 2. 极端情绪检测
             returns = pd.Series(close_prices).pct_change().dropna()
             if len(returns) >= 10:
@@ -3028,7 +3047,7 @@ class AIPredictionService(BaseService):
                 elif all(r < -0.02 for r in recent_returns):  # 连续5天跌幅超2%
                     reversal_signals.append("连续大跌")
                     reversal_score += 1
-            
+
             # 3. 成交量异常
             if 'volume' in kdata.columns:
                 volume_ma = kdata['volume'].rolling(window=20).mean()
@@ -3036,26 +3055,26 @@ class AIPredictionService(BaseService):
                 if current_volume > volume_ma.iloc[-1] * 2:
                     reversal_signals.append("成交量放大")
                     reversal_score += 0.5 if returns.iloc[-1] < 0 else -0.5
-            
+
             # 4. 支撑阻力位测试
             high_prices = kdata['high'].values
             low_prices = kdata['low'].values
-            
+
             if len(high_prices) >= 20:
                 resistance_level = np.percentile(high_prices[-20:], 95)
                 support_level = np.percentile(low_prices[-20:], 5)
                 current_price = close_prices[-1]
-                
+
                 if current_price >= resistance_level * 0.98:
                     reversal_signals.append("接近阻力位")
                     reversal_score -= 1
                 elif current_price <= support_level * 1.02:
                     reversal_signals.append("接近支撑位")
                     reversal_score += 1
-            
+
             # 反转概率计算
             reversal_probability = 1 / (1 + np.exp(-reversal_score))  # Sigmoid函数
-            
+
             # 反转方向和强度
             if reversal_score > 1:
                 reversal_direction = "向上反转"
@@ -3072,7 +3091,7 @@ class AIPredictionService(BaseService):
             else:
                 reversal_direction = "无明显反转"
                 reversal_strength = "弱"
-            
+
             return {
                 'reversal_direction': reversal_direction,
                 'reversal_strength': reversal_strength,
@@ -3084,7 +3103,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.REVERSAL,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"反转预测失败: {e}")
             return {
@@ -3095,14 +3114,14 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def predict_support_resistance(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """
         预测支撑阻力位
-        
+
         Args:
             kdata: K线数据
-            
+
         Returns:
             支撑阻力位预测结果
         """
@@ -3110,23 +3129,23 @@ class AIPredictionService(BaseService):
             high_prices = kdata['high'].values
             low_prices = kdata['low'].values
             close_prices = kdata['close'].values
-            
+
             # 使用分位数方法计算支撑阻力位
             resistance_levels = []
             support_levels = []
-            
+
             # 多时间框架支撑阻力
             for window in [20, 50, 100]:
                 if len(high_prices) >= window:
                     resistance_levels.append(np.percentile(high_prices[-window:], 95))
                     support_levels.append(np.percentile(low_prices[-window:], 5))
-            
+
             # 斐波那契回撤位
             if len(high_prices) >= 50:
                 recent_high = np.max(high_prices[-50:])
                 recent_low = np.min(low_prices[-50:])
                 fib_range = recent_high - recent_low
-                
+
                 fib_levels = {
                     '23.6%': recent_high - fib_range * 0.236,
                     '38.2%': recent_high - fib_range * 0.382,
@@ -3136,7 +3155,7 @@ class AIPredictionService(BaseService):
                 }
             else:
                 fib_levels = {}
-            
+
             # 整数关口
             current_price = close_prices[-1]
             price_magnitude = 10 ** (len(str(int(current_price))) - 1)
@@ -3144,7 +3163,7 @@ class AIPredictionService(BaseService):
                 np.floor(current_price / price_magnitude) * price_magnitude,
                 np.ceil(current_price / price_magnitude) * price_magnitude
             ]
-            
+
             # 移动平均线作为动态支撑阻力
             ma_levels = {
                 'MA5': kdata['close'].rolling(window=5).mean().iloc[-1],
@@ -3152,19 +3171,19 @@ class AIPredictionService(BaseService):
                 'MA20': kdata['close'].rolling(window=20).mean().iloc[-1],
                 'MA50': kdata['close'].rolling(window=50).mean().iloc[-1] if len(kdata) >= 50 else None
             }
-            
+
             # 筛选有效的支撑阻力位
             valid_resistance = [r for r in resistance_levels if r > current_price]
             valid_support = [s for s in support_levels if s < current_price]
-            
+
             # 最近的支撑阻力位
             nearest_resistance = min(valid_resistance) if valid_resistance else None
             nearest_support = max(valid_support) if valid_support else None
-            
+
             # 强度评估
             resistance_strength = len([r for r in resistance_levels if abs(r - nearest_resistance) < current_price * 0.01]) if nearest_resistance else 0
             support_strength = len([s for s in support_levels if abs(s - nearest_support) < current_price * 0.01]) if nearest_support else 0
-            
+
             return {
                 'nearest_resistance': float(nearest_resistance) if nearest_resistance else None,
                 'nearest_support': float(nearest_support) if nearest_support else None,
@@ -3181,7 +3200,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.SUPPORT_RESISTANCE,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"支撑阻力位预测失败: {e}")
             return {
@@ -3192,55 +3211,55 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def predict_volume_profile(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """
         预测成交量分布
-        
+
         Args:
             kdata: K线数据
-            
+
         Returns:
             成交量分布预测结果
         """
         try:
             if 'volume' not in kdata.columns:
                 raise ValueError("缺少成交量数据")
-            
+
             # 价格区间划分
             price_min = kdata['low'].min()
             price_max = kdata['high'].max()
             price_bins = np.linspace(price_min, price_max, 20)
-            
+
             # 计算每个价格区间的成交量
             volume_profile = np.zeros(len(price_bins) - 1)
-            
+
             for i, row in kdata.iterrows():
                 # 假设成交量在OHLC范围内均匀分布
                 price_range = np.linspace(row['low'], row['high'], 10)
                 volume_per_price = row['volume'] / len(price_range)
-                
+
                 for price in price_range:
                     bin_idx = np.digitize(price, price_bins) - 1
                     if 0 <= bin_idx < len(volume_profile):
                         volume_profile[bin_idx] += volume_per_price
-            
+
             # 找到成交量最大的价格区间（POC - Point of Control）
             poc_idx = np.argmax(volume_profile)
             poc_price = (price_bins[poc_idx] + price_bins[poc_idx + 1]) / 2
-            
+
             # 计算价值区域（Value Area）- 包含70%成交量的价格区间
             total_volume = np.sum(volume_profile)
             target_volume = total_volume * 0.7
-            
+
             # 从POC向两边扩展
             left_idx = right_idx = poc_idx
             accumulated_volume = volume_profile[poc_idx]
-            
+
             while accumulated_volume < target_volume and (left_idx > 0 or right_idx < len(volume_profile) - 1):
                 left_volume = volume_profile[left_idx - 1] if left_idx > 0 else 0
                 right_volume = volume_profile[right_idx + 1] if right_idx < len(volume_profile) - 1 else 0
-                
+
                 if left_volume >= right_volume and left_idx > 0:
                     left_idx -= 1
                     accumulated_volume += volume_profile[left_idx]
@@ -3249,19 +3268,19 @@ class AIPredictionService(BaseService):
                     accumulated_volume += volume_profile[right_idx]
                 else:
                     break
-            
+
             value_area_high = (price_bins[right_idx] + price_bins[right_idx + 1]) / 2
             value_area_low = (price_bins[left_idx] + price_bins[left_idx + 1]) / 2
-            
+
             # 成交量分布特征
             volume_distribution = {
                 'price_levels': [(price_bins[i] + price_bins[i + 1]) / 2 for i in range(len(volume_profile))],
                 'volume_amounts': volume_profile.tolist()
             }
-            
+
             # 成交量集中度
             volume_concentration = np.max(volume_profile) / np.mean(volume_profile)
-            
+
             # 当前价格相对位置
             current_price = kdata['close'].iloc[-1]
             if current_price > value_area_high:
@@ -3270,7 +3289,7 @@ class AIPredictionService(BaseService):
                 price_position = "价值区域下方"
             else:
                 price_position = "价值区域内"
-            
+
             return {
                 'poc_price': float(poc_price),
                 'value_area_high': float(value_area_high),
@@ -3284,7 +3303,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.VOLUME_PROFILE,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"成交量分布预测失败: {e}")
             return {
@@ -3296,14 +3315,14 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def predict_seasonality(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """
         预测季节性
-        
+
         Args:
             kdata: K线数据（需要包含时间索引）
-            
+
         Returns:
             季节性预测结果
         """
@@ -3315,21 +3334,21 @@ class AIPredictionService(BaseService):
                 else:
                     # 如果没有日期信息，创建一个假的日期索引
                     kdata.index = pd.date_range(start='2020-01-01', periods=len(kdata), freq='D')
-            
+
             # 计算收益率
             returns = kdata['close'].pct_change().dropna()
-            
+
             # 月度季节性
             monthly_returns = returns.groupby(returns.index.month).mean()
             best_month = monthly_returns.idxmax()
             worst_month = monthly_returns.idxmin()
-            
+
             # 星期效应
             if len(returns) > 50:  # 确保有足够数据
                 weekly_returns = returns.groupby(returns.index.dayofweek).mean()
                 best_weekday = weekly_returns.idxmax()
                 worst_weekday = weekly_returns.idxmin()
-                
+
                 weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
                 best_weekday_name = weekday_names[best_weekday]
                 worst_weekday_name = weekday_names[worst_weekday]
@@ -3337,49 +3356,49 @@ class AIPredictionService(BaseService):
                 best_weekday_name = '数据不足'
                 worst_weekday_name = '数据不足'
                 weekly_returns = pd.Series()
-            
+
             # 季度效应
             quarterly_returns = returns.groupby(returns.index.quarter).mean()
             best_quarter = quarterly_returns.idxmax() if len(quarterly_returns) > 0 else 1
             worst_quarter = quarterly_returns.idxmin() if len(quarterly_returns) > 0 else 1
-            
+
             # 年内时间效应（月份）
-            month_names = ['1月', '2月', '3月', '4月', '5月', '6月', 
-                          '7月', '8月', '9月', '10月', '11月', '12月']
+            month_names = ['1月', '2月', '3月', '4月', '5月', '6月',
+                           '7月', '8月', '9月', '10月', '11月', '12月']
             best_month_name = month_names[best_month - 1] if len(monthly_returns) > 0 else '数据不足'
             worst_month_name = month_names[worst_month - 1] if len(monthly_returns) > 0 else '数据不足'
-            
+
             # 季节性强度评估
             if len(monthly_returns) > 6:
                 monthly_volatility = monthly_returns.std()
                 seasonality_strength = monthly_volatility / abs(monthly_returns.mean()) if monthly_returns.mean() != 0 else 0
             else:
                 seasonality_strength = 0
-            
+
             # 当前时间的季节性预测
             current_date = kdata.index[-1] if len(kdata) > 0 else datetime.now()
             current_month = current_date.month
             current_weekday = current_date.weekday()
             current_quarter = (current_month - 1) // 3 + 1
-            
+
             # 基于历史数据的当前时期预测
             current_month_return = monthly_returns.get(current_month, 0)
             current_quarter_return = quarterly_returns.get(current_quarter, 0)
-            
+
             if len(weekly_returns) > current_weekday:
                 current_weekday_return = weekly_returns.iloc[current_weekday]
             else:
                 current_weekday_return = 0
-            
+
             # 综合季节性评分
             seasonality_score = (
                 current_month_return * 0.5 +
                 current_quarter_return * 0.3 +
                 current_weekday_return * 0.2
             )
-            
+
             seasonality_outlook = "正面" if seasonality_score > 0.001 else "负面" if seasonality_score < -0.001 else "中性"
-            
+
             return {
                 'seasonality_outlook': seasonality_outlook,
                 'seasonality_score': float(seasonality_score),
@@ -3398,7 +3417,7 @@ class AIPredictionService(BaseService):
                 'prediction_type': PredictionType.SEASONALITY,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"季节性预测失败: {e}")
             return {
@@ -3410,7 +3429,7 @@ class AIPredictionService(BaseService):
                 'confidence': 0.3,
                 'model_type': 'fallback'
             }
-    
+
     def optimize_parameters(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         优化参数（别名方法）
@@ -3422,3 +3441,122 @@ class AIPredictionService(BaseService):
             优化结果
         """
         return self.predict_parameter_optimization(data)
+
+    def predict_risk_forecast(self, kdata: pd.DataFrame) -> Dict[str, Any]:
+        """
+        预测风险趋势
+
+        Args:
+            kdata: K线数据
+
+        Returns:
+            风险趋势预测结果
+        """
+        try:
+            if len(kdata) < 20:
+                return {
+                    'status': 'error',
+                    'message': '数据不足，需要至少20个数据点',
+                    'risk_level': 'unknown',
+                    'risk_score': 0.5,
+                    'forecast_days': 0
+                }
+
+            # 计算收益率
+            returns = kdata['close'].pct_change().dropna()
+
+            # 计算波动率（20日滚动）
+            volatility = returns.rolling(window=20).std()
+            current_volatility = volatility.iloc[-1] if len(volatility) > 0 else 0
+
+            # 计算VaR (Value at Risk)
+            var_95 = returns.quantile(0.05)  # 95% VaR
+            var_99 = returns.quantile(0.01)  # 99% VaR
+
+            # 计算最大回撤
+            cumulative_returns = (1 + returns).cumprod()
+            running_max = cumulative_returns.expanding().max()
+            drawdown = (cumulative_returns - running_max) / running_max
+            max_drawdown = drawdown.min()
+
+            # 风险评分计算 (0-1, 1为最高风险)
+            volatility_score = min(current_volatility * 10, 1.0)  # 标准化波动率
+            var_score = min(abs(var_95) * 5, 1.0)  # VaR风险评分
+            drawdown_score = min(abs(max_drawdown), 1.0)  # 回撤风险评分
+
+            # 综合风险评分
+            risk_score = (volatility_score * 0.4 + var_score * 0.4 + drawdown_score * 0.2)
+
+            # 风险等级判断
+            if risk_score < 0.3:
+                risk_level = 'low'
+                risk_description = '低风险'
+            elif risk_score < 0.6:
+                risk_level = 'medium'
+                risk_description = '中等风险'
+            elif risk_score < 0.8:
+                risk_level = 'high'
+                risk_description = '高风险'
+            else:
+                risk_level = 'extreme'
+                risk_description = '极高风险'
+
+            # 趋势预测（基于最近的波动率趋势）
+            recent_volatility = volatility.tail(5).mean() if len(volatility) >= 5 else current_volatility
+            volatility_trend = 'increasing' if current_volatility > recent_volatility else 'decreasing'
+
+            return {
+                'status': 'success',
+                'risk_level': risk_level,
+                'risk_description': risk_description,
+                'risk_score': round(risk_score, 3),
+                'current_volatility': round(current_volatility, 4),
+                'var_95': round(var_95, 4),
+                'var_99': round(var_99, 4),
+                'max_drawdown': round(max_drawdown, 4),
+                'volatility_trend': volatility_trend,
+                'forecast_days': 5,
+                'recommendations': self._get_risk_recommendations(risk_level, risk_score),
+                'timestamp': datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"风险趋势预测失败: {e}")
+            return {
+                'status': 'error',
+                'message': f'预测失败: {str(e)}',
+                'risk_level': 'unknown',
+                'risk_score': 0.5,
+                'forecast_days': 0
+            }
+
+    def _get_risk_recommendations(self, risk_level: str, risk_score: float) -> List[str]:
+        """获取风险管理建议"""
+        recommendations = []
+
+        if risk_level == 'low':
+            recommendations.extend([
+                '当前风险较低，可适当增加仓位',
+                '建议保持现有投资策略',
+                '关注市场变化，准备风险管理措施'
+            ])
+        elif risk_level == 'medium':
+            recommendations.extend([
+                '风险适中，建议保持谨慎',
+                '适当分散投资组合',
+                '设置止损位，控制单笔损失'
+            ])
+        elif risk_level == 'high':
+            recommendations.extend([
+                '高风险警告，建议减少仓位',
+                '加强风险监控，及时止损',
+                '考虑对冲策略降低风险敞口'
+            ])
+        else:  # extreme
+            recommendations.extend([
+                '极高风险！建议立即减仓',
+                '暂停新增投资，保护资本',
+                '考虑清仓观望，等待风险降低'
+            ])
+
+        return recommendations

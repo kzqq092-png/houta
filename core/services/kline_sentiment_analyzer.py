@@ -400,37 +400,37 @@ class KLineSentimentAnalyzer:
 
         # 基于市场情绪的建议
         if result.market_mood == "BULLISH" and result.confidence > 0.7:
-            recommendations.append(" 市场情绪积极，考虑逢低买入")
+            recommendations.append("市场情绪积极，考虑逢低买入")
             if result.risk_level == "LOW":
-                recommendations.append(" 风险较低，可以考虑增加仓位")
+                recommendations.append("风险较低，可以考虑增加仓位")
         elif result.market_mood == "BEARISH" and result.confidence > 0.7:
-            recommendations.append(" 市场情绪悲观，建议减仓或观望")
+            recommendations.append("市场情绪悲观，建议减仓或观望")
             if result.risk_level == "HIGH":
-                recommendations.append(" 高风险信号，建议设置止损")
+                recommendations.append("高风险信号，建议设置止损")
         else:
-            recommendations.append(" 市场中性，建议保持当前仓位")
+            recommendations.append("市场中性，建议保持当前仓位")
 
         # 基于波动率的建议
         if result.volatility_indicator > 0.8:
-            recommendations.append(" 高波动率环境，注意风险控制")
+            recommendations.append("高波动率环境，注意风险控制")
         elif result.volatility_indicator < 0.3:
-            recommendations.append(" 低波动率，可能出现突破机会")
+            recommendations.append("低波动率，可能出现突破机会")
 
         # 基于技术指标的建议
         rsi_indicator = next((ind for ind in result.technical_indicators if ind.name == "RSI"), None)
         if rsi_indicator:
             if rsi_indicator.value < 30:
-                recommendations.append(" RSI超卖，可能反弹机会")
+                recommendations.append("RSI超卖，可能反弹机会")
             elif rsi_indicator.value > 70:
-                recommendations.append(" RSI超买，注意回调风险")
+                recommendations.append("RSI超买，注意回调风险")
 
         # 基于成交量的建议
         volume_indicator = next((ind for ind in result.technical_indicators if ind.name == "Volume"), None)
         if volume_indicator and volume_indicator.signal == "BUY":
-            recommendations.append(" 成交量放大，趋势可能延续")
+            recommendations.append("成交量放大，趋势可能延续")
 
         if not recommendations:
-            recommendations.append(" 当前无明确信号，建议继续观察")
+            recommendations.append("当前无明确信号，建议继续观察")
 
         return recommendations
 

@@ -12,7 +12,6 @@ from typing import Optional, Union, Any
 # 日志系统已迁移到Loguru
 # 直接使用 logger.info(), logger.error() 等方法
 
-
 def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> Optional[pd.DataFrame]:
     """
     K线数据预处理：检查并修正所有关键字段，统一处理datetime字段
@@ -196,7 +195,6 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
     logger.debug(f"[{context}] 数据预处理完成，共{len(df)}行数据")
     return df
 
-
 def validate_kdata(df: pd.DataFrame, context: str = "验证") -> bool:
     """
     验证K线数据的有效性
@@ -240,7 +238,6 @@ def validate_kdata(df: pd.DataFrame, context: str = "验证") -> bool:
     logger.debug(f"[{context}] 数据验证通过")
     return True
 
-
 def standardize_stock_code(code: str) -> str:
     """
     标准化股票代码格式
@@ -272,7 +269,6 @@ def standardize_stock_code(code: str) -> str:
     else:
         # 默认深圳市场
         return f'sz{code}'
-
 
 def calculate_basic_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -326,7 +322,6 @@ def calculate_basic_indicators(df: pd.DataFrame) -> pd.DataFrame:
         logger.error(f"计算基础指标失败: {str(e)}")
 
     return df
-
 
 # 向后兼容的函数别名
 def _kdata_preprocess(df, context="分析"):

@@ -21,7 +21,6 @@ import psutil
 
 logger = logger
 
-
 class MemoryType(Enum):
     """GPU内存类型"""
     VERTEX_BUFFER = "vertex_buffer"
@@ -31,7 +30,6 @@ class MemoryType(Enum):
     RENDER_TARGET = "render_target"
     STORAGE_BUFFER = "storage_buffer"
 
-
 class MemoryPriority(Enum):
     """内存优先级"""
     CRITICAL = 0  # 关键资源，不能释放
@@ -39,7 +37,6 @@ class MemoryPriority(Enum):
     NORMAL = 2    # 正常优先级
     LOW = 3       # 低优先级，优先释放
     DISPOSABLE = 4  # 可随时释放
-
 
 @dataclass
 class MemoryBlock:
@@ -53,7 +50,6 @@ class MemoryBlock:
     access_count: int
     is_allocated: bool = True
     resource_ref: Optional[weakref.ref] = None
-
 
 @dataclass
 class MemoryPool:
@@ -69,7 +65,6 @@ class MemoryPool:
     def __post_init__(self):
         self.blocks = []
         self.free_blocks = deque()
-
 
 @dataclass
 class MemoryStats:
@@ -87,7 +82,6 @@ class MemoryStats:
     def __post_init__(self):
         if self.pools is None:
             self.pools = {}
-
 
 class WebGPUMemoryManager:
     """
@@ -779,11 +773,9 @@ class WebGPUMemoryManager:
         except Exception as e:
             logger.error(f"内存管理器关闭失败: {e}")
 
-
 # 全局内存管理器实例
 _memory_manager: Optional[WebGPUMemoryManager] = None
 _manager_lock = threading.Lock()
-
 
 def get_webgpu_memory_manager(**kwargs) -> WebGPUMemoryManager:
     """获取WebGPU内存管理器实例（单例模式）"""
@@ -793,7 +785,6 @@ def get_webgpu_memory_manager(**kwargs) -> WebGPUMemoryManager:
         if _memory_manager is None:
             _memory_manager = WebGPUMemoryManager(**kwargs)
         return _memory_manager
-
 
 def shutdown_webgpu_memory_manager():
     """关闭WebGPU内存管理器"""

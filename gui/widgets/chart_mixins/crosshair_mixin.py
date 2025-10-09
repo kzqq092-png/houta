@@ -17,7 +17,6 @@ import pandas as pd
 
 from optimization.update_throttler import get_update_throttler
 
-
 class CrosshairMixin:
     """十字光标功能Mixin
 

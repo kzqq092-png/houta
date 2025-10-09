@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 
 def ensure_plugin_configs():
     """确保所有插件都有正确的默认配置"""
-    logger.info(" 确保所有插件都有正确的默认配置...")
+    logger.info("确保所有插件都有正确的默认配置...")
 
     try:
         from db.models.plugin_models import get_data_source_config_manager
@@ -202,11 +202,11 @@ if __name__ == "__main__":
     success = ensure_plugin_configs()
     if success:
         logger.info("\n 所有插件配置已确保正确！")
-        logger.info(" 用户现在打开插件配置对话框应该能看到:")
-        logger.info("   - Wind插件: localhost:9001, 用户名密码认证")
-        logger.info("   - CTP期货: 180.168.146.187:10131, 用户名密码认证")
-        logger.info("   - 我的钢铁网: api.mysteel.com:443, API密钥认证")
-        logger.info("   - 文华财经: api.wenhua.com.cn:443, API密钥认证")
-        logger.info("   - 债券数据: api.bond-data.com:443, API密钥认证")
+        logger.info("用户现在打开插件配置对话框应该能看到:")
+        logger.info(" - Wind插件: localhost:9001, 用户名密码认证")
+        logger.info(" - CTP期货: 180.168.146.187:10131, 用户名密码认证")
+        logger.info(" - 我的钢铁网: api.mysteel.com:443, API密钥认证")
+        logger.info(" - 文华财经: api.wenhua.com.cn:443, API密钥认证")
+        logger.info(" - 债券数据: api.bond-data.com:443, API密钥认证")
     else:
         logger.info("\n 配置处理失败")

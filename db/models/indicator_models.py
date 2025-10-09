@@ -12,7 +12,6 @@ import sqlite3
 from typing import List, Dict, Any, Optional, Union, Tuple
 from dataclasses import dataclass, field, asdict
 
-
 @dataclass
 class IndicatorParameter:
     """指标参数模型"""
@@ -34,7 +33,6 @@ class IndicatorParameter:
         """从字典创建参数对象"""
         return cls(**{k: v for k, v in data.items() if k in cls.__annotations__})
 
-
 @dataclass
 class IndicatorImplementation:
     """指标实现模型"""
@@ -51,7 +49,6 @@ class IndicatorImplementation:
     def from_dict(cls, data: Dict[str, Any]) -> 'IndicatorImplementation':
         """从字典创建实现对象"""
         return cls(**{k: v for k, v in data.items() if k in cls.__annotations__})
-
 
 @dataclass
 class Indicator:
@@ -91,7 +88,6 @@ class Indicator:
         indicator.implementations = impls
         return indicator
 
-
 @dataclass
 class IndicatorCategory:
     """指标分类模型"""
@@ -109,7 +105,6 @@ class IndicatorCategory:
     def from_dict(cls, data: Dict[str, Any]) -> 'IndicatorCategory':
         """从字典创建分类对象"""
         return cls(**{k: v for k, v in data.items() if k in cls.__annotations__})
-
 
 class IndicatorDatabase:
     """指标数据库操作类"""

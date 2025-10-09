@@ -41,9 +41,7 @@ except ImportError:
 if TYPE_CHECKING:
     from core.services import ChartService
 
-
 # 移除重复的ChartDataLoader，使用统一图表服务中的实现
-
 
 class ChartCanvas(QWidget):
     """高性能图表画布 - 基于统一图表服务"""
@@ -690,7 +688,6 @@ class ChartCanvas(QWidget):
     #         self.selection_end = event.pos()
     #         # ... (省略)
     #     super().mouseReleaseEvent(event)
-
 
 class MiddlePanel(BasePanel):
     """

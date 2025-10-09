@@ -22,7 +22,6 @@ from contextlib import contextmanager
 
 from loguru import logger
 
-
 class EventType(Enum):
     """事件类型"""
     DATA_ACCESS = "data_access"           # 数据访问
@@ -34,7 +33,6 @@ class EventType(Enum):
     PERFORMANCE_ALERT = "performance_alert" # 性能告警
     SECURITY_EVENT = "security_event"     # 安全事件
 
-
 class ComplianceLevel(Enum):
     """合规级别"""
     LOW = "low"           # 低
@@ -42,13 +40,11 @@ class ComplianceLevel(Enum):
     HIGH = "high"         # 高
     CRITICAL = "critical" # 关键
 
-
 class AuditLevel(Enum):
     """审计级别"""
     BASIC = "basic"           # 基础审计
     DETAILED = "detailed"     # 详细审计
     COMPREHENSIVE = "comprehensive"  # 全面审计
-
 
 @dataclass
 class ComplianceFlag:
@@ -61,7 +57,6 @@ class ComplianceFlag:
     
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
-
 
 @dataclass
 class AuditRecord:
@@ -151,7 +146,6 @@ class AuditRecord:
         result['compliance_flags'] = [flag.to_dict() for flag in self.compliance_flags]
         
         return result
-
 
 class ComplianceRuleEngine:
     """合规规则引擎"""
@@ -322,7 +316,6 @@ class ComplianceRuleEngine:
         """添加自定义合规规则"""
         self.rules[name] = rule_func
         logger.info(f"添加自定义合规规则: {name}")
-
 
 class ComplianceAuditLogger:
     """
@@ -969,10 +962,8 @@ class ComplianceAuditLogger:
             self._flush_cache()
             self.logger.info("合规性审计日志系统已关闭")
 
-
 # 全局审计日志记录器实例
 _audit_logger: Optional[ComplianceAuditLogger] = None
-
 
 def get_audit_logger() -> ComplianceAuditLogger:
     """获取全局审计日志记录器"""
@@ -980,7 +971,6 @@ def get_audit_logger() -> ComplianceAuditLogger:
     if _audit_logger is None:
         _audit_logger = ComplianceAuditLogger()
     return _audit_logger
-
 
 def audit_log(event_type: EventType):
     """

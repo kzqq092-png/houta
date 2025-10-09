@@ -111,7 +111,7 @@ class BatchSelectionDialog(QDialog):
 
         # 搜索区域
         search_layout = QHBoxLayout()
-        search_layout.addWidget(QLabel("🔍 搜索:"))
+        search_layout.addWidget(QLabel("搜索:"))
 
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText(f"输入{self.asset_type}名称或代码进行搜化..")
@@ -210,17 +210,37 @@ class BatchSelectionDialog(QDialog):
             self.all_items = []
 
     def get_stock_data(self):
-        """获取股票数据 - 优先使用统一插件数据管理器"""
+        """获取股票数据 - 异步版本避免UI卡顿"""
         try:
             # 首先尝试使用统一插件数据管理器（最新架构）
             from core.services.uni_plugin_data_manager import get_uni_plugin_data_manager
 
             uni_manager = get_uni_plugin_data_manager()
             if uni_manager:
+                # 显示进度对话框
+                from PyQt5.QtWidgets import QProgressDialog
+                from PyQt5.QtCore import Qt, QTimer
+
+                progress = QProgressDialog("正在获取股票数据...", "取消", 0, 0, self)
+                progress.setWindowTitle("数据加载")
+                progress.setWindowModality(Qt.WindowModal)
+                progress.setMinimumDuration(1000)  # 1秒后显示
+                progress.setValue(0)
+                progress.show()
+
+                # 记录开始时间
+                start_time = datetime.now()
+
                 # 通过统一插件数据管理器获取股票列表
                 stock_list_data = uni_manager.get_stock_list()
+
+                # 计算耗时
+                elapsed = (datetime.now() - start_time).total_seconds()
+
+                progress.close()
+
                 if stock_list_data:
-                    logger.info(f"通过统一插件数据管理器成功获取最新股票数据: {len(stock_list_data)} 只股票") if logger else None
+                    logger.info(f"通过统一插件数据管理器成功获取最新股票数据: {len(stock_list_data)} 只股票，耗时 {elapsed:.2f}秒") if logger else None
                     return stock_list_data
 
             # 备用方案：使用原有统一数据管理器
@@ -810,14 +830,14 @@ class EnhancedDataImportWidget(QWidget):
         layout = QHBoxLayout(frame)
 
         # 标题
-        title_label = QLabel("🚀 DuckDB专业数据导入系统 (智能化版化")
+        title_label = QLabel("K线专业数据导入系统")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
         layout.addWidget(title_label)
 
         layout.addStretch()
 
         # 版本信息
-        version_label = QLabel("v2.0 - AI增强化")
+        version_label = QLabel("V2.0 - AI增强化")
         version_label.setFont(QFont("Arial", 10))
         layout.addWidget(version_label)
 
@@ -844,21 +864,20 @@ class EnhancedDataImportWidget(QWidget):
         return widget
 
     def create_task_config_group(self) -> QGroupBox:
-        """创建扩展任务配置组（整合任务创建向导功能化"""
-        group = QGroupBox("📋 任务配置")
+        """创建扩展任务配置组"""
+        group = QGroupBox("任务配置")
         group.setFont(QFont("Arial", 10, QFont.Bold))
         main_layout = QVBoxLayout(group)
 
         # 创建折叠式选项化
         self.config_tabs = QTabWidget()
-
         # 基本信息选项化
         basic_tab = self._create_integrated_basic_tab()
-        self.config_tabs.addTab(basic_tab, "📋 基本信息")
+        self.config_tabs.addTab(basic_tab, "基本信息")
 
         # 合并的数据源和高级配置tab
         integrated_config_tab = self._create_integrated_config_tab()
-        self.config_tabs.addTab(integrated_config_tab, "🔧 数据源与高级配置")
+        self.config_tabs.addTab(integrated_config_tab, "数据源与高级配置")
 
         main_layout.addWidget(self.config_tabs)
 
@@ -866,12 +885,12 @@ class EnhancedDataImportWidget(QWidget):
         button_layout = QHBoxLayout()
 
         # 验证配置按钮
-        self.validate_config_btn = QPushButton("🔍 验证配置")
+        self.validate_config_btn = QPushButton("验证配置")
         self.validate_config_btn.clicked.connect(self.validate_current_configuration)
         button_layout.addWidget(self.validate_config_btn)
 
         # 重置配置按钮
-        self.reset_config_btn = QPushButton("🔄 重置")
+        self.reset_config_btn = QPushButton("重置")
         self.reset_config_btn.clicked.connect(self.reset_configuration)
         button_layout.addWidget(self.reset_config_btn)
 
@@ -887,24 +906,24 @@ class EnhancedDataImportWidget(QWidget):
         # 任务名称
         self.task_name_edit = QLineEdit()
         self.task_name_edit.setText(f"导入任务_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
-        layout.addRow("📝 任务名称:", self.task_name_edit)
+        layout.addRow("任务名称:", self.task_name_edit)
 
         # 任务描述
         self.task_desc_edit = QTextEdit()
         self.task_desc_edit.setMaximumHeight(60)
         self.task_desc_edit.setPlaceholderText("输入任务描述（可选）...")
-        layout.addRow("📄 任务描述:", self.task_desc_edit)
+        layout.addRow("任务描述:", self.task_desc_edit)
 
         # 资产类型
         self.asset_type_combo = QComboBox()
         self.asset_type_combo.addItems(["股票", "期货", "基金", "债券", "指数"])
         self.asset_type_combo.currentTextChanged.connect(self.on_asset_type_changed)
-        layout.addRow("📊 资产类型:", self.asset_type_combo)
+        layout.addRow("资产类型:", self.asset_type_combo)
 
         # 数据类型
         self.data_type_combo = QComboBox()
         self.data_type_combo.addItems(["K线数化", "分笔数据", "财务数据", "基本面数化"])
-        layout.addRow("📈 数据类型:", self.data_type_combo)
+        layout.addRow("数据类型:", self.data_type_combo)
 
         # 数据频率
         self.frequency_combo = QComboBox()
@@ -919,7 +938,7 @@ class EnhancedDataImportWidget(QWidget):
         batch_buttons_layout = QHBoxLayout()
 
         # 批量选择按钮
-        self.batch_select_btn = QPushButton("📋 批量选择")
+        self.batch_select_btn = QPushButton("批量选择")
         self.batch_select_btn.clicked.connect(self.show_batch_selection_dialog)
         batch_buttons_layout.addWidget(self.batch_select_btn)
 
@@ -991,7 +1010,7 @@ class EnhancedDataImportWidget(QWidget):
         content_layout.addWidget(datasource_group)
 
         # 第二部分：执行配置
-        execution_group = QGroupBox("⚙️ 执行配置")
+        execution_group = QGroupBox("执行配置")
         execution_layout = QHBoxLayout(execution_group)
 
         # 左侧：资源配置
@@ -1016,7 +1035,7 @@ class EnhancedDataImportWidget(QWidget):
         self.memory_limit_spin = QSpinBox()
         self.memory_limit_spin.setRange(512, 16384)
         self.memory_limit_spin.setValue(2048)
-        self.memory_limit_spin.setSuffix(" MB")
+        self.memory_limit_spin.setSuffix("MB")
         self.memory_limit_spin.setToolTip("内存使用限制")
         resource_layout.addRow("内存限制:", self.memory_limit_spin)
 
@@ -1024,14 +1043,14 @@ class EnhancedDataImportWidget(QWidget):
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(60, 3600)
         self.timeout_spin.setValue(300)
-        self.timeout_spin.setSuffix(" 秒")
+        self.timeout_spin.setSuffix("秒")
         self.timeout_spin.setToolTip("单个请求超时时间")
         resource_layout.addRow("超时设置:", self.timeout_spin)
 
         execution_layout.addWidget(resource_config)
 
         # 右侧：错误处理配置
-        error_config = QGroupBox("🔧 错误处理")
+        error_config = QGroupBox("错误处理")
         error_layout = QFormLayout(error_config)
 
         # 重试次数
@@ -1052,7 +1071,7 @@ class EnhancedDataImportWidget(QWidget):
         self.progress_interval_spin = QSpinBox()
         self.progress_interval_spin.setRange(1, 60)
         self.progress_interval_spin.setValue(5)
-        self.progress_interval_spin.setSuffix(" 秒")
+        self.progress_interval_spin.setSuffix("秒")
         self.progress_interval_spin.setToolTip("进度更新间隔")
         error_layout.addRow("进度间隔:", self.progress_interval_spin)
 
@@ -1066,7 +1085,7 @@ class EnhancedDataImportWidget(QWidget):
         content_layout.addWidget(execution_group)
 
         # 第三部分：智能化功能
-        ai_features_group = QGroupBox("🤖 智能化功能")
+        ai_features_group = QGroupBox("智能化功能")
         ai_layout = QVBoxLayout(ai_features_group)
 
         # 创建两列布局
@@ -1159,7 +1178,7 @@ class EnhancedDataImportWidget(QWidget):
 
     def create_ai_features_group(self) -> QGroupBox:
         """创建AI功能控制化"""
-        group = QGroupBox("🤖 智能化功化")
+        group = QGroupBox("智能化功化")
         group.setFont(QFont("Arial", 10, QFont.Bold))
         layout = QVBoxLayout(group)
 
@@ -1197,12 +1216,12 @@ class EnhancedDataImportWidget(QWidget):
 
     def create_task_operations_group(self) -> QGroupBox:
         """创建任务操作组"""
-        group = QGroupBox("📝 任务操作")
+        group = QGroupBox("任务操作")
         group.setFont(QFont("Arial", 10, QFont.Bold))
         layout = QVBoxLayout(group)
 
         # 新建任务按钮
-        self.new_task_btn = QPushButton("📝 新建任务")
+        self.new_task_btn = QPushButton("新建任务")
         self.new_task_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
@@ -1221,7 +1240,7 @@ class EnhancedDataImportWidget(QWidget):
         layout.addWidget(self.new_task_btn)
 
         # 添加提示文本
-        hint_label = QLabel("💡 提示：任务的启动/停止可通过右侧任务列表的右键菜单操作")
+        hint_label = QLabel("[INFO] 提示：任务的启动/停止可通过右侧任务列表的右键菜单操作")
         hint_label.setWordWrap(True)
         hint_label.setStyleSheet("color: #666; font-size: 11px; padding: 5px;")
         layout.addWidget(hint_label)
@@ -1238,15 +1257,15 @@ class EnhancedDataImportWidget(QWidget):
 
         # 任务管理选项卡（集成增强功能化
         task_management_tab = self.create_enhanced_task_management_tab()
-        self.monitor_tabs.addTab(task_management_tab, "📋 任务管理")
+        self.monitor_tabs.addTab(task_management_tab, "任务管理")
 
         # AI功能控制面板选项卡化
         ai_control_tab = self.create_ai_control_panel_tab()
-        self.monitor_tabs.addTab(ai_control_tab, "🤖 AI控制面板")
+        self.monitor_tabs.addTab(ai_control_tab, "AI控制面板")
 
         # 分布式状态选项卡化
         distributed_tab = self.create_distributed_status_tab()
-        self.monitor_tabs.addTab(distributed_tab, "🌐 分布式状化")
+        self.monitor_tabs.addTab(distributed_tab, "分布式状化")
 
         # 数据质量选项化
         quality_tab = self.create_quality_status_tab()
@@ -1266,11 +1285,11 @@ class EnhancedDataImportWidget(QWidget):
 
         # 任务列表和控制
         task_list_tab = self.create_task_management_tab()
-        task_tabs.addTab(task_list_tab, "📋 任务列表")
+        task_tabs.addTab(task_list_tab, "任务列表")
 
         # 任务依赖可视化
         dependency_tab = self.create_task_dependency_tab()
-        task_tabs.addTab(dependency_tab, "🔗 依赖关系")
+        task_tabs.addTab(dependency_tab, "依赖关系")
 
         # 任务调度控制器
         scheduler_tab = self.create_task_scheduler_tab()
@@ -1303,7 +1322,7 @@ class EnhancedDataImportWidget(QWidget):
         layout = QVBoxLayout(widget)
 
         # 提示信息
-        info_label = QLabel("🔗 任务依赖关系可视化")
+        info_label = QLabel("任务依赖关系可视化")
         info_label.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
         layout.addWidget(info_label)
 
@@ -1375,7 +1394,7 @@ class EnhancedDataImportWidget(QWidget):
         layout = QVBoxLayout(widget)
 
         # 提示信息
-        info_label = QLabel("🤖 AI功能控制面板")
+        info_label = QLabel("AI功能控制面板")
         info_label.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
         layout.addWidget(info_label)
 
@@ -2019,7 +2038,7 @@ class EnhancedDataImportWidget(QWidget):
         toolbar_layout = QHBoxLayout(toolbar_frame)
 
         # 新建任务按钮
-        new_task_btn = QPushButton("📝 新建任务")
+        new_task_btn = QPushButton("新建任务")
         new_task_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
@@ -2037,7 +2056,7 @@ class EnhancedDataImportWidget(QWidget):
         toolbar_layout.addWidget(new_task_btn)
 
         # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新")
+        refresh_btn = QPushButton("刷新")
         refresh_btn.setStyleSheet("""
             QPushButton {
                 background-color: #17a2b8;
@@ -2092,7 +2111,7 @@ class EnhancedDataImportWidget(QWidget):
         toolbar_layout.addStretch()
 
         # 搜索
-        search_label = QLabel("🔍 搜索:")
+        search_label = QLabel("搜索:")
         toolbar_layout.addWidget(search_label)
 
         self.task_search_input = QLineEdit()
@@ -2134,7 +2153,7 @@ class EnhancedDataImportWidget(QWidget):
         layout.addWidget(self.task_table)
 
         # 任务详情面板
-        details_group = QGroupBox("📄 任务详情")
+        details_group = QGroupBox("任务详情")
         details_layout = QVBoxLayout(details_group)
 
         self.task_details_text = QTextEdit()
@@ -2263,6 +2282,21 @@ class EnhancedDataImportWidget(QWidget):
     def _create_task_legacy(self, task_config_dict):
         """传统方式创建任务（回退方案）"""
         try:
+            # 频率字符串到枚举的映射
+            frequency_str = task_config_dict.get('frequency', '1d')
+            frequency_map = {
+                '1d': DataFrequency.DAILY,
+                '1w': DataFrequency.WEEKLY,
+                '1m': DataFrequency.MONTHLY,
+                '5m': DataFrequency.MINUTE_5,
+                '15m': DataFrequency.MINUTE_15,
+                '30m': DataFrequency.MINUTE_30,
+                '60m': DataFrequency.HOUR_1,
+                '1min': DataFrequency.MINUTE_1,
+                'daily': DataFrequency.DAILY
+            }
+            frequency_enum = frequency_map.get(frequency_str, DataFrequency.DAILY)
+
             # 转换为ImportTaskConfig对象
             task_config = ImportTaskConfig(
                 task_id=task_config_dict.get('task_id', f"task_{int(datetime.now().timestamp())}"),
@@ -2271,7 +2305,7 @@ class EnhancedDataImportWidget(QWidget):
                 data_source=task_config_dict.get('data_source', ''),
                 asset_type=task_config_dict.get('asset_type', ''),
                 data_type=task_config_dict.get('data_type', 'K线数据'),
-                frequency=task_config_dict.get('frequency', DataFrequency.DAILY),
+                frequency=frequency_enum,
                 mode=ImportMode.MANUAL,
                 batch_size=task_config_dict.get('batch_size', 100),
                 max_workers=task_config_dict.get('max_workers', 4)
@@ -2429,7 +2463,7 @@ class EnhancedDataImportWidget(QWidget):
             if not item:
                 # 如果没有点击到具体项目，仍然显示基本菜单
                 menu = QMenu(self)
-                refresh_action = QAction("🔄 刷新任务列表", self)
+                refresh_action = QAction("刷新任务列表", self)
                 refresh_action.triggered.connect(self.refresh_task_list)
                 menu.addAction(refresh_action)
                 menu.exec_(self.task_table.mapToGlobal(position))
@@ -2456,7 +2490,7 @@ class EnhancedDataImportWidget(QWidget):
 
                 if not task_name_item or not status_item:
                     # 添加刷新菜单作为默认选项
-                    refresh_action = QAction("🔄 刷新任务列表", self)
+                    refresh_action = QAction("刷新任务列表", self)
                     refresh_action.triggered.connect(self.refresh_task_list)
                     menu.addAction(refresh_action)
                 else:
@@ -2468,7 +2502,7 @@ class EnhancedDataImportWidget(QWidget):
                     if not task_id:
                         task_id = task_name
 
-                    start_action = QAction("🚀 开始导入", self)
+                    start_action = QAction("开始导入", self)
                     start_action.triggered.connect(lambda: self.start_single_task(task_id))
                     start_action.setEnabled("运行中" not in status and "完成" not in status)
                     menu.addAction(start_action)
@@ -2513,7 +2547,7 @@ class EnhancedDataImportWidget(QWidget):
             # 添加通用刷新选项
             if menu.actions():  # 如果菜单不为空，添加分隔符
                 menu.addSeparator()
-            refresh_action = QAction("🔄 刷新任务列表", self)
+            refresh_action = QAction("刷新任务列表", self)
             refresh_action.triggered.connect(self.refresh_task_list)
             menu.addAction(refresh_action)
 
@@ -3311,7 +3345,6 @@ class EnhancedDataImportWidget(QWidget):
 
                     details = f"""任务详细信息:
 
-
     任务ID: {task_id}
     状态: {task_status.status.value}
     进度: {progress_str}
@@ -3489,7 +3522,7 @@ class EnhancedDataImportWidget(QWidget):
         self.memory_limit_spin = QSpinBox()
         self.memory_limit_spin.setRange(512, 16384)
         self.memory_limit_spin.setValue(2048)
-        self.memory_limit_spin.setSuffix(" MB")
+        self.memory_limit_spin.setSuffix("MB")
         self.memory_limit_spin.setToolTip("内存使用限制")
         layout.addRow("内存限制:", self.memory_limit_spin)
 
@@ -3497,7 +3530,7 @@ class EnhancedDataImportWidget(QWidget):
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(60, 3600)
         self.timeout_spin.setValue(300)
-        self.timeout_spin.setSuffix(" 秒")
+        self.timeout_spin.setSuffix("秒")
         self.timeout_spin.setToolTip("任务执行超时时间")
         layout.addRow("执行超时:", self.timeout_spin)
 
@@ -3526,7 +3559,7 @@ class EnhancedDataImportWidget(QWidget):
         self.progress_interval_spin = QSpinBox()
         self.progress_interval_spin.setRange(1, 60)
         self.progress_interval_spin.setValue(5)
-        self.progress_interval_spin.setSuffix(" 秒")
+        self.progress_interval_spin.setSuffix("秒")
         self.progress_interval_spin.setToolTip("进度更新间隔")
         layout.addRow("进度间隔:", self.progress_interval_spin)
 
@@ -3565,11 +3598,11 @@ class EnhancedDataImportWidget(QWidget):
                     from core.services.unified_data_manager import get_unified_data_manager
                     data_manager = get_unified_data_manager()
                     if data_manager and data_manager.test_connection():
-                        connection_status = "✅ 连接正常"
+                        connection_status = "连接正常"
                     else:
-                        connection_status = "❌ 连接失败"
+                        connection_status = "[ERROR] 连接失败"
                 except Exception as e:
-                    connection_status = f"❌ 连接错误: {str(e)}"
+                    connection_status = f"[ERROR] 连接错误: {str(e)}"
             else:
                 connection_status = "ℹ️ 未验证"
 
@@ -3577,26 +3610,26 @@ class EnhancedDataImportWidget(QWidget):
             result_text = f"""配置验证结果:
 
     基本信息:
-    - 任务名称: {task_name} ✅
-    - 资产类型: {self.asset_type_combo.currentText()} ✅
-    - 数据类型: {self.data_type_combo.currentText()} ✅
-    - 数据频率: {self.frequency_combo.currentText()} ✅
-    - 股票代码: {len(symbols)} 个 ✅
+    - 任务名称: {task_name}
+    - 资产类型: {self.asset_type_combo.currentText()}
+    - 数据类型: {self.data_type_combo.currentText()}
+    - 数据频率: {self.frequency_combo.currentText()}
+    - 股票代码: {len(symbols)} 个
 
     数据源配置:
     - 数据源: {data_source}
     - 连接状态: {connection_status}
 
     高级配置:
-    - 批量大小: {self.batch_size_spin.value()} ✅
-    - 工作线程: {self.workers_spin.value()} ✅
+    - 批量大小: {self.batch_size_spin.value()}
+    - 工作线程: {self.workers_spin.value()}
 
     AI功能:
-    - AI优化: {'✅ 启用' if self.ai_optimization_cb.isChecked() else '❌ 禁用'}
-    - 自动调优: {'✅ 启用' if self.auto_tuning_cb.isChecked() else '❌ 禁用'}
-    - 分布式执行: {'✅ 启用' if self.distributed_cb.isChecked() else '❌ 禁用'}
-    - 智能缓存: {'✅ 启用' if self.caching_cb.isChecked() else '❌ 禁用'}
-    - 数据质量监控: {'✅ 启用' if self.quality_monitoring_cb.isChecked() else '❌ 禁用'}
+    - AI优化: {'启用' if self.ai_optimization_cb.isChecked() else '[ERROR] 禁用'}
+    - 自动调优: {'启用' if self.auto_tuning_cb.isChecked() else '[ERROR] 禁用'}
+    - 分布式执行: {'启用' if self.distributed_cb.isChecked() else '[ERROR] 禁用'}
+    - 智能缓存: {'启用' if self.caching_cb.isChecked() else '[ERROR] 禁用'}
+    - 数据质量监控: {'启用' if self.quality_monitoring_cb.isChecked() else '[ERROR] 禁用'}
     """
             QMessageBox.information(self, "配置验证", result_text)
 
@@ -3737,7 +3770,7 @@ class EnhancedDataImportWidget(QWidget):
             layout = QVBoxLayout(dialog)
 
             # 标题
-            title_label = QLabel("🚀 快速选择常用股票组合")
+            title_label = QLabel("快速选择常用股票组合")
             title_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;")
             layout.addWidget(title_label)
 

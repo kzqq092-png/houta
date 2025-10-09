@@ -33,7 +33,7 @@ try:
     from core.services.uni_plugin_data_manager import UniPluginDataManager, get_uni_plugin_data_manager
     from gui.dialogs.plugin_manager_dialog import PluginConfigDialog
     from gui.dialogs.sentiment_plugin_config_dialog import PluginConfigWidget
-    logger.info(" 核心服务导入成功")
+    logger.info("核心服务导入成功")
     PLUGIN_SYSTEM_AVAILABLE = True
 except ImportError as e:
     PluginManager = None
@@ -43,7 +43,6 @@ except ImportError as e:
     PluginConfigWidget = None
     PLUGIN_SYSTEM_AVAILABLE = False
     logger.error(f" 部分服务导入失败: {e}")
-
 
 # 如果PluginConfigWidget没有导入成功，创建一个简单的备用版本
 if not PLUGIN_SYSTEM_AVAILABLE or PluginConfigWidget is None:
@@ -122,7 +121,7 @@ class TablePopulationWorker(QThread):
 
             if self._is_running:
                 self.population_completed.emit()
-                logger.info(" 异步表格填充完成")
+                logger.info("异步表格填充完成")
 
         except Exception as e:
             self.population_failed.emit(str(e))
@@ -327,7 +326,7 @@ class DataSourceLoadingWorker(QThread):
         """异步加载数据源插件"""
         self._is_running = True
         try:
-            logger.info(" 开始异步加载数据源插件...")
+            logger.info("开始异步加载数据源插件...")
 
             real_adapters = {}
             ds_plugins = {}
@@ -541,7 +540,7 @@ class EnhancedPluginManagerDialog(QDialog):
         self.refresh_timer.timeout.connect(self.refresh_status)
         self.refresh_timer.start(30000)  # 30秒刷新一次
 
-        logger.info(" 准备启动数据源同步...")
+        logger.info("准备启动数据源同步...")
         # 数据源同步到统一管理器（延迟执行确保所有服务已初始化）
         QTimer.singleShot(500, self._sync_data_sources_to_unified_manager)
 
@@ -555,21 +554,21 @@ class EnhancedPluginManagerDialog(QDialog):
 
         # 标题栏
         title_layout = QHBoxLayout()
-        title_label = QLabel(" 插件管理器")
+        title_label = QLabel("插件管理器")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
         title_layout.addWidget(title_label)
         title_layout.addStretch()
 
         # 全局操作按钮
-        refresh_btn = QPushButton(" 刷新")
+        refresh_btn = QPushButton("刷新")
         refresh_btn.clicked.connect(self.refresh_status)
         title_layout.addWidget(refresh_btn)
 
-        export_btn = QPushButton(" 导出配置")
+        export_btn = QPushButton("导出配置")
         export_btn.clicked.connect(self.export_all_configs)
         title_layout.addWidget(export_btn)
 
-        import_btn = QPushButton(" 导入配置")
+        import_btn = QPushButton("导入配置")
         import_btn.clicked.connect(self.import_all_configs)
         title_layout.addWidget(import_btn)
 
@@ -693,11 +692,11 @@ class EnhancedPluginManagerDialog(QDialog):
         # 工具栏
         toolbar_layout = QHBoxLayout()
 
-        test_all_btn = QPushButton(" 测试所有连接")
+        test_all_btn = QPushButton("测试所有连接")
         test_all_btn.clicked.connect(self.test_all_sentiment_plugins)
         toolbar_layout.addWidget(test_all_btn)
 
-        reset_weights_btn = QPushButton(" 重置权重")
+        reset_weights_btn = QPushButton("重置权重")
         reset_weights_btn.clicked.connect(self.reset_sentiment_weights)
         toolbar_layout.addWidget(reset_weights_btn)
 
@@ -715,7 +714,7 @@ class EnhancedPluginManagerDialog(QDialog):
         self.refresh_interval_spin = QSpinBox()
         self.refresh_interval_spin.setRange(1, 60)
         self.refresh_interval_spin.setValue(10)
-        self.refresh_interval_spin.setSuffix(" 分钟")
+        self.refresh_interval_spin.setSuffix("分钟")
         global_layout.addRow("刷新间隔:", self.refresh_interval_spin)
 
         toolbar_layout.addWidget(global_config_group)
@@ -790,7 +789,7 @@ class EnhancedPluginManagerDialog(QDialog):
         self.search_edit.setPlaceholderText("输入插件名称或关键词...")
         search_layout.addWidget(self.search_edit)
 
-        search_btn = QPushButton(" 搜索")
+        search_btn = QPushButton("搜索")
         search_btn.clicked.connect(self.search_plugins)
         search_layout.addWidget(search_btn)
 
@@ -806,7 +805,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
         category_layout.addStretch()
 
-        refresh_market_btn = QPushButton(" 刷新市场")
+        refresh_market_btn = QPushButton("刷新市场")
         refresh_market_btn.clicked.connect(self.refresh_market)
         category_layout.addWidget(refresh_market_btn)
 
@@ -852,7 +851,7 @@ class EnhancedPluginManagerDialog(QDialog):
             try:
                 # 验证插件管理器是否已初始化
                 if not hasattr(self.plugin_manager, 'enhanced_plugins'):
-                    logger.info(" 插件管理器未初始化，尝试重新初始化...")
+                    logger.info("插件管理器未初始化，尝试重新初始化...")
                     self.plugin_manager.initialize()
 
                     # 优先使用enhanced_plugins获取插件信息
@@ -904,7 +903,7 @@ class EnhancedPluginManagerDialog(QDialog):
             container = get_service_container()
             if container and container.is_registered(PluginManager):
                 self.plugin_manager = container.resolve(PluginManager)
-                logger.info(" 成功从服务容器获取插件管理器")
+                logger.info("成功从服务容器获取插件管理器")
                 return True
         except Exception as e:
             logger.error(f" 从服务容器获取插件管理器失败: {e}")
@@ -928,7 +927,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
         layout = QVBoxLayout(message_widget)
 
-        title = QLabel(" 暂无插件")
+        title = QLabel("暂无插件")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #6c757d;")
         layout.addWidget(title)
 
@@ -956,7 +955,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
         layout = QVBoxLayout(error_widget)
 
-        title = QLabel(" 插件加载失败")
+        title = QLabel("插件加载失败")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #856404;")
         layout.addWidget(title)
 
@@ -965,7 +964,7 @@ class EnhancedPluginManagerDialog(QDialog):
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
-        retry_btn = QPushButton(" 重试加载")
+        retry_btn = QPushButton("重试加载")
         retry_btn.setMaximumWidth(100)
         retry_btn.clicked.connect(self.load_general_plugins)
         layout.addWidget(retry_btn)
@@ -1023,7 +1022,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
         layout = QVBoxLayout(unavailable_widget)
 
-        title = QLabel(" 插件管理器不可用")
+        title = QLabel("插件管理器不可用")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #721c24;")
         layout.addWidget(title)
 
@@ -1037,7 +1036,7 @@ class EnhancedPluginManagerDialog(QDialog):
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
-        retry_btn = QPushButton(" 重新尝试连接")
+        retry_btn = QPushButton("重新尝试连接")
         retry_btn.setMaximumWidth(150)
         retry_btn.clicked.connect(self.load_general_plugins)
         layout.addWidget(retry_btn)
@@ -1136,7 +1135,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 if container and container.is_registered(SentimentDataService):
                     sentiment_service = container.resolve(SentimentDataService)
                     self.sentiment_service = sentiment_service
-                    logger.info(" 从服务容器获取情绪数据服务成功")
+                    logger.info("从服务容器获取情绪数据服务成功")
             except Exception as e:
                 logger.error(f" 从服务容器获取情绪数据服务失败: {e}")
 
@@ -1200,7 +1199,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 logger.error(f" 获取情绪插件列表失败: {e}")
                 self._load_sentiment_fallback_data()
         else:
-            logger.info(" 情绪数据服务不可用，使用fallback数据")
+            logger.info("情绪数据服务不可用，使用fallback数据")
             self._load_sentiment_fallback_data()
 
     def _load_sentiment_fallback_data(self):
@@ -1411,7 +1410,7 @@ class EnhancedPluginManagerDialog(QDialog):
         enable_cb.setChecked(config.get('enabled', True))
         title_layout.addWidget(enable_cb)
 
-        test_btn = QPushButton(" 测试")
+        test_btn = QPushButton("测试")
         test_btn.setMaximumWidth(80)
         title_layout.addWidget(test_btn)
 
@@ -1861,13 +1860,13 @@ class EnhancedPluginManagerDialog(QDialog):
 
         status = plugin_info['status']
         if status == "未安装":
-            install_btn = QPushButton(" 安装")
+            install_btn = QPushButton("安装")
             install_btn.setStyleSheet("QPushButton { background-color: #28a745; color: white; }")
         elif status == "可更新":
-            install_btn = QPushButton(" 更新")
+            install_btn = QPushButton("更新")
             install_btn.setStyleSheet("QPushButton { background-color: #ffc107; color: black; }")
         else:
-            install_btn = QPushButton(" 已安装")
+            install_btn = QPushButton("已安装")
             install_btn.setEnabled(False)
 
         button_layout.addWidget(install_btn)
@@ -2442,13 +2441,13 @@ class EnhancedPluginManagerDialog(QDialog):
 
         # 标题和说明
         title_layout = QHBoxLayout()
-        title_label = QLabel(" 数据源插件管理")
+        title_label = QLabel("数据源插件管理")
         title_label.setFont(QFont("Arial", 14, QFont.Bold))
         title_layout.addWidget(title_label)
         title_layout.addStretch()
 
         # 刷新按钮
-        refresh_btn = QPushButton(" 刷新")
+        refresh_btn = QPushButton("刷新")
         refresh_btn.clicked.connect(self.refresh_data_source_plugins)
         title_layout.addWidget(refresh_btn)
 
@@ -2531,15 +2530,15 @@ class EnhancedPluginManagerDialog(QDialog):
         # 插件操作按钮
         button_layout = QHBoxLayout()
 
-        load_plugin_btn = QPushButton(" 加载插件")
+        load_plugin_btn = QPushButton("加载插件")
         load_plugin_btn.clicked.connect(self.load_data_source_plugin)
         button_layout.addWidget(load_plugin_btn)
 
-        unload_plugin_btn = QPushButton(" 卸载插件")
+        unload_plugin_btn = QPushButton("卸载插件")
         unload_plugin_btn.clicked.connect(self.unload_data_source_plugin)
         button_layout.addWidget(unload_plugin_btn)
 
-        apply_reconnect_btn = QPushButton(" 批量保存并重连")
+        apply_reconnect_btn = QPushButton("批量保存并重连")
         apply_reconnect_btn.setToolTip("对选中数据源保存配置到数据库并重连；若未选中则对全部进行重连。")
         apply_reconnect_btn.clicked.connect(self.batch_apply_and_reconnect_data_sources)
         button_layout.addWidget(apply_reconnect_btn)
@@ -2646,7 +2645,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 "外汇": "forex",
                 "债券": "bond"
             }
-            logger.info(" 使用静态资产类型列表")
+            logger.info("使用静态资产类型列表")
 
         self.asset_type_combo.currentTextChanged.connect(self.update_priority_list)
         routing_layout.addWidget(self.asset_type_combo, 0, 1)
@@ -2659,16 +2658,16 @@ class EnhancedPluginManagerDialog(QDialog):
         # 路由按钮布局
         routing_btn_layout = QHBoxLayout()
 
-        save_priority_btn = QPushButton(" 保存优先级")
+        save_priority_btn = QPushButton("保存优先级")
         save_priority_btn.clicked.connect(self.save_priority_config)
         routing_btn_layout.addWidget(save_priority_btn)
 
-        test_routing_btn = QPushButton(" 测试路由")
+        test_routing_btn = QPushButton("测试路由")
         test_routing_btn.clicked.connect(self.test_routing_config)
         test_routing_btn.setToolTip("测试路由配置是否生效")
         routing_btn_layout.addWidget(test_routing_btn)
 
-        sync_datasource_btn = QPushButton(" 同步数据源")
+        sync_datasource_btn = QPushButton("同步数据源")
         sync_datasource_btn.clicked.connect(self._sync_data_sources_to_unified_manager)
         sync_datasource_btn.setToolTip("手动同步数据源到统一管理器")
         routing_btn_layout.addWidget(sync_datasource_btn)
@@ -2718,7 +2717,7 @@ class EnhancedPluginManagerDialog(QDialog):
     def refresh_data_source_plugins(self):
         """刷新数据源插件列表（单一路径：从路由器读取）。"""
         try:
-            logger.info(" 刷新数据源插件列表（router 单一来源）...")
+            logger.info("刷新数据源插件列表（router 单一来源）...")
             # 清空现有数据
             self.data_source_table.setRowCount(0)
 
@@ -2732,7 +2731,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
             # 若路由器为空，尝试强制加载并注册
             if not adapters and self.plugin_manager:
-                logger.info(" 路由器暂无数据源，尝试强制重新加载插件并注册...")
+                logger.info("路由器暂无数据源，尝试强制重新加载插件并注册...")
                 try:
                     self.plugin_manager.load_all_plugins()
                 except Exception as e:
@@ -2800,7 +2799,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
     def _fallback_sync_loading(self):
         """回退到同步加载模式"""
-        logger.info(" 回退到同步加载模式")
+        logger.info("回退到同步加载模式")
         # 这里保留原来的同步加载逻辑作为备用
         pass
 
@@ -2808,7 +2807,7 @@ class EnhancedPluginManagerDialog(QDialog):
         """显示无插件消息"""
         self.data_source_table.setRowCount(1)
         self.data_source_table.setItem(0, 0, QTableWidgetItem("未找到数据源插件"))
-        self.data_source_table.setItem(0, 1, QTableWidgetItem(" 无数据"))
+        self.data_source_table.setItem(0, 1, QTableWidgetItem("无数据"))
         for col in range(2, 6):
             self.data_source_table.setItem(0, col, QTableWidgetItem("-"))
 
@@ -2831,7 +2830,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
             # 为每行设置初始加载状态
             for row in range(len(data_sources)):
-                loading_item = QTableWidgetItem(" 加载中...")
+                loading_item = QTableWidgetItem("加载中...")
                 loading_item.setTextAlignment(Qt.AlignCenter)
                 self.data_source_table.setItem(row, 0, loading_item)
                 for col in range(1, 6):
@@ -2863,7 +2862,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
             # 启动异步填充
             self.table_worker.start()
-            logger.info(" 异步表格填充线程已启动")
+            logger.info("异步表格填充线程已启动")
 
         except Exception as e:
             logger.error(f" 启动表格填充失败: {e}")
@@ -2920,7 +2919,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
     def _on_table_population_completed(self):
         """表格填充完成回调"""
-        logger.info(" 异步表格填充完成")
+        logger.info("异步表格填充完成")
 
     def _on_table_population_failed(self, error_message: str):
         """表格填充失败回调"""
@@ -3172,7 +3171,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
             unified_manager = get_unified_data_manager()
             if not unified_manager or not hasattr(unified_manager, 'data_source_router'):
-                logger.error(" 数据源路由器不可用")
+                logger.error("数据源路由器不可用")
                 self.priority_list_widget.clear()
                 return
 
@@ -3438,7 +3437,7 @@ class EnhancedPluginManagerDialog(QDialog):
             logger.info(f" 开始配置数据源插件: {source_id}")
 
             from gui.dialogs.data_source_plugin_config_dialog import DataSourcePluginConfigDialog
-            logger.info(" 成功导入配置对话框")
+            logger.info("成功导入配置对话框")
         except ImportError as ie:
             logger.error(f" 导入配置对话框失败: {ie}")
             QMessageBox.information(self, "功能开发中", f"插件 {source_id} 的配置功能正在开发中...")
@@ -3491,18 +3490,18 @@ class EnhancedPluginManagerDialog(QDialog):
 
             unified_manager = get_unified_data_manager()
             if not unified_manager:
-                logger.error(" 统一数据管理器不可用")
+                logger.error("统一数据管理器不可用")
                 QMessageBox.warning(self, "测试失败", "统一数据管理器不可用")
                 return
 
             if not hasattr(unified_manager, 'data_source_router'):
-                logger.error(" 数据源路由器未启用")
+                logger.error("数据源路由器未启用")
                 QMessageBox.warning(self, "测试失败", "数据源路由器未启用")
                 return
 
             router = unified_manager.data_source_router
             if not router:
-                logger.error(" 数据源路由器为空")
+                logger.error("数据源路由器为空")
                 QMessageBox.warning(self, "测试失败", "数据源路由器为空")
                 return
 
@@ -3558,7 +3557,7 @@ class EnhancedPluginManagerDialog(QDialog):
             tab = QWidget()
             layout = QVBoxLayout(tab)
 
-            placeholder = QLabel(" 状态监控功能开发中...")
+            placeholder = QLabel("状态监控功能开发中...")
             placeholder.setAlignment(Qt.AlignCenter)
             placeholder.setStyleSheet("""
                 QLabel {
@@ -3874,7 +3873,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
     def _sync_data_sources_to_unified_manager(self):
         # SSOT: 本方法已废弃，避免在UI侧重复注册数据源（导致将 PluginInfo 当作实例传入适配器）
-        logger.info(" 跳过 _sync_data_sources_to_unified_manager：已启用路由器单一真源（SSOT）")
+        logger.info("跳过 _sync_data_sources_to_unified_manager：已启用路由器单一真源（SSOT）")
         return
 
     def batch_apply_and_reconnect_data_sources(self):
@@ -3946,7 +3945,7 @@ class EnhancedPluginManagerDialog(QDialog):
     def _create_indicator_strategy_tab(self, tab: QWidget):
         """创建指标/策略插件管理标签页（V2）。"""
         layout = QVBoxLayout(tab)
-        title_label = QLabel(" 指标/策略 插件管理")
+        title_label = QLabel("指标/策略 插件管理")
         title_label.setStyleSheet("font-weight: bold; font-size: 16px;")
         layout.addWidget(title_label)
 
@@ -3982,9 +3981,9 @@ class EnhancedPluginManagerDialog(QDialog):
         layout.addWidget(table)
 
         btn_bar = QHBoxLayout()
-        refresh_btn = QPushButton(" 刷新")
-        config_btn = QPushButton(" 配置")
-        batch_apply_btn = QPushButton(" 批量保存并应用")
+        refresh_btn = QPushButton("刷新")
+        config_btn = QPushButton("配置")
+        batch_apply_btn = QPushButton("批量保存并应用")
         export_btn = QPushButton("导出配置")
         import_btn = QPushButton("导入配置")
         reset_btn = QPushButton("恢复默认")
@@ -4128,7 +4127,7 @@ class EnhancedPluginManagerDialog(QDialog):
             v = QVBoxLayout(dlg)
             v.addWidget(form_widget)
             btns = QHBoxLayout()
-            btn_save = QPushButton(" 保存并应用")
+            btn_save = QPushButton("保存并应用")
             btn_cancel = QPushButton("取消")
             btns.addStretch(1)
             btns.addWidget(btn_save)

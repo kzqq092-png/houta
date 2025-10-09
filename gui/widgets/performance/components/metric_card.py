@@ -8,7 +8,6 @@ from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QGraphicsD
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
 
-
 class ModernMetricCard(QFrame):
     """现代化指标卡片 - 参考TradingView设计"""
 

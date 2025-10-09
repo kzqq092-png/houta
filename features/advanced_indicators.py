@@ -11,7 +11,6 @@ from typing import Dict, List, Optional, Any
 from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess, validate_kdata
 from loguru import logger
 
-
 def calculate_advanced_indicators(df):
     """
     计算高级技术指标
@@ -124,11 +123,9 @@ def calculate_advanced_indicators(df):
 
     return df
 
-
 ALL_PATTERN_TYPES = [
     "头肩顶", "头肩底", "双顶", "双底", "三角形", "锤子线", "倒锤头", "吞没形态", "启明星", "黄昏星", "三白兵", "三只乌鸦", "十字星", "流星线", "射击之星"
 ]
-
 
 def create_pattern_recognition_features(df):
     """
@@ -228,7 +225,6 @@ def create_pattern_recognition_features(df):
 
     return df_new
 
-
 def create_market_regime_features(df):
     """
     创建市场状态特征
@@ -280,7 +276,6 @@ def create_market_regime_features(df):
     df['price_position'] = (df['close'] - df['support']) / (df['resistance'] - df['support'])
 
     return df
-
 
 def add_advanced_indicators(df):
     """

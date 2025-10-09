@@ -326,7 +326,7 @@ class DataSourceManagementWidget(QWidget):
         timeout_spin = QSpinBox()
         timeout_spin.setRange(1, 300)
         timeout_spin.setValue(30)
-        timeout_spin.setSuffix(" 秒")
+        timeout_spin.setSuffix("秒")
         form_layout.addRow("超时时间:", timeout_spin)
 
         # 重试次数

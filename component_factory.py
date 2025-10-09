@@ -9,7 +9,6 @@ from core.market_environment import MarketEnvironment
 from core.system_condition import EnhancedSystemCondition
 from loguru import logger
 
-
 class ComponentFactory:
     """
     交易系统组件工厂，用于集中创建和管理交易系统的各个组件

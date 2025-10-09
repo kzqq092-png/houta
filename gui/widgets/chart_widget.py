@@ -48,7 +48,6 @@ logger = logger
 
 # 导入指标收集
 
-
 class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                   CrosshairMixin, InteractionMixin, ZoomMixin, SignalMixin,
                   ExportMixin, UtilityMixin):

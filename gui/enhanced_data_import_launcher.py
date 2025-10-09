@@ -19,7 +19,6 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-
 # 预先导入QAbstractItemView以防止运行时错误
 try:
     from PyQt5.QtWidgets import QAbstractItemView
@@ -142,14 +141,14 @@ class EnhancedDataImportMainWindow(QMainWindow):
         from PyQt5.QtWidgets import QMessageBox
 
         status_info = """
-        🚀 HIkyuu-UI 增强版数据导入系统状态
+        HIkyuu-UI 增强版数据导入系统状态
         
-        ✅ AI预测服务: 已启用
-        ✅ 性能监控: 已启用  
-        ✅ 多级缓存: 已启用
-        ✅ 分布式执行: 已启用
-        ✅ 自动调优: 已启用
-        ✅ 数据质量监控: 已启用
+       AI预测服务: 已启用
+       性能监控: 已启用  
+       多级缓存: 已启用
+       分布式执行: 已启用
+       自动调优: 已启用
+       数据质量监控: 已启用
         
         系统运行正常！
         """
@@ -171,14 +170,14 @@ class EnhancedDataImportMainWindow(QMainWindow):
         <p><b>版本:</b> 2.0 - AI增强版</p>
         <p><b>作者:</b> FactorWeave-Quant团队</p>
         
-        <h3>🚀 核心特性:</h3>
+        <h3>核心特性:</h3>
         <ul>
-        <li>🤖 AI智能参数优化</li>
-        <li>📊 实时性能监控和异常检测</li>
-        <li>💾 多级智能缓存系统</li>
-        <li>🌐 分布式任务执行</li>
-        <li>⚙️ AutoTuner自动调优</li>
-        <li>✅ 专业数据质量监控</li>
+        <li>AI智能参数优化</li>
+        <li> 实时性能监控和异常检测</li>
+        <li>多级智能缓存系统</li>
+        <li>分布式任务执行</li>
+        <li>AutoTuner自动调优</li>
+        <li>专业数据质量监控</li>
         </ul>
         
         <p><b>技术栈:</b> Python, PyQt5, DuckDB, scikit-learn</p>

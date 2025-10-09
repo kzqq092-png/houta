@@ -24,7 +24,6 @@ from system_optimizer import (
 
 logger = logger
 
-
 class SystemOptimizerPanel(QWidget):
     """系统维护工具面板"""
 

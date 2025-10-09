@@ -185,7 +185,7 @@ class DuckDBOperations:
         # 使用DuckDB的高效批量插入，明确指定列名
         columns = list(batch_data.columns)
         columns_str = ', '.join(columns)
-        
+
         conn.register('temp_batch', batch_data)
         conn.execute(f"INSERT INTO {table_name} ({columns_str}) SELECT {columns_str} FROM temp_batch")
         conn.unregister('temp_batch')
@@ -269,7 +269,12 @@ class DuckDBOperations:
 
         except Exception as e:
             execution_time = time.time() - start_time
-            logger.error(f"查询失败 {table_name}: {e}")
+
+            # 表不存在是正常的降级情况，使用debug级别
+            if "does not exist" in str(e) or "Table with name" in str(e):
+                logger.debug(f"查询失败（表不存在，正常降级） {table_name}: {e}")
+            else:
+                logger.error(f"查询失败 {table_name}: {e}")
 
             return QueryResult(
                 data=pd.DataFrame(),
@@ -604,6 +609,81 @@ class DuckDBOperations:
         self._query_stats.clear()
         self._insert_stats.clear()
         logger.info("性能统计已清理")
+
+    def execute_query(self, database_path: str, query: str, params: Optional[List[Any]] = None) -> QueryResult:
+        """
+        执行自定义SQL查询（带参数支持）
+
+        这是为了向后兼容而添加的方法，内部使用query_data实现
+
+        Args:
+            database_path: 数据库路径
+            query: SQL查询语句（可以包含?占位符）
+            params: 查询参数列表
+
+        Returns:
+            查询结果
+        """
+        try:
+            # 如果有参数，替换占位符
+            if params:
+                # 将?占位符替换为实际值
+                formatted_query = query
+                for param in params:
+                    # 处理字符串参数，需要加引号
+                    if isinstance(param, str):
+                        formatted_query = formatted_query.replace('?', f"'{param}'", 1)
+                    else:
+                        formatted_query = formatted_query.replace('?', str(param), 1)
+            else:
+                formatted_query = query
+
+            # 使用query_data执行查询
+            # 从查询中提取表名（简单处理）
+            table_name = self._extract_table_name(formatted_query)
+
+            result = self.query_data(
+                database_path=database_path,
+                table_name=table_name,
+                custom_sql=formatted_query
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"执行查询失败: {e}")
+            return QueryResult(
+                data=pd.DataFrame(),
+                execution_time=0,
+                row_count=0,
+                columns=[],
+                query_sql=query,
+                success=False,
+                error_message=str(e)
+            )
+
+    def _extract_table_name(self, sql: str) -> str:
+        """从SQL语句中提取表名（简单实现）"""
+        try:
+            # 转换为小写以便匹配
+            sql_lower = sql.lower()
+
+            # 查找FROM关键字
+            from_index = sql_lower.find('from')
+            if from_index == -1:
+                return "unknown"
+
+            # 提取FROM后的第一个单词作为表名
+            after_from = sql[from_index + 4:].strip()
+            table_name = after_from.split()[0]
+
+            # 移除可能的引号
+            table_name = table_name.strip('"').strip("'")
+
+            return table_name
+
+        except Exception:
+            return "unknown"
 
 
 # 全局数据操作实例

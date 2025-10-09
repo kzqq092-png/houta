@@ -31,9 +31,8 @@ from loguru import logger
 from .performance_data_bridge import PerformanceDataBridge, get_performance_bridge
 from .deep_analysis_service import DeepAnalysisService, get_deep_analysis_service
 from ..performance.factorweave_performance_integration import FactorWeavePerformanceIntegrator, get_performance_integrator
-from ..performance.unified_monitor import UnifiedPerformanceMonitor, get_performance_monitor, PerformanceMetric, PerformanceCategory
+from ..performance.unified_monitor import get_performance_monitor
 from ..events import EventBus, get_event_bus
-
 
 class PerformanceAnomalyType(Enum):
     """性能异常类型"""
@@ -43,14 +42,12 @@ class PerformanceAnomalyType(Enum):
     STAGNATION = "stagnation"         # 性能停滞
     RESOURCE_EXHAUSTION = "resource_exhaustion"  # 资源耗尽
 
-
 class PerformanceTrendType(Enum):
     """性能趋势类型"""
     IMPROVING = "improving"            # 改善中
     STABLE = "stable"                 # 稳定
     DEGRADING = "degrading"           # 恶化中
     VOLATILE = "volatile"             # 波动
-
 
 @dataclass
 class PerformanceAnomaly:
@@ -68,7 +65,6 @@ class PerformanceAnomaly:
     auto_resolvable: bool = False
     suggested_actions: List[str] = field(default_factory=list)
 
-
 @dataclass
 class PerformanceTrend:
     """性能趋势"""
@@ -80,7 +76,6 @@ class PerformanceTrend:
     prediction_confidence: float  # 预测置信度
     time_window: timedelta
     data_points: int
-
 
 @dataclass
 class PerformanceOptimizationSuggestion:
@@ -95,7 +90,6 @@ class PerformanceOptimizationSuggestion:
     implementation_difficulty: str  # easy, medium, hard
     priority: str  # low, medium, high, critical
     created_at: datetime = field(default_factory=datetime.now)
-
 
 class EnhancedPerformanceBridge:
     """增强版性能数据桥接器"""
@@ -1030,10 +1024,8 @@ class EnhancedPerformanceBridge:
             logger.error(f"应用优化建议失败: {e}")
             return False
 
-
 # 全局实例
 _enhanced_performance_bridge = None
-
 
 def get_enhanced_performance_bridge() -> EnhancedPerformanceBridge:
     """获取增强版性能数据桥接器实例"""
@@ -1041,7 +1033,6 @@ def get_enhanced_performance_bridge() -> EnhancedPerformanceBridge:
     if _enhanced_performance_bridge is None:
         _enhanced_performance_bridge = EnhancedPerformanceBridge()
     return _enhanced_performance_bridge
-
 
 def initialize_enhanced_performance_bridge(auto_start: bool = True) -> EnhancedPerformanceBridge:
     """初始化增强版性能数据桥接器"""
@@ -1052,7 +1043,6 @@ def initialize_enhanced_performance_bridge(auto_start: bool = True) -> EnhancedP
 
     logger.info("增强版性能数据桥接器初始化完成")
     return bridge
-
 
 if __name__ == "__main__":
     # 测试代码

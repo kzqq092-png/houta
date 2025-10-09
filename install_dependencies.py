@@ -14,7 +14,6 @@ import subprocess
 import os
 from pathlib import Path
 
-
 def install_package(package_name):
     """安装指定的包"""
     logger.info(f"正在安装 {package_name}...")
@@ -26,7 +25,6 @@ def install_package(package_name):
     except subprocess.CalledProcessError:
         logger.info(f"{package_name} 安装失败，请手动安装。")
         return False
-
 
 def install_from_requirements(requirements_file):
     """从requirements.txt文件安装依赖"""
@@ -43,7 +41,6 @@ def install_from_requirements(requirements_file):
     except subprocess.CalledProcessError:
         logger.info("requirements.txt 中的依赖安装失败，请手动安装。")
         return False
-
 
 def main():
     """主函数"""
@@ -73,7 +70,6 @@ def main():
 
     logger.info("\n所有依赖安装完成！")
     logger.info("现在您可以运行 run_trading_gui.py 启动系统了。")
-
 
 if __name__ == "__main__":
     main()

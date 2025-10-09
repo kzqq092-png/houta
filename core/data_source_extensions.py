@@ -24,6 +24,7 @@ class AssetType(Enum):
     OPTIONS = "options"
     CRYPTO = "crypto"
     FOREX = "forex"
+    SECTOR = "sector"  # 板块资产类型
 
 
 class DataType(Enum):
@@ -35,6 +36,7 @@ class DataType(Enum):
     FUNDAMENTAL = "fundamental"
     NEWS = "news"
     FINANCIAL_REPORT = "financial_report"
+    SECTOR_FUND_FLOW = "sector_fund_flow"  # 板块资金流数据类型
 
 
 @dataclass
@@ -429,15 +431,54 @@ class DataSourcePluginAdapter:
     def health_check(self) -> HealthCheckResult:
         """健康检查"""
         try:
-            result = self.plugin.health_check()
-            self._last_health_check = result
-            return result
+            # 检查插件是否有health_check方法
+            if hasattr(self.plugin, 'health_check'):
+                result = self.plugin.health_check()
+                self._last_health_check = result
+                return result
+            else:
+                # 如果插件没有health_check方法，执行基本的连接检查
+                return self._basic_health_check()
         except Exception as e:
             self.logger.error(f"健康检查异常: {self.plugin_id} - {e}")
             return HealthCheckResult(
                 is_healthy=False,
                 status_code=500,
                 message=f"健康检查异常: {str(e)}",
+                response_time_ms=0.0,
+                last_check_time=datetime.now()
+            )
+
+    def _basic_health_check(self) -> HealthCheckResult:
+        """基本健康检查（用于没有实现health_check方法的插件）"""
+        try:
+            start_time = datetime.now()
+
+            # 检查插件是否有test_connection方法
+            if hasattr(self.plugin, 'test_connection'):
+                is_healthy = self.plugin.test_connection()
+                status_code = 200 if is_healthy else 503
+                message = "连接正常" if is_healthy else "连接失败"
+            else:
+                # 如果没有test_connection方法，检查插件是否可用
+                is_healthy = self.plugin is not None
+                status_code = 200 if is_healthy else 503
+                message = "插件可用" if is_healthy else "插件不可用"
+
+            response_time = (datetime.now() - start_time).total_seconds() * 1000
+
+            return HealthCheckResult(
+                is_healthy=is_healthy,
+                status_code=status_code,
+                message=message,
+                response_time_ms=response_time,
+                last_check_time=datetime.now()
+            )
+        except Exception as e:
+            return HealthCheckResult(
+                is_healthy=False,
+                status_code=500,
+                message=f"基本健康检查失败: {str(e)}",
                 response_time_ms=0.0,
                 last_check_time=datetime.now()
             )

@@ -17,13 +17,11 @@ from enum import Enum
 import pandas as pd
 import json
 
-
 # 导入统一的数据质量模型
 from .unified_quality_models import (
     DataQuality, QualityDimension, QualityCheckStatus, QualityIssueLevel,
     UnifiedDataQualityMetrics, QualityProfile, get_default_quality_profiles
 )
-
 
 class MarketType(Enum):
     """市场类型"""
@@ -34,14 +32,12 @@ class MarketType(Enum):
     BOND = "bond"           # 债券市场
     COMMODITY = "commodity"  # 商品市场
 
-
 class ReportType(Enum):
     """财报类型"""
     ANNUAL = "annual"       # 年报
     SEMI_ANNUAL = "semi_annual"  # 半年报
     QUARTERLY = "quarterly"  # 季报
     MONTHLY = "monthly"     # 月报
-
 
 @dataclass
 class EnhancedStockInfo:
@@ -149,7 +145,6 @@ class EnhancedStockInfo:
 
         return cls(**data)
 
-
 @dataclass
 class EnhancedKlineData:
     """
@@ -253,7 +248,6 @@ class EnhancedKlineData:
 
         return cls(**data)
 
-
 @dataclass
 class FinancialStatement:
     """
@@ -302,7 +296,6 @@ class FinancialStatement:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
-
 @dataclass
 class MacroEconomicData:
     """
@@ -338,7 +331,6 @@ class MacroEconomicData:
     data_source: str = ""
     created_at: datetime = field(default_factory=datetime.now)
     data_quality_score: Optional[Decimal] = None
-
 
 @dataclass
 class DataSourcePlugin:
@@ -381,7 +373,6 @@ class DataSourcePlugin:
     error_requests: int = 0                 # 错误请求数
     avg_response_time: Optional[Decimal] = None  # 平均响应时间
 
-
 @dataclass
 class FieldMapping:
     """
@@ -400,10 +391,8 @@ class FieldMapping:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
-
 # 兼容性别名 - DataQualityMetrics现在指向UnifiedDataQualityMetrics
 DataQualityMetrics = UnifiedDataQualityMetrics
-
 
 # 工具函数
 def generate_table_name(plugin_name: str, data_type: str, period: str = None) -> str:
@@ -422,7 +411,6 @@ def generate_table_name(plugin_name: str, data_type: str, period: str = None) ->
     if period:
         return f"{base_name}_{period}"
     return base_name
-
 
 def validate_symbol(symbol: str, market: str) -> bool:
     """
@@ -451,7 +439,6 @@ def validate_symbol(symbol: str, market: str) -> bool:
 
     return True  # 其他市场暂时通过
 
-
 def calculate_change_pct(current: Decimal, previous: Decimal) -> Optional[Decimal]:
     """
     计算涨跌幅
@@ -467,7 +454,6 @@ def calculate_change_pct(current: Decimal, previous: Decimal) -> Optional[Decima
         return None
 
     return ((current - previous) / previous) * 100
-
 
 def calculate_amplitude(high: Decimal, low: Decimal, previous_close: Decimal) -> Optional[Decimal]:
     """
@@ -485,7 +471,6 @@ def calculate_amplitude(high: Decimal, low: Decimal, previous_close: Decimal) ->
         return None
 
     return ((high - low) / previous_close) * 100
-
 
 @dataclass
 class FinancialStatement:
@@ -667,7 +652,6 @@ class FinancialStatement:
 
         return cls(**data)
 
-
 @dataclass
 class MacroEconomicData:
     """
@@ -786,7 +770,6 @@ class MacroEconomicData:
         if same_period_last_year_value is not None and same_period_last_year_value != 0:
             self.yoy_change = ((self.value - same_period_last_year_value) / same_period_last_year_value) * 100
 
-
 # 新增工具函数
 def calculate_financial_ratios(financial_data: FinancialStatement) -> FinancialStatement:
     """
@@ -824,7 +807,6 @@ def calculate_financial_ratios(financial_data: FinancialStatement) -> FinancialS
 
     return financial_data
 
-
 def normalize_financial_data(data: pd.DataFrame, method: str = 'zscore') -> pd.DataFrame:
     """
     财务数据标准化
@@ -851,7 +833,6 @@ def normalize_financial_data(data: pd.DataFrame, method: str = 'zscore') -> pd.D
         data[numeric_columns] = (data[numeric_columns] - median) / mad
 
     return data
-
 
 def calculate_turnover_rate(volume: int, total_shares: int) -> Optional[Decimal]:
     """

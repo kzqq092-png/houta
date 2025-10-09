@@ -17,7 +17,7 @@ try:
     from utils.matplotlib_font_config import configure_matplotlib_chinese_font
     configure_matplotlib_chinese_font()
 except ImportError:
-    logger.info(" 无法导入字体配置工具，使用默认配置")
+    logger.info("无法导入字体配置工具，使用默认配置")
 
 
 class ChartRenderer(QObject):

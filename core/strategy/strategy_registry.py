@@ -19,7 +19,6 @@ from core.adapters import get_config
 from .base_strategy import BaseStrategy, StrategyType
 from .strategy_database import get_strategy_database_manager
 
-
 class StrategyInfo:
     """策略信息类，用于封装策略基本信息"""
 
@@ -34,7 +33,6 @@ class StrategyInfo:
 
     def __repr__(self):
         return f"StrategyInfo(id={self.strategy_id}, name={self.name})"
-
 
 class StrategyRegistry:
     """策略注册器"""
@@ -569,11 +567,9 @@ class StrategyRegistry:
             except Exception as e:
                 self.logger.error(f"事件监听器执行失败 {listener}: {e}")
 
-
 # 全局单例实例
 _strategy_registry = None
 _registry_lock = threading.Lock()
-
 
 def get_strategy_registry() -> StrategyRegistry:
     """获取策略注册器单例"""
@@ -585,7 +581,6 @@ def get_strategy_registry() -> StrategyRegistry:
                 _strategy_registry = StrategyRegistry()
 
     return _strategy_registry
-
 
 def register_strategy(strategy_name: str, metadata: Optional[Dict[str, Any]] = None):
     """

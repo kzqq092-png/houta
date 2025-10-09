@@ -17,6 +17,7 @@ import os
 from .base_tab import BaseAnalysisTab
 from utils.config_manager import ConfigManager
 
+
 class HotspotAnalysisTab(BaseAnalysisTab):
     """热点分析标签页"""
 
@@ -105,7 +106,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         self.period_spin = QSpinBox()
         self.period_spin.setRange(1, 60)
         self.period_spin.setValue(5)
-        self.period_spin.setSuffix(" 天")
+        self.period_spin.setSuffix("天")
         layout.addWidget(self.period_spin, 0, 1)
 
         # 热度阈值
@@ -121,7 +122,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         self.gain_threshold_spin = QDoubleSpinBox()
         self.gain_threshold_spin.setRange(1.0, 50.0)
         self.gain_threshold_spin.setValue(5.0)
-        self.gain_threshold_spin.setSuffix(" %")
+        self.gain_threshold_spin.setSuffix("%")
         layout.addWidget(self.gain_threshold_spin, 1, 1)
 
         # 成交量倍数

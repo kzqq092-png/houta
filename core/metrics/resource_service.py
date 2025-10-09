@@ -9,7 +9,6 @@ from core.events.event_bus import EventBus
 from core.config import config_manager
 from loguru import logger
 
-
 class SystemResourceService:
     """一个后台服务，定期监控并发布系统资源（CPU、内存、磁盘）使用情况。"""
 

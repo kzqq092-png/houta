@@ -75,7 +75,7 @@ except ImportError:
                 logger.info(f"[INFO] {message}")
 
             def warning(self, message):
-                logger.warning(f"[WARNING] {message}")
+                logger.warning(f" {message}")
 
             def error(self, message):
                 logger.error(f"[ERROR] {message}")
@@ -253,7 +253,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         main_layout = QVBoxLayout(central_widget)
 
         # 标题
-        title = QLabel(" HIkyuu Professional Backtest System")
+        title = QLabel("HIkyuu Professional Backtest System")
         title.setStyleSheet("""
             QLabel {
                 font-size: 24px;
@@ -321,19 +321,19 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
 
         # Web界面按钮
         if STREAMLIT_AVAILABLE:
-            web_button = QPushButton(" 启动Web界面")
+            web_button = QPushButton("启动Web界面")
             web_button.clicked.connect(self.launch_web_ui)
             buttons_layout.addWidget(web_button)
 
         # 桌面界面按钮
         if PYQT5_AVAILABLE:
-            desktop_button = QPushButton(" 启动桌面界面")
+            desktop_button = QPushButton("启动桌面界面")
             desktop_button.clicked.connect(self.launch_desktop_ui)
             buttons_layout.addWidget(desktop_button)
 
         # 同时启动按钮
         if STREAMLIT_AVAILABLE and PYQT5_AVAILABLE:
-            both_button = QPushButton(" 同时启动两个界面")
+            both_button = QPushButton("同时启动两个界面")
             both_button.clicked.connect(self.launch_both_ui)
             buttons_layout.addWidget(both_button)
 
@@ -363,7 +363,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         layout = QVBoxLayout(config_tab)
 
         # 配置说明
-        config_label = QLabel(" 系统配置")
+        config_label = QLabel("系统配置")
         config_label.setStyleSheet(
             "font-size: 18px; font-weight: bold; color: #00ff88;")
         layout.addWidget(config_label)
@@ -388,7 +388,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         layout.addLayout(theme_layout)
 
         # 保存配置按钮
-        save_config_button = QPushButton(" 保存配置")
+        save_config_button = QPushButton("保存配置")
         save_config_button.clicked.connect(self.save_config)
         layout.addWidget(save_config_button)
 
@@ -404,7 +404,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         layout = QVBoxLayout(log_tab)
 
         # 日志标题
-        log_label = QLabel(" 系统日志")
+        log_label = QLabel("系统日志")
         log_label.setStyleSheet(
             "font-size: 18px; font-weight: bold; color: #f59e0b;")
         layout.addWidget(log_label)
@@ -425,7 +425,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         layout.addWidget(self.log_display)
 
         # 清除日志按钮
-        clear_log_button = QPushButton(" 清除日志")
+        clear_log_button = QPushButton("清除日志")
         clear_log_button.clicked.connect(self.clear_log)
         layout.addWidget(clear_log_button)
 

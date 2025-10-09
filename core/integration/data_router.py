@@ -13,13 +13,11 @@ import pandas as pd
 
 logger = logger
 
-
 class StorageBackend(Enum):
     """存储后端类型"""
     SQLITE = "sqlite"
     DUCKDB = "duckdb"
     AUTO = "auto"
-
 
 @dataclass
 class RoutingRule:
@@ -29,7 +27,6 @@ class RoutingRule:
     conditions: Optional[Dict[str, Any]] = None
     priority: int = 0
     description: str = ""
-
 
 class DataRouter:
     """
@@ -257,7 +254,6 @@ class DataRouter:
             stats["rules_by_data_type"][data_type] = count
 
         return stats
-
 
 class QueryOptimizer:
     """查询优化器 - 基于查询模式优化路由决策"""

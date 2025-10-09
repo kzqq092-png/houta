@@ -23,7 +23,6 @@ _VOLUME_ALIASES = ['价量形态', 'volume']
 _GAPS_ALIASES = ['缺口形态', 'gap']
 _CONTINUATION_ALIASES = ['持续形态', 'continuation', 'continuation_pattern']
 
-
 class SignalType(Enum):
     """信号类型"""
     BUY = "buy"
@@ -39,7 +38,6 @@ class SignalType(Enum):
             if member.value == s_lower:
                 return member
         return cls.NEUTRAL
-
 
 @dataclass
 class PatternResult:
@@ -74,7 +72,6 @@ class PatternResult:
             **(self.extra_data or {})
         }
 
-
 @dataclass
 class PatternConfig:
     """形态配置"""
@@ -92,7 +89,6 @@ class PatternConfig:
     is_active: bool
     success_rate: float = 0.7  # 默认成功率
     risk_level: str = 'medium'  # 默认风险级别
-
 
 class BasePatternRecognizer(ABC):
     """形态识别器基类"""
@@ -169,7 +165,6 @@ class BasePatternRecognizer(ABC):
             extra_data=extra_data
         )
 
-
 class PatternAlgorithmFactory:
     """形态算法工厂 - 优化版，统一使用DatabaseAlgorithmRecognizer"""
 
@@ -196,7 +191,6 @@ class PatternAlgorithmFactory:
         """获取可用算法列表"""
         return list(cls._recognizers.keys())
 
-
 def register_pattern_algorithm(pattern_type: str):
     """装饰器：注册形态算法"""
     def decorator(cls):
@@ -204,14 +198,12 @@ def register_pattern_algorithm(pattern_type: str):
         return cls
     return decorator
 
-
 # 工具函数 - 性能优化版
 def calculate_body_ratio(open_price: float, close_price: float, high_price: float, low_price: float) -> float:
     """计算实体比例 - 优化版"""
     body_size = abs(close_price - open_price)
     total_range = high_price - low_price
     return body_size / total_range if total_range > 0 else 0.0
-
 
 def calculate_shadow_ratios(open_price: float, close_price: float, high_price: float, low_price: float) -> Tuple[float, float]:
     """计算上下影线比例 - 优化版"""
@@ -227,16 +219,13 @@ def calculate_shadow_ratios(open_price: float, close_price: float, high_price: f
 
     return upper_ratio, lower_ratio
 
-
 def is_bullish_candle(open_price: float, close_price: float) -> bool:
     """判断是否为阳线"""
     return close_price > open_price
 
-
 def is_bearish_candle(open_price: float, close_price: float) -> bool:
     """判断是否为阴线"""
     return close_price < open_price
-
 
 def find_local_extremes(prices: np.ndarray, window: int = 5) -> Tuple[List[int], List[int]]:
     """
@@ -271,7 +260,6 @@ def find_local_extremes(prices: np.ndarray, window: int = 5) -> Tuple[List[int],
 
     return peaks, troughs
 
-
 def calculate_trend_strength(prices: np.ndarray, window: int = 20) -> float:
     """
     计算趋势强度 - 性能优化版
@@ -304,7 +292,6 @@ def calculate_trend_strength(prices: np.ndarray, window: int = 20) -> float:
 
     return 0.0
 
-
 def calculate_volatility(prices: np.ndarray, window: int = 20) -> float:
     """
     计算价格波动率 - 新增性能优化函数
@@ -328,7 +315,6 @@ def calculate_volatility(prices: np.ndarray, window: int = 20) -> float:
 
     return 0.0
 
-
 def calculate_momentum(prices: np.ndarray, period: int = 10) -> float:
     """
     计算价格动量 - 新增性能优化函数
@@ -350,7 +336,6 @@ def calculate_momentum(prices: np.ndarray, period: int = 10) -> float:
         return (current_price - past_price) / past_price
 
     return 0.0
-
 
 def calculate_rsi(prices: np.ndarray, period: int = 14) -> float:
     """

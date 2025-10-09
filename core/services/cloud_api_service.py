@@ -19,7 +19,6 @@ import base64
 
 logger = logger
 
-
 @dataclass
 class CloudConfig:
     """云端配置"""
@@ -46,7 +45,6 @@ class CloudConfig:
             'Content-Type': 'application/json'
         }
 
-
 @dataclass
 class SyncTask:
     """同步任务"""
@@ -64,7 +62,6 @@ class SyncTask:
     def __post_init__(self):
         if self.created_time is None:
             self.created_time = datetime.now()
-
 
 class CloudAPIClient:
     """云端API客户端"""
@@ -209,7 +206,6 @@ class CloudAPIClient:
         except Exception as e:
             logger.error(f"获取服务器状态失败: {e}")
             return {}
-
 
 class CloudSyncManager:
     """云端同步管理器"""
@@ -479,7 +475,6 @@ class CloudSyncManager:
             "completed_tasks": len([t for t in self.sync_tasks if t.status == "completed"]),
             "failed_tasks": len([t for t in self.sync_tasks if t.status == "failed"])
         }
-
 
 class CloudAPIService:
     """云端API服务主类"""

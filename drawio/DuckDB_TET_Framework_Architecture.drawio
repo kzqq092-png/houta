@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram name="TET框架总体架构" id="TET-architecture">
-        <mxGraphModel dx="2939" dy="1932" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+        <mxGraphModel dx="2137" dy="1495" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -105,67 +105,67 @@
                 <mxCell id="note-flow" value="数据流向：&#10;UI → 服务层 → TET管道 → 插件 → 存储" style="text;html=1;strokeColor=#1976d2;fillColor=#e3f2fd;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontColor=#000000;fontSize=12;" parent="1" vertex="1">
                     <mxGeometry x="860" y="-50" width="200" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="import-engine" value="DataImportExecutionEngine&#10;数据导入执行引擎" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="import-engine" value="DataImportExecutionEngine&#10;数据导入执行引擎" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="190" y="95" width="180" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="config-manager" value="ImportConfigManager&#10;导入配置管理器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f8e9;strokeColor=#689f38;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="config-manager" value="ImportConfigManager&#10;导入配置管理器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f8e9;strokeColor=#689f38;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="-30" y="95" width="160" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="standardization-engine" value="DataStandardizationEngine&#10;数据标准化引擎" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#ad1457;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="standardization-engine" value="DataStandardizationEngine&#10;数据标准化引擎" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#ad1457;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="620" y="200" width="180" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="quality-monitor" value="UnifiedDataQualityMonitor&#10;统一数据质量监控器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#ef6c00;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="quality-monitor" value="UnifiedDataQualityMonitor&#10;统一数据质量监控器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#ef6c00;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="70" y="440" width="180" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="performance-bridge" value="EnhancedPerformanceBridge&#10;增强版性能数据桥接器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#2e7d32;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="performance-bridge" value="EnhancedPerformanceBridge&#10;增强版性能数据桥接器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#2e7d32;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="70" y="540" width="180" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="auto-tuner" value="AutoTuner&#10;自动调优器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2f1;strokeColor=#00695c;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="auto-tuner" value="AutoTuner&#10;自动调优器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2f1;strokeColor=#00695c;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="950" y="300" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="anomaly-detector" value="DataAnomalyDetector&#10;数据异常检测器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="anomaly-detector" value="DataAnomalyDetector&#10;数据异常检测器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="950" y="470" width="140" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="distributed-service" value="EnhancedDistributedService&#10;增强版分布式服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="distributed-service" value="EnhancedDistributedService&#10;增强版分布式服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="920" y="200" width="160" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="cache-manager" value="MultiLevelCacheManager&#10;多级缓存管理器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffecb3;strokeColor=#ff8f00;fontColor=#000000;" vertex="1" parent="1">
+                <mxCell id="cache-manager" value="MultiLevelCacheManager&#10;多级缓存管理器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffecb3;strokeColor=#ff8f00;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="930" y="390" width="160" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="arrow-import-unified" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#0288d1;strokeWidth=2;" edge="1" parent="1" source="import-engine" target="unified-data-manager">
+                <mxCell id="arrow-import-unified" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#0288d1;strokeWidth=2;" parent="1" source="import-engine" target="unified-data-manager" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="arrow-config-import" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#689f38;strokeWidth=2;" edge="1" parent="1" target="import-engine">
+                <mxCell id="arrow-config-import" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#689f38;strokeWidth=2;" parent="1" target="import-engine" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="60" y="125" as="sourcePoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="arrow-tet-standardization" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#ffa000;strokeWidth=2;" edge="1" parent="1" source="tet-pipeline" target="standardization-engine">
+                <mxCell id="arrow-tet-standardization" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#ffa000;strokeWidth=2;" parent="1" source="tet-pipeline" target="standardization-engine" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="arrow-quality-import" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;strokeColor=#ef6c00;strokeWidth=2;" edge="1" parent="1" source="quality-monitor" target="transform-2">
+                <mxCell id="arrow-quality-import" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;strokeColor=#ef6c00;strokeWidth=2;" parent="1" source="quality-monitor" target="transform-2" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="arrow-ai-unified" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#827717;strokeWidth=2;" edge="1" parent="1" source="ai-prediction" target="unified-data-manager">
+                <mxCell id="arrow-ai-unified" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#827717;strokeWidth=2;" parent="1" source="ai-prediction" target="unified-data-manager" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="arrow-distributed-tet" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#1565c0;strokeWidth=2;" edge="1" parent="1" source="distributed-service" target="standardization-engine">
+                <mxCell id="arrow-distributed-tet" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#1565c0;strokeWidth=2;" parent="1" source="distributed-service" target="standardization-engine" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="2" value="" style="group" vertex="1" connectable="0" parent="1">
+                <mxCell id="2" value="" style="group" parent="1" vertex="1" connectable="0">
                     <mxGeometry x="690" y="55" width="140" height="100" as="geometry"/>
                 </mxCell>
-                <mxCell id="ai-layer" value="AI智能化层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;fontColor=#000000;fontSize=14;fontStyle=1;" vertex="1" parent="2">
+                <mxCell id="ai-layer" value="AI智能化层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;fontColor=#000000;fontSize=14;fontStyle=1;" parent="2" vertex="1">
                     <mxGeometry x="10" width="120" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="ai-prediction" value="AIPredictionService&#10;AI预测服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fbe7;strokeColor=#827717;fontColor=#000000;" vertex="1" parent="2">
+                <mxCell id="ai-prediction" value="AIPredictionService&#10;AI预测服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fbe7;strokeColor=#827717;fontColor=#000000;" parent="2" vertex="1">
                     <mxGeometry y="40" width="140" height="60" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
     </diagram>
     <diagram name="DuckDB数据下载流程" id="duckdb-flow">
-        <mxGraphModel dx="1416" dy="884" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+        <mxGraphModel dx="1307" dy="902" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -260,7 +260,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="修正版调用链分析" id="corrected-call-chain">
-        <mxGraphModel dx="2816" dy="1884" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+        <mxGraphModel dx="2707" dy="1902" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -277,10 +277,10 @@
                     <mxGeometry x="-30" y="180" width="140" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="import-realtime" value="_import_realtime_data()&#10;实时数据导入" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#ff9800;fontColor=#000000;" parent="1" vertex="1">
-                    <mxGeometry x="490" y="-50" width="140" height="50" as="geometry"/>
+                    <mxGeometry x="490" y="-75" width="140" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="import-fundamental" value="_import_fundamental_data()&#10;基本面数据导入" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#f44336;fontColor=#000000;" parent="1" vertex="1">
-                    <mxGeometry x="490" y="30" width="140" height="50" as="geometry"/>
+                    <mxGeometry x="490" y="20" width="140" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="unified-mgr-detail" value="UnifiedDataManager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f8e9;strokeColor=#689f38;fontColor=#000000;fontSize=16;fontStyle=1;" parent="1" vertex="1">
                     <mxGeometry x="-50" y="300" width="180" height="60" as="geometry"/>
@@ -303,19 +303,19 @@
                 <mxCell id="transform1-detail" value="Transform 1: 查询转换" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#3f51b5;fontColor=#000000;fontSize=14;fontStyle=1;" parent="1" vertex="1">
                     <mxGeometry x="230" y="430" width="160" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="n9PKvmdLGL0r9sDCY0n8-4" style="edgeStyle=none;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;labelBorderColor=none;fontSize=14;" edge="1" parent="1" source="query-validate">
+                <mxCell id="n9PKvmdLGL0r9sDCY0n8-4" style="edgeStyle=none;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;labelBorderColor=none;fontSize=14;" parent="1" source="query-validate" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="90" y="600" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="query-validate" value="query_validate()&#10;查询参数验证" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9c27b0;fontColor=#000000;" parent="1" vertex="1">
-                    <mxGeometry x="-20" y="560" width="120" height="50" as="geometry"/>
+                    <mxGeometry x="130" y="550" width="120" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="query-normalize" value="query_normalize()&#10;查询标准化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2f1;strokeColor=#009688;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="280" y="550" width="120" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="extract-detail" value="Extract: 数据提取" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#ff9800;fontColor=#000000;fontSize=14;fontStyle=1;" parent="1" vertex="1">
-                    <mxGeometry x="490" y="440" width="140" height="40" as="geometry"/>
+                    <mxGeometry x="490" y="460" width="140" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="plugin-select" value="plugin_select()&#10;插件智能选择" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#2196f3;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="500" y="550" width="120" height="50" as="geometry"/>
@@ -353,7 +353,7 @@
                 <mxCell id="accuracy-check" value="准确性检查&#10;_check_accuracy()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="1190" y="240" width="120" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="n9PKvmdLGL0r9sDCY0n8-3" style="edgeStyle=none;html=1;entryX=0.45;entryY=0.017;entryDx=0;entryDy=0;entryPerimeter=0;labelBorderColor=none;fontSize=14;" edge="1" parent="1" source="consistency-check" target="perf-monitor-detail">
+                <mxCell id="n9PKvmdLGL0r9sDCY0n8-3" style="edgeStyle=none;html=1;entryX=0.45;entryY=0.017;entryDx=0;entryDy=0;entryPerimeter=0;labelBorderColor=none;fontSize=14;" parent="1" source="consistency-check" target="perf-monitor-detail" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="consistency-check" value="一致性检查&#10;_check_consistency()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#5c6bc0;fontColor=#000000;" parent="1" vertex="1">
@@ -408,13 +408,20 @@
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="call-t1-normalize" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.7;exitY=1;exitDx=0;exitDy=0;strokeColor=#009688;strokeWidth=2;" parent="1" source="transform1-detail" target="query-normalize" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="342" y="540"/>
+                            <mxPoint x="340" y="540"/>
+                        </Array>
+                    </mxGeometry>
                 </mxCell>
                 <mxCell id="call-normalize-extract" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#009688;strokeWidth=3;" parent="1" source="query-normalize" target="extract-detail" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="call-extract-plugin" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.2;exitY=1;exitDx=0;exitDy=0;strokeColor=#ff9800;strokeWidth=2;" parent="1" source="extract-detail" target="plugin-select" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
+                <mxCell id="call-extract-plugin" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#ff9800;strokeWidth=2;" parent="1" source="extract-detail" target="plugin-select" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                    </mxGeometry>
                 </mxCell>
                 <mxCell id="call-plugin-fetch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#2196f3;strokeWidth=2;" parent="1" source="plugin-select" target="data-fetch" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
@@ -466,7 +473,7 @@
                 <mxCell id="call-unified-tet" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;strokeColor=#689f38;strokeWidth=3;dashed=1;" parent="1" source="unified-mgr-detail" target="tet-detail" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="call-metadata-quality" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.2;exitDx=0;exitDy=0;strokeColor=#9c27b0;strokeWidth=2;dashed=1;labelBorderColor=none;" parent="1" source="metadata-build" target="quality-monitor-detail" edge="1">
+                <mxCell id="call-metadata-quality" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#9c27b0;strokeWidth=2;dashed=1;labelBorderColor=none;" parent="1" source="metadata-build" target="quality-monitor-detail" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="call-execute-perf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.1;exitDx=0;exitDy=0;strokeColor=#0288d1;strokeWidth=2;dashed=1;" parent="1" source="execute-task" target="perf-monitor-detail" edge="1">
@@ -489,153 +496,119 @@
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                
                 <!-- 标题 -->
                 <mxCell id="verified-title" value="DuckDB TET框架真实调用链分析（基于代码验证修正）" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1976d2;" vertex="1" parent="1">
                     <mxGeometry x="300" y="20" width="700" height="40" as="geometry"/>
                 </mxCell>
-
                 <!-- 验证说明 -->
                 <mxCell id="verified-note" value="⚠️ 基于实际代码验证修正 | 已移除不存在的方法 | 修正错误的调用关系" style="text;html=1;strokeColor=#ff9800;fillColor=#fff3e0;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#e65100;" vertex="1" parent="1">
                     <mxGeometry x="300" y="70" width="700" height="30" as="geometry"/>
                 </mxCell>
-
                 <!-- 真实的DataImportExecutionEngine调用链 -->
                 <mxCell id="real-engine" value="DataImportExecutionEngine&#10;数据导入执行引擎" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;fontColor=#000000;fontSize=14;fontStyle=1;" vertex="1" parent="1">
                     <mxGeometry x="50" y="130" width="180" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-execute-task" value="_execute_task()&#10;任务执行核心逻辑" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9c27b0;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="270" y="130" width="140" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-import-methods" value="_import_kline_data()&#10;_import_realtime_data()&#10;_import_fundamental_data()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#4caf50;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="450" y="130" width="160" height="60" as="geometry"/>
                 </mxCell>
-
                 <!-- 实际调用的组件 -->
                 <mxCell id="real-data-provider" value="RealDataProvider&#10;真实数据提供器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f8e9;strokeColor=#689f38;fontColor=#000000;fontSize=14;fontStyle=1;" vertex="1" parent="1">
                     <mxGeometry x="650" y="130" width="140" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="get-real-kdata" value="get_real_kdata()&#10;获取真实K线数据" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#4caf50;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="650" y="220" width="140" height="50" as="geometry"/>
                 </mxCell>
-
                 <!-- 真实的UnifiedDataManager调用链 -->
                 <mxCell id="real-unified-mgr" value="UnifiedDataManager&#10;统一数据管理器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#ff9800;fontColor=#000000;fontSize=14;fontStyle=1;" vertex="1" parent="1">
                     <mxGeometry x="50" y="320" width="160" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-request-data" value="request_data()&#10;异步数据请求" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#ffa000;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="250" y="320" width="120" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-get-methods" value="_get_kdata()&#10;_get_financial_data()&#10;_get_news()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#ff9800;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="410" y="320" width="140" height="60" as="geometry"/>
                 </mxCell>
-
                 <!-- 真实的TETDataPipeline调用链 -->
                 <mxCell id="real-tet-pipeline" value="TETDataPipeline&#10;TET数据管道" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#ad1457;fontColor=#000000;fontSize=14;fontStyle=1;" vertex="1" parent="1">
                     <mxGeometry x="50" y="450" width="140" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-process" value="process()&#10;主处理方法" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9c27b0;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="220" y="450" width="100" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-transform-query" value="transform_query()&#10;查询转换" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#3f51b5;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="350" y="420" width="120" height="50" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-extract-data" value="extract_data_with_failover()&#10;数据提取(故障转移)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#ff9800;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="350" y="480" width="160" height="50" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-transform-data" value="transform_data()&#10;数据标准化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2f1;strokeColor=#009688;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="540" y="450" width="120" height="60" as="geometry"/>
                 </mxCell>
-
                 <!-- 真实的质量监控调用链 -->
                 <mxCell id="real-quality-monitor" value="UnifiedDataQualityMonitor&#10;统一数据质量监控器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#ef6c00;fontColor=#000000;fontSize=14;fontStyle=1;" vertex="1" parent="1">
                     <mxGeometry x="50" y="580" width="180" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-check-quality" value="check_data_quality()&#10;数据质量检查" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fbe7;strokeColor=#827717;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="270" y="580" width="140" height="60" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-8-dimensions" value="8维质量检查&#10;completeness, accuracy,&#10;consistency, timeliness,&#10;validity, uniqueness,&#10;integrity, conformity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#4caf50;fontColor=#000000;" vertex="1" parent="1">
                     <mxGeometry x="450" y="580" width="160" height="60" as="geometry"/>
                 </mxCell>
-
                 <!-- 连接线 - 主调用链 -->
                 <mxCell id="real-call-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#0288d1;strokeWidth=3;" edge="1" parent="1" source="real-engine" target="real-execute-task">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-call-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#9c27b0;strokeWidth=3;" edge="1" parent="1" source="real-execute-task" target="real-import-methods">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-call-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#4caf50;strokeWidth=3;" edge="1" parent="1" source="real-import-methods" target="real-data-provider">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-call-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;strokeColor=#689f38;strokeWidth=2;" edge="1" parent="1" source="real-data-provider" target="get-real-kdata">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <!-- UnifiedDataManager 调用链 -->
                 <mxCell id="real-call-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#ff9800;strokeWidth=3;" edge="1" parent="1" source="real-unified-mgr" target="real-request-data">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-call-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#ffa000;strokeWidth=2;" edge="1" parent="1" source="real-request-data" target="real-get-methods">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <!-- TETDataPipeline 调用链 -->
                 <mxCell id="real-call-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#ad1457;strokeWidth=3;" edge="1" parent="1" source="real-tet-pipeline" target="real-process">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-call-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.3;exitDx=0;exitDy=0;strokeColor=#3f51b5;strokeWidth=2;" edge="1" parent="1" source="real-process" target="real-transform-query">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-call-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.7;exitDx=0;exitDy=0;strokeColor=#ff9800;strokeWidth=2;" edge="1" parent="1" source="real-process" target="real-extract-data">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-call-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#009688;strokeWidth=2;" edge="1" parent="1" source="real-extract-data" target="real-transform-data">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <!-- 质量监控调用链 -->
                 <mxCell id="real-call-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#ef6c00;strokeWidth=3;" edge="1" parent="1" source="real-quality-monitor" target="real-check-quality">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <mxCell id="real-call-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#827717;strokeWidth=2;" edge="1" parent="1" source="real-check-quality" target="real-8-dimensions">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <!-- 跨组件调用 -->
                 <mxCell id="cross-call-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;strokeColor=#4caf50;strokeWidth=2;dashed=1;" edge="1" parent="1" source="real-transform-data" target="real-quality-monitor">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-
                 <!-- 说明文本 -->
                 <mxCell id="real-explanation" value="✅ 验证修正说明：&#10;&#10;🔧 修正的调用关系：&#10;• DataImportExecutionEngine → RealDataProvider (不是UnifiedDataManager)&#10;• UnifiedDataManager → _get_kdata() (没有_check_cache等方法)&#10;• TETDataPipeline → process() → transform_query/extract/transform (不是细分方法)&#10;&#10;📋 验证方法：&#10;• 代码搜索确认方法存在性&#10;• 源码阅读验证调用关系&#10;• 移除不存在的虚构方法&#10;&#10;🎯 架构特点：&#10;• 基于实际代码结构&#10;• 保持适当抽象层次&#10;• 突出主要数据流向" style="text;html=1;strokeColor=#4caf50;fillColor=#e8f5e8;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
                     <mxGeometry x="50" y="700" width="400" height="260" as="geometry"/>
                 </mxCell>
-
                 <!-- 对比说明 -->
                 <mxCell id="comparison" value="❌ 原图错误 vs ✅ 修正版本：&#10;&#10;错误1: _import_kline_data() → UnifiedDataManager.request_data()&#10;修正1: _import_kline_data() → RealDataProvider.get_real_kdata()&#10;&#10;错误2: UnifiedDataManager 有 _check_cache(), _select_data_source()&#10;修正2: 直接调用 _get_kdata(), _get_financial_data()&#10;&#10;错误3: TET有 query_validate(), plugin_select() 等细分方法&#10;修正3: 高层方法 process() → transform_query() → extract → transform&#10;&#10;✅ 质量监控部分基本准确，8维检查方法都存在" style="text;html=1;strokeColor=#f44336;fillColor=#ffebee;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontColor=#000000;fontSize=11;" vertex="1" parent="1">
                     <mxGeometry x="500" y="700" width="450" height="260" as="geometry"/>
                 </mxCell>
-
             </root>
         </mxGraphModel>
     </diagram>

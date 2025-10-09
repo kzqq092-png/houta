@@ -401,8 +401,8 @@ class DatabaseAdminDialog(QDialog):
 
         # 分页
         page_layout = QHBoxLayout()
-        self.prev_btn = QPushButton(" 上一页")
-        self.next_btn = QPushButton(" 下一页")
+        self.prev_btn = QPushButton("上一页")
+        self.next_btn = QPushButton("下一页")
         self.page_label = QLabel()
         self.prev_btn.clicked.connect(self.prev_page)
         self.next_btn.clicked.connect(self.next_page)
@@ -483,11 +483,11 @@ class DatabaseAdminDialog(QDialog):
         row1_layout = QHBoxLayout()
         row1_layout.setSpacing(4)
 
-        self.add_btn = QPushButton(" 新增")
-        self.del_btn = QPushButton(" 删除")
-        self.edit_btn = QPushButton(" 编辑")
-        self.save_btn = QPushButton(" 保存修改")
-        self.refresh_btn = QPushButton(" 刷新")
+        self.add_btn = QPushButton("新增")
+        self.del_btn = QPushButton("删除")
+        self.edit_btn = QPushButton("编辑")
+        self.save_btn = QPushButton("保存修改")
+        self.refresh_btn = QPushButton("刷新")
 
         for btn in [self.add_btn, self.del_btn, self.edit_btn, self.save_btn, self.refresh_btn]:
             btn.setStyleSheet(button_style)
@@ -500,11 +500,11 @@ class DatabaseAdminDialog(QDialog):
         # row2_layout = QHBoxLayout()
         # row2_layout.setSpacing(4)
 
-        self.import_btn = QPushButton(" 导入CSV")
-        self.export_btn = QPushButton(" 导出CSV")
-        self.batch_btn = QPushButton(" 批量修改")
-        self.perm_btn = QPushButton(" 字段权限管理")
-        self.log_btn = QPushButton(" 查看权限变更日志")
+        self.import_btn = QPushButton("导入CSV")
+        self.export_btn = QPushButton("导出CSV")
+        self.batch_btn = QPushButton("批量修改")
+        self.perm_btn = QPushButton("字段权限管理")
+        self.log_btn = QPushButton("查看权限变更日志")
 
         for btn in [self.import_btn, self.export_btn, self.batch_btn, self.perm_btn, self.log_btn]:
             btn.setStyleSheet(button_style)
@@ -517,11 +517,11 @@ class DatabaseAdminDialog(QDialog):
         # row3_layout = QHBoxLayout()
         # row3_layout.setSpacing(4)
 
-        self.upload_btn = QPushButton(" 上传权限到云端")
-        self.download_btn = QPushButton(" 从云端拉取权限")
-        self.schema_btn = QPushButton(" 表结构管理")
-        self.stats_btn = QPushButton(" 数据统计")
-        self.slow_sql_btn = QPushButton(" 慢SQL记录")
+        self.upload_btn = QPushButton("上传权限到云端")
+        self.download_btn = QPushButton("从云端拉取权限")
+        self.schema_btn = QPushButton("表结构管理")
+        self.stats_btn = QPushButton("数据统计")
+        self.slow_sql_btn = QPushButton("慢SQL记录")
 
         for btn in [self.upload_btn, self.download_btn, self.schema_btn, self.stats_btn, self.slow_sql_btn]:
             btn.setStyleSheet(button_style)
@@ -608,7 +608,7 @@ class DatabaseAdminDialog(QDialog):
         # 按钮布局
         button_layout = QHBoxLayout()
 
-        self.save_desc_btn = QPushButton(" 保存描述")
+        self.save_desc_btn = QPushButton("保存描述")
         self.save_desc_btn.clicked.connect(self._save_table_description)
         self.save_desc_btn.setStyleSheet("""
             QPushButton {
@@ -624,7 +624,7 @@ class DatabaseAdminDialog(QDialog):
             }
         """)
 
-        self.clear_desc_btn = QPushButton(" 清空")
+        self.clear_desc_btn = QPushButton("清空")
         self.clear_desc_btn.clicked.connect(self._clear_table_description)
         self.clear_desc_btn.setStyleSheet("""
             QPushButton {
@@ -889,7 +889,7 @@ class DatabaseAdminDialog(QDialog):
             for col in range(self.model.columnCount()):
                 name = self.model.headerData(col, Qt.Horizontal)
                 filters.append(f"{name} LIKE '%{text}%'")
-            self.model.setFilter(" OR ".join(filters))
+            self.model.setFilter("OR ".join(filters))
         self.model.select()
         self.update_page_label()
 
@@ -1905,12 +1905,12 @@ class DatabaseAdminDialog(QDialog):
                 if current_strategy == QSqlTableModel.OnManualSubmit:
                     # 当前是手动提交模式，切换到自动提交
                     self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
-                    self.edit_btn.setText(" 锁定编辑")
+                    self.edit_btn.setText("锁定编辑")
                     QMessageBox.information(self, "编辑模式", "已启用自动编辑模式")
                 else:
                     # 当前是自动提交模式，切换到手动提交
                     self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
-                    self.edit_btn.setText(" 编辑")
+                    self.edit_btn.setText("编辑")
                     QMessageBox.information(self, "编辑模式", "已切换到手动提交模式")
             else:
                 QMessageBox.warning(self, "警告", "请先选择一个表")

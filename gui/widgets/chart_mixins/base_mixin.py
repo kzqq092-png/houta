@@ -23,7 +23,6 @@ from utils.theme import get_theme_manager
 from ..async_data_processor import AsyncDataProcessor
 from ..chart_renderer import ChartRenderer
 
-
 class BaseMixin:
     """基础功能Mixin - 负责初始化、配置管理、主题应用等"""
 

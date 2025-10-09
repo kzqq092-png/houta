@@ -140,7 +140,7 @@ class SystemHealthCheckThread(QThread):
     def run(self):
         """执行健康检查"""
         try:
-            logger.info(" 开始执行系统健康检查...")
+            logger.info("开始执行系统健康检查...")
 
             #  修复：添加详细的错误处理和日志
             if not self._health_checker:
@@ -188,11 +188,9 @@ class AlertHistoryWorker(QRunnable):
             history_data = []
 
             try:
-                from core.services.alert_deduplication_service import AlertDeduplicationService
 
                 # 创建或获取告警去重服务实例
-                alert_service = AlertDeduplicationService()
-
+                alert_service = None
                 # 获取最近24小时的告警历史
                 alert_messages = alert_service.get_alert_history(hours=24)
 
@@ -276,7 +274,7 @@ class EmailTestWorker(QRunnable):
             from core.services.notification_service import NotificationConfig
             from datetime import datetime
 
-            logger.info(" 开始异步邮件测试...")
+            logger.info("开始异步邮件测试...")
 
             # 配置邮件服务
             provider_map = {
@@ -328,10 +326,10 @@ class EmailTestWorker(QRunnable):
             success = notification_service.send_email(test_message, provider)
 
             if success:
-                logger.info(" 邮件发送成功")
+                logger.info("邮件发送成功")
                 self.signals.success.emit(f"测试邮件已发送到 {test_message.recipient}\n请检查您的邮箱（包括垃圾邮件文件夹）")
             else:
-                logger.error(" 邮件发送失败")
+                logger.error("邮件发送失败")
                 self.signals.error.emit("邮件发送失败，请检查配置")
 
         except Exception as e:
@@ -355,7 +353,7 @@ class SMSTestWorker(QRunnable):
             from core.services.notification_service import notification_service, NotificationMessage, NotificationProvider
             from core.services.notification_service import NotificationConfig
 
-            logger.info(" 开始异步短信测试...")
+            logger.info("开始异步短信测试...")
 
             # 配置短信服务
             provider_map = {
@@ -406,10 +404,10 @@ class SMSTestWorker(QRunnable):
             success = notification_service.send_sms(test_message, provider)
 
             if success:
-                logger.info(" 短信发送成功")
+                logger.info("短信发送成功")
                 self.signals.success.emit(f"测试短信已发送到 {test_message.recipient}\n请检查您的手机短信")
             else:
-                logger.error(" 短信发送失败")
+                logger.error("短信发送失败")
                 self.signals.error.emit("短信发送失败，请检查配置")
 
         except Exception as e:

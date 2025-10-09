@@ -18,9 +18,9 @@ from core.indicator_adapter import (
     get_all_indicators_by_category, get_indicator_english_name, get_indicator_params_config,
     get_talib_indicator_list, get_talib_chinese_name, get_indicator_category_by_name
 )
-from core.unified_indicator_service import UnifiedIndicatorService
 from datetime import datetime
 import json
+
 
 class TechnicalAnalysisTab(BaseAnalysisTab):
     """技术分析标签页 - 增强版"""
@@ -242,7 +242,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         filter_layout.setSpacing(4)
 
         # 高级筛选按钮
-        self.advanced_filter_btn = QPushButton(" 筛选")
+        self.advanced_filter_btn = QPushButton("筛选")
         self.advanced_filter_btn.setMaximumHeight(28)
         self.advanced_filter_btn.setStyleSheet("""
             QPushButton {
@@ -258,7 +258,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         self.advanced_filter_btn.clicked.connect(self.show_advanced_filter_dialog)
 
         # 清除筛选按钮
-        self.clear_filter_btn = QPushButton(" 清除")
+        self.clear_filter_btn = QPushButton("清除")
         self.clear_filter_btn.setMaximumHeight(28)
         self.clear_filter_btn.setStyleSheet("""
             QPushButton {
@@ -349,8 +349,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         try:
             # 获取统一指标服务实例
-            unified_service = UnifiedIndicatorService()
-
+            unified_service = None
             if category == "全部":
                 # 获取所有技术指标
                 indicators = []
@@ -361,6 +360,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                             indicators.extend(inds)
 
                     # 添加形态数据
+                    from core.unified_indicator_service import get_unified_service
+                    unified_service = get_unified_service()
                     patterns = unified_service.get_all_patterns()
                     for pattern in patterns:
                         pattern_name = pattern.get('name', pattern.get('english_name', ''))
@@ -375,6 +376,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             elif category == "形态识别" or "形态" in category:
                 # 专门获取形态数据
                 try:
+                    from core.unified_indicator_service import get_unified_service
+                    unified_service = get_unified_service()
                     patterns = unified_service.get_all_patterns()
                     indicators = []
                     for pattern in patterns:
@@ -504,7 +507,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         try:
             # 检查是否是形态指标 - 通过数据库查询判断
-            unified_service = UnifiedIndicatorService()
+            from core.unified_indicator_service import get_unified_service
+            unified_service = get_unified_service()
             patterns = unified_service.get_all_patterns()
             pattern_names = [p.get('name', p.get('english_name', '')) for p in patterns]
 
@@ -606,8 +610,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             pattern_name = pattern_indicator_name  # 直接使用指标名称，无需移除前缀
 
             # 获取统一指标服务实例
-            unified_service = UnifiedIndicatorService()
-
+            from core.unified_indicator_service import get_unified_service
+            unified_service = get_unified_service()
             # 尝试获取形态配置
             pattern_config = None
             patterns = unified_service.get_all_patterns()
@@ -717,7 +721,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         try:
             # 如果是形态指标，只返回形态相关参数
-            unified_service = UnifiedIndicatorService()
+            from core.unified_indicator_service import get_unified_service
+            unified_service = get_unified_service()
             patterns = unified_service.get_all_patterns()
             pattern_names = [p.get('name', p.get('english_name', '')) for p in patterns]
 
@@ -1014,8 +1019,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         """填充指标表格数据"""
         try:
             # 获取统一指标服务的所有指标（包括形态类）
-            unified_service = UnifiedIndicatorService()
-
+            from core.unified_indicator_service import get_unified_service
+            unified_service = get_unified_service()
             # 获取技术指标
             all_indicators_data = unified_service.get_all_indicators()
             # 获取形态数据
@@ -2693,6 +2698,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             return headers.index(column_name)
         except ValueError:
             return -1
+
 
 class AdvancedFilterDialog(QDialog):
     """高级筛选对话框"""

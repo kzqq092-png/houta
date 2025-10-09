@@ -10,7 +10,6 @@ from PyQt5.QtGui import QColor, QKeySequence
 from datetime import datetime
 from .sector_flow_tab_pro import SectorFlowTabPro
 
-
 class SectorFlowTab(SectorFlowTabPro):
     """板块资金流分析标签页 - 继承专业版功能，保持向后兼容"""
 

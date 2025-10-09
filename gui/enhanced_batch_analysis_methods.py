@@ -13,7 +13,6 @@ from PyQt5.QtWidgets import (QListWidgetItem, QTableWidgetItem, QDialog,
                              QMessageBox, QFileDialog)
 from PyQt5.QtCore import Qt, QTimer
 
-
 class EnhancedBatchAnalysisMixin:
     """增强版批量分析功能混入类"""
 

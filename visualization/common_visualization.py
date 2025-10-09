@@ -10,7 +10,6 @@ from loguru import logger
 
 logger = logger
 
-
 class CommonVisualization:
     """通用可视化工具类"""
 

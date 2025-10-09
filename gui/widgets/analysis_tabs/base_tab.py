@@ -15,7 +15,6 @@ from utils.cache import Cache
 from utils.trace_context import get_trace_id, set_trace_id
 from core.performance import measure_performance
 
-
 class BaseAnalysisTab(QWidget):
     """分析标签页基类 - 增强版"""
 
@@ -1517,7 +1516,6 @@ class BaseAnalysisTab(QWidget):
 
 # ==================== 统一线程基类 ====================
 
-
 class BaseDataUpdateThread(QThread):
     """统一的数据更新线程基类"""
 
@@ -1595,7 +1593,6 @@ class BaseDataUpdateThread(QThread):
         self.running = False
         self.status_changed.emit("正在停止...")
 
-
 class BaseAnalysisThread(QThread):
     """统一的分析线程基类"""
 
@@ -1631,7 +1628,6 @@ class BaseAnalysisThread(QThread):
             error_msg = f"分析失败: {str(e)} trace_id={get_trace_id()}"
             logger.error(error_msg)
             self.error_occurred.emit(error_msg)
-
 
 class BaseExportThread(QThread):
     """统一的导出线程基类"""

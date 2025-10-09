@@ -20,7 +20,6 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-
 def create_dummy_h5_file(file_path, model_info):
     """
     创建模拟的.h5文件（实际上是JSON格式）
@@ -54,7 +53,6 @@ def create_dummy_h5_file(file_path, model_info):
         json.dump(dummy_model, f, indent=2, ensure_ascii=False)
 
     logger.info(f" 简化模型已创建: {file_path}")
-
 
 def generate_simplified_models():
     """生成简化版AI模型"""
@@ -138,7 +136,7 @@ def generate_simplified_models():
     logger.info(f"{'='*60}")
 
     if success_count == len(model_configs):
-        logger.info(" 所有简化模型生成成功！")
+        logger.info("所有简化模型生成成功！")
         logger.info("\n 生成的模型文件:")
         for model_type in model_configs.keys():
             model_path = models_dir / f"{model_type}_model.h5"
@@ -147,15 +145,14 @@ def generate_simplified_models():
         logger.info("\n  重要提示:")
         logger.info("1. 这些是简化模型，功能有限")
         logger.info("2. 建议安装TensorFlow以获得完整AI预测功能:")
-        logger.info("   pip install tensorflow")
+        logger.info(" pip install tensorflow")
         logger.info("3. 安装TensorFlow后，运行 python scripts/generate_ai_models.py --quick")
         logger.info("4. 现在可以重新启动FactorWeave-Quant 应用程序")
 
         return True
     else:
-        logger.info(" 部分模型创建失败")
+        logger.info("部分模型创建失败")
         return False
-
 
 if __name__ == "__main__":
     success = generate_simplified_models()

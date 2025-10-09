@@ -19,7 +19,6 @@ except ImportError:
     talib = None
     TALIB_AVAILABLE = False
 
-
 def calculate_obv(df: pd.DataFrame) -> pd.DataFrame:
     """
     计算能量潮(OBV)指标
@@ -63,7 +62,6 @@ def calculate_obv(df: pd.DataFrame) -> pd.DataFrame:
 
     return result
 
-
 def calculate_ad(df: pd.DataFrame) -> pd.DataFrame:
     """
     计算A/D线(Accumulation/Distribution Line)
@@ -99,7 +97,6 @@ def calculate_ad(df: pd.DataFrame) -> pd.DataFrame:
         result['AD'] = pd.Series([float('nan')] * len(df), index=df.index)
 
     return result
-
 
 def calculate_cmf(df: pd.DataFrame, timeperiod: int = 20) -> pd.DataFrame:
     """

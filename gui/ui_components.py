@@ -31,7 +31,6 @@ import threading
 import random
 from PyQt5.QtWidgets import QApplication
 
-
 class BaseAnalysisPanel(QWidget):
     """基础分析面板，统一参数设置、导出、日志、信号、按钮等通用功能"""
 
@@ -169,7 +168,6 @@ class BaseAnalysisPanel(QWidget):
             self.cleanup_resources()
         except:
             pass
-
 
 class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
     """Analysis tools panel for the right side of the main window"""
@@ -459,7 +457,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             super().__del__()
         except:
             pass
-
 
 # 导出主要类
 __all__ = ['BaseAnalysisPanel', 'AnalysisToolsPanel']

@@ -19,7 +19,6 @@ import pandas as pd
 
 logger = logger
 
-
 @dataclass
 class ImportResult:
     """导入结果"""
@@ -33,7 +32,6 @@ class ImportResult:
     def __post_init__(self):
         if self.errors is None:
             self.errors = []
-
 
 class DataBuffer:
     """数据缓冲区"""
@@ -81,7 +79,6 @@ class DataBuffer:
         """总处理项目数"""
         with self._lock:
             return self._total_items
-
 
 class DataImportEngine:
     """
@@ -140,7 +137,6 @@ class DataImportEngine:
         except Exception as e:
             logger.error(f"关闭导入引擎失败: {e}")
 
-
 def main():
     """测试函数"""
     import asyncio
@@ -154,7 +150,6 @@ def main():
         logger.info(f"导入结果: {result}")
 
     asyncio.run(test_import())
-
 
 if __name__ == "__main__":
     main()

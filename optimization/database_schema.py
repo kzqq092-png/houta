@@ -161,7 +161,7 @@ class OptimizationDatabaseManager:
 
             # 标记表已初始化
             self._tables_initialized = True
-            logger.info(" 优化系统数据库表初始化完成")
+            logger.info("优化系统数据库表初始化完成")
 
         except sqlite3.OperationalError as e:
             logger.info(f" 数据库初始化失败: {e}")
@@ -431,7 +431,7 @@ class OptimizationDatabaseManager:
 def create_optimization_database():
     """创建优化系统数据库"""
     manager = OptimizationDatabaseManager()
-    logger.info(" 优化系统数据库创建完成")
+    logger.info("优化系统数据库创建完成")
     return manager
 
 

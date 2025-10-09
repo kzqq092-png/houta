@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import QWidget
 
 logger = logger
 
-
 class GPUEnhancedZoomMixin:
     """GPU增强缩放功能Mixin"""
 

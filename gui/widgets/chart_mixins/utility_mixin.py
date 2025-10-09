@@ -17,7 +17,6 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Tuple, Optional
 
-
 class UtilityMixin:
     """工具功能Mixin
 

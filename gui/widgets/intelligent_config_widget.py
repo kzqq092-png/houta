@@ -96,8 +96,7 @@ class IntelligentConfigWidget(QWidget):
             self.setup_unavailable_ui()
             return
 
-        self.config_manager = config_manager or IntelligentConfigManager()
-        self.current_task_id = None
+        self.config_manager = config_manager or None          self.current_task_id = None
         self.recommendations = []
         self.conflicts = []
 
@@ -116,7 +115,7 @@ class IntelligentConfigWidget(QWidget):
         """设置不可用时的UI"""
         layout = QVBoxLayout(self)
 
-        label = QLabel("⚠️ 智能配置功能不可用")
+        label = QLabel("智能配置功能不可用")
         label.setAlignment(Qt.AlignCenter)
         label.setFont(QFont("Arial", 16))
         label.setStyleSheet("color: #ff6b6b; padding: 50px;")
@@ -134,7 +133,7 @@ class IntelligentConfigWidget(QWidget):
         title_layout.addWidget(title_label)
 
         # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新")
+        refresh_btn = QPushButton("刷新")
         refresh_btn.clicked.connect(self.refresh_all_data)
         title_layout.addWidget(refresh_btn)
 
@@ -199,7 +198,7 @@ class IntelligentConfigWidget(QWidget):
         opt_layout.addWidget(self.optimization_target_combo, 1, 1)
 
         # 执行优化按钮
-        self.optimize_btn = QPushButton("🚀 执行智能优化")
+        self.optimize_btn = QPushButton("执行智能优化")
         self.optimize_btn.clicked.connect(self.execute_optimization)
         opt_layout.addWidget(self.optimize_btn, 2, 0, 1, 2)
 
@@ -234,7 +233,7 @@ class IntelligentConfigWidget(QWidget):
         control_layout.addWidget(self.recommendation_type_combo)
 
         # 生成推荐按钮
-        self.generate_recommendations_btn = QPushButton("💡 生成推荐")
+        self.generate_recommendations_btn = QPushButton("[INFO] 生成推荐")
         self.generate_recommendations_btn.clicked.connect(self.generate_recommendations)
         control_layout.addWidget(self.generate_recommendations_btn)
 
@@ -268,11 +267,11 @@ class IntelligentConfigWidget(QWidget):
         # 控制区域
         control_layout = QHBoxLayout()
 
-        self.detect_conflicts_btn = QPushButton("🔍 检测冲突")
+        self.detect_conflicts_btn = QPushButton("检测冲突")
         self.detect_conflicts_btn.clicked.connect(self.detect_conflicts)
         control_layout.addWidget(self.detect_conflicts_btn)
 
-        self.auto_resolve_btn = QPushButton("🔧 自动解决")
+        self.auto_resolve_btn = QPushButton("自动解决")
         self.auto_resolve_btn.clicked.connect(self.auto_resolve_conflicts)
         control_layout.addWidget(self.auto_resolve_btn)
 
@@ -321,7 +320,7 @@ class IntelligentConfigWidget(QWidget):
         create_template_btn.clicked.connect(self.create_template)
         button_layout.addWidget(create_template_btn)
 
-        apply_template_btn = QPushButton("📋 应用模板")
+        apply_template_btn = QPushButton("应用模板")
         apply_template_btn.clicked.connect(self.apply_template)
         button_layout.addWidget(apply_template_btn)
 
@@ -383,11 +382,11 @@ class IntelligentConfigWidget(QWidget):
         try:
             stats = self.config_manager.get_intelligent_statistics()
 
-            stats_text = "📊 智能配置统计信息\n\n"
+            stats_text = " 智能配置统计信息\n\n"
 
             # 基本统计
             basic_stats = stats.get('intelligent_features', {})
-            stats_text += "🔧 基本统计:\n"
+            stats_text += "基本统计:\n"
             stats_text += f"  配置模板数量: {basic_stats.get('config_templates', 0)}\n"
             stats_text += f"  性能历史记录: {basic_stats.get('performance_history_records', 0)}\n"
             stats_text += f"  优化缓存条目: {basic_stats.get('optimization_cache_entries', 0)}\n"
@@ -397,7 +396,7 @@ class IntelligentConfigWidget(QWidget):
 
             # 任务统计
             task_stats = stats.get('tasks', {})
-            stats_text += "📋 任务统计:\n"
+            stats_text += " 任务统计:\n"
             stats_text += f"  总任务数: {task_stats.get('total', 0)}\n"
             stats_text += f"  启用任务: {task_stats.get('enabled', 0)}\n"
             stats_text += f"  运行中任务: {task_stats.get('running', 0)}\n\n"
@@ -410,7 +409,7 @@ class IntelligentConfigWidget(QWidget):
 
             # 历史统计
             history_stats = stats.get('history_30_days', {})
-            stats_text += "📈 30天历史统计:\n"
+            stats_text += "30天历史统计:\n"
             stats_text += f"  总运行次数: {history_stats.get('total_runs', 0)}\n"
             stats_text += f"  成功运行: {history_stats.get('successful_runs', 0)}\n"
             stats_text += f"  失败运行: {history_stats.get('failed_runs', 0)}\n"
@@ -485,7 +484,7 @@ class IntelligentConfigWidget(QWidget):
 
             if optimized_config:
                 # 显示优化结果
-                result_text = f"✅ 智能优化完成\n\n"
+                result_text = f"智能优化完成\n\n"
                 result_text += f"原始配置:\n"
                 result_text += f"  批次大小: {task_config.batch_size}\n"
                 result_text += f"  工作线程: {task_config.max_workers}\n\n"
@@ -524,16 +523,16 @@ class IntelligentConfigWidget(QWidget):
                         'max_workers': optimized_config.max_workers
                     })
             else:
-                self.optimization_result_text.setPlainText("❌ 优化失败，请检查任务配置")
+                self.optimization_result_text.setPlainText("[ERROR] 优化失败，请检查任务配置")
 
         except Exception as e:
             logger.error(f"执行智能优化失败: {e}")
             self.show_error_message("优化失败", str(e))
-            self.optimization_result_text.setPlainText(f"❌ 优化失败: {e}")
+            self.optimization_result_text.setPlainText(f"[ERROR] 优化失败: {e}")
 
         finally:
             self.optimize_btn.setEnabled(True)
-            self.optimize_btn.setText("🚀 执行智能优化")
+            self.optimize_btn.setText("执行智能优化")
 
     def generate_recommendations(self):
         """生成配置推荐"""
@@ -566,7 +565,7 @@ class IntelligentConfigWidget(QWidget):
             logger.error(f"生成配置推荐失败: {e}")
             self.show_error_message("生成推荐失败", str(e))
             self.generate_recommendations_btn.setEnabled(True)
-            self.generate_recommendations_btn.setText("💡 生成推荐")
+            self.generate_recommendations_btn.setText("[INFO] 生成推荐")
 
     @pyqtSlot(list)
     def on_recommendations_ready(self, recommendations):
@@ -575,7 +574,7 @@ class IntelligentConfigWidget(QWidget):
         self.update_recommendations_table()
 
         self.generate_recommendations_btn.setEnabled(True)
-        self.generate_recommendations_btn.setText("💡 生成推荐")
+        self.generate_recommendations_btn.setText("[INFO] 生成推荐")
 
         self.status_label.setText(f"生成了 {len(recommendations)} 条推荐")
 
@@ -585,7 +584,7 @@ class IntelligentConfigWidget(QWidget):
         self.show_error_message("生成推荐失败", error_message)
 
         self.generate_recommendations_btn.setEnabled(True)
-        self.generate_recommendations_btn.setText("💡 生成推荐")
+        self.generate_recommendations_btn.setText("[INFO] 生成推荐")
 
     def update_recommendations_table(self):
         """更新推荐表格"""
@@ -660,7 +659,7 @@ class IntelligentConfigWidget(QWidget):
             logger.error(f"检测配置冲突失败: {e}")
             self.show_error_message("检测冲突失败", str(e))
             self.detect_conflicts_btn.setEnabled(True)
-            self.detect_conflicts_btn.setText("🔍 检测冲突")
+            self.detect_conflicts_btn.setText("检测冲突")
 
     @pyqtSlot(list)
     def on_conflicts_detected(self, conflicts):
@@ -669,7 +668,7 @@ class IntelligentConfigWidget(QWidget):
         self.update_conflicts_table()
 
         self.detect_conflicts_btn.setEnabled(True)
-        self.detect_conflicts_btn.setText("🔍 检测冲突")
+        self.detect_conflicts_btn.setText("检测冲突")
 
         self.status_label.setText(f"检测到 {len(conflicts)} 个冲突")
 
@@ -679,7 +678,7 @@ class IntelligentConfigWidget(QWidget):
         self.show_error_message("检测冲突失败", error_message)
 
         self.detect_conflicts_btn.setEnabled(True)
-        self.detect_conflicts_btn.setText("🔍 检测冲突")
+        self.detect_conflicts_btn.setText("检测冲突")
 
     def update_conflicts_table(self):
         """更新冲突表格"""
@@ -866,8 +865,7 @@ def main():
     app = QApplication(sys.argv)
 
     if INTELLIGENT_CONFIG_AVAILABLE:
-        config_manager = IntelligentConfigManager()
-        widget = IntelligentConfigWidget(config_manager)
+        config_manager = None          widget = IntelligentConfigWidget(config_manager)
     else:
         widget = IntelligentConfigWidget()
 

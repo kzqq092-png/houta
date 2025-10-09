@@ -31,17 +31,17 @@ class DataAccessExamples:
         try:
             #  获取服务容器
             self.service_container = get_service_container()
-            logger.info(" 获取服务容器成功")
+            logger.info("获取服务容器成功")
 
             #  获取统一数据管理器
             self.data_manager = get_unified_data_manager()
             if self.data_manager:
-                logger.info(" 获取统一数据管理器成功")
+                logger.info("获取统一数据管理器成功")
 
             #  从服务容器获取股票服务
             if self.service_container and self.service_container.is_registered(StockService):
                 self.stock_service = self.service_container.resolve(StockService)
-                logger.info(" 获取股票服务成功")
+                logger.info("获取股票服务成功")
 
         except Exception as e:
             logger.error(f"服务初始化失败: {e}")
@@ -164,7 +164,7 @@ class DataAccessExamples:
          不推荐，仅用于说明
         """
         logger.info("=== 示例4：错误的方式 - 直接实例化DataAccess ===")
-        logger.warning(" 以下代码展示了不推荐的做法：")
+        logger.warning("以下代码展示了不推荐的做法：")
 
         #  错误的做法
         # from core.data.data_access import DataAccess
@@ -176,7 +176,7 @@ class DataAccessExamples:
         logger.warning("3. 难以进行单元测试")
         logger.warning("4. 可能造成资源浪费")
 
-        logger.info(" 应该使用前面示例中的方法")
+        logger.info("应该使用前面示例中的方法")
 
 
 class ComponentWithProperDataAccess:
@@ -201,20 +201,20 @@ class ComponentWithProperDataAccess:
                 try:
                     from core.services.unified_data_manager import UnifiedDataManager
                     self.data_manager = self.service_container.resolve(UnifiedDataManager)
-                    logger.info(" 组件获取到统一数据管理器")
+                    logger.info("组件获取到统一数据管理器")
                 except Exception as e:
                     logger.warning(f"无法获取统一数据管理器: {e}")
 
                 try:
                     self.stock_service = self.service_container.resolve(StockService)
-                    logger.info(" 组件获取到股票服务")
+                    logger.info("组件获取到股票服务")
                 except Exception as e:
                     logger.warning(f"无法获取股票服务: {e}")
 
             # 备用方案
             if not self.data_manager and not self.stock_service:
                 self.data_manager = get_unified_data_manager()
-                logger.info(" 组件通过全局函数获取到统一数据管理器")
+                logger.info("组件通过全局函数获取到统一数据管理器")
 
             self._initialized = True
 

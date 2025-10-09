@@ -1062,7 +1062,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 try:
                     self._sentiment_service = container.resolve(SentimentDataService)
                     if True:  # 使用Loguru日志
-                        logger.info(" 市场情绪组件：情绪数据服务初始化成功")
+                        logger.info("市场情绪组件：情绪数据服务初始化成功")
                 except Exception as resolve_error:
                     if True:  # 使用Loguru日志
                         logger.warning(f" 无法从服务容器获取情绪数据服务: {resolve_error}")
@@ -1124,7 +1124,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     logger.info(f" 市场情绪组件：手动创建情绪数据服务成功，已注册 {registered_count} 个插件")
             else:
                 if True:  # 使用Loguru日志
-                    logger.error(" 市场情绪组件：情绪数据服务初始化失败")
+                    logger.error("市场情绪组件：情绪数据服务初始化失败")
                 self._sentiment_service = None
 
         except Exception as e:

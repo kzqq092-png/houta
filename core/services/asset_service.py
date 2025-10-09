@@ -15,7 +15,6 @@ from ..tet_data_pipeline import StandardQuery, StandardData
 
 logger = logger
 
-
 class AssetService:
     """
     统一资产服务
@@ -458,7 +457,6 @@ class AssetService:
             status['issues'].append(f'健康检查异常: {str(e)}')
 
         return status
-
 
 # 便捷函数
 def create_asset_service(unified_data_manager: UnifiedDataManager,

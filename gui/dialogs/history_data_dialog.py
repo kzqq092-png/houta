@@ -23,7 +23,6 @@ from PyQt5.QtGui import QFont, QPixmap
 
 logger = logger
 
-
 class DataUpdateThread(QThread):
     """数据更新线程"""
 
@@ -56,7 +55,6 @@ class DataUpdateThread(QThread):
 
         except Exception as e:
             self.finished_signal.emit(False, f"数据更新失败: {e}")
-
 
 class HistoryDataDialog(QDialog):
     """历史数据管理对话框"""

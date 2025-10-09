@@ -22,7 +22,6 @@ from utils.config_manager import ConfigManager
 # log_structured已替换为直接的logger调用
 from core.containers import get_service_container
 
-
 class AnalysisStep:
     def __init__(self, step_id: str, name: str):
         self.step_id = step_id
@@ -44,7 +43,6 @@ class AnalysisStep:
         self.duration = self.end_time - self.start_time if self.start_time else None
         self.log = log
         self.error = error
-
 
 class AnalysisProcessManager:
     def __init__(self):
@@ -79,7 +77,6 @@ class AnalysisProcessManager:
 
     def get_history(self):
         return self.history
-
 
 class TradingWidget(QWidget):
     """交易控件类 - 重构版本"""

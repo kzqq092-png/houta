@@ -17,7 +17,6 @@ from core.indicator_strategy_extensions import IStrategyPluginV2
 from core.data_source_extensions import PluginInfo
 from core.plugin_types import PluginType
 
-
 class MovingAverageStrategyPlugin(IStrategyPluginV2):
     """双均线策略插件（V2）"""
 

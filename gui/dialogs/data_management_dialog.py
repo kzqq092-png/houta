@@ -62,7 +62,6 @@ except ImportError as e:
 
 logger = logger.bind(module=__name__) if logger else None
 
-
 class DataManagementDialog(QDialog):
     """数据管理对话框"""
 
@@ -307,7 +306,6 @@ class DataManagementDialog(QDialog):
             logger.info("数据管理对话框关闭")
         event.accept()
 
-
 class QuickDataCheckDialog(QDialog):
     """快速数据检查对话框"""
 
@@ -384,7 +382,6 @@ class QuickDataCheckDialog(QDialog):
         """检查完成"""
         QMessageBox.information(self, "检查完成", "数据完整性检查已完成！")
 
-
 def main():
     """主函数"""
     app = QApplication(sys.argv)
@@ -407,7 +404,6 @@ def main():
     dialog.layout().insertWidget(1, test_btn)
 
     sys.exit(app.exec_())
-
 
 if __name__ == '__main__':
     main()

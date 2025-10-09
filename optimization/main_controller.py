@@ -10,7 +10,6 @@ from optimization.optimization_dashboard import OptimizationDashboard, run_dashb
 from optimization.ui_integration import UIIntegration, create_ui_integration
 from optimization.database_schema import OptimizationDatabaseManager
 from optimization.algorithm_optimizer import AlgorithmOptimizer
-from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 from optimization.version_manager import VersionManager
 from optimization.auto_tuner import AutoTuner, OptimizationConfig
 import sys
@@ -24,7 +23,6 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入优化系统组件
-
 
 class OptimizationController:
     """优化系统主控制器"""
@@ -41,7 +39,7 @@ class OptimizationController:
         self.db_manager = OptimizationDatabaseManager()
         self.ui_integration = UIIntegration(debug_mode)
 
-        print(" HiKyuu 形态识别算法优化系统")
+        print("HiKyuu 形态识别算法优化系统")
         print("=" * 50)
 
     def run_command_line(self, args):
@@ -123,7 +121,7 @@ class OptimizationController:
 
     def list_patterns(self):
         """列出所有形态"""
-        print(" 形态列表")
+        print("形态列表")
         print("-" * 30)
 
         try:
@@ -154,7 +152,7 @@ class OptimizationController:
     def evaluate_pattern(self, pattern_name: str, dataset_count: int = 3):
         """评估形态性能"""
         if not pattern_name:
-            print(" 请指定要评估的形态名称")
+            print("请指定要评估的形态名称")
             return
 
         print(f"评估形态: {pattern_name}")
@@ -184,7 +182,7 @@ class OptimizationController:
     def optimize_pattern(self, pattern_name: str, method: str = "genetic", iterations: int = 30):
         """优化单个形态"""
         if not pattern_name:
-            print(" 请指定要优化的形态名称")
+            print("请指定要优化的形态名称")
             return
 
         print(f" 优化形态: {pattern_name}")
@@ -217,7 +215,7 @@ class OptimizationController:
 
     def batch_optimize(self, method: str = "genetic", iterations: int = 20):
         """批量优化所有形态"""
-        print(" 批量优化所有形态")
+        print("批量优化所有形态")
         print(f"优化方法: {method}")
         print(f"最大迭代次数: {iterations}")
         print("-" * 30)
@@ -249,7 +247,7 @@ class OptimizationController:
 
     def smart_optimize(self, threshold: float = 0.7, target: float = 0.1):
         """智能优化"""
-        print(" 智能优化")
+        print("智能优化")
         print(f"性能阈值: {threshold}")
         print(f"改进目标: {target * 100:.1f}%")
         print("-" * 30)
@@ -261,7 +259,7 @@ class OptimizationController:
             )
 
             if result.get("status") == "no_optimization_needed":
-                print(" 所有形态性能都达到要求，无需优化")
+                print("所有形态性能都达到要求，无需优化")
 
                 # 显示性能分数
                 scores = result.get("performance_scores", {})
@@ -288,7 +286,7 @@ class OptimizationController:
     def show_versions(self, pattern_name: str):
         """显示形态版本"""
         if not pattern_name:
-            print(" 请指定形态名称")
+            print("请指定形态名称")
             return
 
         print(f" {pattern_name} 版本历史")
@@ -320,7 +318,7 @@ class OptimizationController:
     def activate_version(self, pattern_name: str, version_number: int):
         """激活指定版本"""
         if not pattern_name or version_number is None:
-            print(" 请指定形态名称和版本号")
+            print("请指定形态名称和版本号")
             return
 
         print(f"激活版本: {pattern_name} v{version_number}")
@@ -413,7 +411,7 @@ class OptimizationController:
 
     def launch_dashboard(self):
         """启动仪表板"""
-        print("  启动优化仪表板...")
+        print("启动优化仪表板...")
 
         try:
             run_dashboard()
@@ -422,7 +420,7 @@ class OptimizationController:
 
     def initialize_system(self):
         """初始化系统"""
-        print(" 初始化优化系统...")
+        print("初始化优化系统...")
 
         try:
             # 初始化数据库
@@ -436,7 +434,7 @@ class OptimizationController:
             stats = self.db_manager.get_optimization_statistics()
             print(f" 现有版本数: {stats.get('total_versions', 0)}")
 
-            print(" 系统初始化完成")
+            print("系统初始化完成")
 
         except Exception as e:
             print(f" 系统初始化失败: {e}")
@@ -466,7 +464,6 @@ class OptimizationController:
   python main_controller.py dashboard
         """
         print(help_text)
-
 
 def main():
     """主函数"""
@@ -519,7 +516,6 @@ def main():
         if args.debug:
             import traceback
             traceback.print_exc()
-
 
 if __name__ == "__main__":
     main()

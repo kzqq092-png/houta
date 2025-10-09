@@ -17,7 +17,6 @@ import os
 from typing import Callable, Any, Optional
 import threading
 
-
 class AsyncManager:
     """
     异步任务调度主类，支持并发任务提交与回调

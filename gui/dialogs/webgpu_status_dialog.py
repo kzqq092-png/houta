@@ -533,35 +533,23 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
             import pandas as pd
             import numpy as np
 
-            # 尝试从HIkyuu获取真实股票数据
+            # HIkyuu已移除，使用TET框架获取真实股票数据
             try:
-                import hikyuu as hku
+                from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
+                udm = get_unified_data_manager()
 
                 # 获取一个常见的股票代码进行测试
                 stock_codes = ["000001", "000002", "600000", "600036"]  # 平安银行、万科A、浦发银行、招商银行
 
                 for code in stock_codes:
                     try:
-                        stock = hku.getStock(f"sz{code}")
-                        if not stock.isNull():
-                            # 获取最近1000个交易日的数据
-                            kdata = stock.get_kdata(-1000)
-                            if len(kdata) > 100:  # 确保有足够的数据
-                                # 转换为DataFrame格式
-                                data = []
-                                for i in range(len(kdata)):
-                                    record = kdata[i]
-                                    data.append({
-                                        'open': float(record.openPrice),
-                                        'high': float(record.highPrice),
-                                        'low': float(record.lowPrice),
-                                        'close': float(record.closePrice),
-                                        'volume': float(record.transCount)
-                                    })
-
-                                test_data = pd.DataFrame(data)
-                                logger.info(f" 使用真实股票数据进行性能测试: {code}, {len(test_data)}条记录")
-                                return test_data
+                        # 使用TET框架获取股票数据
+                        stock_data = udm.get_kdata(f"sz{code}", period='D', count=1000)
+                        if not stock_data.empty and len(stock_data) > 100:  # 确保有足够的数据
+                            # 数据已经是DataFrame格式，直接使用
+                            test_data = stock_data[['open', 'high', 'low', 'close', 'volume']].copy()
+                            logger.info(f" 使用真实股票数据进行性能测试: {code}, {len(test_data)}条记录")
+                            return test_data
                     except Exception as e:
                         logger.debug(f"获取股票{code}数据失败: {e}")
                         continue
@@ -571,8 +559,8 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
 
             # 如果HIkyuu不可用，尝试使用其他数据源
             try:
-                from core.services.unified_data_manager import UnifiedDataManager
-                data_manager = UnifiedDataManager()
+                from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
+                data_manager = get_unified_data_manager()
 
                 # 尝试获取缓存的股票数据
                 stock_data = data_manager.get_cached_stock_data("000001", limit=1000)
@@ -584,7 +572,7 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
                 logger.debug(f"获取缓存数据失败: {e}")
 
             # 如果都失败了，生成基于真实股票特征的模拟数据
-            logger.warning(" 无法获取真实股票数据，生成基于真实特征的测试数据")
+            logger.warning("无法获取真实股票数据，生成基于真实特征的测试数据")
             return self._generate_realistic_stock_data()
 
         except Exception as e:

@@ -42,7 +42,7 @@ class IndicatorService:
         """
         self.db_path = db_path
         # 使用统一指标服务
-        self.unified_service = UnifiedIndicatorService(db_path)
+        self.unified_service = None
         self._custom_functions = {}  # 存储自定义函数
 
     def close(self):
@@ -150,8 +150,9 @@ def get_indicator_service() -> IndicatorService:
         _global_service = IndicatorService()
     return _global_service
 
-
 # 兼容性函数导出
+
+
 def calculate_indicator(name: str, data: pd.DataFrame, **params) -> Union[pd.DataFrame, pd.Series, Dict[str, Any]]:
     """计算指标（兼容性函数）"""
     service = get_indicator_service()
@@ -193,15 +194,17 @@ except ImportError:
         """解析指标别名"""
         return INDICATOR_ALIASES.get(name.upper(), name)
 
-
 # 批量计算函数
+
+
 def batch_calculate_indicators(indicators: List[str], data: pd.DataFrame, params_dict: Optional[Dict[str, Dict]] = None) -> Dict[str, Any]:
     """批量计算指标（兼容性函数）"""
     service = get_indicator_service()
     return service.batch_calculate_indicators(indicators, data, params_dict)
 
-
 # 形态识别函数
+
+
 def calculate_pattern(name: str, data: pd.DataFrame, **params) -> Union[pd.DataFrame, pd.Series, Dict[str, Any]]:
     """计算形态识别（兼容性函数）"""
     service = get_indicator_service()
@@ -213,8 +216,9 @@ def get_patterns_by_category(category_name: str) -> List[Dict[str, Any]]:
     service = get_indicator_service()
     return service.get_patterns_by_category(category_name)
 
-
 # 清理函数
+
+
 def cleanup_indicator_service():
     """清理指标服务资源"""
     global _global_service
@@ -225,7 +229,6 @@ def cleanup_indicator_service():
 
 # 模块清理
 atexit.register(cleanup_indicator_service)
-
 
 # 兼容性别名
 get_indicator = get_indicator_metadata

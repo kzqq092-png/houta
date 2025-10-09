@@ -57,7 +57,7 @@ class AlertRuleHotLoader(BaseService):
         try:
             # 加载初始规则
             self._load_initial_rules()
-            logger.info(" 告警规则热加载服务初始化成功")
+            logger.info("告警规则热加载服务初始化成功")
         except Exception as e:
             logger.error(f" 告警规则热加载服务初始化失败: {e}")
             raise
@@ -116,7 +116,7 @@ class AlertRuleHotLoader(BaseService):
         if self._timer_thread:
             self._timer_thread.cancel()
 
-        logger.info(" 告警规则热加载服务已停止")
+        logger.info("告警规则热加载服务已停止")
 
     def _schedule_next_check(self):
         """调度下一次检查"""

@@ -25,7 +25,6 @@ logger = logger
 # 抑制pandas性能警告
 warnings.filterwarnings('ignore', category=pd.errors.PerformanceWarning)
 
-
 def calculate_change_pct(current: Union[float, pd.Series],
                          previous: Union[float, pd.Series]) -> Union[float, pd.Series]:
     """
@@ -51,7 +50,6 @@ def calculate_change_pct(current: Union[float, pd.Series],
     except Exception as e:
         logger.error(f"计算涨跌幅失败: {e}")
         return 0.0 if not isinstance(current, pd.Series) else pd.Series([0.0] * len(current))
-
 
 def calculate_amplitude(high: Union[float, pd.Series],
                         low: Union[float, pd.Series],
@@ -81,7 +79,6 @@ def calculate_amplitude(high: Union[float, pd.Series],
         logger.error(f"计算振幅失败: {e}")
         return 0.0 if not isinstance(high, pd.Series) else pd.Series([0.0] * len(high))
 
-
 def calculate_turnover_rate(volume: Union[int, pd.Series],
                             total_shares: Union[int, pd.Series]) -> Union[float, pd.Series]:
     """
@@ -107,7 +104,6 @@ def calculate_turnover_rate(volume: Union[int, pd.Series],
     except Exception as e:
         logger.error(f"计算换手率失败: {e}")
         return 0.0 if not isinstance(volume, pd.Series) else pd.Series([0.0] * len(volume))
-
 
 def calculate_vwap(high: pd.Series, low: pd.Series, close: pd.Series,
                    volume: pd.Series) -> pd.Series:
@@ -138,7 +134,6 @@ def calculate_vwap(high: pd.Series, low: pd.Series, close: pd.Series,
         logger.error(f"计算VWAP失败: {e}")
         return pd.Series([0.0] * len(close), index=close.index)
 
-
 def calculate_moving_average(data: pd.Series, window: int,
                              method: str = 'simple') -> pd.Series:
     """
@@ -168,7 +163,6 @@ def calculate_moving_average(data: pd.Series, window: int,
         logger.error(f"计算移动平均线失败: {e}")
         return pd.Series([np.nan] * len(data), index=data.index)
 
-
 def calculate_rsi(close: pd.Series, window: int = 14) -> pd.Series:
     """
     计算相对强弱指标(RSI)
@@ -191,7 +185,6 @@ def calculate_rsi(close: pd.Series, window: int = 14) -> pd.Series:
     except Exception as e:
         logger.error(f"计算RSI失败: {e}")
         return pd.Series([50.0] * len(close), index=close.index)
-
 
 def calculate_macd(close: pd.Series, fast: int = 12, slow: int = 26,
                    signal: int = 9) -> Dict[str, pd.Series]:
@@ -227,7 +220,6 @@ def calculate_macd(close: pd.Series, fast: int = 12, slow: int = 26,
             'DEA': pd.Series([0.0] * len(close), index=close.index),
             'MACD': pd.Series([0.0] * len(close), index=close.index)
         }
-
 
 def calculate_kdj(high: pd.Series, low: pd.Series, close: pd.Series,
                   window: int = 9, k_smooth: int = 3, d_smooth: int = 3) -> Dict[str, pd.Series]:
@@ -269,7 +261,6 @@ def calculate_kdj(high: pd.Series, low: pd.Series, close: pd.Series,
             'J': pd.Series([50.0] * len(close), index=close.index)
         }
 
-
 def calculate_bollinger_bands(close: pd.Series, window: int = 20,
                               std_dev: float = 2.0) -> Dict[str, pd.Series]:
     """
@@ -302,7 +293,6 @@ def calculate_bollinger_bands(close: pd.Series, window: int = 20,
             'middle': pd.Series([np.nan] * len(close), index=close.index),
             'lower': pd.Series([np.nan] * len(close), index=close.index)
         }
-
 
 def calculate_technical_indicators(data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -364,7 +354,6 @@ def calculate_technical_indicators(data: pd.DataFrame) -> pd.DataFrame:
         logger.error(f"批量计算技术指标失败: {e}")
         return data
 
-
 def calculate_financial_ratios(financial_data: Dict[str, Union[float, Decimal]]) -> Dict[str, float]:
     """
     计算财务比率
@@ -422,7 +411,6 @@ def calculate_financial_ratios(financial_data: Dict[str, Union[float, Decimal]])
     except Exception as e:
         logger.error(f"计算财务比率失败: {e}")
         return {}
-
 
 def normalize_financial_data(data: pd.DataFrame, method: str = 'zscore',
                              columns: Optional[List[str]] = None) -> pd.DataFrame:
@@ -489,7 +477,6 @@ def normalize_financial_data(data: pd.DataFrame, method: str = 'zscore',
         logger.error(f"财务数据标准化失败: {e}")
         return data
 
-
 def calculate_correlation_matrix(data: pd.DataFrame,
                                  method: str = 'pearson') -> pd.DataFrame:
     """
@@ -514,7 +501,6 @@ def calculate_correlation_matrix(data: pd.DataFrame,
     except Exception as e:
         logger.error(f"计算相关性矩阵失败: {e}")
         return pd.DataFrame()
-
 
 def calculate_volatility(returns: pd.Series, window: int = 20,
                          annualize: bool = True) -> pd.Series:
@@ -541,7 +527,6 @@ def calculate_volatility(returns: pd.Series, window: int = 20,
     except Exception as e:
         logger.error(f"计算波动率失败: {e}")
         return pd.Series([0.0] * len(returns), index=returns.index)
-
 
 def calculate_sharpe_ratio(returns: pd.Series, risk_free_rate: float = 0.03,
                            window: int = 252) -> pd.Series:
@@ -571,7 +556,6 @@ def calculate_sharpe_ratio(returns: pd.Series, risk_free_rate: float = 0.03,
     except Exception as e:
         logger.error(f"计算夏普比率失败: {e}")
         return pd.Series([0.0] * len(returns), index=returns.index)
-
 
 def calculate_max_drawdown(cumulative_returns: pd.Series) -> Dict[str, float]:
     """
@@ -612,7 +596,6 @@ def calculate_max_drawdown(cumulative_returns: pd.Series) -> Dict[str, float]:
             'trough_date': None,
             'recovery_date': None
         }
-
 
 def validate_data_quality(data: pd.DataFrame,
                           required_columns: Optional[List[str]] = None) -> Dict[str, Any]:

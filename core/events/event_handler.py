@@ -10,9 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 from .events import BaseEvent
 
-
 logger = logger
-
 
 class EventHandler(ABC):
     """
@@ -60,7 +58,6 @@ class EventHandler(ABC):
     def __str__(self) -> str:
         return f"{self.name}(enabled={self.enabled}, priority={self.priority})"
 
-
 class AsyncEventHandler(EventHandler):
     """
     异步事件处理器基类
@@ -103,7 +100,6 @@ class AsyncEventHandler(EventHandler):
             # 如果没有事件循环，创建新的
             return asyncio.run(self.handle_async(event))
 
-
 class FunctionEventHandler(EventHandler):
     """
     函数事件处理器
@@ -138,7 +134,6 @@ class FunctionEventHandler(EventHandler):
             logger.error(
                 f"Event handler {self.name} failed to handle event {event.event_id}: {e}")
             raise
-
 
 class ConditionalEventHandler(EventHandler):
     """
@@ -188,7 +183,6 @@ class ConditionalEventHandler(EventHandler):
             是否可以处理
         """
         return self.enabled and self.condition(event) and self.handler.can_handle(event)
-
 
 class CompositeEventHandler(EventHandler):
     """

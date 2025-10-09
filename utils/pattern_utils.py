@@ -3,7 +3,6 @@ import pandas as pd
 from scipy.signal import find_peaks
 from loguru import logger
 
-
 def find_peaks_and_troughs(data: pd.Series, prominence: float = 0.02, width: int = 3):
     """
     在时间序列数据中寻找显著的波峰和波谷。
@@ -43,7 +42,6 @@ def find_peaks_and_troughs(data: pd.Series, prominence: float = 0.02, width: int
     }).set_index('index')
 
     return peaks_df, troughs_df
-
 
 if __name__ == '__main__':
     # 为了验证函数的有效性，我们创建一个示例并运行

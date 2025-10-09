@@ -221,7 +221,7 @@ class DuckDBConfigManager:
                 """)
 
                 conn.commit()
-                logger.info(" DuckDB配置表初始化完成")
+                logger.info("DuckDB配置表初始化完成")
 
         except Exception as e:
             logger.error(f" 初始化DuckDB配置表失败: {e}")
@@ -705,7 +705,7 @@ def create_default_profiles():
         olap_id = manager.get_profile_by_name("OLAP优化").id
         manager.activate_profile(olap_id, "system")
 
-        logger.info(" 创建默认DuckDB配置配置文件完成")
+        logger.info("创建默认DuckDB配置配置文件完成")
 
     except Exception as e:
         logger.error(f" 创建默认配置配置文件失败: {e}")

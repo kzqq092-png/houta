@@ -121,7 +121,7 @@ class CloudApiDialog(QDialog):
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(5, 300)
         self.timeout_spin.setValue(30)
-        self.timeout_spin.setSuffix(" 秒")
+        self.timeout_spin.setSuffix("秒")
         server_layout.addRow("超时时间:", self.timeout_spin)
 
         layout.addWidget(server_group)
@@ -155,7 +155,7 @@ class CloudApiDialog(QDialog):
         self.rate_limit_spin = QSpinBox()
         self.rate_limit_spin.setRange(1, 1000)
         self.rate_limit_spin.setValue(100)
-        self.rate_limit_spin.setSuffix(" 请求/分钟")
+        self.rate_limit_spin.setSuffix("请求/分钟")
         advanced_layout.addRow("速率限制:", self.rate_limit_spin)
 
         self.enable_cache_check = QCheckBox("启用响应缓存")
@@ -255,7 +255,7 @@ class CloudApiDialog(QDialog):
         self.sync_interval_spin = QSpinBox()
         self.sync_interval_spin.setRange(1, 3600)
         self.sync_interval_spin.setValue(60)
-        self.sync_interval_spin.setSuffix(" 秒")
+        self.sync_interval_spin.setSuffix("秒")
         sync_settings_layout.addRow("同步间隔:", self.sync_interval_spin)
 
         self.sync_data_types = QListWidget()

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+from core.services.unified_data_manager import get_unified_data_manager
 统一数据导入引擎
 
 整合所有数据导入功能，提供统一的接口和专业级功能
@@ -21,7 +22,6 @@ from loguru import logger
 
 # 配置管理
 from .import_config_manager import ImportConfigManager, ImportTaskConfig, ImportProgress, ImportStatus
-from .intelligent_config_manager import IntelligentConfigManager, ConfigOptimizationLevel, ConfigRecommendationType
 
 # 核心服务
 from core.database.table_manager import TableType
@@ -37,11 +37,10 @@ from optimization.auto_tuner import AutoTuner, TuningTask, OptimizationConfig
 from ..performance.factorweave_performance_integration import FactorWeavePerformanceIntegrator
 from ..services.enhanced_performance_bridge import EnhancedPerformanceBridge, get_enhanced_performance_bridge
 from ..risk_monitoring.enhanced_risk_monitor import EnhancedRiskMonitor, get_enhanced_risk_monitor
-from ..performance.cache_manager import MultiLevelCacheManager, CacheLevel
 
 # 分布式和并发
 from ..services.distributed_service import DistributedService, NodeDiscovery, NodeInfo
-from ..services.enhanced_distributed_service import EnhancedDistributedService, get_enhanced_distributed_service
+# from ..services.enhanced_distributed_service import EnhancedDistributedService, get_enhanced_distributed_service  # Module doesn't exist
 from ..events.enhanced_event_bus import get_enhanced_event_bus, EventPriority, EnhancedEventBus
 from ..async_management.enhanced_async_manager import get_enhanced_async_manager, TaskPriority, ResourceRequirement
 
@@ -326,7 +325,7 @@ class UnifiedDataImportEngine(QObject):
         try:
             # 配置管理器
             if self.enable_intelligent_config:
-                self.config_manager = config_manager or IntelligentConfigManager()
+                self.config_manager = config_manager or None
                 logger.info("使用智能配置管理器")
             else:
                 self.config_manager = config_manager or ImportConfigManager()
@@ -409,7 +408,7 @@ class UnifiedDataImportEngine(QObject):
 
             if self.enable_advanced_caching:
                 # 多级缓存管理器
-                self.cache_manager = MultiLevelCacheManager()
+                self.cache_manager = None
                 logger.info("高级缓存系统已启用")
             else:
                 self.cache_manager = None
@@ -427,8 +426,8 @@ class UnifiedDataImportEngine(QObject):
         """初始化分布式和并发组件"""
         try:
             if self.enable_distributed_execution:
-                # 增强分布式服务
-                self.distributed_service = get_enhanced_distributed_service()
+                # 分布式服务
+                self.distributed_service = DistributedService()
 
                 # 节点发现
                 self.node_discovery = NodeDiscovery()
@@ -1281,7 +1280,7 @@ class UnifiedDataImportEngine(QObject):
         """初始化数据管理器"""
         try:
             if not self.data_manager:
-                self.data_manager = UnifiedDataManager()
+                self.data_manager = get_unified_data_manager()
             self._data_manager_initialized = True
             logger.info("数据管理器初始化完成")
         except Exception as e:

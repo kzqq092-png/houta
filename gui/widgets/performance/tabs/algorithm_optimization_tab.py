@@ -20,7 +20,6 @@ from loguru import logger
 
 logger = logger
 
-
 class ModernAlgorithmOptimizationTab(QWidget):
     """现代化算法优化标签页 - 合并算法性能和自动调优"""
 

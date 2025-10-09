@@ -5,10 +5,8 @@ import pandas as pd
 from core.indicator_adapter import get_talib_indicator_list, calc_talib_indicator
 # 已替换为新的导入
 
-
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 from loguru import logger
-
 
 class EnhancedSystemCondition(ConditionBase):
     """
@@ -279,7 +277,6 @@ class EnhancedSystemCondition(ConditionBase):
         except Exception as e:
             logger.info(f"特征准备错误: {str(e)}")
             return None
-
 
 def get_indicator_categories():
     """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""

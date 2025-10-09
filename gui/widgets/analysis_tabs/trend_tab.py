@@ -19,6 +19,7 @@ from .base_tab import BaseAnalysisTab
 
 logger = logger
 
+
 class TrendAnalysisTab(BaseAnalysisTab):
     # Tab索引常量
     TAB_TREND_ANALYSIS = 0
@@ -172,7 +173,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 """, ('trend_alerts', settings_json))
 
                 conn.commit()
-                logger.info(" 预警设置已保存到数据库")
+                logger.info("预警设置已保存到数据库")
                 return True
 
         except Exception as e:
@@ -238,7 +239,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 """, ('advanced_options', options_json))
 
                 conn.commit()
-                logger.info(" 高级选项设置已保存到数据库")
+                logger.info("高级选项设置已保存到数据库")
                 return True
 
         except Exception as e:
@@ -252,7 +253,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
             self.analysis_completed.connect(self._on_analysis_completed)
             # 连接错误信号
             self.error_occurred.connect(self._on_analysis_error)
-            logger.info(" 趋势分析信号连接完成")
+            logger.info("趋势分析信号连接完成")
         except Exception as e:
             logger.error(f" 信号连接失败: {e}")
 
@@ -267,7 +268,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
             if self._save_advanced_options_to_db(options):
                 self.advanced_options = options
-                logger.info(" 高级选项设置已更新")
+                logger.info("高级选项设置已更新")
 
         except Exception as e:
             logger.error(f" 保存高级选项设置失败: {e}")
@@ -359,17 +360,17 @@ class TrendAnalysisTab(BaseAnalysisTab):
         quick_layout = QHBoxLayout(quick_group)
 
         # 一键趋势分析
-        trend_btn = QPushButton(" 趋势分析")
+        trend_btn = QPushButton("趋势分析")
         trend_btn.setStyleSheet(self._get_button_style('#28a745'))
         trend_btn.clicked.connect(self.comprehensive_trend_analysis)
 
         # 多时间框架分析
-        multi_tf_btn = QPushButton("⏰ 多时间框架")
+        multi_tf_btn = QPushButton("[TIME] 多时间框架")
         multi_tf_btn.setStyleSheet(self._get_button_style('#17a2b8'))
         multi_tf_btn.clicked.connect(self.multi_timeframe_analysis)
 
         # 趋势预警
-        alert_btn = QPushButton(" 趋势预警")
+        alert_btn = QPushButton("趋势预警")
         alert_btn.setStyleSheet(self._get_button_style('#dc3545'))
         alert_btn.clicked.connect(self.setup_trend_alerts)
 
@@ -383,12 +384,12 @@ class TrendAnalysisTab(BaseAnalysisTab):
         advanced_layout = QHBoxLayout(advanced_group)
 
         # 趋势预测
-        predict_btn = QPushButton(" 趋势预测")
+        predict_btn = QPushButton("趋势预测")
         predict_btn.setStyleSheet(self._get_button_style('#6f42c1'))
         predict_btn.clicked.connect(self.trend_prediction)
 
         # 支撑阻力
-        sr_btn = QPushButton(" 支撑阻力")
+        sr_btn = QPushButton("支撑阻力")
         sr_btn.setStyleSheet(self._get_button_style('#fd7e14'))
         sr_btn.clicked.connect(self.support_resistance_analysis)
 
@@ -513,23 +514,23 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
         # 趋势分析结果
         trend_tab = self._create_trend_results_tab()
-        self.results_tabs.addTab(trend_tab, " 趋势分析")
+        self.results_tabs.addTab(trend_tab, "趋势分析")
 
         # 多时间框架
         multi_tf_tab = self._create_multi_timeframe_tab()
-        self.results_tabs.addTab(multi_tf_tab, "⏰ 多时间框架")
+        self.results_tabs.addTab(multi_tf_tab, "[TIME] 多时间框架")
 
         # 趋势预测
         prediction_tab = self._create_prediction_tab()
-        self.results_tabs.addTab(prediction_tab, " 趋势预测")
+        self.results_tabs.addTab(prediction_tab, "趋势预测")
 
         # 支撑阻力
         sr_tab = self._create_support_resistance_tab()
-        self.results_tabs.addTab(sr_tab, " 支撑阻力")
+        self.results_tabs.addTab(sr_tab, "支撑阻力")
 
         # 预警中心
         alert_tab = self._create_alert_tab()
-        self.results_tabs.addTab(alert_tab, " 预警中心")
+        self.results_tabs.addTab(alert_tab, "预警中心")
 
         layout.addWidget(self.results_tabs)
         return panel
@@ -573,10 +574,10 @@ class TrendAnalysisTab(BaseAnalysisTab):
         # 操作按钮
         buttons_layout = QHBoxLayout()
 
-        export_btn = QPushButton(" 导出结果")
+        export_btn = QPushButton("导出结果")
         export_btn.clicked.connect(self.export_trend_results)
 
-        refresh_btn = QPushButton(" 刷新分析")
+        refresh_btn = QPushButton("刷新分析")
         refresh_btn.clicked.connect(self.comprehensive_trend_analysis)
 
         buttons_layout.addWidget(export_btn)
@@ -691,7 +692,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _comprehensive_analysis_async(self):
         """综合分析"""
         try:
-            logger.info(" 开始综合趋势分析异步处理...")
+            logger.info("开始综合趋势分析异步处理...")
             results = {
                 'trend_analysis': [],
                 'statistics': {},
@@ -786,7 +787,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _analyze_basic_trends(self):
         """基础趋势分析"""
         try:
-            logger.info(" 开始基础趋势分析...")
+            logger.info("开始基础趋势分析...")
             trends = []
             algorithm = self.algorithm_combo.currentData()
             period = self.period_spin.value()
@@ -820,7 +821,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
         try:
             # 技术指标趋势分析
-            logger.info(" 开始技术指标趋势分析...")
+            logger.info("开始技术指标趋势分析...")
             indicator_trends = self._analyze_indicator_trends(
                 algorithm, period, threshold)
             # 过滤有效数据
@@ -1485,7 +1486,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def trend_prediction(self):
         """趋势预测"""
         try:
-            logger.info(" 启动趋势预测...")
+            logger.info("启动趋势预测...")
             self.show_loading("正在生成趋势预测...")
 
             # 自动切换到趋势预测tab
@@ -1509,7 +1510,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def support_resistance_analysis(self):
         """支撑阻力分析"""
         try:
-            logger.info(" 启动支撑阻力分析...")
+            logger.info("启动支撑阻力分析...")
             self.show_loading("正在分析支撑阻力位...")
 
             # 自动切换到支撑阻力tab

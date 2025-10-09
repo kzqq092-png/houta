@@ -9,7 +9,6 @@ from typing import Dict, Any, List, Optional
 from .theme_types import Theme
 from PyQt5.QtCore import QObject, pyqtSignal
 
-
 @dataclass
 class ThemeConfig:
     """Theme configuration settings"""
@@ -57,7 +56,6 @@ class ThemeConfig:
             font_family=data.get("font_family", "Arial"),
             font_size=data.get("font_size", 12)
         )
-
 
 @dataclass
 class ChartConfig:
@@ -126,7 +124,6 @@ class ChartConfig:
             font_size=data.get("font_size", 12)
         )
 
-
 @dataclass
 class TradingConfig:
     """Trading parameters configuration"""
@@ -189,7 +186,6 @@ class TradingConfig:
             time_stop=data.get("time_stop", 5)
         )
 
-
 @dataclass
 class AppConfig:
     """Application configuration container"""
@@ -228,7 +224,6 @@ class AppConfig:
             chart=ChartConfig.from_dict(chart_data),
             trading=TradingConfig.from_dict(trading_data)
         )
-
 
 @dataclass
 class DataConfig:
@@ -273,7 +268,6 @@ class DataConfig:
             data_source=data.get("data_source", 'local'),
             backup_enabled=data.get("backup_enabled", True)
         )
-
 
 @dataclass
 class UIConfig:
@@ -322,7 +316,6 @@ class UIConfig:
             layout=data.get("layout", 'default'),
             window_size=data.get("window_size", {'width': 1200, 'height': 800})
         )
-
 
 @dataclass
 class LoggingConfig(QObject):
@@ -400,7 +393,6 @@ class LoggingConfig(QObject):
     def emit_config_changed(self):
         """发射配置变更信号"""
         self.config_changed.emit(self)
-
 
 class UIStyleConfig:
     """UI样式配置"""

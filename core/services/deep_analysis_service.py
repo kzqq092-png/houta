@@ -15,7 +15,6 @@ import threading
 
 logger = logger
 
-
 @dataclass
 class PerformanceMetric:
     """性能指标数据"""
@@ -23,7 +22,6 @@ class PerformanceMetric:
     metric_name: str
     value: float
     category: str = "system"
-
 
 @dataclass
 class BottleneckInfo:
@@ -34,7 +32,6 @@ class BottleneckInfo:
     percentage: float
     severity: str
 
-
 @dataclass
 class AnomalyInfo:
     """异常信息"""
@@ -44,7 +41,6 @@ class AnomalyInfo:
     threshold: float
     severity: str
     description: str
-
 
 class DeepAnalysisService:
     """深度分析服务"""
@@ -370,10 +366,8 @@ class DeepAnalysisService:
 
         return dict(comparison_data)
 
-
 # 全局服务实例
 _deep_analysis_service = None
-
 
 def get_deep_analysis_service() -> DeepAnalysisService:
     """获取深度分析服务实例"""

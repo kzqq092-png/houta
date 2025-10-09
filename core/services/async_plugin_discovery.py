@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import QApplication
 
 logger = logger
 
-
 class AsyncPluginDiscoveryWorker(QThread):
     """异步插件发现工作线程"""
 
@@ -166,7 +165,6 @@ class AsyncPluginDiscoveryWorker(QThread):
         self.quit()
         self.wait(5000)  # 等待最多5秒
 
-
 class AsyncPluginDiscoveryService(QObject):
     """异步插件发现服务"""
 
@@ -231,10 +229,8 @@ class AsyncPluginDiscoveryService(QObject):
         self.discovery_failed.emit(error_msg)
         logger.error(f"异步插件发现失败: {error_msg}")
 
-
 # 全局服务实例
 _async_plugin_discovery_service = None
-
 
 def get_async_plugin_discovery_service() -> AsyncPluginDiscoveryService:
     """获取异步插件发现服务实例"""

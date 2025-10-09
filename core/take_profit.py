@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-
 class AdaptiveTakeProfit(ProfitGoalBase):
     """
     自适应止盈策略

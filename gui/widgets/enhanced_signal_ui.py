@@ -89,7 +89,7 @@ class ProfessionalPriceWidget(QFrame):
         layout.setContentsMargins(10, 8, 10, 8)
 
         # 标题
-        title_label = QLabel(" 实时行情")
+        title_label = QLabel("实时行情")
         title_font = QFont()
         title_font.setPointSize(11)
         title_font.setBold(True)
@@ -198,7 +198,7 @@ class TechnicalIndicatorSummary(QFrame):
         layout.setContentsMargins(10, 8, 10, 8)
 
         # 标题
-        title_label = QLabel(" 技术指标")
+        title_label = QLabel("技术指标")
         title_font = QFont()
         title_font.setPointSize(11)
         title_font.setBold(True)
@@ -363,7 +363,7 @@ class ProfessionalTradingInterface(QWidget):
         layout = QVBoxLayout()
 
         # 占位符标签
-        label = QLabel(" 主图表区域\n(集成现有图表组件)")
+        label = QLabel("主图表区域\n(集成现有图表组件)")
         label.setAlignment(Qt.AlignCenter)
         label.setStyleSheet("""
             QLabel {
@@ -554,7 +554,7 @@ class FloatingSignalPanel(QWidget):
 
         # 标题栏
         title_layout = QHBoxLayout()
-        title_label = QLabel(" 实时信号")
+        title_label = QLabel("实时信号")
         title_font = QFont()
         title_font.setPointSize(10)
         title_font.setBold(True)

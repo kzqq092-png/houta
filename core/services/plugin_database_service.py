@@ -21,7 +21,6 @@ from db.models.plugin_models import (
 
 logger = logger
 
-
 class PluginDatabaseService(QObject):
     """插件数据库服务"""
 
@@ -468,10 +467,8 @@ class PluginDatabaseService(QObject):
             logger.error(f"读取插件配置失败: {plugin_name}, 错误: {e}")
             return None
 
-
 # 全局服务实例
 _plugin_db_service = None
-
 
 def get_plugin_database_service(db_path: str = None) -> PluginDatabaseService:
     """获取插件数据库服务单例"""

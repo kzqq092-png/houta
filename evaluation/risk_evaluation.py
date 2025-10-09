@@ -22,14 +22,12 @@ from enum import Enum
 import warnings
 warnings.filterwarnings('ignore')
 
-
 class RiskLevel(Enum):
     """风险等级"""
     LOW = "low"           # 低风险
     MEDIUM = "medium"     # 中等风险
     HIGH = "high"         # 高风险
     EXTREME = "extreme"   # 极高风险
-
 
 class RiskType(Enum):
     """风险类型"""
@@ -38,7 +36,6 @@ class RiskType(Enum):
     LIQUIDITY = "liquidity"   # 流动性风险
     OPERATIONAL = "operational"  # 操作风险
     CONCENTRATION = "concentration"  # 集中度风险
-
 
 @dataclass
 class RiskMetric:
@@ -50,7 +47,6 @@ class RiskMetric:
     description: str
     threshold: Optional[float] = None
     recommendation: Optional[str] = None
-
 
 class RiskEvaluator:
     """风险评估器"""
@@ -643,7 +639,6 @@ class RiskEvaluator:
         }
         return recommendations.get(level, "需要进一步评估")
 
-
 def create_risk_evaluator(db_path: str = 'db/factorweave_system.sqlite') -> RiskEvaluator:
     """
     创建风险评估器实例
@@ -655,7 +650,6 @@ def create_risk_evaluator(db_path: str = 'db/factorweave_system.sqlite') -> Risk
         风险评估器实例
     """
     return RiskEvaluator(db_path)
-
 
 if __name__ == "__main__":
     # 测试代码

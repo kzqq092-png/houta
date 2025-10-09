@@ -23,7 +23,6 @@ from PyQt5.QtWidgets import QApplication
 
 logger = logger
 
-
 class PluginCache:
     """插件缓存管理器"""
 
@@ -128,7 +127,6 @@ class PluginCache:
         except Exception as e:
             logger.error(f"清理缓存失败: {e}")
 
-
 class BatchPluginProcessor:
     """批量插件处理器"""
 
@@ -225,7 +223,6 @@ class BatchPluginProcessor:
     def cleanup(self):
         """清理资源"""
         self.executor.shutdown(wait=True)
-
 
 class EnhancedAsyncPluginDiscoveryWorker(QThread):
     """增强版异步插件发现工作线程"""
@@ -445,7 +442,6 @@ class EnhancedAsyncPluginDiscoveryWorker(QThread):
         self.quit()
         self.wait(5000)  # 等待最多5秒
 
-
 class EnhancedAsyncPluginDiscoveryService(QObject):
     """增强版异步插件发现服务"""
 
@@ -528,10 +524,8 @@ class EnhancedAsyncPluginDiscoveryService(QObject):
         self.discovery_failed.emit(error_msg)
         logger.error(f"增强版异步插件发现失败: {error_msg}")
 
-
 # 全局服务实例
 _enhanced_async_plugin_discovery_service = None
-
 
 def get_enhanced_async_plugin_discovery_service() -> EnhancedAsyncPluginDiscoveryService:
     """获取增强版异步插件发现服务实例"""

@@ -19,7 +19,6 @@ except ImportError:
     talib = None
     TALIB_AVAILABLE = False
 
-
 def calculate_atr(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
     """
     计算ATR(Average True Range)指标
@@ -61,7 +60,6 @@ def calculate_atr(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
         result['ATR'] = pd.Series([float('nan')] * len(df), index=df.index)
 
     return result
-
 
 def calculate_natr(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
     """
@@ -107,7 +105,6 @@ def calculate_natr(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
         result['NATR'] = pd.Series([float('nan')] * len(df), index=df.index)
 
     return result
-
 
 def calculate_stddev(df: pd.DataFrame, timeperiod: int = 5, nbdev: float = 1.0) -> pd.DataFrame:
     """

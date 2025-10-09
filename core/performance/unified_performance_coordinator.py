@@ -38,7 +38,8 @@ try:
     from gui.widgets.performance.tabs.risk_control_center_tab import ModernRiskControlCenterTab
     # 注意：cache_optimization_tab、ai_prediction_tab、import_performance_tab 不存在，使用现有的
     from gui.widgets.performance.tabs.data_quality_monitor_tab import ModernDataQualityMonitorTab as ModernCacheOptimizationTab
-    from gui.widgets.performance.tabs.enhanced_deep_analysis_tab import ModernEnhancedDeepAnalysisTab as ModernAIPredictionTab
+    # 使用 algorithm_optimization_tab 替代不存在的 enhanced_deep_analysis_tab
+    from gui.widgets.performance.tabs.algorithm_optimization_tab import ModernAlgorithmOptimizationTab as ModernAIPredictionTab
     from gui.widgets.performance.tabs.trading_execution_monitor_tab import ModernTradingExecutionMonitorTab as ModernImportPerformanceTab
     UI_COMPONENTS_AVAILABLE = True
 except ImportError as e:
@@ -59,7 +60,6 @@ try:
 except ImportError:
     AI_PREDICTION_AVAILABLE = False
 
-
 class CoordinatorStatus(Enum):
     """协调器状态"""
     STOPPED = "stopped"
@@ -67,7 +67,6 @@ class CoordinatorStatus(Enum):
     RUNNING = "running"
     STOPPING = "stopping"
     ERROR = "error"
-
 
 @dataclass
 class PerformanceAlert:
@@ -93,7 +92,6 @@ class PerformanceAlert:
             'acknowledged': self.acknowledged
         }
 
-
 @dataclass
 class CoordinatorConfig:
     """协调器配置"""
@@ -113,7 +111,6 @@ class CoordinatorConfig:
     memory_critical_threshold: float = 95.0
     disk_warning_threshold: float = 90.0
     disk_critical_threshold: float = 98.0
-
 
 class ModernTabIntegrator:
     """Modern*Tab组件集成器"""
@@ -325,7 +322,6 @@ class ModernTabIntegrator:
     def get_all_tab_data(self) -> Dict[str, Dict[str, Any]]:
         """获取所有标签页数据"""
         return self.tab_data_cache.copy()
-
 
 class UnifiedPerformanceCoordinator:
     """
@@ -1076,11 +1072,9 @@ class UnifiedPerformanceCoordinator:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
-
 # 全局单例实例
 _coordinator_instance: Optional[UnifiedPerformanceCoordinator] = None
 _coordinator_lock = threading.RLock()
-
 
 def get_performance_coordinator() -> UnifiedPerformanceCoordinator:
     """获取全局性能协调器实例"""
@@ -1092,7 +1086,6 @@ def get_performance_coordinator() -> UnifiedPerformanceCoordinator:
             _coordinator_instance.start()
 
         return _coordinator_instance
-
 
 def initialize_performance_coordinator(config: Optional[CoordinatorConfig] = None) -> UnifiedPerformanceCoordinator:
     """初始化全局性能协调器"""

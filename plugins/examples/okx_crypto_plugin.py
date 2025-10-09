@@ -17,7 +17,6 @@ from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthChe
 from core.plugin_types import AssetType, DataType
 from core.data_source_data_models import QueryParams, StockInfo, KlineData, MarketData
 
-
 class OKXCryptoPlugin(IDataSourcePlugin):
     """OKX（欧易）交易所数字货币数据源插件"""
 
@@ -45,7 +44,6 @@ class OKXCryptoPlugin(IDataSourcePlugin):
         self.last_activity = None
         self.last_error = None
         self.config = {}
-
 
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""

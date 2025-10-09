@@ -19,7 +19,6 @@ from core.performance import measure_performance
 
 logger = logger
 
-
 class LoadingStage(Enum):
     """加载阶段"""
     CRITICAL = 1    # 关键数据（基础K线）
@@ -27,7 +26,6 @@ class LoadingStage(Enum):
     NORMAL = 3      # 普通优先级（常用指标）
     LOW = 4         # 低优先级（高级指标）
     BACKGROUND = 5  # 后台加载（历史数据）
-
 
 @dataclass
 class LoadingTask:
@@ -48,7 +46,6 @@ class LoadingTask:
         if self.priority_within_stage != other.priority_within_stage:
             return self.priority_within_stage < other.priority_within_stage
         return self.created_time < other.created_time
-
 
 class ProgressiveLoadingManager:
     """渐进式加载管理器"""
@@ -725,10 +722,8 @@ class ProgressiveLoadingManager:
             }
         logger.debug("已重置统计信息")
 
-
 # 全局实例
 _progressive_loader = None
-
 
 def get_progressive_loader() -> ProgressiveLoadingManager:
     """获取全局渐进式加载管理器实例"""
@@ -737,7 +732,6 @@ def get_progressive_loader() -> ProgressiveLoadingManager:
         _progressive_loader = ProgressiveLoadingManager()
         _progressive_loader.start()
     return _progressive_loader
-
 
 def initialize_progressive_loader(max_workers: int = os.cpu_count() * 2, enable_delays: bool = True):
     """初始化全局渐进式加载管理器"""
@@ -748,7 +742,6 @@ def initialize_progressive_loader(max_workers: int = os.cpu_count() * 2, enable_
     _progressive_loader.start()
     return _progressive_loader
 
-
 def shutdown_progressive_loader():
     """关闭全局渐进式加载管理器"""
     global _progressive_loader
@@ -756,14 +749,12 @@ def shutdown_progressive_loader():
         _progressive_loader.stop()
         _progressive_loader = None
 
-
 # 便捷函数
 def load_progressive(task_id: str, loader_func: Callable, data_params: Dict[str, Any],
                      stage: LoadingStage = LoadingStage.NORMAL,
                      callback: Optional[Callable] = None) -> bool:
     """渐进式加载便捷函数"""
     return get_progressive_loader().submit_loading_task(task_id, loader_func, data_params, stage, callback)
-
 
 def load_chart_progressive(chart_widget, kdata, indicators) -> bool:
     """渐进式加载图表便捷函数"""

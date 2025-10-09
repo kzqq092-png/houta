@@ -32,7 +32,6 @@ logger = logger
 DB_PATH = os.path.join(os.path.dirname(
     os.path.dirname(__file__)), 'db', 'factorweave_system.sqlite')
 
-
 class ConfigManager(QObject):
     """
     配置管理器适配器
@@ -197,7 +196,6 @@ class ConfigManager(QObject):
         elif self.conn:
             self.conn.close()
 
-
 # 为了兼容性，保留原有的函数接口
 def get_config_manager():
     """获取配置管理器实例"""
@@ -212,7 +210,6 @@ def get_config_manager():
         logger.warning(f"获取ConfigService失败，使用备用模式: {e}")
 
     return ConfigManager()
-
 
 # 兼容性别名
 def create_config_manager():

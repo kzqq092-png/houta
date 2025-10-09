@@ -8,7 +8,6 @@ from loguru import logger
 
 from analysis.pattern_manager import PatternManager
 from optimization.database_schema import OptimizationDatabaseManager
-from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 from optimization.version_manager import VersionManager
 from optimization.auto_tuner import AutoTuner
 import sys
@@ -46,12 +45,12 @@ try:
         import matplotlib.dates as mdates
         CHARTS_AVAILABLE = True
     except ImportError:
-        logger.info("  matplotlib 未安装，图表功能将受限")
+        logger.info("matplotlib 未安装，图表功能将受限")
         CHARTS_AVAILABLE = False
 
     GUI_AVAILABLE = True
 except ImportError:
-    logger.info("  PyQt5 未安装，仪表板功能将受限")
+    logger.info("PyQt5 未安装，仪表板功能将受限")
     GUI_AVAILABLE = False
     CHARTS_AVAILABLE = False
 
@@ -442,11 +441,11 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         actions_group = QGroupBox("快速操作")
         actions_layout = QVBoxLayout()
 
-        self.one_click_btn = QPushButton(" 一键优化所有形态")
+        self.one_click_btn = QPushButton("一键优化所有形态")
         self.one_click_btn.clicked.connect(self.one_click_optimize)
         actions_layout.addWidget(self.one_click_btn)
 
-        self.smart_optimize_btn = QPushButton(" 智能优化")
+        self.smart_optimize_btn = QPushButton("智能优化")
         self.smart_optimize_btn.clicked.connect(self.smart_optimize)
         actions_layout.addWidget(self.smart_optimize_btn)
 
@@ -505,7 +504,7 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
 
         # 优化历史标签页
         self.history_tab = self.create_history_tab()
-        self.tab_widget.addTab(self.history_tab, " 优化历史")
+        self.tab_widget.addTab(self.history_tab, "优化历史")
 
         # 版本管理标签页
         self.version_tab = self.create_version_tab()
@@ -513,7 +512,7 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
 
         # 系统日志标签页
         self.log_tab = self.create_log_tab()
-        self.tab_widget.addTab(self.log_tab, " 系统日志")
+        self.tab_widget.addTab(self.log_tab, "系统日志")
 
         return panel
 
@@ -807,7 +806,7 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
 
     def one_click_optimize(self):
         """一键优化所有形态"""
-        self.log_message(" 启动一键优化...")
+        self.log_message("启动一键优化...")
         self.progress_label.setText("正在优化...")
         self.progress_bar.setValue(0)
 
@@ -839,7 +838,7 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
 
     def smart_optimize(self):
         """智能优化"""
-        self.log_message(" 启动智能优化...")
+        self.log_message("启动智能优化...")
         self.progress_label.setText("智能分析中...")
 
         def run_smart_optimization():
@@ -850,7 +849,7 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
                 )
 
                 if result.get("status") == "no_optimization_needed":
-                    self.log_message(" 所有形态性能都达到要求，无需优化")
+                    self.log_message("所有形态性能都达到要求，无需优化")
                 else:
                     summary = result.get("summary", {})
                     self.log_message(f" 智能优化完成！")
@@ -871,7 +870,7 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         """优化选中的形态"""
         pattern_name = self.pattern_combo.currentText()
         if not pattern_name:
-            self.log_message("  请先选择要优化的形态")
+            self.log_message("请先选择要优化的形态")
             return
 
         self.log_message(f" 开始优化形态: {pattern_name}")
@@ -924,7 +923,7 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
     def clear_log(self):
         """清空日志"""
         self.log_text.clear()
-        self.log_message(" 日志已清空")
+        self.log_message("日志已清空")
 
     def closeEvent(self, event):
         """处理窗口关闭事件"""
@@ -957,7 +956,7 @@ def create_optimization_dashboard(event_bus: EventBus) -> OptimizationDashboard:
 def run_dashboard():
     """运行仪表板应用"""
     if not GUI_AVAILABLE:
-        logger.info(" GUI不可用，无法启动仪表板")
+        logger.info("GUI不可用，无法启动仪表板")
         return
 
     app = QApplication(sys.argv)

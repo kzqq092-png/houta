@@ -26,7 +26,6 @@ from core.indicator_extensions import (
 
 logger = logger
 
-
 class PandasTAIndicatorsPlugin(IIndicatorPlugin):
     """
     Pandas-TA指标插件

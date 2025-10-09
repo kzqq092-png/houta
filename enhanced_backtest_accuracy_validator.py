@@ -42,7 +42,6 @@ except ImportError:
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-
 @dataclass
 class ValidationResult:
     """验证结果数据类"""
@@ -52,7 +51,6 @@ class ValidationResult:
     details: str
     suggestions: List[str]
     error_info: Optional[str] = None
-
 
 class EnhancedBacktestAccuracyValidator:
     """增强版回测准确性验证器"""
@@ -553,7 +551,6 @@ class EnhancedBacktestAccuracyValidator:
                 error_info=str(e)
             )
 
-
 def validate_backtest_system_enhanced(backtest_engine: UnifiedBacktestEngine,
                                       test_data: pd.DataFrame = None,
                                       validation_level: str = "comprehensive") -> Dict[str, Any]:
@@ -662,7 +659,6 @@ def validate_backtest_system_enhanced(backtest_engine: UnifiedBacktestEngine,
         'has_scipy': HAS_SCIPY,
         'has_sklearn': HAS_SKLEARN
     }
-
 
 if __name__ == "__main__":
     logger.info("启动增强版回测系统验证...")

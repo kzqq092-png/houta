@@ -20,7 +20,7 @@ import warnings
 from typing import Optional, Dict, Any
 from functools import lru_cache
 from core.industry_manager import IndustryManager
-from core.services.unified_data_manager import UnifiedDataManager
+from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
 from utils.theme import ThemeManager
 from utils.config_manager import ConfigManager
 
@@ -29,7 +29,6 @@ _factory_lock = threading.Lock()
 
 # 管理器实例缓存
 _manager_cache: Dict[str, Any] = {}
-
 
 class ManagerFactory:
     """管理器工厂类，负责统一创建和管理所有管理器实例"""
@@ -114,7 +113,7 @@ class ManagerFactory:
         with self._lock:
             if force_new or cache_key not in self._instances:
                 try:
-                    self._instances[cache_key] = UnifiedDataManager()
+                    self._instances[cache_key] = get_unified_data_manager()
                 except ImportError as e:
                     warnings.warn(f"无法导入UnifiedDataManager: {e}")
                     self._instances[cache_key] = self._create_simple_data_manager()
@@ -362,7 +361,7 @@ class ManagerFactory:
 
     def _create_simple_data_manager(self):
         """创建数据管理器 - 重定向到UnifiedDataManager"""
-        return UnifiedDataManager()
+        return get_unified_data_manager()
 
     def _create_simple_industry_manager(self):
         """创建简化版行业管理器"""
@@ -469,10 +468,8 @@ class ManagerFactory:
 
             return MinimalIndustryManager()
 
-
 # 全局管理器工厂实例
 _factory_instance: Optional[ManagerFactory] = None
-
 
 def get_manager_factory() -> ManagerFactory:
     """获取管理器工厂实例（单例）"""
@@ -489,7 +486,6 @@ def get_manager_factory() -> ManagerFactory:
 # 便捷函数
 # =============================================================================
 
-
 @lru_cache(maxsize=1)
 def get_config_manager(force_new: bool = False) -> 'ConfigManager':
     """
@@ -503,10 +499,8 @@ def get_config_manager(force_new: bool = False) -> 'ConfigManager':
     """
     return get_manager_factory().get_config_manager(force_new)
 
-
 # get_log_manager 已删除 - 使用纯Loguru架构
 # 直接使用: from loguru import logger
-
 
 def get_theme_manager(config_manager=None, force_new: bool = False) -> 'ThemeManager':
     """
@@ -521,7 +515,6 @@ def get_theme_manager(config_manager=None, force_new: bool = False) -> 'ThemeMan
     """
     return get_manager_factory().get_theme_manager(config_manager, force_new)
 
-
 def get_data_manager(force_new: bool = False) -> 'UnifiedDataManager':
     """
     获取数据管理器实例
@@ -534,7 +527,6 @@ def get_data_manager(force_new: bool = False) -> 'UnifiedDataManager':
         UnifiedDataManager实例
     """
     return get_manager_factory().get_data_manager(force_new)
-
 
 def get_industry_manager(force_new: bool = False) -> 'IndustryManager':
     """
@@ -549,7 +541,6 @@ def get_industry_manager(force_new: bool = False) -> 'IndustryManager':
     """
     return get_manager_factory().get_industry_manager(force_new)
 
-
 def clear_manager_cache(manager_type: Optional[str] = None):
     """
     清除管理器缓存
@@ -558,7 +549,6 @@ def clear_manager_cache(manager_type: Optional[str] = None):
         manager_type: 要清除的管理器类型，None表示清除所有
     """
     get_manager_factory().clear_cache(manager_type)
-
 
 def get_factory_info() -> Dict[str, Any]:
     """
@@ -572,7 +562,6 @@ def get_factory_info() -> Dict[str, Any]:
 # =============================================================================
 # 兼容性函数
 # =============================================================================
-
 
 def ensure_managers_available() -> Dict[str, bool]:
     """
@@ -603,7 +592,6 @@ def ensure_managers_available() -> Dict[str, bool]:
 
     return status
 
-
 def get_manager_summary() -> str:
     """
     获取管理器状态摘要
@@ -628,7 +616,6 @@ def get_manager_summary() -> str:
         summary += f"- {manager_name}\n"
 
     return summary
-
 
 def safe_get_manager(manager_type: str, **kwargs):
     """

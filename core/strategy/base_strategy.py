@@ -16,7 +16,6 @@ import json
 import hashlib
 from pathlib import Path
 
-
 class StrategyType(Enum):
     """策略类型枚举"""
     TREND_FOLLOWING = "trend_following"      # 趋势跟踪
@@ -29,7 +28,6 @@ class StrategyType(Enum):
     MACHINE_LEARNING = "machine_learning"    # 机器学习
     CUSTOM = "custom"                        # 自定义策略
 
-
 class StrategyStatus(Enum):
     """策略状态枚举"""
     INACTIVE = "inactive"        # 未激活
@@ -40,7 +38,6 @@ class StrategyStatus(Enum):
     ERROR = "error"            # 错误状态
     COMPLETED = "completed"    # 已完成
 
-
 class SignalType(Enum):
     """信号类型枚举"""
     BUY = "buy"                # 买入信号
@@ -48,7 +45,6 @@ class SignalType(Enum):
     HOLD = "hold"              # 持有信号
     CLOSE_LONG = "close_long"  # 平多信号
     CLOSE_SHORT = "close_short"  # 平空信号
-
 
 @dataclass
 class StrategySignal:
@@ -78,7 +74,6 @@ class StrategySignal:
             'take_profit': float(self.take_profit) if self.take_profit is not None else None,
             'position_size': float(self.position_size) if self.position_size is not None else None
         }
-
 
 @dataclass
 class StrategyParameter:
@@ -115,7 +110,6 @@ class StrategyParameter:
             return True
         except:
             return False
-
 
 class BaseStrategy(ABC):
     """策略基类 - 所有策略的统一接口"""

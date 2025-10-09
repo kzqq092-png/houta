@@ -15,7 +15,6 @@ from core.indicator_strategy_extensions import IIndicatorPluginV2
 from core.data_source_extensions import PluginInfo
 from core.plugin_types import PluginType
 
-
 class RSIIndicatorPlugin(IIndicatorPluginV2):
     """RSI 指标插件（V2）"""
 

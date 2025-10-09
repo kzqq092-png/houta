@@ -40,7 +40,6 @@ sklearn_svm = _sklearn_modules.get('svm') if _sklearn_modules else None
 if sklearn_svm:
     SVC = getattr(sklearn_svm, 'SVC', None)
 
-
 def train_enhanced_model(X_train, y_train):
     """
     训练增强型机器学习模型
@@ -227,7 +226,6 @@ def train_enhanced_model(X_train, y_train):
                 break
 
     return final_model, feature_importance
-
 
 def prevent_overfitting(X_train, y_train, X_test, y_test):
     """

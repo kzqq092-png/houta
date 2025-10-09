@@ -10,7 +10,6 @@ import os
 
 logger = logger
 
-
 def suppress_warnings():
     """抑制各种不必要的警告"""
     try:

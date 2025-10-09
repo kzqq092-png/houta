@@ -13,7 +13,6 @@ import uuid
 
 from ..plugin_types import AssetType
 
-
 @dataclass
 class BaseEvent(ABC):
     """
@@ -30,7 +29,6 @@ class BaseEvent(ABC):
         """事件创建后的初始化处理"""
         if not self.source:
             self.source = self.__class__.__name__
-
 
 @dataclass
 class AssetSelectedEvent(BaseEvent):
@@ -58,7 +56,6 @@ class AssetSelectedEvent(BaseEvent):
             'time_range': self.time_range,
             'chart_type': self.chart_type
         })
-
 
 @dataclass
 class StockSelectedEvent(AssetSelectedEvent):
@@ -97,7 +94,6 @@ class StockSelectedEvent(AssetSelectedEvent):
             'stock_name': self.stock_name
         })
 
-
 @dataclass
 class AssetDataReadyEvent(BaseEvent):
     """
@@ -121,7 +117,6 @@ class AssetDataReadyEvent(BaseEvent):
             'market': self.market,
             'data_type': self.data_type
         })
-
 
 @dataclass
 class UIDataReadyEvent(AssetDataReadyEvent):
@@ -160,7 +155,6 @@ class UIDataReadyEvent(AssetDataReadyEvent):
             'kline_data': self.kline_data
         })
 
-
 @dataclass
 class ChartUpdateEvent(BaseEvent):
     """
@@ -184,7 +178,6 @@ class ChartUpdateEvent(BaseEvent):
             'time_range': self.time_range
         })
 
-
 @dataclass
 class AnalysisCompleteEvent(BaseEvent):
     """
@@ -204,7 +197,6 @@ class AnalysisCompleteEvent(BaseEvent):
             'results': self.results
         })
 
-
 @dataclass
 class DataUpdateEvent(BaseEvent):
     """
@@ -223,7 +215,6 @@ class DataUpdateEvent(BaseEvent):
             'stock_code': self.stock_code,
             'update_info': self.update_info
         })
-
 
 @dataclass
 class ErrorEvent(BaseEvent):
@@ -246,7 +237,6 @@ class ErrorEvent(BaseEvent):
             'severity': self.severity
         })
 
-
 @dataclass
 class UIUpdateEvent(BaseEvent):
     """
@@ -266,7 +256,6 @@ class UIUpdateEvent(BaseEvent):
             'update_data': self.update_data
         })
 
-
 @dataclass
 class ThemeChangedEvent(BaseEvent):
     """
@@ -284,7 +273,6 @@ class ThemeChangedEvent(BaseEvent):
             'theme_config': self.theme_config
         })
 
-
 @dataclass
 class PerformanceUpdateEvent(BaseEvent):
     """
@@ -299,7 +287,6 @@ class PerformanceUpdateEvent(BaseEvent):
         self.data.update({
             'metrics': self.metrics
         })
-
 
 @dataclass
 class IndicatorChangedEvent(BaseEvent):
@@ -317,7 +304,6 @@ class IndicatorChangedEvent(BaseEvent):
             'selected_indicators': self.selected_indicators,
             'indicator_params': self.indicator_params
         })
-
 
 @dataclass
 class UIDataReadyEvent(BaseEvent):
@@ -339,7 +325,6 @@ class UIDataReadyEvent(BaseEvent):
             'stock_name': self.stock_name
         })
 
-
 @dataclass
 class MultiScreenToggleEvent(BaseEvent):
     """
@@ -355,7 +340,6 @@ class MultiScreenToggleEvent(BaseEvent):
             'is_multi_screen': self.is_multi_screen
         })
 
-
 @dataclass
 class TradeExecutedEvent(BaseEvent):
     """
@@ -370,7 +354,6 @@ class TradeExecutedEvent(BaseEvent):
         self.data.update({
             'trade_record': self.trade_record
         })
-
 
 @dataclass
 class PositionUpdatedEvent(BaseEvent):
@@ -388,7 +371,6 @@ class PositionUpdatedEvent(BaseEvent):
             'portfolio': self.portfolio,
             'updated_positions': self.updated_positions
         })
-
 
 @dataclass
 class PatternSignalsDisplayEvent(BaseEvent):
@@ -409,9 +391,7 @@ class PatternSignalsDisplayEvent(BaseEvent):
             'highlighted_signal_index': self.highlighted_signal_index
         })
 
-
 # 告警相关事件
-
 
 class AlertLevel(Enum):
     """告警级别枚举"""
@@ -419,7 +399,6 @@ class AlertLevel(Enum):
     WARNING = "warning"
     ERROR = "error"
     CRITICAL = "critical"
-
 
 @dataclass
 class ResourceAlert(BaseEvent):
@@ -448,7 +427,6 @@ class ResourceAlert(BaseEvent):
             'unit': self.unit
         })
 
-
 @dataclass
 class ApplicationAlert(BaseEvent):
     """
@@ -476,4 +454,76 @@ class ApplicationAlert(BaseEvent):
             'current_value': self.current_value,
             'threshold': self.threshold,
             'unit': self.unit
+        })
+
+# 实时数据相关事件
+
+@dataclass
+class RealtimeDataEvent(BaseEvent):
+    """
+    实时数据事件
+
+    当接收到实时行情数据时触发
+    """
+    realtime_data: Dict[str, Any] = field(default_factory=dict)
+    symbol: str = ""
+    data_type: str = "realtime"
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'realtime_data': self.realtime_data,
+            'symbol': self.symbol,
+            'data_type': self.data_type
+        })
+
+@dataclass
+class TickDataEvent(BaseEvent):
+    """
+    Tick数据事件
+
+    当接收到Tick数据时触发
+    """
+    tick_data: Dict[str, Any] = field(default_factory=dict)
+    symbol: str = ""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'tick_data': self.tick_data,
+            'symbol': self.symbol
+        })
+
+@dataclass
+class OrderBookEvent(BaseEvent):
+    """
+    订单簿数据事件
+
+    当接收到订单簿数据时触发
+    """
+    order_book_data: Dict[str, Any] = field(default_factory=dict)
+    symbol: str = ""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'order_book_data': self.order_book_data,
+            'symbol': self.symbol
+        })
+
+@dataclass
+class ComputedIndicatorEvent(BaseEvent):
+    """
+    计算指标事件
+
+    当实时计算引擎完成指标计算时触发
+    """
+    computed_indicators: Dict[str, Any] = field(default_factory=dict)
+    symbol: str = ""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'computed_indicators': self.computed_indicators,
+            'symbol': self.symbol
         })

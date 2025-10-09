@@ -23,7 +23,6 @@ from PyQt5.QtWidgets import QWidget
 
 logger = logger
 
-
 class InteractionType(Enum):
     """交互类型"""
     ZOOM_IN = "zoom_in"
@@ -33,7 +32,6 @@ class InteractionType(Enum):
     PAN_UP = "pan_up"
     PAN_DOWN = "pan_down"
     RESET = "reset"
-
 
 @dataclass
 class ViewportState:
@@ -73,7 +71,6 @@ class ViewportState:
             center_y + zoomed_height / 2
         )
 
-
 @dataclass
 class InteractionEvent:
     """交互事件"""
@@ -108,7 +105,6 @@ class InteractionEvent:
             delta=delta,
             modifiers=int(event.modifiers())
         )
-
 
 class GPUInteractionEngine(QObject):
     """GPU加速交互引擎"""

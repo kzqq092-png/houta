@@ -21,7 +21,6 @@ from loguru import logger
 
 logger = logger
 
-
 class ModernTradingExecutionMonitorTab(QWidget):
     """现代化交易执行监控标签页 - 量化交易专用"""
 

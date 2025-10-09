@@ -28,6 +28,7 @@ from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap, QPainter, QBrush
 
 logger = logger.bind(module=__name__)
 
+
 class StatusUpdateWorker(QThread):
     """数据源状态异步更新工作线程"""
 
@@ -49,7 +50,7 @@ class StatusUpdateWorker(QThread):
             self._is_running = True
 
             if not self.router:
-                logger.info(" 路由器不可用")
+                logger.info("路由器不可用")
                 self.update_failed.emit("路由器不可用")
                 return
 
@@ -57,7 +58,7 @@ class StatusUpdateWorker(QThread):
             logger.info(f" 开始异步更新，数据源数量: {len(data_sources)}")
 
             if not data_sources:
-                logger.info(" 没有注册的数据源")
+                logger.info("没有注册的数据源")
                 self.update_failed.emit("没有注册的数据源")
                 return
 
@@ -125,7 +126,7 @@ class StatusUpdateWorker(QThread):
 
             if self._is_running:
                 self.update_completed.emit()
-                logger.info(" 异步状态更新完成")
+                logger.info("异步状态更新完成")
 
         except Exception as e:
             self.update_failed.emit(str(e))
@@ -167,6 +168,7 @@ class StatusUpdateWorker(QThread):
         """停止更新"""
         self._is_running = False
 
+
 class StatusIndicator(QLabel):
     """状态指示器组件"""
 
@@ -206,6 +208,7 @@ class StatusIndicator(QLabel):
 
         self.setPixmap(pixmap)
         self.setToolTip(f"状态: {self.status}")
+
 
 class MetricCard(QFrame):
     """指标卡片组件"""
@@ -264,6 +267,7 @@ class MetricCard(QFrame):
         self.value_label.setText(value)
         self.value_label.setStyleSheet(f"color: {color};")
 
+
 class NotificationItem(QListWidgetItem):
     """通知项目"""
 
@@ -297,6 +301,7 @@ class NotificationItem(QListWidgetItem):
         if level in colors:
             self.setForeground(colors[level])
 
+
 class DataSourceStatusWidget(QWidget):
     """数据源状态监控主组件"""
 
@@ -320,7 +325,7 @@ class DataSourceStatusWidget(QWidget):
 
         # 标题栏
         title_layout = QHBoxLayout()
-        title_label = QLabel(" 数据源状态监控")
+        title_label = QLabel("数据源状态监控")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
         title_layout.addWidget(title_label)
         title_layout.addStretch()
@@ -331,11 +336,11 @@ class DataSourceStatusWidget(QWidget):
         self.auto_refresh_check.toggled.connect(self.toggle_auto_refresh)
         title_layout.addWidget(self.auto_refresh_check)
 
-        refresh_btn = QPushButton(" 刷新")
+        refresh_btn = QPushButton("刷新")
         refresh_btn.clicked.connect(self.refresh_status)
         title_layout.addWidget(refresh_btn)
 
-        clear_btn = QPushButton(" 清空通知")
+        clear_btn = QPushButton("清空通知")
         clear_btn.clicked.connect(self.clear_notifications)
         title_layout.addWidget(clear_btn)
 
@@ -575,7 +580,7 @@ class DataSourceStatusWidget(QWidget):
     def refresh_status(self):
         """刷新状态 - 异步处理防止UI卡死"""
         try:
-            logger.info(" 开始刷新数据源状态...")
+            logger.info("开始刷新数据源状态...")
 
             # 尝试从统一数据管理器获取数据
             router = None
@@ -585,15 +590,15 @@ class DataSourceStatusWidget(QWidget):
                     router = unified_manager.data_source_router
                     logger.info(f" 获取到数据源路由器，注册数据源数量: {len(router.data_sources) if router.data_sources else 0}")
                 else:
-                    logger.info(" 统一数据管理器不可用或缺少路由器")
+                    logger.info("统一数据管理器不可用或缺少路由器")
             except ImportError:
-                logger.info(" 无法导入统一数据管理器")
+                logger.info("无法导入统一数据管理器")
             except Exception as e:
                 logger.info(f" 获取统一数据管理器失败: {e}")
 
             # 如果没有路由器，尝试从插件管理器获取数据
             if not router:
-                logger.info(" 尝试从插件管理器获取数据源信息...")
+                logger.info("尝试从插件管理器获取数据源信息...")
                 self._refresh_from_plugin_manager()
                 return
 
@@ -614,7 +619,7 @@ class DataSourceStatusWidget(QWidget):
 
             # 启动异步更新
             self.status_worker.start()
-            logger.info(" 异步状态更新线程已启动")
+            logger.info("异步状态更新线程已启动")
 
         except Exception as e:
             logger.info(f" 刷新状态失败: {e}")
@@ -743,7 +748,7 @@ class DataSourceStatusWidget(QWidget):
 
             # 如果没有找到任何数据源，创建示例数据
             if not mock_status_data:
-                logger.info(" 创建示例数据源信息...")
+                logger.info("创建示例数据源信息...")
                 example_sources = [
                     ("akshare_stock", "AkShare股票数据源", True),
                     ("yahoo_finance", "Yahoo Finance数据源", False),
@@ -814,7 +819,7 @@ class DataSourceStatusWidget(QWidget):
 
     def _on_update_completed(self):
         """异步更新完成回调"""
-        logger.info(" 数据源状态异步更新完成")
+        logger.info("数据源状态异步更新完成")
 
     def _on_update_failed(self, error_message: str):
         """异步更新失败回调"""
@@ -835,13 +840,13 @@ class DataSourceStatusWidget(QWidget):
                     # 更新状态
                     health_score = data['health_score']
                     if health_score > 0.7:
-                        status_item = QTableWidgetItem(" 健康")
+                        status_item = QTableWidgetItem("健康")
                         status_item.setForeground(QColor("#28a745"))
                     elif health_score > 0.3:
-                        status_item = QTableWidgetItem(" 警告")
+                        status_item = QTableWidgetItem("警告")
                         status_item.setForeground(QColor("#ffc107"))
                     else:
-                        status_item = QTableWidgetItem(" 错误")
+                        status_item = QTableWidgetItem("错误")
                         status_item.setForeground(QColor("#dc3545"))
 
                     self.status_table.setItem(row, 1, status_item)
@@ -944,13 +949,13 @@ class DataSourceStatusWidget(QWidget):
 
                     # 状态
                     if metric and metric.health_score > 0.7:
-                        status_item = QTableWidgetItem(" 健康")
+                        status_item = QTableWidgetItem("健康")
                         status_item.setForeground(QColor("#28a745"))
                     elif metric and metric.health_score > 0.3:
-                        status_item = QTableWidgetItem(" 警告")
+                        status_item = QTableWidgetItem("警告")
                         status_item.setForeground(QColor("#ffc107"))
                     else:
-                        status_item = QTableWidgetItem(" 错误")
+                        status_item = QTableWidgetItem("错误")
                         status_item.setForeground(QColor("#dc3545"))
 
                     self.status_table.setItem(row, 1, status_item)
@@ -1206,6 +1211,7 @@ class DataSourceStatusWidget(QWidget):
         self.notifications_list.clear()
         self.notification_count_label.setText("通知总数: 0")
         self.add_notification("info", "通知已清空")
+
 
 if __name__ == "__main__":
     import sys

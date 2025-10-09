@@ -17,11 +17,9 @@ if TYPE_CHECKING:
 
 logger = logger
 
-
 class QObjectMeta(wrappertype, type(ABC)):
     """解决QObject和ABC元类冲突的自定义元类"""
     pass
-
 
 class BasePanel(QObject, ABC, metaclass=QObjectMeta):
     """

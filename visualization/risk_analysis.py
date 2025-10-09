@@ -9,7 +9,6 @@ from loguru import logger
 
 logger = logger
 
-
 class RiskAnalysis:
     def __init__(self):
         pass

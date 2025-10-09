@@ -18,7 +18,6 @@ except ImportError:
     logger.warning("PyQt5模块导入失败，Qt帮助工具将不可用")
     PYQT5_AVAILABLE = False
 
-
 def safe_connect(sender: QObject, signal: pyqtSignal, slot: Callable,
                  connection_type: Optional[Any] = None) -> bool:
     """
@@ -53,7 +52,6 @@ def safe_connect(sender: QObject, signal: pyqtSignal, slot: Callable,
         logger.error(traceback.format_exc())
         return False
 
-
 def register_meta_types() -> bool:
     """
     注册常用的PyQt5元类型，避免信号连接时的类型错误
@@ -79,7 +77,6 @@ def register_meta_types() -> bool:
         logger.error(f"元类型注册失败: {e}")
         logger.error(traceback.format_exc())
         return False
-
 
 def create_wrapper_slot(slot_func: Callable) -> Callable:
     """

@@ -17,7 +17,6 @@ from dataclasses import dataclass
 # 基础日志配置
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class PerformanceData:
     """性能数据"""
@@ -26,7 +25,6 @@ class PerformanceData:
     disk_usage: float = 0.0
     network_io: float = 0.0
     response_time: float = 0.0
-
 
 class UnifiedPerformanceWidget:
     """统一性能Widget"""
@@ -73,10 +71,8 @@ class UnifiedPerformanceWidget:
         """重置性能数据"""
         self.data = PerformanceData()
 
-
 # 全局实例
 _unified_widget = None
-
 
 def get_unified_performance_widget() -> UnifiedPerformanceWidget:
     """获取统一性能Widget实例"""
@@ -84,7 +80,6 @@ def get_unified_performance_widget() -> UnifiedPerformanceWidget:
     if _unified_widget is None:
         _unified_widget = UnifiedPerformanceWidget()
     return _unified_widget
-
 
 class ModernUnifiedPerformanceWidget(UnifiedPerformanceWidget):
     """现代化统一性能Widget"""
@@ -101,7 +96,6 @@ class ModernUnifiedPerformanceWidget(UnifiedPerformanceWidget):
     def enable_animations(self, enabled: bool = True):
         """启用/禁用动画"""
         self.animations_enabled = enabled
-
 
 # 导出的公共接口
 __all__ = [

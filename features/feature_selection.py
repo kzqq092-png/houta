@@ -6,7 +6,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from loguru import logger
 
-
 def optimize_features_with_pca(X, variance_threshold=0.95):
     """
     使用PCA优化特征集
@@ -43,7 +42,6 @@ def optimize_features_with_pca(X, variance_threshold=0.95):
     logger.info(f"保留的方差比例: {pca.explained_variance_ratio_.sum():.4f}")
 
     return X_pca, pca
-
 
 def enhanced_feature_selection(X, y):
     """
@@ -219,7 +217,6 @@ def enhanced_feature_selection(X, y):
         # 发生错误时返回所有特征的索引（相当于不进行选择）
         return list(range(X.shape[1])), None
 
-
 def integrate_enhanced_features(df):
     """
     集成所有增强特征
@@ -265,7 +262,6 @@ def integrate_enhanced_features(df):
 
     return df
 
-
 def select_features_pca(X, n_components=10):
     """
     使用主成分分析(PCA)进行特征降维
@@ -308,7 +304,6 @@ def select_features_pca(X, n_components=10):
     logger.info(f"PCA选择了{len(selected_features)}个特征，解释了{total_variance:.2%}的方差")
 
     return selected_features
-
 
 def select_features_importance(X, y, n_features=20, model_type='random_forest', random_state=42):
     """
@@ -392,7 +387,6 @@ def select_features_importance(X, y, n_features=20, model_type='random_forest', 
 
     return selected_features
 
-
 def calculate_feature_correlations(X, threshold=0.7):
     """
     计算特征之间的相关性并识别高度相关的特征
@@ -429,7 +423,6 @@ def calculate_feature_correlations(X, threshold=0.7):
         logger.info(f"未发现高度相关的特征 (相关性 > {threshold})")
 
     return high_corr
-
 
 def remove_redundant_features(X, y, threshold=0.7, target_col=None):
     """

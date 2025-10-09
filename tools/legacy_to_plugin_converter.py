@@ -18,7 +18,6 @@ from datetime import datetime
 
 from loguru import logger
 
-
 class LegacyToPluginConverter:
     """传统数据源转插件转换器"""
     
@@ -300,7 +299,6 @@ from unittest.mock import Mock, patch
 
 from plugins.data_sources.{source_name}_plugin import {config["plugin_class"]}
 
-
 class Test{config["plugin_class"]}(unittest.TestCase):
     """测试{config["plugin_name"]}"""
     
@@ -393,7 +391,6 @@ class Test{config["plugin_class"]}(unittest.TestCase):
         """测试清理"""
         if self.plugin.is_connected():
             self.plugin.disconnect()
-
 
 if __name__ == '__main__':
     unittest.main()
@@ -685,7 +682,6 @@ python tools/plugin_health_check.py
         
         return validation
 
-
 def main():
     """主函数 - 命令行接口"""
     import argparse
@@ -738,7 +734,6 @@ def main():
         return 1
     
     return 0
-
 
 if __name__ == "__main__":
     exit(main())

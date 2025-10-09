@@ -427,7 +427,7 @@ class PerformanceAlertsWidget(QWidget):
         layout.addWidget(self.alerts_table)
 
         # 统计信息
-        stats_group = QGroupBox("📊 告警统计")
+        stats_group = QGroupBox("告警统计")
         stats_layout = QGridLayout(stats_group)
 
         # 活跃告警数
@@ -545,7 +545,7 @@ class PerformanceAlertsWidget(QWidget):
 
             # 操作按钮
             if not alert.resolved:
-                resolve_btn = QPushButton("✅ 解决")
+                resolve_btn = QPushButton("解决")
                 resolve_btn.clicked.connect(lambda checked, aid=alert.id: self.resolve_alert(aid))
                 resolve_btn.setStyleSheet("""
                     QPushButton {
@@ -639,7 +639,7 @@ class EnhancedPerformanceDashboard(QWidget):
         # 标题和控制区域
         header_layout = QHBoxLayout()
 
-        title_label = QLabel("🚀 增强性能监控仪表板")
+        title_label = QLabel("增强性能监控仪表板")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -678,19 +678,19 @@ class EnhancedPerformanceDashboard(QWidget):
 
         # 实时监控选项卡
         realtime_tab = self.create_realtime_tab()
-        self.tab_widget.addTab(realtime_tab, "📊 实时监控")
+        self.tab_widget.addTab(realtime_tab, "实时监控")
 
         # 历史趋势选项卡
         history_tab = self.create_history_tab()
-        self.tab_widget.addTab(history_tab, "📈 历史趋势")
+        self.tab_widget.addTab(history_tab, "历史趋势")
 
         # 性能告警选项卡
         self.alerts_widget = PerformanceAlertsWidget()
-        self.tab_widget.addTab(self.alerts_widget, "⚠️ 性能告警")
+        self.tab_widget.addTab(self.alerts_widget, "性能告警")
 
         # 优化建议选项卡
         optimization_tab = self.create_optimization_tab()
-        self.tab_widget.addTab(optimization_tab, "💡 优化建议")
+        self.tab_widget.addTab(optimization_tab, "[INFO] 优化建议")
 
         layout.addWidget(self.tab_widget)
 
@@ -724,7 +724,7 @@ class EnhancedPerformanceDashboard(QWidget):
         layout = QVBoxLayout(widget)
 
         # 仪表盘区域
-        gauges_group = QGroupBox("📊 实时指标仪表盘")
+        gauges_group = QGroupBox("实时指标仪表盘")
         gauges_layout = QGridLayout(gauges_group)
 
         # 创建仪表盘
@@ -746,7 +746,7 @@ class EnhancedPerformanceDashboard(QWidget):
         layout.addWidget(gauges_group)
 
         # 实时图表区域
-        charts_group = QGroupBox("📈 实时图表")
+        charts_group = QGroupBox("实时图表")
         charts_layout = QGridLayout(charts_group)
 
         # 创建实时图表
@@ -773,7 +773,7 @@ class EnhancedPerformanceDashboard(QWidget):
         layout = QVBoxLayout(widget)
 
         # 历史控制区域
-        control_group = QGroupBox("🔍 历史查询控制")
+        control_group = QGroupBox("历史查询控制")
         control_layout = QHBoxLayout(control_group)
 
         # 指标选择
@@ -802,7 +802,7 @@ class EnhancedPerformanceDashboard(QWidget):
         control_layout.addWidget(self.time_range_combo)
 
         # 查询按钮
-        query_btn = QPushButton("📊 查询历史")
+        query_btn = QPushButton("查询历史")
         query_btn.clicked.connect(self.query_history)
         control_layout.addWidget(query_btn)
 
@@ -811,7 +811,7 @@ class EnhancedPerformanceDashboard(QWidget):
         layout.addWidget(control_group)
 
         # 历史图表区域
-        history_chart_group = QGroupBox("📈 历史趋势图表")
+        history_chart_group = QGroupBox("历史趋势图表")
         history_chart_layout = QVBoxLayout(history_chart_group)
 
         self.history_chart = RealTimeChart(MetricType.CPU_USAGE)
@@ -821,7 +821,7 @@ class EnhancedPerformanceDashboard(QWidget):
         layout.addWidget(history_chart_group)
 
         # 统计信息区域
-        stats_group = QGroupBox("📊 统计信息")
+        stats_group = QGroupBox("统计信息")
         stats_layout = QGridLayout(stats_group)
 
         # 平均值
@@ -864,7 +864,7 @@ class EnhancedPerformanceDashboard(QWidget):
         control_layout.addWidget(analysis_type_combo)
 
         # 分析按钮
-        analyze_btn = QPushButton("🔍 开始分析")
+        analyze_btn = QPushButton("开始分析")
         analyze_btn.clicked.connect(self.perform_optimization_analysis)
         control_layout.addWidget(analyze_btn)
 
@@ -873,14 +873,14 @@ class EnhancedPerformanceDashboard(QWidget):
         layout.addWidget(control_group)
 
         # 瓶颈分析区域
-        bottleneck_group = QGroupBox("🔍 性能瓶颈分析")
+        bottleneck_group = QGroupBox("性能瓶颈分析")
         bottleneck_layout = QVBoxLayout(bottleneck_group)
 
         self.bottleneck_analysis = QTextEdit()
         self.bottleneck_analysis.setReadOnly(True)
         self.bottleneck_analysis.setMaximumHeight(150)
         self.bottleneck_analysis.setText("""
-🔍 性能瓶颈分析结果：
+ 性能瓶颈分析结果：
 
 • CPU瓶颈: 当前CPU使用率较高（76%），建议优化计算密集型任务
 • 内存瓶颈: 内存使用正常（45%），暂无优化需求
@@ -888,14 +888,14 @@ class EnhancedPerformanceDashboard(QWidget):
 • 网络瓶颈: 网络I/O正常，暂无优化需求
 • 缓存瓶颈: 缓存命中率较低（67%），建议调整缓存策略
 
-💡 主要建议：优先解决CPU和缓存问题，预期性能提升 15-20%
+[INFO] 主要建议：优先解决CPU和缓存问题，预期性能提升 15-20%
         """)
         bottleneck_layout.addWidget(self.bottleneck_analysis)
 
         layout.addWidget(bottleneck_group)
 
         # 优化建议列表
-        suggestions_group = QGroupBox("💡 具体优化建议")
+        suggestions_group = QGroupBox("[INFO] 具体优化建议")
         suggestions_layout = QVBoxLayout(suggestions_group)
 
         self.suggestions_table = QTableWidget()
@@ -933,7 +933,7 @@ class EnhancedPerformanceDashboard(QWidget):
 • 接下来24小时: 磁盘I/O可能因为日志轮转而短暂增加
 • 缓存效率: 如不优化，命中率可能进一步下降至60%
 
-⚠️ 风险提醒: 当前趋势下，系统可能在2小时内达到性能瓶颈
+ 风险提醒: 当前趋势下，系统可能在2小时内达到性能瓶颈
         """)
         prediction_layout.addWidget(self.performance_prediction)
 

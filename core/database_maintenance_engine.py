@@ -30,7 +30,6 @@ from .cross_asset_query_engine import get_cross_asset_query_engine
 
 logger = logger.bind(module=__name__)
 
-
 class MaintenanceTaskType(Enum):
     """维护任务类型枚举"""
     HEALTH_CHECK = "health_check"           # 健康检查
@@ -43,7 +42,6 @@ class MaintenanceTaskType(Enum):
     BACKUP = "backup"                       # 数据备份
     ARCHIVE = "archive"                     # 数据归档
 
-
 class MaintenanceStatus(Enum):
     """维护状态枚举"""
     PENDING = "pending"
@@ -52,14 +50,12 @@ class MaintenanceStatus(Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-
 class MaintenancePriority(Enum):
     """维护优先级枚举"""
     LOW = 1
     NORMAL = 2
     HIGH = 3
     CRITICAL = 4
-
 
 @dataclass
 class MaintenanceTask:
@@ -94,7 +90,6 @@ class MaintenanceTask:
             'progress': self.progress
         }
 
-
 @dataclass
 class DatabaseHealthReport:
     """数据库健康报告"""
@@ -126,7 +121,6 @@ class DatabaseHealthReport:
             'recommendations': self.recommendations
         }
 
-
 @dataclass
 class MaintenanceSchedule:
     """维护计划"""
@@ -151,7 +145,6 @@ class MaintenanceSchedule:
             'next_run': self.next_run.isoformat() if self.next_run else None,
             'parameters': self.parameters
         }
-
 
 class DatabaseMaintenanceEngine:
     """
@@ -894,11 +887,9 @@ class DatabaseMaintenanceEngine:
         self.executor.shutdown(wait=True)
         logger.info("DatabaseMaintenanceEngine 已关闭")
 
-
 # 全局实例
 _maintenance_engine: Optional[DatabaseMaintenanceEngine] = None
 _engine_lock = threading.Lock()
-
 
 def get_database_maintenance_engine() -> DatabaseMaintenanceEngine:
     """获取全局数据库维护引擎实例"""
@@ -909,7 +900,6 @@ def get_database_maintenance_engine() -> DatabaseMaintenanceEngine:
             _maintenance_engine = DatabaseMaintenanceEngine()
 
         return _maintenance_engine
-
 
 def initialize_database_maintenance_engine(max_workers: int = 2) -> DatabaseMaintenanceEngine:
     """初始化数据库维护引擎"""

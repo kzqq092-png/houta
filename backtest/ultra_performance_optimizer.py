@@ -97,9 +97,10 @@ class UltraPerformanceOptimizer:
         # 分布式客户端
         self.dask_client = None
         self.ray_initialized = False
+        self._compute_env_initialized = False
 
-        # 初始化计算环境
-        self._initialize_compute_environment()
+        # 延迟初始化计算环境（避免Windows多进程问题）
+        # self._initialize_compute_environment()  # 改为按需初始化
 
     def _check_gpu_availability(self) -> bool:
         """检查GPU可用性"""
@@ -153,8 +154,19 @@ class UltraPerformanceOptimizer:
 
         return base_config
 
+    def _ensure_compute_environment(self):
+        """确保计算环境已初始化（延迟加载）"""
+        if self._compute_env_initialized:
+            return
+
+        try:
+            self._initialize_compute_environment()
+            self._compute_env_initialized = True
+        except Exception as e:
+            logger.warning(f"计算环境初始化失败: {e}，将使用基础模式")
+
     def _initialize_compute_environment(self):
-        """初始化计算环境"""
+        """初始化计算环境（内部方法，由_ensure_compute_environment调用）"""
         try:
             # 初始化Dask分布式客户端
             if self.compute_backend in [ComputeBackend.DISTRIBUTED, ComputeBackend.HYBRID]:
@@ -164,10 +176,10 @@ class UltraPerformanceOptimizer:
                         threads_per_worker=2,
                         memory_limit=f"{self.config['memory_limit'] // self.config['max_workers']}B"
                     )
-                    logger.warning(
+                    logger.info(
                         f"Dask客户端已初始化: {self.dask_client.dashboard_link}")
                 except Exception as e:
-                    logger.info(f"Dask初始化失败: {e}")
+                    logger.warning(f"Dask初始化失败: {e}")
 
             # 初始化Ray
             if self.performance_level == PerformanceLevel.EXTREME:
@@ -179,9 +191,9 @@ class UltraPerformanceOptimizer:
                                 self.config['memory_limit'] * 0.3)
                         )
                         self.ray_initialized = True
-                        logger.warning("Ray已初始化")
+                        logger.info("Ray已初始化")
                 except Exception as e:
-                    logger.info(f"Ray初始化失败: {e}")
+                    logger.warning(f"Ray初始化失败: {e}")
 
         except Exception as e:
             logger.error(f"计算环境初始化失败: {e}")
@@ -483,6 +495,9 @@ class UltraPerformanceOptimizer:
         Returns:
             Tuple: (回测结果, 性能指标)
         """
+        # 确保计算环境已初始化（延迟加载）
+        self._ensure_compute_environment()
+
         start_time = time.time()
         start_memory = psutil.virtual_memory().used
 

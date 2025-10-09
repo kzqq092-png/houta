@@ -20,7 +20,6 @@ from .compatibility import CompatibilityReport
 
 logger = logger
 
-
 class RenderBackend(Enum):
     """渲染后端类型"""
     WEBGPU = "webgpu"
@@ -28,7 +27,6 @@ class RenderBackend(Enum):
     WEBGL = "webgl"
     CANVAS2D = "canvas2d"
     MATPLOTLIB = "matplotlib"
-
 
 class ChartRenderer(Protocol):
     """图表渲染器协议"""
@@ -52,7 +50,6 @@ class ChartRenderer(Protocol):
     def get_performance_info(self) -> Dict[str, Any]:
         """获取性能信息"""
         ...
-
 
 class BaseRenderer(ABC):
     """渲染器基类"""
@@ -110,7 +107,6 @@ class BaseRenderer(ABC):
             self._performance_stats['total_render_time'] /
             self._performance_stats['render_count']
         )
-
 
 class WebGPURenderer(BaseRenderer):
     """WebGPU渲染器"""
@@ -223,7 +219,6 @@ class WebGPURenderer(BaseRenderer):
         if self._initialized:
             logger.debug("WebGPU清空渲染内容")
 
-
 class OpenGLRenderer(BaseRenderer):
     """OpenGL渲染器"""
 
@@ -315,7 +310,6 @@ class OpenGLRenderer(BaseRenderer):
         if self._initialized:
             logger.debug("OpenGL清空渲染内容")
 
-
 class Canvas2DRenderer(BaseRenderer):
     """Canvas 2D渲染器"""
 
@@ -402,7 +396,6 @@ class Canvas2DRenderer(BaseRenderer):
         """清空渲染内容"""
         if self._initialized:
             logger.debug("Canvas 2D清空渲染内容")
-
 
 class MatplotlibRenderer(BaseRenderer):
     """Matplotlib渲染器（最终后备方案）"""
@@ -521,7 +514,6 @@ class MatplotlibRenderer(BaseRenderer):
                 if ax:
                     ax.clear()
             logger.debug("Matplotlib清空渲染内容")
-
 
 class FallbackRenderer:
     """多层降级渲染器"""

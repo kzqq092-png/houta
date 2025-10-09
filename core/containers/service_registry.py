@@ -10,9 +10,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 import threading
 
-
 logger = logger
-
 
 class ServiceScope(Enum):
     """
@@ -21,7 +19,6 @@ class ServiceScope(Enum):
     SINGLETON = "singleton"  # 单例模式
     TRANSIENT = "transient"  # 每次请求都创建新实例
     SCOPED = "scoped"       # 在特定作用域内是单例
-
 
 @dataclass
 class ServiceInfo:
@@ -46,7 +43,6 @@ class ServiceInfo:
         """初始化后处理"""
         if not self.name:
             self.name = self.service_type.__name__
-
 
 class ServiceRegistry:
     """

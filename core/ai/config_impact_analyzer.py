@@ -28,7 +28,6 @@ warnings.filterwarnings('ignore')
 
 from ..importdata.import_config_manager import ImportTaskConfig, DataFrequency, ImportMode
 
-
 class ImpactSeverity(Enum):
     """影响严重程度"""
     MINIMAL = "minimal"        # 最小影响
@@ -36,7 +35,6 @@ class ImpactSeverity(Enum):
     MEDIUM = "medium"         # 中等影响
     HIGH = "high"             # 高影响
     CRITICAL = "critical"     # 严重影响
-
 
 class RiskCategory(Enum):
     """风险类别"""
@@ -47,7 +45,6 @@ class RiskCategory(Enum):
     OPERATIONAL = "operational"          # 运营风险
     SECURITY = "security"                # 安全风险
 
-
 class ChangeType(Enum):
     """变更类型"""
     PARAMETER_INCREASE = "parameter_increase"    # 参数增加
@@ -56,7 +53,6 @@ class ChangeType(Enum):
     CONFIGURATION_REMOVE = "configuration_remove" # 配置移除
     STRATEGY_CHANGE = "strategy_change"         # 策略变更
     DEPENDENCY_CHANGE = "dependency_change"     # 依赖变更
-
 
 @dataclass
 class ConfigChange:
@@ -70,7 +66,6 @@ class ConfigChange:
     description: str = ""
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-
 @dataclass
 class ImpactPrediction:
     """影响预测"""
@@ -80,7 +75,6 @@ class ImpactPrediction:
     change_percentage: float
     confidence: float
     impact_severity: ImpactSeverity
-
 
 @dataclass
 class RiskAssessment:
@@ -92,7 +86,6 @@ class RiskAssessment:
     impact_score: float  # 影响分数
     risk_level: ImpactSeverity
     mitigation_strategies: List[str] = field(default_factory=list)
-
 
 @dataclass
 class ConfigImpactAnalysis:
@@ -110,7 +103,6 @@ class ConfigImpactAnalysis:
     optimal_change_time: Optional[str] = None
     dependencies: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-
 
 class ConfigImpactAnalyzer:
     """
@@ -1371,7 +1363,6 @@ class ConfigImpactAnalyzer:
             self.analysis_cache.clear()
         logger.info("影响分析缓存已清空")
 
-
 def main():
     """测试配置变更影响分析器"""
     from ..importdata.import_config_manager import DataFrequency, ImportMode
@@ -1472,7 +1463,6 @@ def main():
     reduced_analysis = analyzer.analyze_config_change_impact(original_config, reduced_config)
     logger.info(f"减少参数变更的整体风险分数: {reduced_analysis.overall_risk_score:.3f}")
     logger.info(f"减少参数变更的影响严重程度: {reduced_analysis.overall_impact_severity.value}")
-
 
 if __name__ == "__main__":
     main()

@@ -11,7 +11,6 @@ import socket
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
 def fetch_latest_tdx_servers():
     """从GitHub获取最新的TDX服务器列表"""
     try:
@@ -42,7 +41,6 @@ def fetch_latest_tdx_servers():
     except Exception as e:
         print(f"❌ 获取服务器列表失败: {e}")
         return []
-
 
 def test_server_connectivity(server, timeout=3):
     """测试单个服务器的连通性"""
@@ -78,7 +76,6 @@ def test_server_connectivity(server, timeout=3):
         server['error'] = str(e)
         return server
 
-
 def test_servers_concurrent(servers, max_workers=20):
     """并发测试服务器连通性"""
     print(f"🔄 开始并发测试 {len(servers)} 个服务器的连通性...")
@@ -108,7 +105,6 @@ def test_servers_concurrent(servers, max_workers=20):
 
     return tested_servers
 
-
 def get_best_servers(tested_servers, limit=15):
     """获取最佳服务器列表"""
     # 筛选可用服务器
@@ -133,7 +129,6 @@ def get_best_servers(tested_servers, limit=15):
         print(f"{i:<4} {server['name']:<25} {server['host']:<15} {server['port']:<6} {server['response_time']*1000:.0f}ms")
 
     return best_servers
-
 
 def update_tdx_database(best_servers):
     """更新TDX数据库中的服务器列表"""
@@ -171,7 +166,6 @@ def update_tdx_database(best_servers):
         print(f"❌ 更新数据库失败: {e}")
         return False
 
-
 def main():
     """主函数"""
     print("🚀 TDX服务器列表更新工具")
@@ -204,7 +198,6 @@ def main():
         print("]")
     else:
         print("❌ 数据库更新失败")
-
 
 if __name__ == "__main__":
     main()

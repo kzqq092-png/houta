@@ -33,7 +33,7 @@ try:
     from tensorflow.keras.utils import to_categorical
     from models.deep_learning import build_deep_learning_model, TENSORFLOW_AVAILABLE
     TF_AVAILABLE = True
-    logger.info(" TensorFlow 可用")
+    logger.info("TensorFlow 可用")
 except ImportError as e:
     TF_AVAILABLE = False
     logger.info(f" TensorFlow 不可用: {e}")
@@ -269,7 +269,7 @@ class AIModelGenerator:
         logger.info(f"模型类型: {model_types}")
 
         if not TF_AVAILABLE:
-            logger.info(" TensorFlow不可用，无法生成深度学习模型")
+            logger.info("TensorFlow不可用，无法生成深度学习模型")
             logger.info("请安装TensorFlow: pip install tensorflow")
             return False
 
@@ -288,10 +288,10 @@ class AIModelGenerator:
         logger.info(f"{'='*60}")
 
         if success_count == len(model_types):
-            logger.info(" 所有模型生成成功！现在可以重新启动FactorWeave-Quant 应用程序。")
+            logger.info("所有模型生成成功！现在可以重新启动FactorWeave-Quant 应用程序。")
             return True
         else:
-            logger.info(" 部分模型生成失败，请检查错误信息。")
+            logger.info("部分模型生成失败，请检查错误信息。")
             return False
 
 
@@ -313,18 +313,18 @@ def main():
     logger.info("=" * 60)
 
     # 创建模型生成器
-    generator = AIModelGenerator(quick_mode=args.quick)
+    generator= AIModelGenerator(quick_mode=args.quick)
 
     # 生成模型
     if args.model == 'all':
-        success = generator.generate_all_models()
+        success= generator.generate_all_models()
     else:
         try:
             generator.train_and_save_model(args.model)
-            success = True
+            success= True
         except Exception as e:
             logger.info(f"模型生成失败: {e}")
-            success = False
+            success= False
 
     if success:
         logger.info("\n 下一步操作:")
@@ -333,7 +333,6 @@ def main():
         logger.info("3. 测试AI预测功能")
 
     sys.exit(0 if success else 1)
-
 
 if __name__ == "__main__":
     main()

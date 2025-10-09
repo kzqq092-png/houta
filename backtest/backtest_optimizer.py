@@ -21,14 +21,12 @@ from dataclasses import dataclass
 from enum import Enum
 from core.performance_optimizer import ProfessionalPerformanceOptimizer, OptimizationLevel
 
-
 class BacktestOptimizationLevel(Enum):
     """回测优化级别枚举"""
     BASIC = "basic"              # 基础优化
     STANDARD = "standard"        # 标准优化
     AGGRESSIVE = "aggressive"    # 激进优化
     PROFESSIONAL = "professional"  # 专业级优化
-
 
 @dataclass
 class BacktestPerformanceMetrics:
@@ -40,7 +38,6 @@ class BacktestPerformanceMetrics:
     parallel_efficiency: float
     optimization_level: BacktestOptimizationLevel
     timestamp: datetime
-
 
 class VectorizedBacktestEngine:
     """
@@ -181,7 +178,6 @@ class VectorizedBacktestEngine:
         except Exception as e:
             self.logger.error(f"向量化回测失败: {e}")
             raise
-
 
 class ParallelBacktestEngine:
     """
@@ -398,7 +394,6 @@ class ParallelBacktestEngine:
             self.logger.error(f"计算优化指标失败: {e}")
             return 0.0
 
-
 class MemoryOptimizedBacktestEngine:
     """
     内存优化回测引擎
@@ -505,7 +500,6 @@ class MemoryOptimizedBacktestEngine:
         except Exception as e:
             self.logger.error(f"重新计算累积指标失败: {e}")
             return result
-
 
 class ProfessionalBacktestOptimizer:
     """
@@ -702,7 +696,6 @@ class ProfessionalBacktestOptimizer:
 
 # 装饰器函数
 
-
 def optimize_backtest_performance(optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL):
     """回测性能优化装饰器"""
     def decorator(func):
@@ -725,11 +718,9 @@ def optimize_backtest_performance(optimization_level: BacktestOptimizationLevel 
 
 # 便捷函数
 
-
 def create_backtest_optimizer(optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL) -> ProfessionalBacktestOptimizer:
     """创建回测优化器实例"""
     return ProfessionalBacktestOptimizer(optimization_level=optimization_level)
-
 
 def run_optimized_backtest(data: pd.DataFrame, strategy_func: Callable,
                            optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL,

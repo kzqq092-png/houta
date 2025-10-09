@@ -94,7 +94,7 @@ class AIStockSelector:
             return kdata_preprocess(df, context)
         except ImportError:
             # 如果导入失败，返回原数据
-            logger.info(f"[WARNING] 无法导入统一的数据预处理模块，使用原数据")
+            logger.info(f" 无法导入统一的数据预处理模块，使用原数据")
             return df
         except Exception as e:
             logger.info(f"[ERROR] 数据预处理失败: {str(e)}")

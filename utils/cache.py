@@ -21,7 +21,6 @@ except ImportError:
     redis = None
     aioredis = None
 
-
 class Cache:
     """
     统一缓存类，支持本地/分布式/异步

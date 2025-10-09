@@ -6,7 +6,6 @@ from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, confusion_matrix, classification_report,
                              roc_curve, auc, precision_recall_curve)
 
-
 def evaluate_ml_model(model, X_test, y_test, predictions=None):
     """
     评估机器学习模型的性能
@@ -87,7 +86,6 @@ def evaluate_ml_model(model, X_test, y_test, predictions=None):
 
     # 返回指标字典
     return metrics_dict
-
 
 def analyze_feature_importance(model, feature_names, top_n=20):
     """

@@ -25,7 +25,6 @@ from .risk_visualizer import *
 Visualization package for trading system analysis.
 """
 
-
 __all__ = [
     'ChartUtils',
     'DataUtils',

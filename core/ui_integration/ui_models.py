@@ -15,7 +15,6 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from enum import Enum
 
-
 @dataclass
 class UIDataModel:
     """UI数据模型基类"""
@@ -23,7 +22,6 @@ class UIDataModel:
     source_service: Optional[str] = None
     is_cached: bool = False
     cache_expiry: Optional[datetime] = None
-
 
 @dataclass
 class TaskStatusUIModel(UIDataModel):
@@ -36,7 +34,6 @@ class TaskStatusUIModel(UIDataModel):
     performance_metrics: Dict[str, Any] = field(default_factory=dict)
     dependencies: List[str] = field(default_factory=list)
     error_message: Optional[str] = None
-
 
 @dataclass
 class AIStatusUIModel(UIDataModel):
@@ -60,7 +57,6 @@ class AIStatusUIModel(UIDataModel):
     model_version: str = "未知"
     data_quality_score: float = 0.0
 
-
 @dataclass
 class PerformanceUIModel(UIDataModel):
     """性能指标UI模型"""
@@ -73,7 +69,6 @@ class PerformanceUIModel(UIDataModel):
     distributed_nodes: int = 0
     node_status: Dict[str, str] = field(default_factory=dict)
 
-
 @dataclass
 class QualityUIModel(UIDataModel):
     """数据质量UI模型"""
@@ -84,7 +79,6 @@ class QualityUIModel(UIDataModel):
     timeliness: float
     anomaly_count: int = 0
     critical_issues: List[str] = field(default_factory=list)
-
 
 @dataclass
 class PredictionResultUIModel(UIDataModel):
@@ -97,7 +91,6 @@ class PredictionResultUIModel(UIDataModel):
     features_used: List[str] = field(default_factory=list)
     explanation: str = ""
     created_at: datetime = field(default_factory=datetime.now)
-
 
 # 导出的公共接口
 __all__ = [

@@ -408,12 +408,12 @@ class ProfessionalUISystem:
             # 控制按钮
             col1, col2 = st.columns(2)
             with col1:
-                if st.button(" 开始回测", use_container_width=True):
+                if st.button("开始回测", use_container_width=True):
                     self._start_backtest(
                         initial_capital, position_size, commission_pct, professional_level, performance_level)
 
             with col2:
-                if st.button(" 停止监控", use_container_width=True):
+                if st.button("停止监控", use_container_width=True):
                     self._stop_monitoring()
 
     def _render_metrics_summary(self):
@@ -478,9 +478,9 @@ class ProfessionalUISystem:
         st.markdown('<h3 class="sub-title"> 实时图表</h3>',
                     unsafe_allow_html=True)
 
-        # 图表选项�?
+        # 图表选项
         tab1, tab2, tab3, tab4 = st.tabs(
-            [" 收益分析", " 风险分析", " 交易分析", " 性能分析"])
+            [" 收益分析", "风险分析", "交易分析", "性能分析"])
 
         with tab1:
             self._render_performance_charts()
@@ -844,9 +844,9 @@ class ProfessionalUISystem:
 
         # 监控状态
         if self.is_running:
-            st.success(" 实时监控运行中")
+            st.success("实时监控运行中")
         else:
-            st.error(" 实时监控已停止")
+            st.error("实时监控已停止")
 
         # 最新指标
         if st.session_state.monitoring_data:

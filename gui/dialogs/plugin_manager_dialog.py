@@ -31,6 +31,7 @@ from core.plugin_types import PluginType, PluginCategory
 
 logger = logger.bind(module=__name__)
 
+
 class PluginStatusWidget(QWidget):
     """插件状态小部件"""
 
@@ -264,6 +265,7 @@ class PluginStatusWidget(QWidget):
 
         except Exception as e:
             logger.warning(f"更新按钮状态失败: {e}")
+
 
 class PluginConfigDialog(QDialog):
     """插件配置对话框"""
@@ -815,6 +817,7 @@ class PluginConfigDialog(QDialog):
                                      QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.load_config()
+
 
 class PluginManagerDialog(QDialog):
     """插件管理主界面对话框"""
@@ -1828,7 +1831,7 @@ class PluginManagerDialog(QDialog):
     def _on_database_updated(self):
         """数据库更新处理"""
         try:
-            self.add_log(" 插件数据库已更新", "DEBUG")
+            self.add_log("插件数据库已更新", "DEBUG")
 
             # 刷新监控统计
             self.update_monitor_stats()
@@ -1840,6 +1843,7 @@ class PluginManagerDialog(QDialog):
         """关闭事件"""
         self.timer.stop()
         event.accept()
+
 
 # 测试代码
 if __name__ == "__main__":

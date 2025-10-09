@@ -111,7 +111,7 @@ class AIStatusWidget(QWidget):
         layout = QVBoxLayout(self)
 
         # 总体状态区域
-        overview_group = QGroupBox("🤖 AI系统总览")
+        overview_group = QGroupBox("AI系统总览")
         overview_layout = QGridLayout(overview_group)
 
         # AI服务状态指示器
@@ -160,7 +160,7 @@ class AIStatusWidget(QWidget):
         layout.addWidget(overview_group)
 
         # 模型详情表格
-        models_group = QGroupBox("📊 模型状态详情")
+        models_group = QGroupBox("模型状态详情")
         models_layout = QVBoxLayout(models_group)
 
         self.models_table = QTableWidget()
@@ -185,7 +185,7 @@ class AIStatusWidget(QWidget):
         controls_layout = QHBoxLayout()
 
         # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新状态")
+        refresh_btn = QPushButton("刷新状态")
         refresh_btn.clicked.connect(self.refresh_ai_status)
         controls_layout.addWidget(refresh_btn)
 
@@ -195,7 +195,7 @@ class AIStatusWidget(QWidget):
         controls_layout.addWidget(retrain_btn)
 
         # 导出报告按钮
-        export_btn = QPushButton("📄 导出报告")
+        export_btn = QPushButton("导出报告")
         export_btn.clicked.connect(self.export_report)
         controls_layout.addWidget(export_btn)
 
@@ -389,7 +389,7 @@ class PredictionDisplayWidget(QWidget):
         layout = QVBoxLayout(self)
 
         # 预测控制区域
-        control_group = QGroupBox("🎯 预测控制")
+        control_group = QGroupBox("预测控制")
         control_layout = QHBoxLayout(control_group)
 
         # 预测类型选择
@@ -411,7 +411,7 @@ class PredictionDisplayWidget(QWidget):
         control_layout.addWidget(self.confidence_label)
 
         # 执行预测按钮
-        predict_btn = QPushButton("🚀 执行预测")
+        predict_btn = QPushButton("执行预测")
         predict_btn.clicked.connect(self.execute_prediction)
         control_layout.addWidget(predict_btn)
 
@@ -420,7 +420,7 @@ class PredictionDisplayWidget(QWidget):
         layout.addWidget(control_group)
 
         # 预测结果展示区域
-        results_group = QGroupBox("📈 预测结果")
+        results_group = QGroupBox("预测结果")
         results_layout = QVBoxLayout(results_group)
 
         # 结果表格
@@ -442,7 +442,7 @@ class PredictionDisplayWidget(QWidget):
         layout.addWidget(results_group)
 
         # 预测统计区域
-        stats_group = QGroupBox("📊 预测统计")
+        stats_group = QGroupBox("预测统计")
         stats_layout = QGridLayout(stats_group)
 
         # 今日预测次数
@@ -666,13 +666,13 @@ class UserBehaviorWidget(QWidget):
         self.retention_spin = QSpinBox()
         self.retention_spin.setRange(7, 365)
         self.retention_spin.setValue(30)
-        self.retention_spin.setSuffix(" 天")
+        self.retention_spin.setSuffix("天")
         control_layout.addRow("数据保留期:", self.retention_spin)
 
         layout.addWidget(control_group)
 
         # 学习进度区域
-        progress_group = QGroupBox("📈 学习进度")
+        progress_group = QGroupBox("学习进度")
         progress_layout = QGridLayout(progress_group)
 
         # 总体学习进度
@@ -699,7 +699,7 @@ class UserBehaviorWidget(QWidget):
         layout.addWidget(progress_group)
 
         # 学习统计区域
-        stats_group = QGroupBox("📊 学习统计")
+        stats_group = QGroupBox("学习统计")
         stats_layout = QFormLayout(stats_group)
 
         # 学习样本数
@@ -721,7 +721,7 @@ class UserBehaviorWidget(QWidget):
         layout.addWidget(stats_group)
 
         # 用户行为洞察
-        insights_group = QGroupBox("💡 行为洞察")
+        insights_group = QGroupBox("[INFO] 行为洞察")
         insights_layout = QVBoxLayout(insights_group)
 
         self.insights_text = QTextEdit()
@@ -769,7 +769,7 @@ class AIFeaturesControlPanel(QWidget):
         # 标题区域
         title_layout = QHBoxLayout()
 
-        title_label = QLabel("🤖 AI功能控制面板")
+        title_label = QLabel("AI功能控制面板")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -800,11 +800,11 @@ class AIFeaturesControlPanel(QWidget):
 
         # AI状态监控选项卡
         status_tab = AIStatusWidget()
-        self.tab_widget.addTab(status_tab, "📊 状态监控")
+        self.tab_widget.addTab(status_tab, "状态监控")
 
         # 预测结果展示选项卡
         prediction_tab = PredictionDisplayWidget()
-        self.tab_widget.addTab(prediction_tab, "🎯 预测结果")
+        self.tab_widget.addTab(prediction_tab, "预测结果")
 
         # 用户行为学习选项卡
         behavior_tab = UserBehaviorWidget()
@@ -812,7 +812,7 @@ class AIFeaturesControlPanel(QWidget):
 
         # 配置推荐选项卡
         recommendation_tab = self.create_recommendation_tab()
-        self.tab_widget.addTab(recommendation_tab, "💡 智能推荐")
+        self.tab_widget.addTab(recommendation_tab, "[INFO] 智能推荐")
 
         layout.addWidget(self.tab_widget)
 
@@ -839,7 +839,7 @@ class AIFeaturesControlPanel(QWidget):
         control_layout.addWidget(recommendation_type_combo)
 
         # 获取推荐按钮
-        get_recommendations_btn = QPushButton("🚀 获取推荐")
+        get_recommendations_btn = QPushButton("获取推荐")
         control_layout.addWidget(get_recommendations_btn)
 
         control_layout.addStretch()
@@ -847,13 +847,13 @@ class AIFeaturesControlPanel(QWidget):
         layout.addWidget(control_group)
 
         # 推荐结果区域
-        results_group = QGroupBox("💡 推荐结果")
+        results_group = QGroupBox("[INFO] 推荐结果")
         results_layout = QVBoxLayout(results_group)
 
         recommendations_text = QTextEdit()
         recommendations_text.setReadOnly(True)
         recommendations_text.setText("""
-🎯 当前推荐配置：
+当前推荐配置：
 
 1. 批处理大小优化
    • 建议值: 150 (当前: 100)
@@ -880,13 +880,13 @@ class AIFeaturesControlPanel(QWidget):
         # 推荐操作按钮
         actions_layout = QHBoxLayout()
 
-        apply_all_btn = QPushButton("✅ 应用全部")
+        apply_all_btn = QPushButton("应用全部")
         actions_layout.addWidget(apply_all_btn)
 
-        apply_selected_btn = QPushButton("📝 应用选中")
+        apply_selected_btn = QPushButton("应用选中")
         actions_layout.addWidget(apply_selected_btn)
 
-        ignore_btn = QPushButton("❌ 忽略推荐")
+        ignore_btn = QPushButton("[ERROR] 忽略推荐")
         actions_layout.addWidget(ignore_btn)
 
         actions_layout.addStretch()

@@ -29,7 +29,6 @@ from ..database.factorweave_analytics_db import get_analytics_db
 
 logger = logger
 
-
 @dataclass
 class PerformanceBenchmark:
     """性能基准数据类"""
@@ -39,7 +38,6 @@ class PerformanceBenchmark:
     current_value: float
     improvement_percentage: float
     status: str  # 'excellent', 'good', 'needs_improvement', 'critical'
-
 
 class FactorWeavePerformanceIntegrator:
     """FactorWeave性能监控集成器"""
@@ -551,10 +549,8 @@ class FactorWeavePerformanceIntegrator:
             logger.error(f"检测异常失败: {e}")
             return []
 
-
 # 全局实例和工厂函数
 _performance_integrator = None
-
 
 def get_performance_integrator() -> FactorWeavePerformanceIntegrator:
     """获取性能监控集成器的全局实例"""
@@ -562,7 +558,6 @@ def get_performance_integrator() -> FactorWeavePerformanceIntegrator:
     if _performance_integrator is None:
         _performance_integrator = FactorWeavePerformanceIntegrator()
     return _performance_integrator
-
 
 # 便捷装饰器
 def measure_factorweave_performance(operation_name: str, category: str = 'custom'):

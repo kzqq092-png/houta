@@ -20,7 +20,6 @@ from plotly.subplots import make_subplots
 import plotly.express as px
 from loguru import logger
 
-
 class RiskExporter:
     """风险报告导出器"""
 

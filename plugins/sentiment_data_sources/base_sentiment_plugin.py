@@ -20,7 +20,6 @@ from plugins.sentiment_data_source_interface import (
     TradingSignal
 )
 
-
 @dataclass
 class SentimentPluginInfo:
     """情绪数据源插件信息结构"""
@@ -37,7 +36,6 @@ class SentimentPluginInfo:
             self.tags = []
 
 # 移除本地重复定义的类，使用统一接口
-
 
 class BaseSentimentPlugin(ISentimentDataSource):
     """情绪数据源插件基类"""

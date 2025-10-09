@@ -6,7 +6,6 @@ from scipy import stats
 import warnings
 from loguru import logger
 
-
 def optimize_data_quality(df):
     """
     优化数据质量，处理缺失值和异常值
@@ -37,7 +36,6 @@ def optimize_data_quality(df):
 
     return df_clean
 
-
 def detect_and_handle_outliers(series, n_sigmas=3.0):
     """
     检测并处理异常值
@@ -63,7 +61,6 @@ def detect_and_handle_outliers(series, n_sigmas=3.0):
     series_clean.loc[series > upper_bound] = upper_bound
 
     return series_clean
-
 
 def reduce_noise_with_filtering(df, columns=None, window=5, method='ewm'):
     """
@@ -102,7 +99,6 @@ def reduce_noise_with_filtering(df, columns=None, window=5, method='ewm'):
 
     return df_filtered
 
-
 def simple_kalman_filter(series, q=0.01, r=0.1):
     """
     简单的卡尔曼滤波实现
@@ -133,7 +129,6 @@ def simple_kalman_filter(series, q=0.01, r=0.1):
         filtered[i] = prediction
 
     return pd.Series(filtered, index=series.index)
-
 
 def prepare_features_and_labels(df, future_period=5, threshold=0.015):
     """
@@ -191,7 +186,6 @@ def prepare_features_and_labels(df, future_period=5, threshold=0.015):
         df.loc[latest_dates, 'is_latest'] = True
 
     return df, feature_columns
-
 
 def preprocess_data(df):
     """
@@ -310,7 +304,6 @@ def preprocess_data(df):
 
     return result
 
-
 def create_features_targets(df, target_type='regression', lookahead_periods=5, threshold=0.01):
     """
     创建特征和目标变量
@@ -360,7 +353,6 @@ def create_features_targets(df, target_type='regression', lookahead_periods=5, t
     target = target[valid_indices]
 
     return features, target
-
 
 def balance_samples(X, y):
     """

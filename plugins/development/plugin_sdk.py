@@ -16,6 +16,7 @@ import tempfile
 
 from ..plugin_interface import PluginType, PluginCategory, PluginMetadata
 
+
 class PluginTemplate:
     """插件模板"""
 
@@ -354,6 +355,7 @@ class {class_name}(I{plugin_type}Plugin):
 '''
     }
 
+
 class PluginSDK:
     """插件开发工具包"""
 
@@ -408,7 +410,7 @@ class PluginSDK:
             tags = []
 
         # 创建项目目录
-        project_name = name.lower().replace(" ", "_")
+        project_name = name.lower().replace("", "_")
         project_dir = self.projects_dir / project_name
         project_dir.mkdir(exist_ok=True)
 

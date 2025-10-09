@@ -361,7 +361,7 @@ class AnomalyDetailsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # 异常基本信息
-        info_group = QGroupBox("📋 异常信息")
+        info_group = QGroupBox("异常信息")
         info_layout = QFormLayout(info_group)
 
         # 异常ID
@@ -437,7 +437,7 @@ class AnomalyDetailsDialog(QDialog):
         layout.addWidget(info_group)
 
         # 异常描述
-        desc_group = QGroupBox("📝 异常描述")
+        desc_group = QGroupBox("异常描述")
         desc_layout = QVBoxLayout(desc_group)
 
         desc_text = QTextEdit()
@@ -449,7 +449,7 @@ class AnomalyDetailsDialog(QDialog):
         layout.addWidget(desc_group)
 
         # 修复建议
-        suggestion_group = QGroupBox("💡 修复建议")
+        suggestion_group = QGroupBox("[INFO] 修复建议")
         suggestion_layout = QVBoxLayout(suggestion_group)
 
         suggestion_text = QTextEdit()
@@ -462,7 +462,7 @@ class AnomalyDetailsDialog(QDialog):
 
         # 上下文信息
         if self.anomaly.context:
-            context_group = QGroupBox("🔍 上下文信息")
+            context_group = QGroupBox("上下文信息")
             context_layout = QVBoxLayout(context_group)
 
             context_text = QTextEdit()
@@ -479,7 +479,7 @@ class AnomalyDetailsDialog(QDialog):
             button_layout = QHBoxLayout()
 
             # 自动修复按钮
-            fix_btn = QPushButton("🔧 自动修复")
+            fix_btn = QPushButton("自动修复")
             fix_btn.clicked.connect(lambda: self.fix_requested.emit(self.anomaly.id))
             fix_btn.setStyleSheet("""
                 QPushButton {
@@ -555,7 +555,7 @@ class AnomalyDetectionDisplay(QWidget):
         # 标题和控制区域
         header_layout = QHBoxLayout()
 
-        title_label = QLabel("🔍 异常检测可视化")
+        title_label = QLabel("异常检测可视化")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -569,7 +569,7 @@ class AnomalyDetectionDisplay(QWidget):
         header_layout.addStretch()
 
         # 控制按钮
-        scan_btn = QPushButton("🔍 开始检测")
+        scan_btn = QPushButton("开始检测")
         scan_btn.clicked.connect(self.start_anomaly_detection)
         scan_btn.setStyleSheet("""
             QPushButton {
@@ -587,7 +587,7 @@ class AnomalyDetectionDisplay(QWidget):
         """)
         header_layout.addWidget(scan_btn)
 
-        auto_fix_btn = QPushButton("🔧 自动修复")
+        auto_fix_btn = QPushButton("自动修复")
         auto_fix_btn.clicked.connect(self.auto_fix_anomalies)
         auto_fix_btn.setStyleSheet("""
             QPushButton {
@@ -612,19 +612,19 @@ class AnomalyDetectionDisplay(QWidget):
 
         # 异常概览选项卡
         overview_tab = self.create_overview_tab()
-        self.tab_widget.addTab(overview_tab, "📊 异常概览")
+        self.tab_widget.addTab(overview_tab, "异常概览")
 
         # 异常列表选项卡
         list_tab = self.create_list_tab()
-        self.tab_widget.addTab(list_tab, "📋 异常列表")
+        self.tab_widget.addTab(list_tab, "异常列表")
 
         # 趋势分析选项卡
         trends_tab = self.create_trends_tab()
-        self.tab_widget.addTab(trends_tab, "📈 趋势分析")
+        self.tab_widget.addTab(trends_tab, "趋势分析")
 
         # 配置选项卡
         config_tab = self.create_config_tab()
-        self.tab_widget.addTab(config_tab, "⚙️ 检测配置")
+        self.tab_widget.addTab(config_tab, "检测配置")
 
         layout.addWidget(self.tab_widget)
 
@@ -656,7 +656,7 @@ class AnomalyDetectionDisplay(QWidget):
         layout = QVBoxLayout(widget)
 
         # 异常统计
-        stats_group = QGroupBox("📊 异常统计")
+        stats_group = QGroupBox("异常统计")
         stats_layout = QGridLayout(stats_group)
 
         # 总异常数
@@ -691,7 +691,7 @@ class AnomalyDetectionDisplay(QWidget):
         visual_layout = QHBoxLayout()
 
         # 异常分布图
-        chart_group = QGroupBox("📈 异常分布")
+        chart_group = QGroupBox("异常分布")
         chart_layout = QVBoxLayout(chart_group)
 
         self.anomaly_chart = AnomalyChart()
@@ -701,7 +701,7 @@ class AnomalyDetectionDisplay(QWidget):
         visual_layout.addWidget(chart_group)
 
         # 严重程度饼图
-        pie_group = QGroupBox("📊 严重程度分布")
+        pie_group = QGroupBox("严重程度分布")
         pie_layout = QVBoxLayout(pie_group)
 
         self.severity_pie = AnomalySeverityPie()
@@ -758,7 +758,7 @@ class AnomalyDetectionDisplay(QWidget):
         filter_layout.addStretch()
 
         # 批量操作
-        batch_fix_btn = QPushButton("🔧 批量修复")
+        batch_fix_btn = QPushButton("批量修复")
         batch_fix_btn.clicked.connect(self.batch_fix_anomalies)
         filter_layout.addWidget(batch_fix_btn)
 
@@ -798,7 +798,7 @@ class AnomalyDetectionDisplay(QWidget):
         layout = QVBoxLayout(widget)
 
         # 趋势控制
-        control_group = QGroupBox("📊 趋势分析控制")
+        control_group = QGroupBox("趋势分析控制")
         control_layout = QFormLayout(control_group)
 
         # 时间范围
@@ -816,33 +816,33 @@ class AnomalyDetectionDisplay(QWidget):
         layout.addWidget(control_group)
 
         # 趋势图表
-        trends_group = QGroupBox("📈 趋势图表")
+        trends_group = QGroupBox("趋势图表")
         trends_layout = QVBoxLayout(trends_group)
 
         # 简化的趋势显示
         self.trends_text = QTextEdit()
         self.trends_text.setReadOnly(True)
         self.trends_text.setText("""
-📈 异常检测趋势分析 (最近7天):
+异常检测趋势分析 (最近7天):
 
-📊 异常数量趋势:
+ 异常数量趋势:
 • 总异常数: 145个 (↑ +12%)
 • 日均异常: 20.7个
 • 异常峰值: 周三 34个异常
 
-🎯 类型分布变化:
+类型分布变化:
 • 离群值: 45% (↑ +5%)
 • 缺失数据: 25% (→ 持平)
 • 重复数据: 20% (↓ -3%)
 • 格式错误: 10% (↓ -2%)
 
-⚠️ 严重程度趋势:
+ 严重程度趋势:
 • 严重异常: 8个 (↑ +2个)
 • 高级异常: 23个 (↑ +5个)
 • 中级异常: 67个 (↑ +8个)
 • 低级异常: 47个 (↓ -3个)
 
-💡 关键发现:
+[INFO] 关键发现:
 • 数据质量整体有所下降
 • 离群值检测敏感度可能需要调整
 • 建议加强数据预处理环节
@@ -852,26 +852,26 @@ class AnomalyDetectionDisplay(QWidget):
         layout.addWidget(trends_group)
 
         # 异常模式识别
-        patterns_group = QGroupBox("🔍 异常模式识别")
+        patterns_group = QGroupBox("异常模式识别")
         patterns_layout = QVBoxLayout(patterns_group)
 
         self.patterns_text = QTextEdit()
         self.patterns_text.setReadOnly(True)
         self.patterns_text.setMaximumHeight(120)
         self.patterns_text.setText("""
-🔍 异常模式识别结果:
+ 异常模式识别结果:
 
-📋 发现的模式:
+ 发现的模式:
 • 价格列在交易时间段异常率较高
 • 成交量数据在节假日前后容易出现离群值
 • 股票代码格式错误多集中在新股数据
 
-⏰ 时间模式:
+[TIME] 时间模式:
 • 每日9:30-10:00异常检测数量最多
 • 周五异常修复率最高 (85%)
 • 月末数据质量问题增加 20%
 
-🎯 预测性发现:
+预测性发现:
 • 基于历史模式，下周二可能出现较多异常
 • 建议提前加强数据验证流程
         """)
@@ -887,7 +887,7 @@ class AnomalyDetectionDisplay(QWidget):
         layout = QVBoxLayout(widget)
 
         # 检测参数配置
-        params_group = QGroupBox("⚙️ 检测参数配置")
+        params_group = QGroupBox("检测参数配置")
         params_layout = QFormLayout(params_group)
 
         # 检测敏感度
@@ -969,11 +969,11 @@ class AnomalyDetectionDisplay(QWidget):
         # 操作按钮
         button_layout = QHBoxLayout()
 
-        apply_btn = QPushButton("✅ 应用配置")
+        apply_btn = QPushButton("应用配置")
         apply_btn.clicked.connect(self.apply_detection_config)
         button_layout.addWidget(apply_btn)
 
-        reset_btn = QPushButton("🔄 重置默认")
+        reset_btn = QPushButton("重置默认")
         reset_btn.clicked.connect(self.reset_detection_config)
         button_layout.addWidget(reset_btn)
 
@@ -1183,9 +1183,9 @@ class AnomalyDetectionDisplay(QWidget):
             }
 
             status_icons = {
-                AnomalyStatus.DETECTED: "🔍",
-                AnomalyStatus.CONFIRMED: "✅",
-                AnomalyStatus.FIXED: "🔧",
+                AnomalyStatus.DETECTED: "",
+                AnomalyStatus.CONFIRMED: "[SUCCESS]",
+                AnomalyStatus.FIXED: "",
                 AnomalyStatus.IGNORED: "🚫"
             }
 

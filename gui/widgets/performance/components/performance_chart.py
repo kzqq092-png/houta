@@ -22,7 +22,6 @@ try:
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
-
 class ModernPerformanceChart(QWidget):
     """现代化性能图表组件 - 参考专业交易软件"""
 

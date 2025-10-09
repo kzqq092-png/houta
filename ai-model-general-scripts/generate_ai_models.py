@@ -33,7 +33,7 @@ try:
     from tensorflow.keras.utils import to_categorical
     from models.deep_learning import build_deep_learning_model, TENSORFLOW_AVAILABLE
     TF_AVAILABLE = True
-    logger.info(" TensorFlow 可用")
+    logger.info("TensorFlow 可用")
 except ImportError as e:
     TF_AVAILABLE = False
     logger.info(f" TensorFlow 不可用: {e}")
@@ -269,7 +269,7 @@ class AIModelGenerator:
         logger.info(f"模型类型: {model_types}")
 
         if not TF_AVAILABLE:
-            logger.info(" TensorFlow不可用，无法生成深度学习模型")
+            logger.info("TensorFlow不可用，无法生成深度学习模型")
             logger.info("请安装TensorFlow: pip install tensorflow")
             return False
 
@@ -288,10 +288,10 @@ class AIModelGenerator:
         logger.info(f"{'='*60}")
 
         if success_count == len(model_types):
-            logger.info(" 所有模型生成成功！现在可以重新启动FactorWeave-Quant 应用程序。")
+            logger.info("所有模型生成成功！现在可以重新启动FactorWeave-Quant 应用程序。")
             return True
         else:
-            logger.info(" 部分模型生成失败，请检查错误信息。")
+            logger.info("部分模型生成失败，请检查错误信息。")
             return False
 
 

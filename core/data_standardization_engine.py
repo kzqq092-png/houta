@@ -22,9 +22,9 @@ from loguru import logger
 from .plugin_types import AssetType, DataType
 from .asset_database_manager import get_asset_database_manager
 from .data_router import DataSource
+from .data_schemas import get_standard_schemas, get_schema_by_type, StandardDataSchema, FieldMapping
 
 logger = logger.bind(module=__name__)
-
 
 class DataFormat(Enum):
     """数据格式枚举"""
@@ -35,7 +35,6 @@ class DataFormat(Enum):
     LIST = "list"
     NUMPY_ARRAY = "numpy_array"
     CUSTOM = "custom"
-
 
 @dataclass
 class FieldMapping:
@@ -91,7 +90,6 @@ class FieldMapping:
                 raise
             return self.default_value
 
-
 @dataclass
 class StandardDataSchema:
     """标准数据模式定义"""
@@ -112,7 +110,6 @@ class StandardDataSchema:
     def get_target_fields(self) -> List[str]:
         """获取目标字段列表"""
         return [field.target_field for field in self.fields]
-
 
 @dataclass
 class StandardizationRule:
@@ -155,7 +152,6 @@ class StandardizationRule:
 
         return issues
 
-
 @dataclass
 class StandardizationResult:
     """标准化结果"""
@@ -180,7 +176,6 @@ class StandardizationResult:
             'processing_time_ms': self.processing_time_ms
         }
 
-
 class DataStandardizationEngine:
     """
     数据标准化引擎
@@ -198,98 +193,45 @@ class DataStandardizationEngine:
         # 核心组件
         self.asset_db_manager = get_asset_database_manager()
 
+        # 获取全局标准数据模式
+        self.standard_schemas = get_standard_schemas()
+
         # 标准化规则注册表
         self._standardization_rules: Dict[str, StandardizationRule] = {}
 
-        # 内置数据模式
-        self._builtin_schemas: Dict[str, StandardDataSchema] = {}
-
         # 处理统计
         self._processing_stats: Dict[str, Dict[str, Any]] = {}
+
+        # 数据质量统计
+        self._quality_stats: Dict[str, Dict[str, Any]] = {}
 
         # 线程锁
         self._engine_lock = threading.RLock()
 
         # 初始化内置规则
-        self._initialize_builtin_schemas()
         self._initialize_builtin_rules()
 
-        logger.info("DataStandardizationEngine 初始化完成")
-
-    def _initialize_builtin_schemas(self):
-        """初始化内置数据模式"""
-        # K线数据标准模式
-        kline_schema = StandardDataSchema(
-            name="standard_kline",
-            description="标准K线数据模式",
-            fields=[
-                FieldMapping("symbol", "symbol", "str", is_required=True),
-                FieldMapping("timestamp", "timestamp", "datetime", is_required=True),
-                FieldMapping("open", "open", "float", is_required=True),
-                FieldMapping("high", "high", "float", is_required=True),
-                FieldMapping("low", "low", "float", is_required=True),
-                FieldMapping("close", "close", "float", is_required=True),
-                FieldMapping("volume", "volume", "int", default_value=0),
-                FieldMapping("amount", "amount", "float", default_value=0.0),
-                FieldMapping("frequency", "frequency", "str", default_value="1d"),
-                FieldMapping("data_source", "data_source", "str", is_required=True),
-            ],
-            primary_key=["symbol", "timestamp", "frequency", "data_source"],
-            indexes=["symbol", "timestamp", "data_source"]
-        )
-
-        # 实时行情标准模式
-        realtime_schema = StandardDataSchema(
-            name="standard_realtime",
-            description="标准实时行情模式",
-            fields=[
-                FieldMapping("symbol", "symbol", "str", is_required=True),
-                FieldMapping("timestamp", "timestamp", "datetime", is_required=True),
-                FieldMapping("price", "price", "float", is_required=True),
-                FieldMapping("volume", "volume", "int", default_value=0),
-                FieldMapping("bid_price", "bid_price", "float"),
-                FieldMapping("ask_price", "ask_price", "float"),
-                FieldMapping("bid_volume", "bid_volume", "int"),
-                FieldMapping("ask_volume", "ask_volume", "int"),
-                FieldMapping("data_source", "data_source", "str", is_required=True),
-            ],
-            primary_key=["symbol", "timestamp", "data_source"]
-        )
-
-        # 基本面数据标准模式
-        fundamental_schema = StandardDataSchema(
-            name="standard_fundamental",
-            description="标准基本面数据模式",
-            fields=[
-                FieldMapping("symbol", "symbol", "str", is_required=True),
-                FieldMapping("report_date", "report_date", "datetime", is_required=True),
-                FieldMapping("pe_ratio", "pe_ratio", "float"),
-                FieldMapping("pb_ratio", "pb_ratio", "float"),
-                FieldMapping("market_cap", "market_cap", "float"),
-                FieldMapping("total_shares", "total_shares", "int"),
-                FieldMapping("revenue", "revenue", "float"),
-                FieldMapping("net_profit", "net_profit", "float"),
-                FieldMapping("data_source", "data_source", "str", is_required=True),
-            ],
-            primary_key=["symbol", "report_date", "data_source"]
-        )
-
-        self._builtin_schemas = {
-            "kline": kline_schema,
-            "realtime": realtime_schema,
-            "fundamental": fundamental_schema
-        }
-
-        logger.debug(f"初始化了 {len(self._builtin_schemas)} 个内置数据模式")
+        logger.info("DataStandardizationEngine 初始化完成，加载了 {} 个标准数据模式".format(
+            len(self.standard_schemas.list_schemas())
+        ))
 
     def _initialize_builtin_rules(self):
         """初始化内置标准化规则"""
+        # 获取标准K线数据模式
+        kline_schema = self.standard_schemas.get_schema("standard_kline")
+        quote_schema = self.standard_schemas.get_schema("standard_quote")
+        stock_info_schema = self.standard_schemas.get_schema("standard_stock_info")
+
+        if not kline_schema:
+            logger.error("未找到standard_kline数据模式")
+            return
+
         # 通达信K线数据规则
         self.register_standardization_rule(
             source=DataSource.TONGDAXIN,
             data_type=DataType.HISTORICAL_KLINE,
-            asset_type=AssetType.STOCK_A,
-            schema=self._builtin_schemas["kline"],
+            asset_type=AssetType.STOCK,
+            schema=kline_schema,
             preprocessing_func=self._preprocess_tongdaxin_kline,
             quality_checks=[self._check_kline_price_validity, self._check_kline_completeness]
         )
@@ -298,8 +240,8 @@ class DataStandardizationEngine:
         self.register_standardization_rule(
             source=DataSource.EASTMONEY,
             data_type=DataType.HISTORICAL_KLINE,
-            asset_type=AssetType.STOCK_A,
-            schema=self._builtin_schemas["kline"],
+            asset_type=AssetType.STOCK,
+            schema=kline_schema,
             preprocessing_func=self._preprocess_eastmoney_kline,
             quality_checks=[self._check_kline_price_validity, self._check_kline_completeness]
         )
@@ -309,12 +251,34 @@ class DataStandardizationEngine:
             source=DataSource.BINANCE,
             data_type=DataType.HISTORICAL_KLINE,
             asset_type=AssetType.CRYPTO,
-            schema=self._builtin_schemas["kline"],
+            schema=kline_schema,
             preprocessing_func=self._preprocess_binance_kline,
             quality_checks=[self._check_kline_price_validity, self._check_kline_completeness]
         )
 
-        logger.debug(f"初始化了 {len(self._standardization_rules)} 个内置标准化规则")
+        # 实时行情规则
+        if quote_schema:
+            self.register_standardization_rule(
+                source=DataSource.EASTMONEY,
+                data_type=DataType.REAL_TIME_QUOTE,
+                asset_type=AssetType.STOCK,
+                schema=quote_schema,
+                preprocessing_func=self._preprocess_eastmoney_quote,
+                quality_checks=[self._check_quote_validity]
+            )
+
+        # 股票基本信息规则
+        if stock_info_schema:
+            self.register_standardization_rule(
+                source=DataSource.EASTMONEY,
+                data_type=DataType.FUNDAMENTAL,
+                asset_type=AssetType.STOCK,
+                schema=stock_info_schema,
+                preprocessing_func=self._preprocess_stock_info,
+                quality_checks=[self._check_stock_info_validity]
+            )
+
+        logger.info(f"初始化了 {len(self._standardization_rules)} 个内置标准化规则")
 
     def _preprocess_tongdaxin_kline(self, raw_data: Any) -> pd.DataFrame:
         """预处理通达信K线数据"""
@@ -398,6 +362,108 @@ class DataStandardizationEngine:
             return df
 
         return pd.DataFrame()
+
+    def _preprocess_eastmoney_quote(self, raw_data: Any) -> pd.DataFrame:
+        """预处理东方财富实时行情数据"""
+        if isinstance(raw_data, pd.DataFrame):
+            df = raw_data.copy()
+
+            # 东方财富实时行情字段映射
+            field_map = {
+                'f43': 'current_price',    # 最新价
+                'f44': 'high',             # 最高价
+                'f45': 'low',              # 最低价
+                'f46': 'open',             # 开盘价
+                'f60': 'close',            # 昨收价
+                'f47': 'volume',           # 成交量
+                'f48': 'amount',           # 成交额
+                'f169': 'change_percent',  # 涨跌幅
+                'f170': 'change',          # 涨跌额
+                'f19': 'bid_price',        # 买一价
+                'f20': 'ask_price',        # 卖一价
+                'f21': 'bid_volume',       # 买一量
+                'f22': 'ask_volume',       # 卖一量
+            }
+
+            # 重命名字段
+            for old_col, new_col in field_map.items():
+                if old_col in df.columns:
+                    df[new_col] = df[old_col]
+
+            # 添加时间戳
+            df['timestamp'] = datetime.now()
+
+            return df
+
+        return pd.DataFrame()
+
+    def _preprocess_stock_info(self, raw_data: Any) -> pd.DataFrame:
+        """预处理股票基本信息数据"""
+        if isinstance(raw_data, pd.DataFrame):
+            df = raw_data.copy()
+
+            # 字段映射和数据清理
+            if 'total_mv' in df.columns:
+                df['market_cap'] = df['total_mv']  # 总市值
+            if 'circulate_mv' in df.columns:
+                df['float_market_cap'] = df['circulate_mv']  # 流通市值
+            if 'total_share' in df.columns:
+                df['total_shares'] = df['total_share']  # 总股本
+            if 'float_share' in df.columns:
+                df['float_shares'] = df['float_share']  # 流通股本
+
+            # 添加更新时间
+            df['updated_time'] = datetime.now()
+
+            return df
+
+        return pd.DataFrame()
+
+    def _check_quote_validity(self, data: pd.DataFrame) -> List[str]:
+        """检查实时行情有效性"""
+        issues = []
+
+        if data.empty:
+            return ["数据为空"]
+
+        # 检查必要字段
+        required_fields = ['current_price', 'timestamp']
+        for field in required_fields:
+            if field not in data.columns:
+                issues.append(f"缺少必要字段: {field}")
+            elif data[field].isnull().sum() > 0:
+                issues.append(f"字段 {field} 存在空值")
+
+        # 检查价格合理性
+        if 'current_price' in data.columns:
+            negative_prices = (data['current_price'] <= 0).sum()
+            if negative_prices > 0:
+                issues.append(f"发现 {negative_prices} 条记录的价格不合理(<=0)")
+
+        return issues
+
+    def _check_stock_info_validity(self, data: pd.DataFrame) -> List[str]:
+        """检查股票基本信息有效性"""
+        issues = []
+
+        if data.empty:
+            return ["数据为空"]
+
+        # 检查必要字段
+        required_fields = ['code', 'name']
+        for field in required_fields:
+            if field not in data.columns:
+                issues.append(f"缺少必要字段: {field}")
+            elif data[field].isnull().sum() > 0:
+                issues.append(f"字段 {field} 存在空值")
+
+        # 检查股票代码格式
+        if 'code' in data.columns:
+            invalid_codes = data[~data['code'].str.match(r'^\d{6}$|^[A-Z]{1,5}$', na=False)]
+            if len(invalid_codes) > 0:
+                issues.append(f"发现 {len(invalid_codes)} 条记录的股票代码格式不正确")
+
+        return issues
 
     def _check_kline_price_validity(self, data: pd.DataFrame) -> List[str]:
         """检查K线价格有效性"""
@@ -783,11 +849,9 @@ class DataStandardizationEngine:
 
             return combinations
 
-
 # 全局实例
 _standardization_engine: Optional[DataStandardizationEngine] = None
 _engine_lock = threading.Lock()
-
 
 def get_data_standardization_engine() -> DataStandardizationEngine:
     """获取全局数据标准化引擎实例"""
@@ -798,7 +862,6 @@ def get_data_standardization_engine() -> DataStandardizationEngine:
             _standardization_engine = DataStandardizationEngine()
 
         return _standardization_engine
-
 
 def initialize_data_standardization_engine() -> DataStandardizationEngine:
     """初始化数据标准化引擎"""

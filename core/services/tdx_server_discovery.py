@@ -15,7 +15,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
-
 class TdxServerDiscoveryService:
     """TDX服务器发现服务"""
 
@@ -430,10 +429,8 @@ class TdxServerDiscoveryService:
             logger.error(f"更新服务器数据库失败: {e}")
             return 0
 
-
 # 全局服务实例
 _discovery_service = None
-
 
 def get_discovery_service() -> TdxServerDiscoveryService:
     """获取服务发现实例"""
@@ -442,19 +439,16 @@ def get_discovery_service() -> TdxServerDiscoveryService:
         _discovery_service = TdxServerDiscoveryService()
     return _discovery_service
 
-
 # 便捷函数
 async def discover_tdx_servers(include_online: bool = True) -> List[Dict]:
     """发现TDX服务器的便捷函数"""
     service = get_discovery_service()
     return await service.discover_servers(include_online=include_online)
 
-
 async def get_fastest_tdx_servers(limit: int = 5) -> List[Dict]:
     """获取最快TDX服务器的便捷函数"""
     service = get_discovery_service()
     return await service.get_fastest_servers(limit=limit)
-
 
 def discover_servers() -> List[Dict]:
     """

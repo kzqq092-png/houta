@@ -29,7 +29,6 @@ from sklearn.cluster import DBSCAN
 import warnings
 warnings.filterwarnings('ignore')
 
-
 class AnomalyType(Enum):
     """异常类型"""
     MISSING_DATA = "missing_data"           # 数据缺失
@@ -43,14 +42,12 @@ class AnomalyType(Enum):
     CORRELATION_ANOMALY = "correlation_anomaly"  # 相关性异常
     VOLUME_ANOMALY = "volume_anomaly"       # 数据量异常
 
-
 class AnomalySeverity(Enum):
     """异常严重程度"""
     LOW = "low"           # 低
     MEDIUM = "medium"     # 中等
     HIGH = "high"         # 高
     CRITICAL = "critical" # 严重
-
 
 class RepairAction(Enum):
     """修复动作"""
@@ -62,7 +59,6 @@ class RepairAction(Enum):
     MANUAL_REVIEW = "manual_review"     # 人工审核
     ROLLBACK = "rollback"               # 回滚
     ALERT_ONLY = "alert_only"           # 仅告警
-
 
 @dataclass
 class AnomalyDetectionConfig:
@@ -86,7 +82,6 @@ class AnomalyDetectionConfig:
     model_update_interval: int = 3600       # 模型更新间隔（秒）
     history_retention_days: int = 30        # 历史记录保留天数
 
-
 @dataclass
 class AnomalyRecord:
     """异常记录"""
@@ -107,7 +102,6 @@ class AnomalyRecord:
     is_resolved: bool = False
     resolution_time: Optional[datetime] = None
 
-
 @dataclass
 class RepairSuggestion:
     """修复建议"""
@@ -119,7 +113,6 @@ class RepairSuggestion:
     expected_outcome: str = ""
     risk_level: str = "low"
     estimated_time: float = 0.0  # 预计修复时间（秒）
-
 
 @dataclass
 class RepairResult:
@@ -134,7 +127,6 @@ class RepairResult:
     repair_time: datetime
     confidence: float
     side_effects: List[str] = field(default_factory=list)
-
 
 class DataAnomalyDetector:
     """
@@ -1312,7 +1304,6 @@ class DataAnomalyDetector:
         except Exception as e:
             logger.error(f"清理旧记录失败: {e}")
 
-
 def main():
     """测试数据异常检测和自动修复系统"""
     # 创建检测器
@@ -1405,7 +1396,6 @@ def main():
     # 获取最近异常
     recent_anomalies = detector.get_recent_anomalies(hours=1)
     logger.info(f"\n最近1小时异常数量: {len(recent_anomalies)}")
-
 
 if __name__ == "__main__":
     main()

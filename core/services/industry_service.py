@@ -15,7 +15,6 @@ from ..industry_manager import IndustryManager
 
 logger = logger
 
-
 class IndustryService(CacheableService, ConfigurableService):
     """行业数据服务"""
 

@@ -148,37 +148,37 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
     def _init_sector_flow_service(self):
         """初始化板块资金流服务"""
-        logger.info(" 开始初始化板块资金流服务...")
+        logger.info("开始初始化板块资金流服务...")
         import time
         start_time = time.time()
 
         try:
             if self.service_container:
-                logger.info(" 服务容器可用，获取板块资金流服务...")
+                logger.info("服务容器可用，获取板块资金流服务...")
                 from core.services.sector_fund_flow_service import SectorFundFlowService
-                logger.info(" 板块资金流服务类导入成功")
+                logger.info("板块资金流服务类导入成功")
 
-                logger.info(" 从服务容器解析板块资金流服务...")
+                logger.info("从服务容器解析板块资金流服务...")
                 resolve_start = time.time()
                 self.sector_flow_service = self.service_container.resolve(SectorFundFlowService)
                 resolve_time = time.time()
                 logger.info(f" 从服务容器获取板块资金流服务成功，耗时: {(resolve_time - resolve_start):.2f}秒")
 
                 # 初始化服务
-                logger.info(" 初始化板块资金流服务...")
+                logger.info("初始化板块资金流服务...")
                 init_start = time.time()
                 self.sector_flow_service.initialize()
                 init_time = time.time()
                 logger.info(f" 板块资金流服务初始化完成，耗时: {(init_time - init_start):.2f}秒")
 
                 # 连接信号
-                logger.info(" 连接板块资金流服务信号...")
+                logger.info("连接板块资金流服务信号...")
                 self.sector_flow_service.data_updated.connect(self._on_flow_data_updated)
                 self.sector_flow_service.error_occurred.connect(self._on_flow_error)
-                logger.info(" 板块资金流服务信号连接完成")
+                logger.info("板块资金流服务信号连接完成")
 
             else:
-                logger.info(" 服务容器不可用，板块资金流功能受限")
+                logger.info("服务容器不可用，板块资金流功能受限")
 
             end_time = time.time()
             logger.info(f" 板块资金流服务初始化完成，总耗时: {(end_time - start_time):.2f}秒")
@@ -249,17 +249,17 @@ class SectorFlowTabPro(BaseAnalysisTab):
         quick_layout = QHBoxLayout(quick_group)
 
         # 实时监控
-        realtime_btn = QPushButton(" 实时监控")
+        realtime_btn = QPushButton("实时监控")
         realtime_btn.setStyleSheet(self._get_button_style('#28a745'))
         realtime_btn.clicked.connect(self.realtime_monitoring)
 
         # 板块轮动
-        rotation_btn = QPushButton(" 板块轮动")
+        rotation_btn = QPushButton("板块轮动")
         rotation_btn.setStyleSheet(self._get_button_style('#007bff'))
         rotation_btn.clicked.connect(self.sector_rotation_analysis)
 
         # 聪明资金
-        smart_money_btn = QPushButton(" 聪明资金")
+        smart_money_btn = QPushButton("聪明资金")
         smart_money_btn.setStyleSheet(self._get_button_style('#6f42c1'))
         smart_money_btn.clicked.connect(self.smart_money_analysis)
 
@@ -273,12 +273,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
         advanced_layout = QHBoxLayout(advanced_group)
 
         # 综合分析
-        comprehensive_btn = QPushButton(" 综合分析")
+        comprehensive_btn = QPushButton("综合分析")
         comprehensive_btn.setStyleSheet(self._get_button_style('#17a2b8'))
         comprehensive_btn.clicked.connect(self.comprehensive_flow_analysis)
 
         # 流向预测
-        prediction_btn = QPushButton(" 流向预测")
+        prediction_btn = QPushButton("流向预测")
         prediction_btn.setStyleSheet(self._get_button_style('#ffc107'))
         prediction_btn.clicked.connect(self.flow_prediction)
 
@@ -350,7 +350,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
         self.amount_threshold_spin = QSpinBox()
         self.amount_threshold_spin.setRange(100, 100000)
         self.amount_threshold_spin.setValue(1000)
-        self.amount_threshold_spin.setSuffix(" 万")
+        self.amount_threshold_spin.setSuffix("万")
         params_layout.addRow("金额阈值:", self.amount_threshold_spin)
 
         # 排序方式
@@ -417,23 +417,23 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
         # 资金流排行
         ranking_tab = self._create_ranking_tab()
-        self.results_tabs.addTab(ranking_tab, " 资金流排行")
+        self.results_tabs.addTab(ranking_tab, "资金流排行")
 
         # 板块轮动
         rotation_tab = self._create_rotation_tab()
-        self.results_tabs.addTab(rotation_tab, " 板块轮动")
+        self.results_tabs.addTab(rotation_tab, "板块轮动")
 
         # 聪明资金
         smart_money_tab = self._create_smart_money_tab()
-        self.results_tabs.addTab(smart_money_tab, " 聪明资金")
+        self.results_tabs.addTab(smart_money_tab, "聪明资金")
 
         # 流向预测
         prediction_tab = self._create_prediction_tab()
-        self.results_tabs.addTab(prediction_tab, " 流向预测")
+        self.results_tabs.addTab(prediction_tab, "流向预测")
 
         # 实时监控
         monitor_tab = self._create_monitor_tab()
-        self.results_tabs.addTab(monitor_tab, " 实时监控")
+        self.results_tabs.addTab(monitor_tab, "实时监控")
 
         layout.addWidget(self.results_tabs)
         return panel
@@ -558,8 +558,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def realtime_monitoring(self):
         """实时监控 - 使用专用线程避免界面卡死"""
         try:
-            logger.info(" [DEBUG] 实时监控按钮被点击")
-            logger.info(" [DEBUG] 实时监控按钮被点击")
+            logger.info("[DEBUG] 实时监控按钮被点击")
+            logger.info("[DEBUG] 实时监控按钮被点击")
 
             # 立即显示用户反馈
             QMessageBox.information(self, "实时监控", "实时监控功能已启动，正在分析数据...")
@@ -568,26 +568,26 @@ class SectorFlowTabPro(BaseAnalysisTab):
             if hasattr(self, 'progress_bar'):
                 self.progress_bar.setVisible(True)
                 self.progress_bar.setValue(0)
-                logger.info(" [DEBUG] 进度条已显示")
+                logger.info("[DEBUG] 进度条已显示")
             else:
-                logger.warning(" [DEBUG] progress_bar 不存在")
+                logger.warning("[DEBUG] progress_bar 不存在")
 
             if hasattr(self, 'status_label'):
                 self.status_label.setText("正在启动实时监控...")
-                logger.info(" [DEBUG] 状态标签已更新")
+                logger.info("[DEBUG] 状态标签已更新")
             else:
-                logger.warning(" [DEBUG] status_label 不存在")
+                logger.warning("[DEBUG] status_label 不存在")
 
             # 启动异步分析线程
-            logger.info(" [DEBUG] 创建分析线程")
+            logger.info("[DEBUG] 创建分析线程")
             self.realtime_thread = SectorFlowAnalysisThread(self._realtime_monitoring_async)
             self.realtime_thread.analysis_completed.connect(self._on_realtime_analysis_completed)
             self.realtime_thread.error_occurred.connect(self._on_realtime_analysis_error)
             self.realtime_thread.progress_updated.connect(self._on_realtime_progress_updated)
 
-            logger.info(" [DEBUG] 启动分析线程")
+            logger.info("[DEBUG] 启动分析线程")
             self.realtime_thread.start()
-            logger.info(" [DEBUG] 分析线程已启动")
+            logger.info("[DEBUG] 分析线程已启动")
 
         except Exception as e:
             error_msg = f"启动实时监控失败: {e}"
@@ -600,8 +600,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def _realtime_monitoring_async(self):
         """异步实时监控"""
         try:
-            logger.info(" [DEBUG] 开始异步实时监控")
-            logger.info(" [DEBUG] 开始异步实时监控")
+            logger.info("[DEBUG] 开始异步实时监控")
+            logger.info("[DEBUG] 开始异步实时监控")
             results = self._get_realtime_fund_flow_data()
             logger.info(f" [DEBUG] 获取到数据: {len(results) if isinstance(results, list) else 'N/A'} 条记录")
             logger.info(f" [DEBUG] 获取到数据: {len(results) if isinstance(results, list) else 'N/A'} 条记录")
@@ -677,7 +677,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def _get_realtime_fund_flow_data(self):
         """获取实时资金流数据 - 使用新的SectorDataService"""
         try:
-            logger.info(" [DEBUG] 开始获取实时资金流数据")
+            logger.info("[DEBUG] 开始获取实时资金流数据")
 
             # 🆕 优先使用新的SectorDataService
             try:
@@ -690,7 +690,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 sector_service = unified_data_manager.get_sector_fund_flow_service()
 
                 if sector_service is not None:
-                    logger.info(" [DEBUG] SectorDataService 初始化成功")
+                    logger.info("[DEBUG] SectorDataService 初始化成功")
 
                     # 获取板块资金流排行榜
                     ranking_data = sector_service.get_sector_fund_flow_ranking(
@@ -704,10 +704,10 @@ class SectorFlowTabPro(BaseAnalysisTab):
                             logger.info(f" [DEBUG] SectorDataService获取板块资金流数据成功: {len(monitor_data)} 条")
                             return monitor_data
                     else:
-                        logger.warning(" [DEBUG] SectorDataService未获取到数据")
+                        logger.warning("[DEBUG] SectorDataService未获取到数据")
 
                 else:
-                    logger.warning(" [DEBUG] SectorDataService不可用")
+                    logger.warning("[DEBUG] SectorDataService不可用")
 
             except Exception as e:
                 logger.warning(f" [DEBUG] SectorDataService获取数据失败: {e}")
@@ -724,8 +724,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 event_bus = EventBus() if not hasattr(self, 'event_bus') else self.event_bus
 
                 if service_container:
-                    unified_data_manager = UnifiedDataManager(service_container, event_bus)
-                    logger.info(" [DEBUG] TET统一数据管理器初始化成功")
+                    unified_data_manager = get_unified_data_manager(service_container, event_bus)
+                    logger.info("[DEBUG] TET统一数据管理器初始化成功")
 
                     # 尝试获取板块资金流数据
                     try:
@@ -791,24 +791,24 @@ class SectorFlowTabPro(BaseAnalysisTab):
                             logger.info(f" [DEBUG] TET框架生成监控数据: {len(monitor_data)} 条")
                             return monitor_data
                 else:
-                    logger.warning(" [DEBUG] 服务容器不可用，跳过TET框架")
-                    logger.info(" [DEBUG] 服务容器不可用，跳过TET框架")
+                    logger.warning("[DEBUG] 服务容器不可用，跳过TET框架")
+                    logger.info("[DEBUG] 服务容器不可用，跳过TET框架")
 
             except Exception as e:
                 logger.error(f" [DEBUG] TET框架方案失败: {e}")
                 logger.info(f" [DEBUG] TET框架方案失败: {e}")
 
             # 方案2：使用数据管理器获取资金流数据
-            logger.info(" [DEBUG] 尝试数据管理器方案")
-            logger.info(" [DEBUG] 尝试数据管理器方案")
+            logger.info("[DEBUG] 尝试数据管理器方案")
+            logger.info("[DEBUG] 尝试数据管理器方案")
 
             try:
                 from utils.manager_factory import get_data_manager
                 data_manager = get_data_manager()
 
                 if data_manager and hasattr(data_manager, 'get_fund_flow'):
-                    logger.info(" [DEBUG] 通过数据管理器获取资金流数据")
-                    logger.info(" [DEBUG] 通过数据管理器获取资金流数据")
+                    logger.info("[DEBUG] 通过数据管理器获取资金流数据")
+                    logger.info("[DEBUG] 通过数据管理器获取资金流数据")
 
                     fund_flow_data = data_manager.get_fund_flow()
 
@@ -824,16 +824,16 @@ class SectorFlowTabPro(BaseAnalysisTab):
                                 logger.info(f" [DEBUG] 数据管理器生成监控数据: {len(monitor_data)} 条")
                                 return monitor_data
                     else:
-                        logger.warning(" [DEBUG] 数据管理器未返回有效数据")
-                        logger.info(" [DEBUG] 数据管理器未返回有效数据")
+                        logger.warning("[DEBUG] 数据管理器未返回有效数据")
+                        logger.info("[DEBUG] 数据管理器未返回有效数据")
 
             except Exception as e:
                 logger.error(f" [DEBUG] 数据管理器方案失败: {e}")
                 logger.info(f" [DEBUG] 数据管理器方案失败: {e}")
 
             # 方案3：自实现资金流数据获取（使用AkShare网络查询）
-            logger.info(" [DEBUG] 自实现资金流数据获取")
-            logger.info(" [DEBUG] 自实现资金流数据获取")
+            logger.info("[DEBUG] 自实现资金流数据获取")
+            logger.info("[DEBUG] 自实现资金流数据获取")
 
             try:
                 monitor_data = self._implement_fund_flow_analysis()
@@ -847,8 +847,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 logger.info(f" [DEBUG] 自实现方案失败: {e}")
 
             # 所有真实数据源都失败，返回空数据
-            logger.error(" [DEBUG] 所有真实数据源都失败，无法获取数据")
-            logger.info(" [DEBUG] 所有真实数据源都失败，无法获取数据")
+            logger.error("[DEBUG] 所有真实数据源都失败，无法获取数据")
+            logger.info("[DEBUG] 所有真实数据源都失败，无法获取数据")
             return []
 
         except Exception as e:
@@ -860,14 +860,14 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def _implement_fund_flow_analysis(self):
         """自实现资金流分析功能"""
         try:
-            logger.info(" [DEBUG] 开始自实现资金流分析")
-            logger.info(" [DEBUG] 开始自实现资金流分析")
+            logger.info("[DEBUG] 开始自实现资金流分析")
+            logger.info("[DEBUG] 开始自实现资金流分析")
 
             # 使用AkShare直接获取板块资金流数据
             try:
                 import akshare as ak
-                logger.info(" [DEBUG] 使用AkShare获取板块资金流数据")
-                logger.info(" [DEBUG] 使用AkShare获取板块资金流数据")
+                logger.info("[DEBUG] 使用AkShare获取板块资金流数据")
+                logger.info("[DEBUG] 使用AkShare获取板块资金流数据")
 
                 # 获取板块资金流排行
                 sector_flow_df = ak.stock_sector_fund_flow_rank(indicator="今日")
@@ -916,16 +916,16 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
                     return monitor_data
                 else:
-                    logger.warning(" [DEBUG] AkShare返回空数据")
-                    logger.info(" [DEBUG] AkShare返回空数据")
+                    logger.warning("[DEBUG] AkShare返回空数据")
+                    logger.info("[DEBUG] AkShare返回空数据")
 
             except Exception as e:
                 logger.error(f" [DEBUG] AkShare获取数据失败: {e}")
                 logger.info(f" [DEBUG] AkShare获取数据失败: {e}")
 
             # AkShare失败，无法获取真实数据
-            logger.error(" [DEBUG] AkShare网络查询失败，无法获取真实板块资金流数据")
-            logger.info(" [DEBUG] AkShare网络查询失败，无法获取真实板块资金流数据")
+            logger.error("[DEBUG] AkShare网络查询失败，无法获取真实板块资金流数据")
+            logger.info("[DEBUG] AkShare网络查询失败，无法获取真实板块资金流数据")
             return []
 
         except Exception as e:
@@ -1085,10 +1085,10 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 logger.info(f" [DEBUG] 实时数据: {len(realtime_data) if isinstance(realtime_data, list) else 'N/A'} 条")
 
                 if hasattr(self, 'monitor_table') and self.monitor_table:
-                    logger.info(" [DEBUG] 更新监控表格")
+                    logger.info("[DEBUG] 更新监控表格")
                     self._update_monitor_table(realtime_data)
                 else:
-                    logger.info(" [DEBUG] monitor_table 不存在，使用消息框显示结果")
+                    logger.info("[DEBUG] monitor_table 不存在，使用消息框显示结果")
                     # 创建简单的消息框显示结果
                     if realtime_data:
                         message = f"实时监控完成，检测到 {len(realtime_data)} 个事件:\n\n"
@@ -1100,7 +1100,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                     else:
                         QMessageBox.information(self, "实时监控结果", "未检测到显著的资金流动事件")
             else:
-                logger.info(" [DEBUG] 结果中没有 realtime_data")
+                logger.info("[DEBUG] 结果中没有 realtime_data")
 
             logger.info("实时监控分析完成")
 
@@ -1146,8 +1146,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def sector_rotation_analysis(self):
         """板块轮动分析 - 使用专用线程避免界面卡死"""
         try:
-            logger.info(" [DEBUG] 板块轮动按钮被点击")
-            logger.info(" [DEBUG] 板块轮动按钮被点击")
+            logger.info("[DEBUG] 板块轮动按钮被点击")
+            logger.info("[DEBUG] 板块轮动按钮被点击")
 
             # 立即显示用户反馈
             QMessageBox.information(self, "板块轮动分析", "板块轮动分析功能已启动，正在分析数据...")
@@ -1166,7 +1166,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             self.rotation_thread.progress_updated.connect(self._on_sector_rotation_progress_updated)
             self.rotation_thread.start()
 
-            logger.info(" [DEBUG] 板块轮动分析线程已启动")
+            logger.info("[DEBUG] 板块轮动分析线程已启动")
 
         except Exception as e:
             error_msg = f"启动板块轮动分析失败: {e}"
@@ -1288,8 +1288,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def smart_money_analysis(self):
         """聪明资金分析 - 使用专用线程避免界面卡死"""
         try:
-            logger.info(" [DEBUG] 聪明资金按钮被点击")
-            logger.info(" [DEBUG] 聪明资金按钮被点击")
+            logger.info("[DEBUG] 聪明资金按钮被点击")
+            logger.info("[DEBUG] 聪明资金按钮被点击")
 
             # 立即显示用户反馈
             QMessageBox.information(self, "聪明资金检测", "聪明资金检测功能已启动，正在分析数据...")
@@ -1308,7 +1308,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             self.smart_money_thread.progress_updated.connect(self._on_smart_money_progress_updated)
             self.smart_money_thread.start()
 
-            logger.info(" [DEBUG] 聪明资金分析线程已启动")
+            logger.info("[DEBUG] 聪明资金分析线程已启动")
 
         except Exception as e:
             error_msg = f"启动聪明资金分析失败: {e}"
@@ -1688,7 +1688,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 else:
                     QMessageBox.information(self, "聪明资金检测结果", "未检测到显著的聪明资金活动")
             else:
-                logger.info(" [DEBUG] 结果中没有 smart_money_data")
+                logger.info("[DEBUG] 结果中没有 smart_money_data")
 
             logger.info("聪明资金分析完成")
 
@@ -2186,7 +2186,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                         self.error.emit(str(e))
 
             dialog = QDialog(self)
-            dialog.setWindowTitle("📊 板块资金流历史数据下载")
+            dialog.setWindowTitle("板块资金流历史数据下载")
             dialog.setFixedSize(500, 600)
             dialog.setStyleSheet("""
                 QDialog {
@@ -2226,7 +2226,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             layout = QVBoxLayout(dialog)
 
             # 标题
-            title_label = QLabel("📈 板块资金流历史数据下载工具")
+            title_label = QLabel("板块资金流历史数据下载工具")
             title_font = QFont()
             title_font.setPointSize(14)
             title_font.setBold(True)
@@ -2236,7 +2236,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             layout.addWidget(title_label)
 
             # 数据源选择组
-            source_group = QGroupBox("🔗 数据源配置")
+            source_group = QGroupBox("数据源配置")
             source_layout = QVBoxLayout(source_group)
 
             source_layout.addWidget(QLabel("选择数据源:"))
@@ -2294,7 +2294,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             layout.addWidget(date_group)
 
             # 下载选项组
-            options_group = QGroupBox("⚙️ 下载选项")
+            options_group = QGroupBox("下载选项")
             options_layout = QVBoxLayout(options_group)
 
             # 数据类型选择
@@ -2326,7 +2326,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             layout.addWidget(options_group)
 
             # 进度显示组
-            progress_group = QGroupBox("📊 下载进度")
+            progress_group = QGroupBox("下载进度")
             progress_layout = QVBoxLayout(progress_group)
 
             progress_bar = QProgressBar()
@@ -2350,9 +2350,9 @@ class SectorFlowTabPro(BaseAnalysisTab):
             # 按钮区域
             button_layout = QHBoxLayout()
 
-            download_btn = QPushButton("🚀 开始下载")
-            cancel_btn = QPushButton("❌ 取消")
-            close_btn = QPushButton("✅ 关闭")
+            download_btn = QPushButton("开始下载")
+            cancel_btn = QPushButton("[ERROR] 取消")
+            close_btn = QPushButton("关闭")
             close_btn.setEnabled(False)
 
             button_layout.addWidget(download_btn)
@@ -2384,7 +2384,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
                 # 获取参数
                 source_text = source_combo.currentText()
-                source = source_text.split(" - ")[0]  # 提取数据源名称
+                source = source_text.split("- ")[0]  # 提取数据源名称
                 start_date = start_date_edit.date().toString("yyyy-MM-dd")
                 end_date = end_date_edit.date().toString("yyyy-MM-dd")
                 include_daily = daily_check.isChecked()
@@ -2393,12 +2393,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
                 # 验证日期范围
                 if start_date >= end_date:
-                    log_text.append("❌ 错误: 开始日期必须早于结束日期")
+                    log_text.append("[ERROR] 错误: 开始日期必须早于结束日期")
                     return
 
                 # 验证数据类型选择
                 if not include_daily and not include_intraday:
-                    log_text.append("❌ 错误: 至少选择一种数据类型")
+                    log_text.append("[ERROR] 错误: 至少选择一种数据类型")
                     return
 
                 # 禁用下载按钮
@@ -2407,9 +2407,9 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 progress_bar.setValue(0)
                 status_label.setText("准备下载...")
                 log_text.append(f"📅 下载范围: {start_date} 至 {end_date}")
-                log_text.append(f"🔗 数据源: {source}")
-                log_text.append(f"📊 数据类型: {'日度' if include_daily else ''}{'、' if include_daily and include_intraday else ''}{'分时' if include_intraday else ''}")
-                log_text.append(f"🔄 重试次数: {retry_count}")
+                log_text.append(f"数据源: {source}")
+                log_text.append(f" 数据类型: {'日度' if include_daily else ''}{'、' if include_daily and include_intraday else ''}{'分时' if include_intraday else ''}")
+                log_text.append(f"重试次数: {retry_count}")
 
                 # 获取SectorDataService实例
                 sector_service = None
@@ -2418,11 +2418,11 @@ class SectorFlowTabPro(BaseAnalysisTab):
                     unified_data_manager = get_unified_data_manager()
                     sector_service = unified_data_manager.get_sector_fund_flow_service()
                 except Exception as service_error:
-                    log_text.append(f"❌ 获取数据服务失败: {service_error}")
+                    log_text.append(f"[ERROR] 获取数据服务失败: {service_error}")
                     return
 
                 if sector_service is None:
-                    log_text.append("❌ SectorDataService服务不可用")
+                    log_text.append("[ERROR] SectorDataService服务不可用")
                     return
 
                 # 创建下载线程
@@ -2431,7 +2431,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 def on_progress(value, message):
                     progress_bar.setValue(value)
                     status_label.setText(message)
-                    log_text.append(f"📊 {message}")
+                    log_text.append(f" {message}")
 
                 def on_finished(result):
                     download_btn.setEnabled(True)
@@ -2439,7 +2439,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
                     if result.get('success', False):
                         count = result.get('processed_count', 0)
-                        log_text.append(f"✅ 下载成功! 共处理 {count} 条数据")
+                        log_text.append(f"下载成功! 共处理 {count} 条数据")
                         status_label.setText(f"下载完成 - {count} 条数据")
 
                         # 刷新主界面数据
@@ -2447,13 +2447,13 @@ class SectorFlowTabPro(BaseAnalysisTab):
                             self._refresh_data()
                     else:
                         error_msg = result.get('error', '未知错误')
-                        log_text.append(f"❌ 下载失败: {error_msg}")
+                        log_text.append(f"[ERROR] 下载失败: {error_msg}")
                         status_label.setText("下载失败")
 
                 def on_error(error_msg):
                     download_btn.setEnabled(True)
                     close_btn.setEnabled(True)
-                    log_text.append(f"❌ 下载错误: {error_msg}")
+                    log_text.append(f"[ERROR] 下载错误: {error_msg}")
                     status_label.setText("下载失败")
                     progress_bar.setValue(0)
 
@@ -2470,7 +2470,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 nonlocal download_worker
                 if download_worker and download_worker.isRunning():
                     download_worker.terminate()
-                    log_text.append("⚠️ 下载已取消")
+                    log_text.append("下载已取消")
                     status_label.setText("已取消")
                     download_btn.setEnabled(True)
                     close_btn.setEnabled(True)

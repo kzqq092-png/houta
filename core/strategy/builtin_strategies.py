@@ -14,7 +14,6 @@ from datetime import datetime
 from .base_strategy import BaseStrategy, StrategySignal, StrategyType, SignalType
 from .strategy_registry import register_strategy
 
-
 @register_strategy("MA策略", {
     "category": "技术分析",
     "description": "基于移动平均线的趋势跟踪策略"
@@ -112,7 +111,6 @@ class MAStrategy(BaseStrategy):
             0.9, max(0.1, (price_change * 2 + volume_ratio * 0.3 + ma_separation * 5) / 3))
 
         return confidence
-
 
 @register_strategy("MACD策略", {
     "category": "技术分析",
@@ -215,7 +213,6 @@ class MACDStrategy(BaseStrategy):
 
         return confidence
 
-
 @register_strategy("RSI策略", {
     "category": "技术分析",
     "description": "基于RSI指标的超买超卖策略"
@@ -314,7 +311,6 @@ class RSIStrategy(BaseStrategy):
             0.9, max(0.1, (rsi_extreme + abs(price_change) * 2 + volume_ratio * 0.2) / 3))
 
         return confidence
-
 
 @register_strategy("KDJ策略", {
     "category": "技术分析",
@@ -422,7 +418,6 @@ class KDJStrategy(BaseStrategy):
 
         return confidence
 
-
 @register_strategy("布林带策略", {
     "category": "技术分析",
     "description": "基于布林带的突破策略"
@@ -523,7 +518,6 @@ class BollingerBandsStrategy(BaseStrategy):
             0.1, (bb_width * 5 + abs(0.5 - price_position) * 2 + volume_ratio * 0.3) / 3))
 
         return confidence
-
 
 @register_strategy("形态分析策略", {
     "category": "形态识别",

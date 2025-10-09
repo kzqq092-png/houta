@@ -20,8 +20,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate
 from PyQt5.QtGui import QFont
 
-
-
 class ExportWorker(QThread):
     """导出工作线程"""
 
@@ -175,7 +173,6 @@ class ExportWorker(QThread):
         except Exception as e:
             logger.error(f"Batch export failed: {e}")
             self.export_error.emit(f"批量导出失败: {str(e)}")
-
 
 class DataExportDialog(QDialog):
     """数据导出对话框"""

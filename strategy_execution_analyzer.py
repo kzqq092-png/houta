@@ -59,7 +59,7 @@ class StrategyExecutionAnalyzer:
 
     def analyze_strategy_execution(self) -> Dict[str, Any]:
         """分析策略执行逻辑"""
-        logger.info(" 开始分析策略执行和风险控制逻辑...")
+        logger.info("开始分析策略执行和风险控制逻辑...")
 
         results = {
             'execution_flow_analysis': {},
@@ -73,33 +73,33 @@ class StrategyExecutionAnalyzer:
 
         try:
             # 1. 分析执行流程
-            logger.info(" 分析执行流程...")
+            logger.info("分析执行流程...")
             results['execution_flow_analysis'] = self._analyze_execution_flow()
 
             # 2. 分析风险控制
-            logger.info(" 分析风险控制机制...")
+            logger.info("分析风险控制机制...")
             results['risk_control_analysis'] = self._analyze_risk_control()
 
             # 3. 分析交易逻辑
-            logger.info(" 分析交易逻辑...")
+            logger.info("分析交易逻辑...")
             results['trading_logic_issues'] = self._analyze_trading_logic()
 
             # 4. 分析数据完整性
-            logger.info(" 分析数据完整性...")
+            logger.info("分析数据完整性...")
             results['data_integrity_issues'] = self._analyze_data_integrity()
 
             # 5. 分析性能问题
-            logger.info(" 分析性能问题...")
+            logger.info("分析性能问题...")
             results['performance_issues'] = self._analyze_performance_issues()
 
             # 6. 生成安全建议
-            logger.info(" 生成安全建议...")
+            logger.info("生成安全建议...")
             results['safety_recommendations'] = self._generate_safety_recommendations()
 
             # 7. 识别关键修复项
             results['critical_fixes_needed'] = self._identify_critical_fixes(results)
 
-            logger.info(" 策略执行分析完成")
+            logger.info("策略执行分析完成")
             return results
 
         except Exception as e:
@@ -795,7 +795,7 @@ class StrategyExecutionAnalyzer:
 
             # 显示摘要
             logger.info("\n" + "="*80)
-            logger.info(" 策略执行和风险控制分析结果")
+            logger.info("策略执行和风险控制分析结果")
             logger.info("="*80)
 
             execution_flow = results.get('execution_flow_analysis', {})
@@ -814,8 +814,8 @@ class StrategyExecutionAnalyzer:
                 for fix in critical_fixes[:3]:
                     logger.info(f"   - {fix['title']} ({fix['risk_level']})")
 
-            logger.info(" 策略执行分析报告已保存到 strategy_execution_analysis.md")
-            logger.info(" 原始分析数据已保存到 strategy_execution_data.json")
+            logger.info("策略执行分析报告已保存到 strategy_execution_analysis.md")
+            logger.info("原始分析数据已保存到 strategy_execution_data.json")
 
             return results
 

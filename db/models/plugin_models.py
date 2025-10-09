@@ -757,7 +757,7 @@ class DataSourcePluginConfigManager:
                 (plugin_id, config_data, priority, weight, enabled, max_pool_size, 
                  pool_timeout, pool_cleanup_interval, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (plugin_id, config_json, priority, weight, enabled, 
+                ''', (plugin_id, config_json, priority, weight, enabled,
                       max_pool_size, pool_timeout, pool_cleanup_interval, current_time))
 
                 conn.commit()

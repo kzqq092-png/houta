@@ -14,7 +14,6 @@ from loguru import logger
 from .base_panel import BasePanel
 from gui.widgets.log_widget_loguru import LoguruLogWidget
 
-
 class LoguruLogPanel(BasePanel):
     """纯Loguru日志面板类"""
 

@@ -12,7 +12,6 @@ import random
 
 logger = logging.getLogger(__name__)
 
-
 class AkShareNetworkConfig:
     """AkShare网络配置管理器"""
 
@@ -324,10 +323,8 @@ class AkShareNetworkConfig:
         logger.info(f"代理加载完成: {success_count}/{len(proxy_list)} 个代理可用")
         return success_count
 
-
 # 全局网络配置实例
 _network_config = None
-
 
 def get_akshare_network_config() -> AkShareNetworkConfig:
     """获取AkShare网络配置实例"""
@@ -335,7 +332,6 @@ def get_akshare_network_config() -> AkShareNetworkConfig:
     if _network_config is None:
         _network_config = AkShareNetworkConfig()
     return _network_config
-
 
 def configure_akshare_network(delay_seconds: float = 1.0,
                               max_requests_per_minute: int = 30,

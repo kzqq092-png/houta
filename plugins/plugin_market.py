@@ -95,7 +95,6 @@ except ImportError:
                         for key, value in kwargs.items():
                             setattr(self, key, value)
 
-
 @dataclass
 class PluginInfo:
     """插件信息"""
@@ -122,7 +121,6 @@ class PluginInfo:
         metadata_data = data.pop('metadata')
         metadata = PluginMetadata(**metadata_data)
         return cls(metadata=metadata, **data)
-
 
 class PluginMarketAPI:
     """插件市场API客户端"""
@@ -292,7 +290,6 @@ class PluginMarketAPI:
         except requests.RequestException as e:
             raise Exception(f"举报失败: {e}")
 
-
 class PluginDownloader(QThread):
     """插件下载器"""
 
@@ -350,7 +347,6 @@ class PluginDownloader(QThread):
     def cancel(self):
         """取消下载"""
         self.cancelled = True
-
 
 class PluginInstaller:
     """插件安装器"""
@@ -475,7 +471,6 @@ class PluginInstaller:
 
         except Exception as e:
             raise Exception(f"读取插件元数据失败: {e}")
-
 
 class PluginMarket:
     """插件市场主类"""

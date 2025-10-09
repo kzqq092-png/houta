@@ -20,7 +20,6 @@ import weakref
 
 logger = logger
 
-
 class RenderPriority(Enum):
     """渲染优先级"""
     IMMEDIATE = 0   # 立即渲染
@@ -28,7 +27,6 @@ class RenderPriority(Enum):
     NORMAL = 2      # 正常优先级
     LOW = 3         # 低优先级
     BACKGROUND = 4  # 后台渲染
-
 
 class BatchType(Enum):
     """批处理类型"""
@@ -38,7 +36,6 @@ class BatchType(Enum):
     TEXT_RENDERING = "text_rendering"        # 文本渲染
     LINE_RENDERING = "line_rendering"        # 线条渲染
     POINT_RENDERING = "point_rendering"      # 点渲染
-
 
 @dataclass
 class RenderCommand:
@@ -54,7 +51,6 @@ class RenderCommand:
     render_state: Dict[str, Any] = field(default_factory=dict)
     created_time: float = field(default_factory=time.time)
     callback: Optional[Callable] = None
-
 
 @dataclass
 class RenderBatch:
@@ -72,7 +68,6 @@ class RenderBatch:
     last_update_time: float = field(default_factory=time.time)
     is_dirty: bool = True
 
-
 @dataclass
 class ShaderProgram:
     """着色器程序"""
@@ -87,7 +82,6 @@ class ShaderProgram:
     usage_count: int = 0
     last_used_time: float = field(default_factory=time.time)
 
-
 @dataclass
 class PipelineStats:
     """管道统计信息"""
@@ -100,7 +94,6 @@ class PipelineStats:
     average_batch_size: float = 0.0
     frame_time: float = 0.0
     gpu_utilization: float = 0.0
-
 
 class WebGPUPipelineOptimizer:
     """
@@ -775,11 +768,9 @@ class WebGPUPipelineOptimizer:
         except Exception as e:
             logger.error(f"关闭管道优化器失败: {e}")
 
-
 # 全局管道优化器实例
 _pipeline_optimizer: Optional[WebGPUPipelineOptimizer] = None
 _optimizer_lock = threading.Lock()
-
 
 def get_webgpu_pipeline_optimizer(**kwargs) -> WebGPUPipelineOptimizer:
     """获取WebGPU管道优化器实例（单例模式）"""
@@ -789,7 +780,6 @@ def get_webgpu_pipeline_optimizer(**kwargs) -> WebGPUPipelineOptimizer:
         if _pipeline_optimizer is None:
             _pipeline_optimizer = WebGPUPipelineOptimizer(**kwargs)
         return _pipeline_optimizer
-
 
 def shutdown_webgpu_pipeline_optimizer():
     """关闭WebGPU管道优化器"""

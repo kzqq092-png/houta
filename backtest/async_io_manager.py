@@ -31,7 +31,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import weakref
 import time
 
-
 class AsyncIOManager:
     """异步I/O管理器"""
 
@@ -307,7 +306,6 @@ class AsyncIOManager:
         """上下文管理器出口"""
         self.cleanup()
 
-
 class SmartDataCache:
     """智能数据缓存"""
 
@@ -405,7 +403,6 @@ class SmartDataCache:
                 'max_memory_mb': self.max_memory_bytes / 1024 / 1024,
                 'memory_usage_percent': (self.current_memory_usage / self.max_memory_bytes) * 100
             }
-
 
 # 全局实例
 async_io_manager = AsyncIOManager()

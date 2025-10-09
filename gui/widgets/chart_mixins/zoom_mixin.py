@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from PyQt5.QtCore import QTimer
 
-
 class ZoomMixin:
     """缩放功能Mixin"""
 

@@ -61,7 +61,7 @@ class ConcurrencyResourceAnalyzer:
 
     def analyze_concurrency_and_resources(self) -> Dict[str, Any]:
         """分析并发安全性和资源管理"""
-        logger.info(" 开始分析并发安全性和资源管理...")
+        logger.info("开始分析并发安全性和资源管理...")
 
         results = {
             'thread_safety_analysis': {},
@@ -75,34 +75,34 @@ class ConcurrencyResourceAnalyzer:
 
         try:
             # 1. 分析线程安全性
-            logger.info(" 分析线程安全性...")
+            logger.info("分析线程安全性...")
             results['thread_safety_analysis'] = self._analyze_thread_safety()
 
             # 2. 分析资源管理
-            logger.info(" 分析资源管理...")
+            logger.info("分析资源管理...")
             results['resource_management_analysis'] = self._analyze_resource_management()
 
             # 3. 检测并发问题
-            logger.info(" 检测并发问题...")
+            logger.info("检测并发问题...")
             results['concurrency_issues'] = self._detect_concurrency_issues()
 
             # 4. 检测资源泄漏
-            logger.info(" 检测资源泄漏...")
+            logger.info("检测资源泄漏...")
             results['resource_leaks'] = self._detect_resource_leaks()
 
             # 5. 分析内存管理
-            logger.info(" 分析内存管理...")
+            logger.info("分析内存管理...")
             results['memory_management_issues'] = self._analyze_memory_management()
 
             # 6. 评估性能影响
-            logger.info(" 评估性能影响...")
+            logger.info("评估性能影响...")
             results['performance_impact'] = self._assess_performance_impact()
 
             # 7. 生成安全建议
-            logger.info(" 生成安全建议...")
+            logger.info("生成安全建议...")
             results['safety_recommendations'] = self._generate_safety_recommendations()
 
-            logger.info(" 并发和资源分析完成")
+            logger.info("并发和资源分析完成")
             return results
 
         except Exception as e:
@@ -812,7 +812,7 @@ class ConcurrencyResourceAnalyzer:
 
             # 显示摘要
             logger.info("\n" + "="*80)
-            logger.info(" 并发安全性和资源管理分析结果")
+            logger.info("并发安全性和资源管理分析结果")
             logger.info("="*80)
 
             thread_safety = results.get('thread_safety_analysis', {})
@@ -837,8 +837,8 @@ class ConcurrencyResourceAnalyzer:
                 for bottleneck in bottlenecks:
                     logger.info(f"   - {bottleneck}")
 
-            logger.info(" 并发和资源分析报告已保存到 concurrency_resource_analysis.md")
-            logger.info(" 原始分析数据已保存到 concurrency_resource_data.json")
+            logger.info("并发和资源分析报告已保存到 concurrency_resource_analysis.md")
+            logger.info("原始分析数据已保存到 concurrency_resource_data.json")
 
             return results
 

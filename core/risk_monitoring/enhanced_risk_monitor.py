@@ -146,6 +146,10 @@ class EnhancedRiskMonitor:
 
         # 监控状态
         self.is_monitoring = False
+
+        # 预测缓存
+        self._prediction_cache = {}  # 预测结果缓存
+        self._cache_ttl = 300  # 缓存有效期（秒）
         self.monitoring_thread = None
         self.alert_queue = queue.Queue()
         self.metrics_history = []
@@ -377,6 +381,23 @@ class EnhancedRiskMonitor:
             logger.error(f"分析风险指标失败: {e}")
             return []
 
+    def _get_cached_prediction(self, prediction_type: str, cache_key: str):
+        """获取缓存的预测结果"""
+        import time
+        current_time = time.time()
+
+        if cache_key in self._prediction_cache:
+            cached_result, timestamp = self._prediction_cache[cache_key]
+            if current_time - timestamp < self._cache_ttl:
+                return cached_result
+
+        return None
+
+    def _cache_prediction(self, cache_key: str, result):
+        """缓存预测结果"""
+        import time
+        self._prediction_cache[cache_key] = (result, time.time())
+
     def _predict_risk_trends(self, metrics: List[RiskMetric]) -> Dict[str, float]:
         """预测风险趋势"""
         predictions = {}
@@ -387,15 +408,31 @@ class EnhancedRiskMonitor:
 
             for metric in metrics:
                 # 使用AI服务预测未来风险值
-                prediction_result = self.ai_service.predict(
-                    PredictionType.RISK_FORECAST,
-                    {
-                        'metric_name': metric.name,
-                        'current_value': metric.value,
-                        'historical_data': self._get_metric_history(metric.name),
-                        'market_conditions': self._get_market_conditions()
-                    }
-                )
+
+                # 生成缓存键
+                cache_key = f"risk_forecast_{metric.name}_{metric.value}"
+
+                # 尝试从缓存获取结果
+                prediction_result = self._get_cached_prediction("RISK_FORECAST", cache_key)
+
+                if prediction_result is None:
+                    # 缓存未命中，进行预测
+                    prediction_result = self.ai_service.predict(
+                        PredictionType.RISK_FORECAST,
+                        {
+                            'metric_name': metric.name,
+                            'current_value': metric.value,
+                            'historical_data': self._get_metric_history(metric.name),
+                            'market_conditions': self._get_market_conditions()
+                        }
+                    )
+
+                    # 缓存结果
+                    if prediction_result:
+                        self._cache_prediction(cache_key, prediction_result)
+                else:
+                    # 使用缓存结果
+                    pass  # prediction_result already set
 
                 if prediction_result and prediction_result.get('success'):
                     predicted_value = prediction_result.get('predicted_value', metric.value)

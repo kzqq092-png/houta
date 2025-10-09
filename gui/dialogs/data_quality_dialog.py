@@ -12,7 +12,6 @@ from datetime import datetime
 
 logger = logger
 
-
 class DataQualityDialog(QDialog):
     """数据质量检查对话框"""
 

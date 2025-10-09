@@ -22,7 +22,6 @@ from core.plugin_types import AssetType, DataType, PluginType
 
 logger = logger.bind(module=__name__)
 
-
 class DataSource(Enum):
     """数据源枚举"""
     TONGDAXIN = "tongdaxin"
@@ -37,7 +36,6 @@ class DataSource(Enum):
     AKSHARE = "akshare"
     CUSTOM = "custom"
 
-
 class RouteStrategy(Enum):
     """路由策略枚举"""
     FASTEST = "fastest"          # 最快响应
@@ -46,7 +44,6 @@ class RouteStrategy(Enum):
     LOAD_BALANCE = "load_balance"     # 负载均衡
     FAILOVER = "failover"        # 故障转移
     CUSTOM = "custom"            # 自定义策略
-
 
 @dataclass
 class DataRequest:
@@ -77,7 +74,6 @@ class DataRequest:
             'metadata': self.metadata
         }
 
-
 @dataclass
 class RouteResult:
     """路由结果结构"""
@@ -107,7 +103,6 @@ class RouteResult:
             'metadata': self.metadata
         }
 
-
 @dataclass
 class DataSourceInfo:
     """数据源信息"""
@@ -122,7 +117,6 @@ class DataSourceInfo:
     cost_per_request: float = 0.0
     rate_limit: Optional[int] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 class DataRouter:
     """
@@ -610,11 +604,9 @@ class DataRouter:
         logger.info(f"批量路由完成: {len(requests)} 个请求")
         return results
 
-
 # 全局实例
 _data_router: Optional[DataRouter] = None
 _router_lock = threading.Lock()
-
 
 def get_data_router() -> DataRouter:
     """获取全局数据路由器实例"""
@@ -625,7 +617,6 @@ def get_data_router() -> DataRouter:
             _data_router = DataRouter()
 
         return _data_router
-
 
 def initialize_data_router() -> DataRouter:
     """初始化数据路由器"""

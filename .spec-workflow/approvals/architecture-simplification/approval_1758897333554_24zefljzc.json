@@ -1,0 +1,21 @@
+{
+  "id": "approval_1758897333554_24zefljzc",
+  "title": "架构精简重构任务分解 - 22个详细任务实现15个核心服务",
+  "filePath": ".spec-workflow/specs/architecture-simplification/tasks.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-26T14:35:33.554Z",
+  "category": "spec",
+  "categoryName": "architecture-simplification",
+  "response": "Feedback Summary (1 comments):\n\nGeneral Comments:\n1. 增加阶段性功能测试，不只是编译正确，必须确保所有逻辑正常，功能正常，逻辑正确\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"增加阶段性功能测试，不只是编译正确，必须确保所有逻辑正常，功能正常，逻辑正确\",\n      \"timestamp\": \"2025-09-26T14:36:42.629Z\",\n      \"id\": \"comment_1758897402629_iy7h6yz6z\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nGeneral Comments:\\n1. 增加阶段性功能测试，不只是编译正确，必须确保所有逻辑正常，功能正常，逻辑正确\\n\\n\",\n  \"timestamp\": \"2025-09-26T14:36:43.616Z\"\n}",
+  "respondedAt": "2025-09-26T14:36:43.643Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "增加阶段性功能测试，不只是编译正确，必须确保所有逻辑正常，功能正常，逻辑正确",
+      "timestamp": "2025-09-26T14:36:42.629Z",
+      "id": "comment_1758897402629_iy7h6yz6z"
+    }
+  ]
+}

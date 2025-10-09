@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor
 import asyncio  # Added for asyncio.create_task
 import pandas as pd
+from pathlib import Path
 from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QLineEdit, QComboBox, QPushButton, QLabel, QFrame,
@@ -60,7 +61,7 @@ class LeftPanel(BasePanel):
             if hasattr(coordinator, 'service_container'):
                 self.asset_service = coordinator.service_container.resolve(AssetService)
                 self.multi_asset_enabled = True
-                logger.info(" 多资产支持已启用")
+                logger.info("多资产支持已启用")
         except Exception as e:
             logger.info(f"ℹ 多资产服务不可用，使用股票模式: {e}")
 
@@ -222,11 +223,30 @@ class LeftPanel(BasePanel):
                 if market_text != "全部":
                     market = market_text
 
-            # 使用资产服务加载数据
-            assets = self.asset_service.get_asset_list(
-                asset_type=self.current_asset_type,
-                market=market
-            )
+            # 使用统一数据管理器加载数据
+            from core.services.unified_data_manager import get_unified_data_manager
+            data_manager = get_unified_data_manager()
+
+            if data_manager:
+                # 转换资产类型为字符串
+                asset_type_str = self.current_asset_type.value.lower()
+                asset_df = data_manager.get_asset_list(asset_type=asset_type_str, market=market)
+
+                # 转换DataFrame为资产列表格式
+                assets = []
+                if not asset_df.empty:
+                    for _, row in asset_df.iterrows():
+                        assets.append({
+                            'symbol': row.get('code', ''),
+                            'name': row.get('name', ''),
+                            'asset_type': self.current_asset_type.value,
+                            'market': row.get('market', ''),
+                            'industry': row.get('industry', ''),
+                            'sector': row.get('sector', ''),
+                            'status': row.get('status', 'active')
+                        })
+            else:
+                assets = []
 
             # 更新UI显示
             self._populate_asset_table(assets)
@@ -287,26 +307,44 @@ class LeftPanel(BasePanel):
             logger.error(f"填充资产表格失败: {e}")
 
     def _load_stock_list_legacy(self) -> None:
-        """传统方式加载股票列表（向后兼容）"""
+        """DuckDB优先方式加载股票列表"""
         try:
-            if self.stock_service:
-                stock_list = self.stock_service.get_stock_list()
-                if stock_list:
+            # 使用统一数据管理器的新方法
+            from core.services.unified_data_manager import get_unified_data_manager
+            data_manager = get_unified_data_manager()
+
+            if data_manager:
+                # 获取当前市场过滤
+                market = 'all'
+                if hasattr(self, 'market_combo'):
+                    market_text = self.market_combo.currentText()
+                    if market_text != "全部":
+                        market = market_text.lower()
+
+                # 使用新的资产列表方法
+                stock_df = data_manager.get_asset_list(asset_type='stock', market=market)
+
+                if not stock_df.empty:
                     # 转换为统一格式
                     assets = []
-                    for stock in stock_list:
+                    for _, stock in stock_df.iterrows():
                         assets.append({
                             'symbol': stock.get('code', ''),
                             'name': stock.get('name', ''),
                             'asset_type': 'STOCK',
                             'market': stock.get('market', ''),
-                            'status': 'active'
+                            'industry': stock.get('industry', ''),
+                            'sector': stock.get('sector', ''),
+                            'status': stock.get('status', 'active')
                         })
                     self._populate_asset_table(assets)
-                    self._update_status(f"已加载 {len(assets)} 只股票")
+                    self._update_status(f"已加载 {len(assets)} 只股票（来自DuckDB）")
                 else:
                     self._clear_asset_list()
-                    self._update_status("获取股票列表失败")
+                    self._update_status("DuckDB中暂无股票数据，请运行数据导入脚本")
+            else:
+                self._clear_asset_list()
+                self._update_status("统一数据管理器不可用")
         except Exception as e:
             logger.error(f"传统方式加载股票列表失败: {e}")
             self._update_status("加载股票列表失败")
@@ -895,12 +933,11 @@ class LeftPanel(BasePanel):
             portfolio_manager = None
             try:
                 if hasattr(self.coordinator, 'service_container'):
-                    from core.business.portfolio_manager import PortfolioManager
                     from core.data.data_access import DataAccess
 
                     # 创建投资组合管理器（实际应用中应该从服务容器获取）
                     data_access = DataAccess()
-                    portfolio_manager = PortfolioManager(data_access)
+                    portfolio_manager = None
             except Exception as e:
                 logger.warning(f"无法创建投资组合管理器: {e}")
 
@@ -1053,42 +1090,363 @@ class LeftPanel(BasePanel):
                 self.count_label.setText("股票: 0")
                 return
 
+            # 统计数据来源
+            database_count = sum(1 for stock in stocks if stock.get('source') == 'database')
+            service_count = len(stocks) - database_count
+
             items = []
             for stock in stocks:
-                item = QTreeWidgetItem(
-                    [stock.get('code', ''), stock.get('name', '')])
+                # 创建显示文本，包含数据来源标识
+                code = stock.get('code', '')
+                name = stock.get('name', '')
+                source = stock.get('source', 'unknown')
+                status = stock.get('status', '')
+
+                # 根据数据来源添加标识
+                if source == 'database':
+                    name_with_source = f"{name} [DB]"  # 数据库来源标识
+                elif source == 'service':
+                    name_with_source = f"{name} [在线]"  # 在线服务标识
+                else:
+                    name_with_source = name
+
+                item = QTreeWidgetItem([code, name_with_source])
+
+                # 设置不同数据来源的显示样式
+                if source == 'database':
+                    # 数据库数据使用绿色标识
+                    item.setToolTip(0, f"数据来源：数据库 (已下载)\n更新时间：{stock.get('update_time', '未知')}")
+                    item.setToolTip(1, f"数据来源：数据库 (已下载)\n更新时间：{stock.get('update_time', '未知')}")
+                elif source == 'service':
+                    # 在线服务数据使用蓝色标识
+                    item.setToolTip(0, "数据来源：在线服务")
+                    item.setToolTip(1, "数据来源：在线服务")
+
                 # 将完整的股票信息字典存储在item中
                 item.setData(0, Qt.UserRole, stock)
                 items.append(item)
 
             self.stock_tree.addTopLevelItems(items)
-            self.count_label.setText(f"股票: {len(stocks)}")
+
+            # 更新状态显示，包含数据来源统计
+            if database_count > 0 and service_count > 0:
+                status_text = f"股票: {len(stocks)} (数据库: {database_count}, 在线: {service_count})"
+            elif database_count > 0:
+                status_text = f"股票: {len(stocks)} (全部来自数据库)"
+            elif service_count > 0:
+                status_text = f"股票: {len(stocks)} (全部来自在线服务)"
+            else:
+                status_text = f"股票: {len(stocks)}"
+
+            self.count_label.setText(status_text)
 
         except Exception as e:
             logger.error(f"更新股票树失败: {e}", exc_info=True)
             self.show_message(f"更新股票列表失败: {e}", 'error')
 
     def _load_stock_data(self, search_text: str = None) -> None:
-        """加载股票数据"""
+        """加载股票数据 - 优先从数据库获取已下载的资产数据"""
         self._show_loading(True)
         self.status_label.setText("正在加载股票列表...")
 
         try:
-            # 使用股票服务同步获取股票列表
-            # 注意：这是一个同步调用，如果数据量大，未来可能需要优化为在工作线程中执行
-            if search_text:
-                stocks = self.stock_service.search_stocks(search_text)
+            # 优先使用TET框架从数据库获取已下载的股票列表
+            stocks = self._get_stocks_from_database(search_text)
+
+            # 如果数据库中没有数据，则使用传统方式获取
+            if not stocks:
+                logger.info("数据库中无股票数据，使用传统方式获取")
+                stocks = self._get_stocks_from_service(search_text)
             else:
-                market = self.market_combo.currentText()
-                if market == "全部":
-                    market = None
-                stocks = self.stock_service.get_stock_list(market=market)
+                logger.info(f"从数据库获取到 {len(stocks)} 只股票")
 
             self._on_data_loaded(stocks)
 
         except Exception as e:
             logger.error(f"Failed to load stock list: {e}", exc_info=True)
             self._on_data_error(str(e))
+
+    def _get_stocks_from_database(self, search_text: str = None) -> List[Dict[str, Any]]:
+        """从数据库获取已下载的股票列表"""
+        try:
+            # 优先尝试直接从DuckDB文件读取数据
+            stocks_df = self._direct_query_duckdb_stocks(search_text)
+
+            if not stocks_df.empty:
+                # 转换为标准格式
+                stocks = []
+                for _, row in stocks_df.iterrows():
+                    stock_info = {
+                        'code': str(row.get('code', '')),
+                        'name': str(row.get('name', '')),
+                        'market': str(row.get('market', '')),
+                        'asset_type': str(row.get('asset_type', 'STOCK')),
+                        'status': 'downloaded',  # 标记为已下载
+                        'update_time': row.get('update_time', ''),
+                        'source': 'database'  # 标记数据来源
+                    }
+
+                    # 应用搜索过滤
+                    if search_text:
+                        search_lower = search_text.lower()
+                        if (search_lower not in stock_info['code'].lower() and
+                                search_lower not in stock_info['name'].lower()):
+                            continue
+
+                    stocks.append(stock_info)
+
+                logger.info(f"从数据库获取股票列表成功: {len(stocks)} 只股票")
+                return stocks
+
+            # 备选方案：通过TET框架和DuckDB获取已下载的股票列表
+            if hasattr(self.data_manager, '_uni_plugin_manager') and self.data_manager._uni_plugin_manager:
+                uni_manager = self.data_manager._uni_plugin_manager
+
+                # 获取市场过滤条件
+                market = None
+                if hasattr(self, 'market_combo') and self.market_combo:
+                    market_text = self.market_combo.currentText()
+                    if market_text != "全部":
+                        market = market_text
+
+                # 从DuckDB的stock_list表查询数据
+                stocks_df = self._query_stocks_from_duckdb(uni_manager, market, search_text)
+
+                if not stocks_df.empty:
+                    # 转换为标准格式
+                    stocks = []
+                    for _, row in stocks_df.iterrows():
+                        stock_info = {
+                            'code': str(row.get('code', '')),
+                            'name': str(row.get('name', '')),
+                            'market': str(row.get('market', '')),
+                            'asset_type': str(row.get('asset_type', 'STOCK')),
+                            'status': 'downloaded',  # 标记为已下载
+                            'update_time': row.get('update_time', ''),
+                            'source': 'database'  # 标记数据来源
+                        }
+
+                        # 应用搜索过滤
+                        if search_text:
+                            search_lower = search_text.lower()
+                            if (search_lower not in stock_info['code'].lower() and
+                                    search_lower not in stock_info['name'].lower()):
+                                continue
+
+                        stocks.append(stock_info)
+
+                    logger.info(f"从数据库获取股票列表成功: {len(stocks)} 只股票")
+                    return stocks
+
+            logger.debug("无法从数据库获取股票列表")
+            return []
+
+        except Exception as e:
+            logger.error(f"从数据库获取股票列表失败: {e}")
+            return []
+
+    def _direct_query_duckdb_stocks(self, search_text: str = None) -> pd.DataFrame:
+        """直接查询DuckDB数据库中的股票列表"""
+        try:
+            import duckdb
+
+            # 获取数据库路径
+            db_path = self._get_stock_database_path()
+
+            # 检查数据库文件是否存在
+            if not Path(db_path).exists():
+                logger.debug(f"DuckDB文件不存在: {db_path}")
+                return pd.DataFrame()
+
+            # 获取市场过滤条件
+            market = None
+            if hasattr(self, 'market_combo') and self.market_combo:
+                market_text = self.market_combo.currentText()
+                if market_text != "全部":
+                    market = market_text
+
+            # 构建查询条件
+            query_conditions = []
+            if market:
+                # 根据市场名称映射到数据库中的market字段
+                market_mapping = {
+                    "上海": "sh",
+                    "深圳": "sz",
+                    "创业板": "sz",
+                    "科创板": "sh",
+                    "北交所": "bj"
+                }
+                db_market = market_mapping.get(market, market.lower())
+                query_conditions.append(f"market = '{db_market}'")
+
+            if search_text:
+                search_condition = f"(code LIKE '%{search_text}%' OR name LIKE '%{search_text}%')"
+                query_conditions.append(search_condition)
+
+            # 构建SQL查询
+            base_query = "SELECT code, name, market, asset_type, update_time FROM stock_list"
+            if query_conditions:
+                query = f"{base_query} WHERE {' AND '.join(query_conditions)}"
+            else:
+                query = base_query
+
+            query += " ORDER BY code LIMIT 1000"  # 限制返回数量
+
+            # 执行查询
+            with duckdb.connect(db_path) as conn:
+                # 检查表是否存在 (DuckDB语法)
+                table_check = "SHOW TABLES"
+                tables_result = conn.execute(table_check).fetchall()
+                table_names = [table[0] for table in tables_result]
+
+                if 'stock_list' not in table_names:
+                    logger.debug("stock_list表不存在")
+                    return pd.DataFrame()
+
+                # 执行股票查询
+                result = conn.execute(query).df()
+                logger.debug(f"直接查询DuckDB成功，返回 {len(result)} 条记录")
+                return result
+
+        except ImportError:
+            logger.debug("duckdb模块不可用")
+            return pd.DataFrame()
+        except Exception as e:
+            logger.debug(f"直接查询DuckDB失败: {e}")
+            return pd.DataFrame()
+
+    def _query_stocks_from_duckdb(self, uni_manager, market: str = None, search_text: str = None) -> pd.DataFrame:
+        """从DuckDB查询股票数据"""
+        try:
+            # 获取DuckDB操作接口 - 尝试多种可能的路径
+            duckdb_ops = None
+
+            # 方法1: 直接从uni_manager获取
+            if hasattr(uni_manager, 'duckdb_operations') and uni_manager.duckdb_operations:
+                duckdb_ops = uni_manager.duckdb_operations
+
+            # 方法2: 从data_manager获取
+            elif hasattr(self.data_manager, 'enhanced_duckdb_downloader'):
+                downloader = self.data_manager.enhanced_duckdb_downloader
+                if hasattr(downloader, 'duckdb_operations'):
+                    duckdb_ops = downloader.duckdb_operations
+
+            # 方法3: 尝试从其他路径获取
+            elif hasattr(self.data_manager, 'duckdb_operations'):
+                duckdb_ops = self.data_manager.duckdb_operations
+
+            if not duckdb_ops:
+                logger.debug("无法找到DuckDB操作接口，跳过数据库查询")
+                return pd.DataFrame()
+
+            # 构建查询条件
+            query_conditions = []
+            if market:
+                # 根据市场名称映射到数据库中的market字段
+                market_mapping = {
+                    "上海": "sh",
+                    "深圳": "sz",
+                    "创业板": "sz",
+                    "科创板": "sh",
+                    "北交所": "bj"
+                }
+                db_market = market_mapping.get(market, market.lower())
+                query_conditions.append(f"market = '{db_market}'")
+
+            if search_text:
+                search_condition = f"(code LIKE '%{search_text}%' OR name LIKE '%{search_text}%')"
+                query_conditions.append(search_condition)
+
+            # 构建SQL查询
+            base_query = "SELECT code, name, market, asset_type, update_time FROM stock_list"
+            if query_conditions:
+                query = f"{base_query} WHERE {' AND '.join(query_conditions)}"
+            else:
+                query = base_query
+
+            query += " ORDER BY code"
+
+            # 执行查询
+            if hasattr(duckdb_ops, 'query_data'):
+                # 使用 query_data 方法（返回 QueryResult）
+                result = duckdb_ops.query_data(
+                    table_name="stock_list",
+                    database_path=self._get_stock_database_path(),
+                    where_clause=" AND ".join(query_conditions) if query_conditions else None,
+                    order_by="code"
+                )
+
+                # QueryResult 对象有 success 属性和 data 属性
+                if result and result.success and result.data is not None:
+                    return result.data
+                else:
+                    logger.debug(f"DuckDB查询返回空结果或失败: {result.error_message if result else 'None'}")
+            elif hasattr(duckdb_ops, 'execute_query'):
+                # 备用方法：直接执行SQL
+                result = duckdb_ops.execute_query(
+                    database_path=self._get_stock_database_path(),
+                    query=query
+                )
+
+                # 处理可能的返回格式
+                if isinstance(result, dict):
+                    if result.get('success') and result.get('data') is not None:
+                        return result['data']
+                elif hasattr(result, 'success'):
+                    if result.success and result.data is not None:
+                        return result.data
+
+            logger.debug("DuckDB查询执行失败或stock_list表不存在，使用备用数据源")
+            return pd.DataFrame()
+
+        except Exception as e:
+            logger.debug(f"DuckDB查询股票数据失败，使用备用数据源: {e}")
+            return pd.DataFrame()
+
+    def _get_stock_database_path(self) -> str:
+        """获取股票数据库路径"""
+        try:
+            # 尝试从数据管理器获取数据库路径
+            if hasattr(self.data_manager, 'enhanced_duckdb_downloader'):
+                downloader = self.data_manager.enhanced_duckdb_downloader
+                if hasattr(downloader, 'db_paths') and 'kline' in downloader.db_paths:
+                    return downloader.db_paths['kline']
+
+            # 使用默认路径
+            from pathlib import Path
+            db_path = Path.cwd() / "cache" / "duckdb" / "kline.duckdb"
+            return str(db_path)
+
+        except Exception as e:
+            logger.error(f"获取股票数据库路径失败: {e}")
+            # 返回默认路径
+            from pathlib import Path
+            return str(Path.cwd() / "cache" / "duckdb" / "kline.duckdb")
+
+    def _get_stocks_from_service(self, search_text: str = None) -> List[Dict[str, Any]]:
+        """使用传统服务方式获取股票列表"""
+        try:
+            # 使用股票服务同步获取股票列表
+            if search_text:
+                stocks = self.stock_service.search_stocks(search_text)
+            else:
+                market = None
+                if hasattr(self, 'market_combo') and self.market_combo:
+                    market_text = self.market_combo.currentText()
+                    if market_text != "全部":
+                        market = market_text
+                stocks = self.stock_service.get_stock_list(market=market)
+
+            # 为每个股票添加来源标记
+            for stock in stocks:
+                stock['source'] = 'service'
+                stock['status'] = 'online'
+
+            return stocks
+
+        except Exception as e:
+            logger.error(f"使用服务获取股票列表失败: {e}")
+            return []
 
     @pyqtSlot(list)
     def _on_data_loaded(self, stocks: List[Dict[str, Any]]) -> None:

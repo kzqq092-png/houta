@@ -61,7 +61,7 @@ class PluginConfigWidget(QWidget):
         header_layout.addWidget(self.enabled_cb)
 
         # 测试按钮
-        test_btn = QPushButton(" 测试连接")
+        test_btn = QPushButton("测试连接")
         test_btn.setMaximumWidth(100)
         test_btn.clicked.connect(self._on_test_requested)
         header_layout.addWidget(test_btn)
@@ -92,7 +92,7 @@ class PluginConfigWidget(QWidget):
         # 缓存设置
         self.cache_duration_spin = QSpinBox()
         self.cache_duration_spin.setRange(1, 60)
-        self.cache_duration_spin.setSuffix(" 分钟")
+        self.cache_duration_spin.setSuffix("分钟")
         self.cache_duration_spin.setValue(self.config.get('cache_duration_minutes', 5))
         self.cache_duration_spin.setToolTip("数据缓存持续时间")
         self.cache_duration_spin.valueChanged.connect(self._on_config_changed)
@@ -109,7 +109,7 @@ class PluginConfigWidget(QWidget):
         # 超时设置
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(5, 120)
-        self.timeout_spin.setSuffix(" 秒")
+        self.timeout_spin.setSuffix("秒")
         self.timeout_spin.setValue(self.config.get('timeout_seconds', 30))
         self.timeout_spin.setToolTip("网络请求超时时间")
         self.timeout_spin.valueChanged.connect(self._on_config_changed)
@@ -311,21 +311,21 @@ class SentimentPluginConfigDialog(QDialog):
         # 工具栏
         toolbar_layout = QHBoxLayout()
 
-        refresh_btn = QPushButton(" 刷新状态")
+        refresh_btn = QPushButton("刷新状态")
         refresh_btn.clicked.connect(self.refresh_plugin_status)
         toolbar_layout.addWidget(refresh_btn)
 
-        test_all_btn = QPushButton(" 测试所有")
+        test_all_btn = QPushButton("测试所有")
         test_all_btn.clicked.connect(self.test_all_plugins)
         toolbar_layout.addWidget(test_all_btn)
 
         toolbar_layout.addStretch()
 
-        export_btn = QPushButton(" 导出配置")
+        export_btn = QPushButton("导出配置")
         export_btn.clicked.connect(self.export_config)
         toolbar_layout.addWidget(export_btn)
 
-        import_btn = QPushButton(" 导入配置")
+        import_btn = QPushButton("导入配置")
         import_btn.clicked.connect(self.import_config)
         toolbar_layout.addWidget(import_btn)
 
@@ -355,7 +355,7 @@ class SentimentPluginConfigDialog(QDialog):
         self.refresh_interval_spin = QSpinBox()
         self.refresh_interval_spin.setRange(1, 60)
         self.refresh_interval_spin.setValue(10)
-        self.refresh_interval_spin.setSuffix(" 分钟")
+        self.refresh_interval_spin.setSuffix("分钟")
         global_layout.addRow("刷新间隔:", self.refresh_interval_spin)
 
         self.max_concurrent_spin = QSpinBox()

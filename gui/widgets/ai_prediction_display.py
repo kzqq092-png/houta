@@ -322,7 +322,7 @@ class PredictionHistoryWidget(QWidget):
         layout.addWidget(self.history_table)
 
         # 统计信息
-        stats_group = QGroupBox("📊 统计信息")
+        stats_group = QGroupBox("统计信息")
         stats_layout = QGridLayout(stats_group)
 
         # 总预测次数
@@ -533,7 +533,7 @@ class RealTimePredictionWidget(QWidget):
         layout.addWidget(status_group)
 
         # 实时图表
-        chart_group = QGroupBox("📈 实时预测图表")
+        chart_group = QGroupBox("实时预测图表")
         chart_layout = QVBoxLayout(chart_group)
 
         self.real_time_chart = PredictionChart()
@@ -543,7 +543,7 @@ class RealTimePredictionWidget(QWidget):
         layout.addWidget(chart_group)
 
         # 最新预测结果
-        latest_group = QGroupBox("🎯 最新预测结果")
+        latest_group = QGroupBox("最新预测结果")
         latest_layout = QFormLayout(latest_group)
 
         # 预测类型
@@ -695,7 +695,7 @@ class AIPredictionDisplay(QWidget):
         layout = QVBoxLayout(self)
 
         # 标题
-        title_label = QLabel("🎯 AI预测结果展示")
+        title_label = QLabel("AI预测结果展示")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -719,11 +719,11 @@ class AIPredictionDisplay(QWidget):
 
         # 趋势分析选项卡
         trend_tab = self.create_trend_analysis_tab()
-        self.tab_widget.addTab(trend_tab, "📈 趋势分析")
+        self.tab_widget.addTab(trend_tab, "趋势分析")
 
         # 模型性能选项卡
         performance_tab = self.create_model_performance_tab()
-        self.tab_widget.addTab(performance_tab, "⚡ 模型性能")
+        self.tab_widget.addTab(performance_tab, "模型性能")
 
         layout.addWidget(self.tab_widget)
 
@@ -733,7 +733,7 @@ class AIPredictionDisplay(QWidget):
         layout = QVBoxLayout(widget)
 
         # 趋势控制区域
-        control_group = QGroupBox("📊 趋势分析控制")
+        control_group = QGroupBox("趋势分析控制")
         control_layout = QHBoxLayout(control_group)
 
         # 分析类型
@@ -749,7 +749,7 @@ class AIPredictionDisplay(QWidget):
         control_layout.addWidget(time_window_combo)
 
         # 分析按钮
-        analyze_btn = QPushButton("📈 开始分析")
+        analyze_btn = QPushButton("开始分析")
         control_layout.addWidget(analyze_btn)
 
         control_layout.addStretch()
@@ -757,7 +757,7 @@ class AIPredictionDisplay(QWidget):
         layout.addWidget(control_group)
 
         # 趋势图表区域
-        chart_group = QGroupBox("📈 趋势图表")
+        chart_group = QGroupBox("趋势图表")
         chart_layout = QVBoxLayout(chart_group)
 
         trend_chart = PredictionChart()
@@ -767,21 +767,21 @@ class AIPredictionDisplay(QWidget):
         layout.addWidget(chart_group)
 
         # 趋势分析结果
-        results_group = QGroupBox("📋 分析结果")
+        results_group = QGroupBox("分析结果")
         results_layout = QVBoxLayout(results_group)
 
         results_text = QTextEdit()
         results_text.setMaximumHeight(150)
         results_text.setReadOnly(True)
         results_text.setText("""
-📊 趋势分析报告：
+ 趋势分析报告：
 
 • 置信度趋势：过去24小时内平均置信度为 84.2%，呈上升趋势
 • 预测准确率：当前准确率为 87.5%，较昨日提升 3.2%
 • 执行时间：平均执行时间为 125ms，性能稳定
 • 预测频率：每分钟平均 2.3 次预测，符合预期
 
-🔍 关键洞察：
+ 关键洞察：
 • AI模型在上午时段表现最佳
 • 执行时间预测的准确率最高（92.1%）
 • 异常检测的误报率有所下降
@@ -798,7 +798,7 @@ class AIPredictionDisplay(QWidget):
         layout = QVBoxLayout(widget)
 
         # 性能指标区域
-        metrics_group = QGroupBox("⚡ 性能指标")
+        metrics_group = QGroupBox("性能指标")
         metrics_layout = QGridLayout(metrics_group)
 
         # 响应时间
@@ -836,7 +836,7 @@ class AIPredictionDisplay(QWidget):
         layout.addWidget(metrics_group)
 
         # 模型比较区域
-        comparison_group = QGroupBox("🔄 模型比较")
+        comparison_group = QGroupBox("模型比较")
         comparison_layout = QVBoxLayout(comparison_group)
 
         comparison_table = QTableWidget()

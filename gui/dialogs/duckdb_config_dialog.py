@@ -32,9 +32,7 @@ from PyQt5.QtGui import QFont, QIcon, QPixmap, QPalette, QColor
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-
 logger = logger
-
 
 class DuckDBConfigTestThread(QThread):
     """DuckDB配置测试线程"""
@@ -129,7 +127,6 @@ class DuckDBConfigTestThread(QThread):
         except Exception as e:
             logger.error(f"配置测试失败: {e}")
             self.test_failed.emit(str(e))
-
 
 class DuckDBConfigDialog(QDialog):
     """DuckDB配置管理对话框"""
@@ -1161,7 +1158,6 @@ class DuckDBConfigDialog(QDialog):
         except Exception as e:
             logger.error(f"加载测试结果失败: {e}")
 
-
 def show_duckdb_config_dialog(parent=None):
     """显示DuckDB配置对话框"""
     try:
@@ -1177,7 +1173,6 @@ def show_duckdb_config_dialog(parent=None):
         if parent:
             QMessageBox.warning(parent, "错误", f"无法打开DuckDB配置对话框: {e}")
         return QDialog.Rejected
-
 
 if __name__ == '__main__':
     import sys

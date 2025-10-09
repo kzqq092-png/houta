@@ -559,11 +559,11 @@ class ModernStrategyPerformanceTab(QWidget):
             # 将股票信息分行显示，每行最多显示3只股票
             for i in range(0, len(full_stock_info_list), 3):
                 line_stocks = full_stock_info_list[i:i+3]
-                tooltip_lines.append("  " + ", ".join(line_stocks))
+                tooltip_lines.append("" + ", ".join(line_stocks))
 
             if len(selected_codes) < total_stocks:
                 tooltip_lines.append("")
-                tooltip_lines.append(" 提示：可在设置中调整分析股票数量")
+                tooltip_lines.append("提示：可在设置中调整分析股票数量")
 
             tooltip_text = "\n".join(tooltip_lines)
 
@@ -583,7 +583,7 @@ class ModernStrategyPerformanceTab(QWidget):
         try:
             import pandas as pd
             import numpy as np
-            from core.services.unified_data_manager import UnifiedDataManager
+            from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
             from core.tet_data_pipeline import StandardQuery
             from core.plugin_types import AssetType, DataType
             import datetime
@@ -591,7 +591,7 @@ class ModernStrategyPerformanceTab(QWidget):
             # 获取统一数据管理器实例
             try:
                 from core.containers import get_service_container
-                from core.services.unified_data_manager import UnifiedDataManager  # Added import
+                from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager  # Added import
                 container = get_service_container()
                 data_manager = None
                 if container:
@@ -616,11 +616,11 @@ class ModernStrategyPerformanceTab(QWidget):
 
                 if data_manager is None:
                     logger.warning("未能从服务容器获取UnifiedDataManager，尝试创建新实例。")
-                    data_manager = UnifiedDataManager()
+                    data_manager = get_unified_data_manager()
                     logger.info("UnifiedDataManager新实例创建成功")
             except Exception as e:
                 logger.error(f"获取UnifiedDataManager时发生未知错误: {e}", exc_info=True)
-                data_manager = UnifiedDataManager()  # 兜底方案
+                data_manager = get_unified_data_manager()  # 兜底方案
 
             if not data_manager:
                 logger.warning("无法获取UnifiedDataManager，无法获取真实市场数据")

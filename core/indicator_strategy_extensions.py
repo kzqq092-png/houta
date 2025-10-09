@@ -9,7 +9,6 @@ import pandas as pd
 from .plugin_types import PluginType
 from .data_source_extensions import PluginInfo  # 复用通用的 PluginInfo 定义
 
-
 class IIndicatorPluginV2(ABC):
     """
     指标插件 V2 标准接口
@@ -44,7 +43,6 @@ class IIndicatorPluginV2(ABC):
     def calculate(self, data: pd.DataFrame, **params) -> Dict[str, pd.Series]:
         """计算指标，返回包含若干序列的字典。"""
         pass
-
 
 class IStrategyPluginV2(ABC):
     """

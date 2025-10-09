@@ -5,7 +5,6 @@ from loguru import logger
 # 日志系统已迁移到Loguru
 # 直接使用 logger.info(), logger.error() 等方法
 
-
 def calculate_atr(df, period=14):
     """
     计算ATR (Average True Range)
@@ -37,7 +36,6 @@ def calculate_atr(df, period=14):
     true_range = np.max(ranges, axis=1)
     return true_range.rolling(period).mean()
 
-
 def calculate_drawdown(equity_curve):
     """
     计算回撤 - 保留简单版本用于快速计算
@@ -67,7 +65,6 @@ def calculate_drawdown(equity_curve):
     logger.info(f"回撤计算完成，最大回撤={max_drawdown:.4f}")
     return drawdown, max_drawdown
 
-
 def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252):
     """
     计算夏普比率 - 保留简单版本用于快速计算
@@ -95,7 +92,6 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252):
 
     logger.info(f"夏普比率计算完成，年化夏普比率={annual_sharpe:.4f}")
     return annual_sharpe
-
 
 def calculate_performance_metrics(trades=None, equity_curve=None, returns_df=None):
     """
@@ -150,7 +146,6 @@ def calculate_performance_metrics(trades=None, equity_curve=None, returns_df=Non
         logger.error(f"性能指标计算失败: {e}")
         return _calculate_simple_performance_metrics_fallback(trades, equity_curve)
 
-
 def _build_returns_from_trades(trades):
     """从交易记录构建收益序列"""
     # 使用全局logger
@@ -169,7 +164,6 @@ def _build_returns_from_trades(trades):
         returns.append(trade_return)
 
     return pd.DataFrame({'daily_return': returns})
-
 
 def _calculate_simple_performance_metrics_fallback(trades, equity_curve):
     """简化版性能指标计算 - 作为后备方案"""
@@ -228,7 +222,6 @@ def _calculate_simple_performance_metrics_fallback(trades, equity_curve):
     logger.info("后备方案性能指标计算完成")
     return metrics
 
-
 def get_optimal_position_size(capital, risk_per_trade, entry_price, stop_loss):
     """
     计算最优仓位大小（基于固定风险）
@@ -263,7 +256,6 @@ def get_optimal_position_size(capital, risk_per_trade, entry_price, stop_loss):
     result = position_size if position_size >= 100 else 0
     logger.info(f"最优仓位计算完成，建议仓位={result}股")
     return result
-
 
 def _kdata_preprocess(df, context="分析"):
     """K线数据预处理：检查并修正所有关键字段，统一处理datetime字段"""

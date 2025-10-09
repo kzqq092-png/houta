@@ -19,7 +19,6 @@ except ImportError:
     talib = None
     TALIB_AVAILABLE = False
 
-
 def calculate_macd(df: pd.DataFrame, fastperiod: int = 12, slowperiod: int = 26, signalperiod: int = 9) -> pd.DataFrame:
     """
     计算MACD指标
@@ -66,7 +65,6 @@ def calculate_macd(df: pd.DataFrame, fastperiod: int = 12, slowperiod: int = 26,
 
     return result
 
-
 def calculate_rsi(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
     """
     计算RSI指标
@@ -104,7 +102,6 @@ def calculate_rsi(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
         result['RSI'] = pd.Series([float('nan')] * len(df), index=df.index)
 
     return result
-
 
 def calculate_kdj(df: pd.DataFrame, fastk_period: int = 9, slowk_period: int = 3, slowd_period: int = 3) -> pd.DataFrame:
     """
@@ -166,7 +163,6 @@ def calculate_kdj(df: pd.DataFrame, fastk_period: int = 9, slowk_period: int = 3
 
     return result
 
-
 def calculate_cci(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
     """
     计算CCI指标
@@ -202,7 +198,6 @@ def calculate_cci(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
         result['CCI'] = pd.Series([float('nan')] * len(df), index=df.index)
 
     return result
-
 
 def calculate_stoch(df: pd.DataFrame, fastk_period: int = 5, slowk_period: int = 3, slowd_period: int = 3,
                     slowk_matype: int = 0, slowd_matype: int = 0) -> pd.DataFrame:

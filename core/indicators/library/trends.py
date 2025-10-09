@@ -19,7 +19,6 @@ except ImportError:
     talib = None
     TALIB_AVAILABLE = False
 
-
 def calculate_ma(df: pd.DataFrame, timeperiod: int = 20) -> pd.DataFrame:
     """
     计算移动平均线
@@ -48,7 +47,6 @@ def calculate_ma(df: pd.DataFrame, timeperiod: int = 20) -> pd.DataFrame:
         result['MA'] = pd.Series([float('nan')] * len(df), index=df.index)
 
     return result
-
 
 def calculate_bbands(df: pd.DataFrame, timeperiod: int = 20, nbdevup: float = 2.0, nbdevdn: float = 2.0) -> pd.DataFrame:
     """
@@ -94,7 +92,6 @@ def calculate_bbands(df: pd.DataFrame, timeperiod: int = 20, nbdevup: float = 2.
             result[col] = pd.Series([float('nan')] * len(df), index=df.index)
 
     return result
-
 
 def calculate_adx(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
     """

@@ -3,10 +3,8 @@ from hikyuu.trade_sys import EnvironmentBase
 import numpy as np
 import pandas as pd
 
-
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 from loguru import logger
-
 
 class MarketEnvironment(EnvironmentBase):
     """

@@ -29,7 +29,6 @@ from datetime import datetime, timedelta
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
 class SectorFundFlowExample:
     """板块资金流功能使用示例类"""
 
@@ -46,8 +45,7 @@ class SectorFundFlowExample:
 
             # 直接创建SectorDataService，避免依赖服务容器
             from core.services.sector_data_service import SectorDataService
-            from core.performance.cache_manager import MultiLevelCacheManager
-            from core.tet_data_pipeline import TETDataPipeline
+                        from core.tet_data_pipeline import TETDataPipeline
 
             # 创建必要的组件（这里可以使用None，SectorDataService会处理）
             cache_manager = None  # SectorDataService会处理None情况
@@ -255,12 +253,10 @@ class SectorFundFlowExample:
         logger.info("- 要使用API功能，请先启动API服务: python api_server.py")
         logger.info("- 更多功能请参考README.md中的详细文档")
 
-
 def main():
     """主函数"""
     example = SectorFundFlowExample()
     example.run_all_examples()
-
 
 if __name__ == "__main__":
     # 配置日志格式

@@ -7,7 +7,6 @@ from loguru import logger
 from PyQt5.QtCore import Qt
 from datetime import datetime
 
-
 class CustomIndicatorManagerDialog(QDialog):
     """
     自定义情绪指标管理对话框，支持添加、编辑、删除自定义指标，数据持久化。

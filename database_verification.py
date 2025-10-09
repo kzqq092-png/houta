@@ -66,7 +66,7 @@ def check_database_content(db_path):
                     columns = [row[0] for row in columns_result]
 
                     print(f"    字段: {', '.join(columns)}")
-                    print("    样本数据:")
+                    print("  样本数据:")
                     for i, row in enumerate(sample_result):
                         print(f"      第{i+1}行: {dict(zip(columns, row))}")
 

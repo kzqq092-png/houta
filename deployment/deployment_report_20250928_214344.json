@@ -1,0 +1,195 @@
+{
+  "timestamp": "2025-09-28T21:43:44.108465",
+  "deployment_summary": {
+    "overall_success_rate": 66.67,
+    "stage_success_rates": {
+      "dependency_installation": 100.0,
+      "configuration": 100.0,
+      "service_deployment": 0,
+      "validation": 66.67
+    },
+    "total_errors": 1,
+    "deployment_status": "FAILED"
+  },
+  "deployment_details": {
+    "pre_deployment_checks": {},
+    "dependency_installation": {
+      "total_packages": 9,
+      "successful_installs": 9,
+      "failed_installs": [],
+      "success_rate": 100.0,
+      "details": {
+        "pip_upgrade": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: pip in e:\\anaconda3\\lib\\site-packages (24.2)\nCollecting pip\n  Downloading https://mirrors.aliyun.com/pypi/packages/b7/3f/945ef7ab14dc4f9d7f40288d2df998d1837ee0888ec3659c813487572faa/pip-25.2-py3-none-any.whl (1.8 MB)\n     ---------------------------------------- 1.8/1.8 MB 1.8 MB/s eta 0:00:00\nInstalling collected packages: pip\n  Attempting uninstall: pip\n    Found existing installation: pip 24.2\n    Uninstalling pip-24.2:\n      Successfully uninstalled pip-24.2\nSuccessfully installed pip-25.2\n",
+          "error": ""
+        },
+        "loguru>=0.7.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: loguru>=0.7.0 in e:\\anaconda3\\lib\\site-packages (0.7.3)\nRequirement already satisfied: colorama>=0.3.4 in e:\\anaconda3\\lib\\site-packages (from loguru>=0.7.0) (0.4.6)\nRequirement already satisfied: win32-setctime>=1.0.0 in e:\\anaconda3\\lib\\site-packages (from loguru>=0.7.0) (1.2.0)\n",
+          "error": ""
+        },
+        "psutil>=5.9.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: psutil>=5.9.0 in e:\\anaconda3\\lib\\site-packages (5.9.0)\n",
+          "error": ""
+        },
+        "pandas>=1.5.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: pandas>=1.5.0 in e:\\anaconda3\\lib\\site-packages (2.2.2)\nRequirement already satisfied: numpy>=1.26.0 in e:\\anaconda3\\lib\\site-packages (from pandas>=1.5.0) (1.26.4)\nRequirement already satisfied: python-dateutil>=2.8.2 in e:\\anaconda3\\lib\\site-packages (from pandas>=1.5.0) (2.9.0.post0)\nRequirement already satisfied: pytz>=2020.1 in e:\\anaconda3\\lib\\site-packages (from pandas>=1.5.0) (2024.1)\nRequirement already satisfied: tzdata>=2022.7 in e:\\anaconda3\\lib\\site-packages (from pandas>=1.5.0) (2023.3)\nRequirement already satisfied: six>=1.5 in e:\\anaconda3\\lib\\site-packages (from python-dateutil>=2.8.2->pandas>=1.5.0) (1.16.0)\n",
+          "error": ""
+        },
+        "numpy>=1.21.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: numpy>=1.21.0 in e:\\anaconda3\\lib\\site-packages (1.26.4)\n",
+          "error": ""
+        },
+        "requests>=2.28.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: requests>=2.28.0 in e:\\anaconda3\\lib\\site-packages (2.32.3)\nRequirement already satisfied: charset-normalizer<4,>=2 in e:\\anaconda3\\lib\\site-packages (from requests>=2.28.0) (3.3.2)\nRequirement already satisfied: idna<4,>=2.5 in e:\\anaconda3\\lib\\site-packages (from requests>=2.28.0) (3.7)\nRequirement already satisfied: urllib3<3,>=1.21.1 in e:\\anaconda3\\lib\\site-packages (from requests>=2.28.0) (2.2.3)\nRequirement already satisfied: certifi>=2017.4.17 in e:\\anaconda3\\lib\\site-packages (from requests>=2.28.0) (2025.1.31)\n",
+          "error": ""
+        },
+        "aiohttp>=3.8.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: aiohttp>=3.8.0 in e:\\anaconda3\\lib\\site-packages (3.12.15)\nRequirement already satisfied: aiohappyeyeballs>=2.5.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.8.0) (2.6.1)\nRequirement already satisfied: aiosignal>=1.4.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.8.0) (1.4.0)\nRequirement already satisfied: attrs>=17.3.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.8.0) (23.1.0)\nRequirement already satisfied: frozenlist>=1.1.1 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.8.0) (1.4.0)\nRequirement already satisfied: multidict<7.0,>=4.5 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.8.0) (6.0.4)\nRequirement already satisfied: propcache>=0.2.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.8.0) (0.3.2)\nRequirement already satisfied: yarl<2.0,>=1.17.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.8.0) (1.20.1)\nRequirement already satisfied: idna>=2.0 in e:\\anaconda3\\lib\\site-packages (from yarl<2.0,>=1.17.0->aiohttp>=3.8.0) (3.7)\nRequirement already satisfied: typing-extensions>=4.2 in e:\\anaconda3\\lib\\site-packages (from aiosignal>=1.4.0->aiohttp>=3.8.0) (4.11.0)\n",
+          "error": ""
+        },
+        "asyncio-mqtt>=0.11.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nCollecting asyncio-mqtt>=0.11.0\n  Downloading https://mirrors.aliyun.com/pypi/packages/2a/64/c8a8c2ed51f3c1f4b8d2f244424d3bad3fbd4333eb01589c6b00a6dd2c04/asyncio_mqtt-0.16.2-py3-none-any.whl (17 kB)\nCollecting paho-mqtt>=1.6.0 (from asyncio-mqtt>=0.11.0)\n  Downloading https://mirrors.aliyun.com/pypi/packages/c4/cb/00451c3cf31790287768bb12c6bec834f5d292eaf3022afc88e14b8afc94/paho_mqtt-2.1.0-py3-none-any.whl (67 kB)\nInstalling collected packages: paho-mqtt, asyncio-mqtt\n\nSuccessfully installed asyncio-mqtt-0.16.2 paho-mqtt-2.1.0\n",
+          "error": ""
+        },
+        "duckdb>=0.8.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: duckdb>=0.8.0 in e:\\anaconda3\\lib\\site-packages (1.3.2)\n",
+          "error": ""
+        },
+        "akshare>=1.9.0": {
+          "success": true,
+          "output": "Looking in indexes: https://mirrors.aliyun.com/pypi/simple\nRequirement already satisfied: akshare>=1.9.0 in e:\\anaconda3\\lib\\site-packages (1.17.31)\nRequirement already satisfied: aiohttp>=3.11.13 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (3.12.15)\nRequirement already satisfied: beautifulsoup4>=4.9.1 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (4.12.3)\nRequirement already satisfied: lxml>=4.2.1 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (5.2.1)\nRequirement already satisfied: pandas>=0.25 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (2.2.2)\nRequirement already satisfied: requests>=2.22.0 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (2.32.3)\nRequirement already satisfied: html5lib>=1.0.1 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (1.1)\nRequirement already satisfied: xlrd>=1.2.0 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (2.0.2)\nRequirement already satisfied: urllib3>=1.25.8 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (2.2.3)\nRequirement already satisfied: tqdm>=4.43.0 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (4.66.5)\nRequirement already satisfied: openpyxl>=3.0.3 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (3.1.5)\nRequirement already satisfied: jsonpath>=0.82 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (0.82.2)\nRequirement already satisfied: tabulate>=0.8.6 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (0.9.0)\nRequirement already satisfied: decorator>=4.4.2 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (5.1.1)\nRequirement already satisfied: nest_asyncio>=1.6.0 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (1.6.0)\nRequirement already satisfied: mini-racer>=0.12.4 in e:\\anaconda3\\lib\\site-packages (from akshare>=1.9.0) (0.12.4)\nRequirement already satisfied: aiohappyeyeballs>=2.5.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.11.13->akshare>=1.9.0) (2.6.1)\nRequirement already satisfied: aiosignal>=1.4.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.11.13->akshare>=1.9.0) (1.4.0)\nRequirement already satisfied: attrs>=17.3.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.11.13->akshare>=1.9.0) (23.1.0)\nRequirement already satisfied: frozenlist>=1.1.1 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.11.13->akshare>=1.9.0) (1.4.0)\nRequirement already satisfied: multidict<7.0,>=4.5 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.11.13->akshare>=1.9.0) (6.0.4)\nRequirement already satisfied: propcache>=0.2.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.11.13->akshare>=1.9.0) (0.3.2)\nRequirement already satisfied: yarl<2.0,>=1.17.0 in e:\\anaconda3\\lib\\site-packages (from aiohttp>=3.11.13->akshare>=1.9.0) (1.20.1)\nRequirement already satisfied: idna>=2.0 in e:\\anaconda3\\lib\\site-packages (from yarl<2.0,>=1.17.0->aiohttp>=3.11.13->akshare>=1.9.0) (3.7)\nRequirement already satisfied: typing-extensions>=4.2 in e:\\anaconda3\\lib\\site-packages (from aiosignal>=1.4.0->aiohttp>=3.11.13->akshare>=1.9.0) (4.11.0)\nRequirement already satisfied: soupsieve>1.2 in e:\\anaconda3\\lib\\site-packages (from beautifulsoup4>=4.9.1->akshare>=1.9.0) (2.5)\nRequirement already satisfied: six>=1.9 in e:\\anaconda3\\lib\\site-packages (from html5lib>=1.0.1->akshare>=1.9.0) (1.16.0)\nRequirement already satisfied: webencodings in e:\\anaconda3\\lib\\site-packages (from html5lib>=1.0.1->akshare>=1.9.0) (0.5.1)\nRequirement already satisfied: et-xmlfile in e:\\anaconda3\\lib\\site-packages (from openpyxl>=3.0.3->akshare>=1.9.0) (1.1.0)\nRequirement already satisfied: numpy>=1.26.0 in e:\\anaconda3\\lib\\site-packages (from pandas>=0.25->akshare>=1.9.0) (1.26.4)\nRequirement already satisfied: python-dateutil>=2.8.2 in e:\\anaconda3\\lib\\site-packages (from pandas>=0.25->akshare>=1.9.0) (2.9.0.post0)\nRequirement already satisfied: pytz>=2020.1 in e:\\anaconda3\\lib\\site-packages (from pandas>=0.25->akshare>=1.9.0) (2024.1)\nRequirement already satisfied: tzdata>=2022.7 in e:\\anaconda3\\lib\\site-packages (from pandas>=0.25->akshare>=1.9.0) (2023.3)\nRequirement already satisfied: charset-normalizer<4,>=2 in e:\\anaconda3\\lib\\site-packages (from requests>=2.22.0->akshare>=1.9.0) (3.3.2)\nRequirement already satisfied: certifi>=2017.4.17 in e:\\anaconda3\\lib\\site-packages (from requests>=2.22.0->akshare>=1.9.0) (2025.1.31)\nRequirement already satisfied: colorama in e:\\anaconda3\\lib\\site-packages (from tqdm>=4.43.0->akshare>=1.9.0) (0.4.6)\n",
+          "error": ""
+        }
+      }
+    },
+    "configuration_setup": {
+      "config_directory": {
+        "created": true
+      },
+      "production_config": {
+        "created": true,
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\config\\production.json"
+      },
+      "log_directory": {
+        "created": true
+      },
+      "data_directory": {
+        "created": true
+      },
+      "environment_file": {
+        "created": true,
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\.env"
+      }
+    },
+    "service_deployment": {},
+    "post_deployment_validation": {
+      "configuration": {
+        "config_file_exists": true,
+        "config_file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\config\\production.json",
+        "config_valid": true,
+        "environment": "production"
+      },
+      "directory_structure": {
+        "config": {
+          "exists": true,
+          "writable": true
+        },
+        "logs": {
+          "exists": true,
+          "writable": true
+        },
+        "data": {
+          "exists": true,
+          "writable": true
+        }
+      },
+      "scripts": {
+        "startup_script_exists": false,
+        "stop_script_exists": false,
+        "startup_script_executable": false,
+        "stop_script_executable": false
+      },
+      "dependencies": {
+        "loguru": {
+          "available": true
+        },
+        "psutil": {
+          "available": true
+        },
+        "pandas": {
+          "available": true
+        },
+        "numpy": {
+          "available": true
+        },
+        "requests": {
+          "available": true
+        },
+        "aiohttp": {
+          "available": true
+        },
+        "asyncio-mqtt": {
+          "available": false
+        },
+        "duckdb": {
+          "available": true
+        },
+        "akshare": {
+          "available": true
+        }
+      },
+      "health_check": {
+        "success": false,
+        "error": "invalid syntax (unified_monitor.py, line 1411)"
+      }
+    },
+    "rollback_plan": {
+      "created": true,
+      "plan_file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\deployment\\rollback_plan.json",
+      "script_file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\rollback_deployment.sh",
+      "details": {
+        "timestamp": "2025-09-28T21:43:44.106466",
+        "backup_location": "deployment/backup_20250928_214344",
+        "rollback_steps": [
+          "1. 停止当前运行的服务",
+          "2. 恢复备份的配置文件",
+          "3. 恢复备份的代码文件",
+          "4. 重新安装之前的依赖版本",
+          "5. 重启服务并验证功能"
+        ],
+        "rollback_script": "rollback_deployment.sh",
+        "emergency_contacts": [
+          "系统管理员: admin@company.com",
+          "开发团队: dev@company.com"
+        ]
+      }
+    },
+    "errors": [
+      "System requirements check: argument 1 (impossible<bad format char>)"
+    ]
+  },
+  "system_info": {
+    "python_version": "3.12.7",
+    "platform": "win32",
+    "project_root": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui",
+    "deployment_time": "2025-09-28T21:43:44.108465"
+  },
+  "next_steps": [
+    "❌ 部署失败，需要回滚",
+    "🔄 执行回滚计划",
+    "🔍 分析失败原因",
+    "🛠️ 修复问题后重新部署",
+    "📞 联系技术支持"
+  ],
+  "step_success_rate": 50.0,
+  "success": false
+}

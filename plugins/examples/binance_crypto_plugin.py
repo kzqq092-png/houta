@@ -53,7 +53,6 @@ DEFAULT_CONFIG = {
     'max_retries': 3
 }
 
-
 class BinanceCryptoPlugin(IDataSourcePlugin):
     """币安数字货币数据源插件"""
 
@@ -770,11 +769,9 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
             self.logger.error(traceback.format_exc())
             return pd.DataFrame()
 
-
 def create_plugin() -> IDataSourcePlugin:
     """创建插件实例"""
     return BinanceCryptoPlugin()
-
 
 # 插件元数据
 PLUGIN_METADATA = {

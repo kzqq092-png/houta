@@ -28,7 +28,6 @@ from .data_router import DataSource
 
 logger = logger.bind(module=__name__)
 
-
 class QueryType(Enum):
     """查询类型枚举"""
     SINGLE_ASSET = "single_asset"           # 单资产查询
@@ -37,7 +36,6 @@ class QueryType(Enum):
     AGGREGATED = "aggregated"               # 聚合查询
     TIME_SERIES = "time_series"             # 时间序列查询
     STATISTICAL = "statistical"             # 统计查询
-
 
 class AggregationType(Enum):
     """聚合类型枚举"""
@@ -52,12 +50,10 @@ class AggregationType(Enum):
     FIRST = "first"
     LAST = "last"
 
-
 class SortOrder(Enum):
     """排序顺序枚举"""
     ASC = "asc"
     DESC = "desc"
-
 
 @dataclass
 class QueryFilter:
@@ -91,7 +87,6 @@ class QueryFilter:
         else:
             return f"{self.field} {self.operator} '{self.value}'"
 
-
 @dataclass
 class QuerySort:
     """查询排序"""
@@ -101,7 +96,6 @@ class QuerySort:
     def to_sql_order(self) -> str:
         """转换为SQL排序"""
         return f"{self.field} {self.order.value.upper()}"
-
 
 @dataclass
 class QueryAggregation:
@@ -125,7 +119,6 @@ class QueryAggregation:
             sql_agg += f" AS {self.alias}"
 
         return sql_agg
-
 
 @dataclass
 class CrossAssetQueryRequest:
@@ -189,7 +182,6 @@ class CrossAssetQueryRequest:
 
         return errors
 
-
 @dataclass
 class QueryExecutionPlan:
     """查询执行计划"""
@@ -208,7 +200,6 @@ class QueryExecutionPlan:
             'estimated_cost': self.estimated_cost,
             'parallel_execution': self.parallel_execution
         }
-
 
 @dataclass
 class QueryResult:
@@ -239,7 +230,6 @@ class QueryResult:
             result['execution_plan'] = self.execution_plan.to_dict()
 
         return result
-
 
 class CrossAssetQueryEngine:
     """
@@ -756,11 +746,9 @@ class CrossAssetQueryEngine:
         self.clear_cache()
         logger.info("CrossAssetQueryEngine 已关闭")
 
-
 # 全局实例
 _cross_asset_query_engine: Optional[CrossAssetQueryEngine] = None
 _engine_lock = threading.Lock()
-
 
 def get_cross_asset_query_engine() -> CrossAssetQueryEngine:
     """获取全局跨资产查询引擎实例"""
@@ -771,7 +759,6 @@ def get_cross_asset_query_engine() -> CrossAssetQueryEngine:
             _cross_asset_query_engine = CrossAssetQueryEngine()
 
         return _cross_asset_query_engine
-
 
 def initialize_cross_asset_query_engine(max_workers: int = 4) -> CrossAssetQueryEngine:
     """初始化跨资产查询引擎"""

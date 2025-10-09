@@ -62,7 +62,7 @@ class AlertEventHandler:
                 if history_id:
                     logger.info(f" 资源告警已保存到数据库，ID: {history_id}")
                 else:
-                    logger.error(" 保存资源告警到数据库失败")
+                    logger.error("保存资源告警到数据库失败")
 
             else:
                 # 兼容旧的字典格式
@@ -124,7 +124,7 @@ class AlertEventHandler:
                 if history_id:
                     logger.info(f" 应用告警已保存到数据库，ID: {history_id}")
                 else:
-                    logger.error(" 保存应用告警到数据库失败")
+                    logger.error("保存应用告警到数据库失败")
 
             else:
                 # 兼容旧的字典格式

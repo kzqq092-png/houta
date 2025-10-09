@@ -418,7 +418,7 @@ class SmartAlertWidget(QWidget):
         # 标题栏
         header_layout = QHBoxLayout()
 
-        title_label = QLabel(" 智能交易提醒")
+        title_label = QLabel("智能交易提醒")
         title_font = QFont()
         title_font.setPointSize(11)
         title_font.setBold(True)

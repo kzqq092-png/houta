@@ -181,7 +181,7 @@ class DataSourcePluginConfigDialog(QDialog):
         title_layout.addStretch()
 
         # 状态指示器
-        self.status_label = QLabel(" 未连接")
+        self.status_label = QLabel("未连接")
         self.status_label.setStyleSheet("color: #dc3545; font-weight: bold;")
         title_layout.addWidget(self.status_label)
 
@@ -215,25 +215,25 @@ class DataSourcePluginConfigDialog(QDialog):
         # 按钮栏
         button_layout = QHBoxLayout()
 
-        test_btn = QPushButton(" 测试连接")
+        test_btn = QPushButton("测试连接")
         test_btn.clicked.connect(self.test_connection)
         button_layout.addWidget(test_btn)
 
-        reset_btn = QPushButton(" 重置配置")
+        reset_btn = QPushButton("重置配置")
         reset_btn.clicked.connect(self.reset_config)
         button_layout.addWidget(reset_btn)
 
         button_layout.addStretch()
 
-        save_btn = QPushButton(" 保存配置")
+        save_btn = QPushButton("保存配置")
         save_btn.clicked.connect(self.save_config)
         button_layout.addWidget(save_btn)
 
-        apply_btn = QPushButton(" 保存并重连")
+        apply_btn = QPushButton("保存并重连")
         apply_btn.clicked.connect(self.save_and_reconnect)
         button_layout.addWidget(apply_btn)
 
-        cancel_btn = QPushButton(" 取消")
+        cancel_btn = QPushButton("取消")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
@@ -287,7 +287,7 @@ class DataSourcePluginConfigDialog(QDialog):
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(1, 300)
         self.timeout_spin.setValue(30)
-        self.timeout_spin.setSuffix(" 秒")
+        self.timeout_spin.setSuffix("秒")
         conn_layout.addRow("连接超时:", self.timeout_spin)
 
         layout.addWidget(conn_group)
@@ -402,7 +402,7 @@ class DataSourcePluginConfigDialog(QDialog):
         status_layout = QGridLayout(status_group)
 
         status_layout.addWidget(QLabel("连接状态:"), 0, 0)
-        self.connection_status_label = QLabel(" 未连接")
+        self.connection_status_label = QLabel("未连接")
         status_layout.addWidget(self.connection_status_label, 0, 1)
 
         status_layout.addWidget(QLabel("最后检查:"), 1, 0)
@@ -414,7 +414,7 @@ class DataSourcePluginConfigDialog(QDialog):
         status_layout.addWidget(self.response_time_label, 2, 1)
 
         # 手动检查按钮
-        manual_check_btn = QPushButton(" 立即检查")
+        manual_check_btn = QPushButton("立即检查")
         manual_check_btn.clicked.connect(self.check_health)
         status_layout.addWidget(manual_check_btn, 3, 1)
 
@@ -441,7 +441,7 @@ class DataSourcePluginConfigDialog(QDialog):
         metrics_layout.addWidget(self.health_score_label, 3, 1)
 
         # 重置统计按钮
-        reset_metrics_btn = QPushButton(" 重置统计")
+        reset_metrics_btn = QPushButton("重置统计")
         reset_metrics_btn.clicked.connect(self.reset_metrics)
         metrics_layout.addWidget(reset_metrics_btn, 4, 1)
 
@@ -454,13 +454,13 @@ class DataSourcePluginConfigDialog(QDialog):
         self.health_interval_spin = QSpinBox()
         self.health_interval_spin.setRange(10, 300)
         self.health_interval_spin.setValue(30)
-        self.health_interval_spin.setSuffix(" 秒")
+        self.health_interval_spin.setSuffix("秒")
         health_config_layout.addRow("检查间隔:", self.health_interval_spin)
 
         self.health_timeout_spin = QSpinBox()
         self.health_timeout_spin.setRange(1, 60)
         self.health_timeout_spin.setValue(10)
-        self.health_timeout_spin.setSuffix(" 秒")
+        self.health_timeout_spin.setSuffix("秒")
         health_config_layout.addRow("检查超时:", self.health_timeout_spin)
 
         self.enable_auto_check = QCheckBox("启用自动健康检查")
@@ -488,13 +488,13 @@ class DataSourcePluginConfigDialog(QDialog):
         self.cache_ttl_spin = QSpinBox()
         self.cache_ttl_spin.setRange(1, 3600)
         self.cache_ttl_spin.setValue(300)
-        self.cache_ttl_spin.setSuffix(" 秒")
+        self.cache_ttl_spin.setSuffix("秒")
         cache_layout.addRow("缓存TTL:", self.cache_ttl_spin)
 
         self.max_cache_size_spin = QSpinBox()
         self.max_cache_size_spin.setRange(1, 1000)
         self.max_cache_size_spin.setValue(100)
-        self.max_cache_size_spin.setSuffix(" MB")
+        self.max_cache_size_spin.setSuffix("MB")
         cache_layout.addRow("最大缓存大小:", self.max_cache_size_spin)
 
         layout.addWidget(cache_group)
@@ -532,14 +532,14 @@ class DataSourcePluginConfigDialog(QDialog):
         self.pool_timeout_spin = QSpinBox()
         self.pool_timeout_spin.setRange(5, 300)
         self.pool_timeout_spin.setValue(30)
-        self.pool_timeout_spin.setSuffix(" 秒")
+        self.pool_timeout_spin.setSuffix("秒")
         self.pool_timeout_spin.setToolTip("连接池中连接的超时时间")
         pool_layout.addRow("连接超时时间:", self.pool_timeout_spin)
 
         self.pool_cleanup_interval_spin = QSpinBox()
         self.pool_cleanup_interval_spin.setRange(60, 3600)
         self.pool_cleanup_interval_spin.setValue(300)
-        self.pool_cleanup_interval_spin.setSuffix(" 秒")
+        self.pool_cleanup_interval_spin.setSuffix("秒")
         self.pool_cleanup_interval_spin.setToolTip("连接池清理间隔时间")
         pool_layout.addRow("清理间隔:", self.pool_cleanup_interval_spin)
 
@@ -556,7 +556,7 @@ class DataSourcePluginConfigDialog(QDialog):
         custom_layout.addWidget(self.custom_config_text)
 
         # 验证按钮
-        validate_btn = QPushButton(" 验证JSON")
+        validate_btn = QPushButton("验证JSON")
         validate_btn.clicked.connect(self.validate_custom_config)
         custom_layout.addWidget(validate_btn)
 
@@ -755,7 +755,7 @@ class DataSourcePluginConfigDialog(QDialog):
             },
 
             # 东方财富插件
-            "examples.eastmoney_stock_plugin": {
+            "data_sources.eastmoney_plugin": {
                 "connection": {
                     "host": "push2.eastmoney.com",
                     "port": 443,
@@ -1094,11 +1094,11 @@ class DataSourcePluginConfigDialog(QDialog):
         """健康检查结果处理"""
         try:
             if is_healthy:
-                self.status_label.setText(" 已连接")
+                self.status_label.setText("已连接")
                 self.status_label.setStyleSheet("color: #28a745; font-weight: bold;")
-                self.connection_status_label.setText(" 正常")
+                self.connection_status_label.setText("正常")
             else:
-                self.status_label.setText(" 连接失败")
+                self.status_label.setText("连接失败")
                 self.status_label.setStyleSheet("color: #dc3545; font-weight: bold;")
                 self.connection_status_label.setText(f" 失败: {message}")
 
@@ -1313,7 +1313,7 @@ class DataSourcePluginConfigDialog(QDialog):
 
                     QMessageBox.information(self, "已应用", "配置已保存并重连成功，线程池配置已更新。")
                     # 刷新状态与指标
-                    self.status_label.setText(" 已连接")
+                    self.status_label.setText("已连接")
                     self.status_label.setStyleSheet("color: #28a745; font-weight: bold;")
                     self.update_metrics()
                 else:
@@ -1360,7 +1360,7 @@ class DataSourcePluginConfigDialog(QDialog):
             return "Coinbase"
         else:
             # 默认格式化：将下划线替换为空格，首字母大写
-            return self.source_id.replace("_", " ").title()
+            return self.source_id.replace("_", "").title()
 
     def _get_default_servers_for_plugin(self) -> list:
         """为插件获取默认服务器配置"""

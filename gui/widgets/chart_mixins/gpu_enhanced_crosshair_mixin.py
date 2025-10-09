@@ -17,7 +17,6 @@ from PyQt5.QtWidgets import QWidget
 
 logger = logger
 
-
 class GPUEnhancedCrosshairMixin:
     """GPU增强十字光标功能Mixin"""
 

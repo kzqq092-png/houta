@@ -87,7 +87,7 @@ class PluginTableManager:
                         self._create_kline_tables(conn, plugin_name)
                     elif data_type == DataType.FUNDAMENTAL:
                         self._create_fundamental_table(conn, plugin_name)
-                    elif data_type == DataType.FINANCIAL_STATEMENTS:
+                    elif data_type == DataType.FINANCIAL_STATEMENT:
                         self._create_financial_table(conn, plugin_name)
                     elif data_type == DataType.MACRO_ECONOMIC:
                         self._create_macro_table(conn, plugin_name)
@@ -440,7 +440,7 @@ class DataQualityMonitor:
                     )
                 """)
 
-                logger.info(" 数据质量监控表初始化完成")
+                logger.info("数据质量监控表初始化完成")
 
         except Exception as e:
             logger.error(f" 数据质量监控表初始化失败: {e}")
@@ -448,11 +448,11 @@ class DataQualityMonitor:
     def start_monitoring(self) -> bool:
         """启动数据质量监控"""
         try:
-            logger.info("🔍 启动数据质量监控...")
+            logger.info("启动数据质量监控...")
             # 这里可以添加定时监控逻辑
             # 目前只是标记监控已启动
             self._monitoring_active = True
-            logger.info("✅ 数据质量监控已启动")
+            logger.info("数据质量监控已启动")
             return True
         except Exception as e:
             logger.error(f"启动数据质量监控失败: {e}")
@@ -706,7 +706,7 @@ class FieldMappingManager:
                     )
                 """)
 
-                logger.info(" 字段映射表初始化完成")
+                logger.info("字段映射表初始化完成")
 
         except Exception as e:
             logger.error(f" 字段映射表初始化失败: {e}")

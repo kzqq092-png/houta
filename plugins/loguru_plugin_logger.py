@@ -10,7 +10,6 @@ import sys
 from contextlib import contextmanager
 from functools import wraps
 
-
 class PluginLoggerAdapter:
     """插件专用Loguru适配器 - 替代原有的_safe_log机制"""
 
@@ -85,7 +84,6 @@ class PluginLoggerAdapter:
             **extra
         ).info(f"[{self.plugin_name}] 数据操作: {operation}, 记录数: {record_count}")
 
-
 class SafePluginLogger:
     """安全插件日志器 - 完全基于Loguru，移除三层安全机制"""
 
@@ -117,7 +115,6 @@ class SafePluginLogger:
         """代理到适配器"""
         return getattr(self.adapter, name)
 
-
 @contextmanager
 def plugin_logging_context(plugin_name: str, operation: str):
     """插件日志上下文管理器"""
@@ -140,7 +137,6 @@ def plugin_logging_context(plugin_name: str, operation: str):
         safe_logger.performance(f"{operation}_error", duration, error=str(e))
         raise
 
-
 def plugin_method_logger(plugin_name: str):
     """插件方法日志装饰器"""
     def decorator(func):
@@ -154,7 +150,6 @@ def plugin_method_logger(plugin_name: str):
 
         return wrapper
     return decorator
-
 
 class PluginConfigLogger:
     """插件配置专用日志器"""
@@ -184,18 +179,15 @@ class PluginConfigLogger:
 
 # 便捷函数
 
-
 def get_plugin_logger(plugin_name: str, plugin_version: str = "1.0.0") -> SafePluginLogger:
     """获取插件专用日志器"""
     return SafePluginLogger(plugin_name, plugin_version)
-
 
 def get_plugin_config_logger(plugin_name: str) -> PluginConfigLogger:
     """获取插件配置专用日志器"""
     return PluginConfigLogger(plugin_name)
 
 # 向后兼容的safe_log函数
-
 
 def safe_log(level: str, message: str, plugin_name: str = "Unknown", error: Optional[Exception] = None):
     """向后兼容的safe_log函数 - 现在基于纯Loguru"""

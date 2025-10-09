@@ -58,10 +58,10 @@ class ModernSystemHealthTab(QWidget):
         layout.setSpacing(10)
 
         # 健康检查控制面板
-        control_group = QGroupBox(" 系统健康检查")
+        control_group = QGroupBox("系统健康检查")
         control_layout = QHBoxLayout()
 
-        self.check_button = QPushButton(" 开始健康检查")
+        self.check_button = QPushButton("开始健康检查")
         self.check_button.clicked.connect(self.run_health_check)
         control_layout.addWidget(self.check_button)
 
@@ -73,7 +73,7 @@ class ModernSystemHealthTab(QWidget):
         layout.addWidget(control_group)
 
         # 健康状态总览
-        overview_group = QGroupBox(" 健康状态总览")
+        overview_group = QGroupBox("健康状态总览")
         overview_layout = QGridLayout()
 
         self.overall_status_label = QLabel("总体状态: 未检查")
@@ -102,7 +102,7 @@ class ModernSystemHealthTab(QWidget):
         layout.addWidget(overview_group)
 
         # 详细报告
-        report_group = QGroupBox(" 详细报告")
+        report_group = QGroupBox("详细报告")
         report_layout = QVBoxLayout()
 
         self.report_text = QTextEdit()
@@ -116,7 +116,7 @@ class ModernSystemHealthTab(QWidget):
         layout.addWidget(report_group)
 
         # 建议和操作
-        recommendations_group = QGroupBox(" 建议和操作")
+        recommendations_group = QGroupBox("建议和操作")
         recommendations_layout = QVBoxLayout()
 
         self.recommendations_list = QListWidget()
@@ -186,7 +186,7 @@ class ModernSystemHealthTab(QWidget):
             return
 
         self.check_button.setEnabled(False)
-        self.check_button.setText(" 检查中...")
+        self.check_button.setText("检查中...")
 
         self._check_thread = SystemHealthCheckThread(self._health_checker)
         self._check_thread.health_check_completed.connect(self.on_check_completed)
@@ -197,7 +197,7 @@ class ModernSystemHealthTab(QWidget):
     def on_check_completed(self, report: dict):
         """健康检查完成处理"""
         self.check_button.setEnabled(True)
-        self.check_button.setText(" 开始健康检查")
+        self.check_button.setText("开始健康检查")
 
         # 更新总体状态
         overall_health = report.get('overall_health', 'unknown')
@@ -232,7 +232,7 @@ class ModernSystemHealthTab(QWidget):
     def on_check_error(self, error: str):
         """健康检查错误处理"""
         self.check_button.setEnabled(True)
-        self.check_button.setText(" 开始健康检查")
+        self.check_button.setText("开始健康检查")
 
         #  修复：更好的错误显示和日志
         logger.error(f"健康检查失败: {error}")

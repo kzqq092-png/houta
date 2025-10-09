@@ -83,7 +83,7 @@ class SystemOptimizerExample(QMainWindow):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             loop.run_until_complete(self.optimizer_service.initialize_async())
-            logger.info(" 系统优化器服务初始化成功")
+            logger.info("系统优化器服务初始化成功")
         except Exception as e:
             logger.info(f" 系统优化器服务初始化失败: {e}")
 

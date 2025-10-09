@@ -31,7 +31,6 @@ from ..strategy_events import (
 
 logger = logger
 
-
 class BacktestStatus(Enum):
     """回测状态"""
     PENDING = "pending"
@@ -40,7 +39,6 @@ class BacktestStatus(Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-
 class OptimizationStatus(Enum):
     """优化状态"""
     PENDING = "pending"
@@ -48,7 +46,6 @@ class OptimizationStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-
 
 @dataclass
 class StrategyConfig:
@@ -60,7 +57,6 @@ class StrategyConfig:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class BacktestTask:
@@ -76,7 +72,6 @@ class BacktestTask:
     created_at: datetime = field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-
 
 @dataclass
 class OptimizationTask:
@@ -95,7 +90,6 @@ class OptimizationTask:
     created_at: datetime = field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-
 
 class StrategyService(BaseService):
     """

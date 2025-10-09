@@ -46,14 +46,12 @@ except ImportError:
     ML_AVAILABLE = False
     logger.warning("机器学习库不可用，自适应缓存将使用规则基础策略")
 
-
 class AdaptiveMode(Enum):
     """自适应模式"""
     LEARNING = "learning"        # 学习模式
     OPTIMIZING = "optimizing"    # 优化模式
     STABLE = "stable"           # 稳定模式
     FALLBACK = "fallback"       # 回退模式
-
 
 class LearningPhase(Enum):
     """学习阶段"""
@@ -62,7 +60,6 @@ class LearningPhase(Enum):
     MODEL_TRAINING = "model_training"    # 模型训练阶段
     VALIDATION = "validation"            # 验证阶段
     DEPLOYMENT = "deployment"            # 部署阶段
-
 
 @dataclass
 class AdaptiveConfig:
@@ -87,7 +84,6 @@ class AdaptiveConfig:
     enable_fallback_protection: bool = True     # 启用回退保护
     max_performance_degradation: float = 0.1    # 最大性能下降容忍度
     emergency_fallback_threshold: float = 0.5   # 紧急回退阈值
-
 
 @dataclass
 class PerformanceSnapshot:
@@ -124,7 +120,6 @@ class PerformanceSnapshot:
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
-
 @dataclass
 class StrategyPerformance:
     """策略性能记录"""
@@ -145,7 +140,6 @@ class StrategyPerformance:
         self.std_performance = np.std(self.performance_history)
         self.usage_count += 1
         self.last_used = datetime.now()
-
 
 class MLCachePredictor:
     """机器学习缓存预测器"""
@@ -354,7 +348,6 @@ class MLCachePredictor:
         except Exception as e:
             logger.error(f"模型加载失败: {e}")
             return False
-
 
 class AdaptiveCacheStrategy:
     """
@@ -864,11 +857,9 @@ class AdaptiveCacheStrategy:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
-
 # 全局自适应策略管理器
 _adaptive_strategies: Dict[str, AdaptiveCacheStrategy] = {}
 _strategies_lock = threading.RLock()
-
 
 def get_adaptive_strategy(cache_name: str, config: Optional[AdaptiveConfig] = None) -> AdaptiveCacheStrategy:
     """获取自适应策略实例"""
@@ -881,7 +872,6 @@ def get_adaptive_strategy(cache_name: str, config: Optional[AdaptiveConfig] = No
         
         return _adaptive_strategies[cache_name]
 
-
 def remove_adaptive_strategy(cache_name: str) -> bool:
     """移除自适应策略实例"""
     global _adaptive_strategies
@@ -892,7 +882,6 @@ def remove_adaptive_strategy(cache_name: str) -> bool:
             del _adaptive_strategies[cache_name]
             return True
         return False
-
 
 def get_all_adaptive_strategies() -> Dict[str, AdaptiveCacheStrategy]:
     """获取所有自适应策略"""

@@ -56,7 +56,7 @@ class AIPredictionConfigDialog(QDialog):
         main_layout = QVBoxLayout(self)
 
         # 标题
-        title_label = QLabel(" AI预测系统配置管理")
+        title_label = QLabel("AI预测系统配置管理")
         title_label.setFixedHeight(30)
         title_font = QFont()
         title_font.setPointSize(16)
@@ -101,23 +101,23 @@ class AIPredictionConfigDialog(QDialog):
 
         # 模型配置标签页
         model_tab = self.create_model_config_tab()
-        self.config_tabs.addTab(model_tab, " 模型配置")
+        self.config_tabs.addTab(model_tab, "模型配置")
 
         # 验证配置标签页
         validation_tab = self.create_validation_config_tab()
-        self.config_tabs.addTab(validation_tab, " 验证配置")
+        self.config_tabs.addTab(validation_tab, "验证配置")
 
         # 特征配置标签页
         feature_tab = self.create_feature_config_tab()
-        self.config_tabs.addTab(feature_tab, " 特征配置")
+        self.config_tabs.addTab(feature_tab, "特征配置")
 
         # 缓存配置标签页
         cache_tab = self.create_cache_config_tab()
-        self.config_tabs.addTab(cache_tab, " 缓存配置")
+        self.config_tabs.addTab(cache_tab, "缓存配置")
 
         # 日志配置标签页
         logging_tab = self.create_logging_config_tab()
-        self.config_tabs.addTab(logging_tab, " 日志配置")
+        self.config_tabs.addTab(logging_tab, "日志配置")
 
         return widget
 
@@ -194,7 +194,7 @@ class AIPredictionConfigDialog(QDialog):
         # 模型更新间隔
         self.model_update_interval = QSpinBox()
         self.model_update_interval.setRange(1, 168)
-        self.model_update_interval.setSuffix(" 小时")
+        self.model_update_interval.setSuffix("小时")
         advanced_layout.addRow("模型更新间隔:", self.model_update_interval)
 
         layout.addWidget(advanced_group)
@@ -295,7 +295,7 @@ class AIPredictionConfigDialog(QDialog):
         # 缓存TTL
         self.cache_ttl = QSpinBox()
         self.cache_ttl.setRange(60, 3600)
-        self.cache_ttl.setSuffix(" 秒")
+        self.cache_ttl.setSuffix("秒")
         cache_layout.addRow("缓存有效期:", self.cache_ttl)
 
         # 最大缓存大小
@@ -346,7 +346,7 @@ class AIPredictionConfigDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 历史记录标题
-        history_label = QLabel(" 配置变更历史")
+        history_label = QLabel("配置变更历史")
         history_font = QFont()
         history_font.setBold(True)
         history_label.setFont(history_font)
@@ -360,7 +360,7 @@ class AIPredictionConfigDialog(QDialog):
         layout.addWidget(self.history_table)
 
         # 刷新按钮
-        refresh_btn = QPushButton(" 刷新历史")
+        refresh_btn = QPushButton("刷新历史")
         refresh_btn.clicked.connect(self.load_history)
         layout.addWidget(refresh_btn)
 
@@ -371,29 +371,29 @@ class AIPredictionConfigDialog(QDialog):
         layout = QHBoxLayout()
 
         # 应用按钮
-        apply_btn = QPushButton(" 应用配置")
+        apply_btn = QPushButton("应用配置")
         apply_btn.clicked.connect(self.apply_config)
         layout.addWidget(apply_btn)
 
         # 重置按钮
-        reset_btn = QPushButton(" 重置默认")
+        reset_btn = QPushButton("重置默认")
         reset_btn.clicked.connect(self.reset_to_defaults)
         layout.addWidget(reset_btn)
 
         # 导出按钮
-        export_btn = QPushButton(" 导出配置")
+        export_btn = QPushButton("导出配置")
         export_btn.clicked.connect(self.export_config)
         layout.addWidget(export_btn)
 
         # 导入按钮
-        import_btn = QPushButton(" 导入配置")
+        import_btn = QPushButton("导入配置")
         import_btn.clicked.connect(self.import_config)
         layout.addWidget(import_btn)
 
         layout.addStretch()
 
         # 关闭按钮
-        close_btn = QPushButton(" 关闭")
+        close_btn = QPushButton("关闭")
         close_btn.clicked.connect(self.close)
         layout.addWidget(close_btn)
 
@@ -465,7 +465,7 @@ class AIPredictionConfigDialog(QDialog):
 
             self.detailed_errors.setChecked(logging_config.get('detailed_errors', True))
 
-            self.status_label.setText(" 配置已加载")
+            self.status_label.setText("配置已加载")
 
         except Exception as e:
             logger.error(f"填充UI失败: {e}")
@@ -534,7 +534,7 @@ class AIPredictionConfigDialog(QDialog):
                 self.config_manager.update_config(key, value, "UI用户")
                 self.config_changed.emit(key, value)
 
-            self.status_label.setText(" 配置已保存并应用")
+            self.status_label.setText("配置已保存并应用")
             self.load_history()  # 刷新历史记录
 
             QMessageBox.information(self, "成功", "配置已成功保存并应用！")
@@ -560,7 +560,7 @@ class AIPredictionConfigDialog(QDialog):
             try:
                 self.config_manager.reset_to_defaults("UI重置")
                 self.load_current_configs()
-                self.status_label.setText(" 已重置为默认配置")
+                self.status_label.setText("已重置为默认配置")
                 QMessageBox.information(self, "成功", "配置已重置为默认值，原配置已备份！")
 
             except Exception as e:
@@ -642,7 +642,7 @@ class AIPredictionConfigDialog(QDialog):
                 self.history_table.setItem(row, 2, QTableWidgetItem(time_str))
 
                 # 查看详情按钮
-                view_btn = QPushButton(" 查看")
+                view_btn = QPushButton("查看")
                 view_btn.clicked.connect(lambda checked, data=(old_value, new_value):
                                          self.show_change_details(data[0], data[1]))
                 self.history_table.setCellWidget(row, 3, view_btn)
@@ -663,7 +663,7 @@ class AIPredictionConfigDialog(QDialog):
         layout = QVBoxLayout(dialog)
 
         # 旧配置
-        layout.addWidget(QLabel(" 变更前:"))
+        layout.addWidget(QLabel("变更前:"))
         old_text = QTextEdit()
         old_text.setReadOnly(True)
         try:
@@ -677,7 +677,7 @@ class AIPredictionConfigDialog(QDialog):
         layout.addWidget(old_text)
 
         # 新配置
-        layout.addWidget(QLabel(" 变更后:"))
+        layout.addWidget(QLabel("变更后:"))
         new_text = QTextEdit()
         new_text.setReadOnly(True)
         try:

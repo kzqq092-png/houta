@@ -16,20 +16,17 @@ from .containers import ServiceContainer
 
 logger = logger
 
-
 class SignalType(Enum):
     """信号类型"""
     BUY = "buy"
     SELL = "sell"
     HOLD = "hold"
 
-
 class PositionType(Enum):
     """仓位类型"""
     LONG = "long"
     SHORT = "short"
     EMPTY = "empty"
-
 
 @dataclass
 class TradingSignal:
@@ -46,7 +43,6 @@ class TradingSignal:
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
-
 
 @dataclass
 class Position:
@@ -76,7 +72,6 @@ class Position:
             self.unrealized_pnl = (new_price - self.avg_price) * self.quantity
         elif self.position_type == PositionType.SHORT:
             self.unrealized_pnl = (self.avg_price - new_price) * self.quantity
-
 
 class TradingEngine:
     """
@@ -422,16 +417,13 @@ class TradingEngine:
         except Exception as e:
             logger.error(f"交易引擎清理失败: {e}")
 
-
 # 全局交易引擎实例
 _global_engine = None
-
 
 def get_trading_engine() -> Optional[TradingEngine]:
     """获取全局交易引擎实例"""
     global _global_engine
     return _global_engine
-
 
 def initialize_trading_engine(service_container: ServiceContainer, event_bus: EventBus) -> TradingEngine:
     """初始化全局交易引擎"""
@@ -439,7 +431,6 @@ def initialize_trading_engine(service_container: ServiceContainer, event_bus: Ev
     if _global_engine is None:
         _global_engine = TradingEngine(service_container, event_bus)
     return _global_engine
-
 
 def cleanup_trading_engine():
     """清理全局交易引擎"""

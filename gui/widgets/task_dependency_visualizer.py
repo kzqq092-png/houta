@@ -189,7 +189,7 @@ class TaskNodeGraphicsItem(QGraphicsEllipseItem):
         menu = QMenu()
 
         # 编辑动作
-        edit_action = menu.addAction("📝 编辑任务")
+        edit_action = menu.addAction("编辑任务")
         edit_action.triggered.connect(self.edit_task)
 
         # 删除动作
@@ -199,7 +199,7 @@ class TaskNodeGraphicsItem(QGraphicsEllipseItem):
         menu.addSeparator()
 
         # 添加依赖动作
-        add_dep_action = menu.addAction("🔗 添加依赖")
+        add_dep_action = menu.addAction("添加依赖")
         add_dep_action.triggered.connect(self.add_dependency)
 
         # 查看详情动作
@@ -614,7 +614,7 @@ class TaskDependencyVisualizer(QWidget):
         layout.addWidget(toolbar)
 
         # 任务列表
-        tasks_group = QGroupBox("📋 任务列表")
+        tasks_group = QGroupBox("任务列表")
         tasks_layout = QVBoxLayout(tasks_group)
 
         self.task_list = QListWidget()
@@ -629,7 +629,7 @@ class TaskDependencyVisualizer(QWidget):
         layout.addWidget(tasks_group)
 
         # 依赖信息
-        deps_group = QGroupBox("🔗 依赖信息")
+        deps_group = QGroupBox("依赖信息")
         deps_layout = QVBoxLayout(deps_group)
 
         self.dependency_info = QTextEdit()
@@ -640,10 +640,10 @@ class TaskDependencyVisualizer(QWidget):
         layout.addWidget(deps_group)
 
         # 冲突检测
-        conflicts_group = QGroupBox("⚠️ 冲突检测")
+        conflicts_group = QGroupBox("冲突检测")
         conflicts_layout = QVBoxLayout(conflicts_group)
 
-        detect_btn = QPushButton("🔍 检测冲突")
+        detect_btn = QPushButton("检测冲突")
         detect_btn.clicked.connect(self.detect_conflicts)
         conflicts_layout.addWidget(detect_btn)
 
@@ -668,11 +668,11 @@ class TaskDependencyVisualizer(QWidget):
         layout.addWidget(auto_layout_btn)
 
         # 缩放控制
-        zoom_in_btn = QPushButton("🔍+")
+        zoom_in_btn = QPushButton("+")
         zoom_in_btn.clicked.connect(self.zoom_in)
         layout.addWidget(zoom_in_btn)
 
-        zoom_out_btn = QPushButton("🔍-")
+        zoom_out_btn = QPushButton("-")
         zoom_out_btn.clicked.connect(self.zoom_out)
         layout.addWidget(zoom_out_btn)
 
@@ -852,7 +852,7 @@ class TaskDependencyVisualizer(QWidget):
             self.conflicts_list.addItem(item)
 
         if not conflicts:
-            item = QListWidgetItem("✅ 未发现冲突")
+            item = QListWidgetItem("未发现冲突")
             self.conflicts_list.addItem(item)
 
     def auto_layout(self):

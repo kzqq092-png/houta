@@ -29,7 +29,6 @@ _theme_manager_instance: Optional['ThemeManager'] = None
 DB_PATH = os.path.join(os.path.dirname(
     os.path.dirname(__file__)), 'db', 'factorweave_system.sqlite')
 
-
 def safe_read_file(filepath):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -41,7 +40,6 @@ def safe_read_file(filepath):
         except UnicodeDecodeError:
             with open(filepath, 'r', encoding='latin1') as f:
                 return f.read()
-
 
 def load_theme_json_with_comments(path: str) -> dict:
     """读取带注释的JSON文件，自动去除注释"""
@@ -56,11 +54,9 @@ def load_theme_json_with_comments(path: str) -> dict:
         [line for line in content.splitlines() if line.strip()])
     return json.loads(content)
 
-
 class ThemeType(Enum):
     JSON = 'json'
     QSS = 'qss'
-
 
 class ThemeManager(QObject):
     """主题管理器类，统一从config/theme.json读取所有配色"""
@@ -443,7 +439,6 @@ class ThemeManager(QObject):
         self.set_theme(name)
         # 不再重复emit，set_theme已emit
         return True
-
 
 def get_theme_manager(config_manager: Optional[ConfigManager] = None) -> ThemeManager:
     """获取主题管理器实例

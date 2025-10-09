@@ -29,6 +29,7 @@ from gui.widgets.performance.tabs.data_quality_monitor_tab import ModernDataQual
 from gui.widgets.performance.tabs.system_health_tab import ModernSystemHealthTab
 # 已删除的标签页：UI优化、深度分析、算法性能、自动调优、告警配置
 # 已合并或升级为新的标签页
+from core.performance.unified_monitor import UnifiedPerformanceMonitor
 
 logger = logger
 
@@ -61,7 +62,6 @@ class ModernUnifiedPerformanceWidget(QWidget):
         self._has_smart_monitoring = False
 
         # 初始化性能监控器
-        from core.performance.unified_monitor import UnifiedPerformanceMonitor
         self.performance_monitor = UnifiedPerformanceMonitor()
         logger.info("性能监控器初始化完成")
         self.performance_integrator = None
@@ -167,10 +167,10 @@ class ModernUnifiedPerformanceWidget(QWidget):
         toolbar.setFixedHeight(40)
 
         # 状态指示器
-        self.connection_status = QLabel(" 实时连接")
+        self.connection_status = QLabel("实时连接")
         self.connection_status.setStyleSheet("""
-            color: #27ae60; 
-            font-weight: bold; 
+            color: #27ae60;
+            font-weight: bold;
             font-size: 11px;
             padding: 8px 12px;
             background: rgba(39, 174, 96, 0.1);
@@ -229,11 +229,11 @@ class ModernUnifiedPerformanceWidget(QWidget):
 
         # 2. 策略性能 - 量化策略核心指标
         self.strategy_tab = ModernStrategyPerformanceTab()
-        tab_widget.addTab(self.strategy_tab, "📈 策略性能")
+        tab_widget.addTab(self.strategy_tab, "策略性能")
 
         # 3. 算法优化 - 合并算法性能和自动调优
         self.algorithm_optimization_tab = ModernAlgorithmOptimizationTab()
-        tab_widget.addTab(self.algorithm_optimization_tab, "⚡ 算法优化")
+        tab_widget.addTab(self.algorithm_optimization_tab, "算法优化")
 
         # 4. 风险控制中心 - 升级版告警配置，专注风险管理
         self.risk_control_tab = ModernRiskControlCenterTab()
@@ -241,15 +241,15 @@ class ModernUnifiedPerformanceWidget(QWidget):
 
         # 5. 交易执行监控 - 量化交易专用，监控执行质量
         self.execution_monitor_tab = ModernTradingExecutionMonitorTab()
-        tab_widget.addTab(self.execution_monitor_tab, "⚡ 执行监控")
+        tab_widget.addTab(self.execution_monitor_tab, "执行监控")
 
         # 6. 数据质量监控 - 量化交易数据质量保障
         self.data_quality_tab = ModernDataQualityMonitorTab()
-        tab_widget.addTab(self.data_quality_tab, "📊 数据质量")
+        tab_widget.addTab(self.data_quality_tab, "数据质量")
 
         # 7. 系统健康检查 - 系统诊断和健康状态
         self.health_tab = ModernSystemHealthTab(self._health_checker)
-        tab_widget.addTab(self.health_tab, "🔍 健康检查")
+        tab_widget.addTab(self.health_tab, "健康检查")
 
         return tab_widget
 
@@ -464,7 +464,6 @@ class ModernUnifiedPerformanceWidget(QWidget):
                 if self._should_update_cache(cache_key, 3):  # 3秒缓存，风险监控需要更频繁
                     # 从风险管理系统获取真实风险数据
                     try:
-                        from core.risk_manager import RiskManager
                         from core.risk_control import RiskMonitor
                         from core.performance.professional_risk_metrics import ProfessionalRiskMetrics
 
@@ -473,7 +472,7 @@ class ModernUnifiedPerformanceWidget(QWidget):
 
                         # 尝试从风险管理器获取数据
                         try:
-                            risk_manager = RiskManager()
+                            risk_manager = None
                             if risk_manager.initialized:
                                 # 获取当前持仓风险
                                 current_positions = getattr(risk_manager, 'current_positions', {})
@@ -543,7 +542,6 @@ class ModernUnifiedPerformanceWidget(QWidget):
                     # 从交易执行系统获取真实数据
                     try:
                         from core.trading_controller import TradingController
-                        from core.business.trading_manager import TradingManager
                         from core.services.trading_service import TradingService
 
                         execution_metrics = {}
@@ -559,7 +557,7 @@ class ModernUnifiedPerformanceWidget(QWidget):
 
                         # 尝试从交易管理器获取数据
                         try:
-                            trading_manager = TradingManager()
+                            trading_manager = None
                             if hasattr(trading_manager, 'get_performance_metrics'):
                                 perf_metrics = trading_manager.get_performance_metrics()
                                 execution_metrics.update(perf_metrics)
@@ -611,7 +609,7 @@ class ModernUnifiedPerformanceWidget(QWidget):
                 if self._should_update_cache(cache_key, 5):  # 5秒缓存
                     # 从数据质量监控系统获取真实数据
                     try:
-                        from core.services.unified_data_manager import UnifiedDataManager
+                        from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
                         from plugins.data_sources.hikyuu_data_plugin import HikyuuDataPlugin
                         from core.data_source_extensions import HealthCheckResult
 
@@ -619,7 +617,7 @@ class ModernUnifiedPerformanceWidget(QWidget):
 
                         # 尝试从统一数据管理器获取数据质量信息
                         try:
-                            data_manager = UnifiedDataManager()
+                            data_manager = get_unified_data_manager()
 
                             # 获取数据源健康状态
                             health_status = getattr(data_manager, '_health_status', {})

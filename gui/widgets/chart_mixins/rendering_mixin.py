@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 # 替换旧的指标系统导入
 from core.indicator_adapter import get_indicator_english_name
 
-
 class RenderingMixin:
     """图表渲染功能Mixin"""
 

@@ -68,7 +68,6 @@ class CustomDataPlugin(IDataSourcePlugin):
         self.last_error = None
         self.config = {}
 
-
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
         return self.supported_asset_types
@@ -531,7 +530,7 @@ class CustomDataPlugin(IDataSourcePlugin):
 
     def get_supported_data_types(self) -> List[DataType]:
         """获取支持的数据类型列表"""
-        return [DataType.HISTORICAL_KLINE, DataType.REAL_TIME_QUOTE]
+        return [DataType.HISTORICAL_KLINE, DataType.REAL_TIME_QUOTE, DataType.ASSET_LIST]
 
     def initialize(self, config: Dict[str, Any]) -> bool:
         """初始化插件"""

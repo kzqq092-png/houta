@@ -13,7 +13,6 @@ from loguru import logger
 
 logger = logger
 
-
 class MetricsAggregationService:
     """
     指标聚合服务

@@ -12,7 +12,6 @@ from core.network.plugin_auto_register import initialize_plugin_network_configs,
 
 logger = logging.getLogger(__name__)
 
-
 class AppInitializer:
     """应用初始化器"""
     
@@ -206,10 +205,8 @@ class AppInitializer:
                 'error': str(e)
             }
 
-
 # 全局初始化器实例
 _app_initializer = None
-
 
 def get_app_initializer() -> AppInitializer:
     """获取应用初始化器实例"""
@@ -218,18 +215,15 @@ def get_app_initializer() -> AppInitializer:
         _app_initializer = AppInitializer()
     return _app_initializer
 
-
 def initialize_application() -> Dict[str, Any]:
     """初始化应用"""
     initializer = get_app_initializer()
     return initializer.initialize_all()
 
-
 def get_app_status() -> Dict[str, Any]:
     """获取应用状态"""
     initializer = get_app_initializer()
     return initializer.get_initialization_status()
-
 
 # 这个函数应该在应用的main.py或__init__.py中调用
 def startup_initialization():

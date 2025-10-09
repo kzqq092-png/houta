@@ -10,7 +10,6 @@ from PyQt5.QtGui import QColor, QKeySequence
 from .wave_tab_pro import WaveAnalysisTabPro
 import datetime
 
-
 class WaveAnalysisTab(WaveAnalysisTabPro):
     """波浪分析标签页 - 继承专业版功能，保持向后兼容"""
 

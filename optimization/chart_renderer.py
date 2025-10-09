@@ -27,9 +27,7 @@ import matplotlib.dates as mdates
 from core.performance import measure_performance
 from optimization.update_throttler import get_update_throttler
 
-
 logger = logger
-
 
 class RenderPriority(Enum):
     """渲染优先级"""
@@ -38,7 +36,6 @@ class RenderPriority(Enum):
     NORMAL = 3      # 普通优先级（主要指标）
     LOW = 4         # 低优先级（次要指标）
     BACKGROUND = 5  # 后台渲染（装饰元素）
-
 
 @dataclass
 class RenderTask:
@@ -54,7 +51,6 @@ class RenderTask:
         """支持优先级队列排序"""
         return self.priority.value < other.priority.value
 
-
 class ChartRenderer(QObject):
     """优化的图表渲染器"""
 
@@ -64,7 +60,7 @@ class ChartRenderer(QObject):
     render_error = pyqtSignal(str)  # 错误信号
     priority_render_complete = pyqtSignal(str, object)  # 优先级渲染完成信号
 
-    def __init__(self, max_workers: int = os.cpu_count() * 2, enable_progressive: bool = True):
+    def __init__(self, max_workers: int = os.cpu_count(), enable_progressive: bool = True):
         """
         初始化图表渲染器
 
@@ -105,7 +101,7 @@ class ChartRenderer(QObject):
 
         # 从gui版本合并的属性
         self._view_range = None  # 当前视图范围
-        self._downsampling_threshold = 5000  # 降采样阈值
+        self._downsampling_threshold = 2000  # 降采样阈值
         self._last_layout = None  # 缓存上一次布局参数
 
         # 渲染优先级管理
@@ -1182,10 +1178,8 @@ class ChartRenderer(QObject):
         ]
         return colors[index % len(colors)]
 
-
 # 全局图表渲染器实例
 _global_renderer = None
-
 
 def get_chart_renderer() -> ChartRenderer:
     """获取全局图表渲染器实例"""
@@ -1194,7 +1188,6 @@ def get_chart_renderer() -> ChartRenderer:
         _global_renderer = ChartRenderer()
         _global_renderer.start()
     return _global_renderer
-
 
 def initialize_chart_renderer(max_workers: int = 4, enable_progressive: bool = True):
     """初始化全局渲染器"""
@@ -1205,7 +1198,6 @@ def initialize_chart_renderer(max_workers: int = 4, enable_progressive: bool = T
     _global_renderer = ChartRenderer(max_workers, enable_progressive)
     _global_renderer.start()
 
-
 def shutdown_chart_renderer():
     """关闭全局渲染器"""
     global _global_renderer
@@ -1215,18 +1207,15 @@ def shutdown_chart_renderer():
 
 # 便捷函数
 
-
 def render_chart(task_id: str, render_func: Callable, data: Any,
                  priority: RenderPriority = RenderPriority.NORMAL,
                  callback: Optional[Callable] = None) -> bool:
     """渲染图表"""
     return get_chart_renderer().render_with_priority(task_id, render_func, data, priority, callback)
 
-
 def render_progressive(chart_data: Dict[str, Any], canvas, stages: Optional[List[str]] = None) -> bool:
     """渐进式渲染图表"""
     return get_chart_renderer().render_chart_progressive(chart_data, canvas, stages)
-
 
 # 导出接口
 __all__ = [

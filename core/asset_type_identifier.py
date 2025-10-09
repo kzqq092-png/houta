@@ -16,7 +16,6 @@ from dataclasses import dataclass
 
 from .plugin_types import AssetType
 
-
 @dataclass
 class IdentificationRule:
     """资产类型识别规则"""
@@ -24,7 +23,6 @@ class IdentificationRule:
     pattern: str
     description: str
     priority: int = 100  # 优先级，数字越小优先级越高
-
 
 class AssetTypeIdentifier:
     """
@@ -420,10 +418,8 @@ class AssetTypeIdentifier:
             "total_rules": len(self._identification_rules)
         }
 
-
 # 单例模式，提供全局访问点
 _global_identifier = None
-
 
 def get_asset_type_identifier() -> AssetTypeIdentifier:
     """获取全局资产类型识别器实例"""
@@ -432,17 +428,14 @@ def get_asset_type_identifier() -> AssetTypeIdentifier:
         _global_identifier = AssetTypeIdentifier()
     return _global_identifier
 
-
 # 便捷函数
 def identify_asset_type(symbol: str) -> AssetType:
     """便捷函数：识别单个股票代码的资产类型"""
     return get_asset_type_identifier().identify_asset_type_by_symbol(symbol)
 
-
 def get_asset_type_identifier() -> AssetTypeIdentifier:
     """获取资产类型识别器实例"""
     return AssetTypeIdentifier.get_instance()
-
 
 def batch_identify_asset_types(symbols: List[str]) -> Dict[str, AssetType]:
     """便捷函数：批量识别股票代码的资产类型"""

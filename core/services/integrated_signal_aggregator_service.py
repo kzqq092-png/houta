@@ -279,7 +279,7 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
     async def initialize(self):
         """初始化服务"""
         try:
-            logger.info(" 初始化智能信号聚合服务（TET模式）...")
+            logger.info("初始化智能信号聚合服务（TET模式）...")
 
             # 获取统一数据管理器
             self.unified_data_manager = get_unified_data_manager()
@@ -288,7 +288,7 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
 
             # 验证TET模式是否启用
             if not self.unified_data_manager.tet_enabled:
-                logger.warning(" TET模式未启用，尝试初始化...")
+                logger.warning("TET模式未启用，尝试初始化...")
                 self.unified_data_manager._initialize_tet_pipeline()
 
             if not self.unified_data_manager.tet_enabled:
@@ -300,7 +300,7 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
             if container:
                 try:
                     self.asset_service = container.resolve(AssetService)
-                    logger.info(" AssetService注入成功")
+                    logger.info("AssetService注入成功")
                 except Exception as e:
                     logger.warning(f" AssetService注入失败: {e}")
                     # 创建默认实例
@@ -314,7 +314,7 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
                 self.asset_service
             )
 
-            logger.info(" 智能信号聚合服务（TET模式）初始化完成")
+            logger.info("智能信号聚合服务（TET模式）初始化完成")
 
         except Exception as e:
             logger.error(f" 服务初始化失败: {e}")

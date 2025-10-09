@@ -22,7 +22,6 @@ from core.plugin_types import PluginType, PluginCategory
 from plugins.development.plugin_sdk import PluginSDK
 from core.plugin_manager import PluginManager, PluginInfo
 
-
 class PluginSearchThread(QThread):
     """插件搜索线程"""
 
@@ -49,7 +48,6 @@ class PluginSearchThread(QThread):
             self.search_completed.emit(plugins, total)
         except Exception as e:
             self.search_failed.emit(str(e))
-
 
 class PluginCard(QFrame):
     """插件卡片组件"""
@@ -161,7 +159,6 @@ class PluginCard(QFrame):
         button_layout.addWidget(install_btn)
 
         layout.addLayout(button_layout)
-
 
 class EnhancedPluginMarketDialog(QDialog):
     """增强插件市场对话框"""
@@ -676,7 +673,6 @@ class EnhancedPluginMarketDialog(QDialog):
 
         except Exception as e:
             QMessageBox.warning(self, "测试失败", f"测试项目时发生错误:\n{e}")
-
 
 if __name__ == "__main__":
     import sys

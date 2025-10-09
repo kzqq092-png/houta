@@ -46,7 +46,7 @@ class PerformanceDataBridge:
 
             logger.info("性能数据桥接器事件处理器注册完成")
         except Exception as e:
-            logger.error("注册事件处理器失败: {}", str(e))
+            logger.error(f"注册事件处理器失败: {str(e)}")
 
     def _handle_application_metric(self, event: ApplicationMetricRecorded):
         """处理应用指标事件"""
@@ -65,10 +65,10 @@ class PerformanceDataBridge:
                 "application"
             )
 
-            logger.debug("应用指标已桥接: {} - {:.3f}s", event.operation_name, event.duration)
+            logger.debug(f"应用指标已桥接: {event.operation_name} - {event.duration:.3f}s")
 
         except Exception as e:
-            logger.error("处理应用指标事件失败: {}", str(e))
+            logger.error(f"处理应用指标事件失败: {str(e)}")
 
     def _handle_system_resource(self, event: SystemResourceUpdated):
         """处理系统资源更新事件"""
@@ -78,10 +78,10 @@ class PerformanceDataBridge:
             self.deep_analysis_service.record_metric("memory_usage", event.memory_percent, "system")
             self.deep_analysis_service.record_metric("disk_usage", event.disk_percent, "system")
 
-            logger.debug("系统资源已桥接: CPU={:.1f}%, MEM={:.1f}%, DISK={:.1f}%", event.cpu_percent, event.memory_percent, event.disk_percent)
+            logger.debug(f"系统资源已桥接: CPU={event.cpu_percent:.1f}%, MEM={event.memory_percent:.1f}%, DISK={event.disk_percent:.1f}%")
 
         except Exception as e:
-            logger.error("处理系统资源事件失败: {}", str(e))
+            logger.error(f"处理系统资源事件失败: {str(e)}")
 
     def start_active_collection(self):
         """开始主动数据收集"""
@@ -123,7 +123,7 @@ class PerformanceDataBridge:
                 time.sleep(self.collection_interval)
 
             except Exception as e:
-                logger.error("数据收集循环错误: {}", str(e))
+                logger.error(f"数据收集循环错误: {str(e)}")
                 time.sleep(1)  # 错误时短暂延迟
 
     def _collect_system_metrics(self):
@@ -161,7 +161,7 @@ class PerformanceDataBridge:
 
         except Exception as e:
             try:
-                logger.error(f"收集系统指标失败: {e}")
+                logger.error(f"收集系统指标失败: {str(e)}")
             except Exception:
                 # 如果logger.error也失败，使用最基本的记录方式
                 logger.info("收集系统指标时发生错误")
@@ -181,10 +181,10 @@ class PerformanceDataBridge:
                             stats.avg_time
                         )
 
-                logger.debug("应用指标收集完成: {} 个操作", len(monitor.stats))
+                logger.debug(f"应用指标收集完成: {len(monitor.stats)} 个操作")
 
         except Exception as e:
-            logger.debug("收集应用指标时出现问题: {}", str(e))
+            logger.debug(f"收集应用指标时出现问题: {str(e)}")
 
         try:
             # 从应用指标服务获取数据
@@ -205,19 +205,19 @@ class PerformanceDataBridge:
                                 avg_duration
                             )
 
-                    logger.debug("应用服务指标收集完成: {} 个操作", len(metrics))
+                    logger.debug(f"应用服务指标收集完成: {len(metrics)} 个操作")
 
                 except Exception as e:
-                    logger.debug("应用指标服务不可用: {}", str(e))
+                    logger.debug(f"应用指标服务不可用: {str(e)}")
 
         except Exception as e:
-            logger.debug("收集应用服务指标时出现问题: {}", str(e))
+            logger.debug(f"收集应用服务指标时出现问题: {str(e)}")
 
     def inject_sample_data(self, count: int = 100):
         """注入示例数据用于测试"""
         import random
 
-        logger.info("开始注入 {} 条示例数据...", count)
+        logger.info(f"开始注入 {count} 条示例数据...")
 
         # 示例操作类型
         operations = [
@@ -245,15 +245,15 @@ class PerformanceDataBridge:
                 self.deep_analysis_service.record_metric(metric_name, value, "system")
 
             if i % 20 == 0:
-                logger.info("已注入 {}/{} 批数据", i+1, count)
+                logger.info(f"已注入 {i+1}/{count} 批数据")
 
-        logger.info("示例数据注入完成: {} 批数据", count)
+        logger.info(f"示例数据注入完成: {count} 批数据")
 
         # 验证数据
         metrics_count = len(self.deep_analysis_service.metrics_history)
         operations_count = sum(len(timings) for timings in self.deep_analysis_service.operation_timings.values())
 
-        logger.info("数据验证: 指标 {} 条, 操作 {} 条", metrics_count, operations_count)
+        logger.info(f"数据验证: 指标 {metrics_count} 条, 操作 {operations_count} 条")
 
     def get_status(self) -> Dict[str, Any]:
         """获取桥接器状态"""
@@ -304,7 +304,7 @@ if __name__ == "__main__":
 
     # 显示状态
     status = bridge.get_status()
-    logger.info("桥接器状态:", status)
+    logger.info(f"桥接器状态: {status}")
 
     # 测试深度分析功能
     analysis_service = get_deep_analysis_service()

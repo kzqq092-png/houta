@@ -111,7 +111,6 @@ else:
         }
         self.trades.append(trade_info)
 
-
 class SMAStrategy(BaseBacktraderStrategy):
     """SMA交叉策略"""
 
@@ -143,7 +142,6 @@ class SMAStrategy(BaseBacktraderStrategy):
                     'type': 'SELL',
                     'price': self.datas[0].close[0]
                 })
-
 
 class MACDStrategy(BaseBacktraderStrategy):
     """MACD策略"""
@@ -179,7 +177,6 @@ class MACDStrategy(BaseBacktraderStrategy):
                     'price': self.datas[0].close[0]
                 })
 
-
 class RSIStrategy(BaseBacktraderStrategy):
     """RSI策略"""
 
@@ -210,7 +207,6 @@ class RSIStrategy(BaseBacktraderStrategy):
                     'type': 'SELL',
                     'price': self.datas[0].close[0]
                 })
-
 
 class BollingerBandsStrategy(BaseBacktraderStrategy):
     """布林带策略"""
@@ -243,7 +239,6 @@ class BollingerBandsStrategy(BaseBacktraderStrategy):
                     'type': 'SELL',
                     'price': self.datas[0].close[0]
                 })
-
 
 class BacktraderStrategyPlugin(IStrategyPlugin):
     """Backtrader策略插件"""
@@ -614,7 +609,6 @@ class BacktraderStrategyPlugin(IStrategyPlugin):
         except Exception as e:
             logger.error(f"Backtrader策略清理失败: {e}")
 
-
 # 导出的策略类
 AVAILABLE_STRATEGIES = {
     'backtrader_sma': lambda: BacktraderStrategyPlugin(),
@@ -623,13 +617,11 @@ AVAILABLE_STRATEGIES = {
     'backtrader_bollinger': lambda: BacktraderStrategyPlugin(),
 }
 
-
 def get_available_strategies() -> Dict[str, callable]:
     """获取可用的Backtrader策略"""
     if not BACKTRADER_AVAILABLE:
         return {}
     return AVAILABLE_STRATEGIES
-
 
 def create_strategy(strategy_name: str) -> Optional[BacktraderStrategyPlugin]:
     """创建策略实例"""

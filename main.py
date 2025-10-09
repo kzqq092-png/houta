@@ -38,6 +38,12 @@ try:
     from PyQt5.QtCore import Qt
     from PyQt5.QtGui import QIcon
     from qasync import QEventLoop
+    # 设置Qt应用程序属性
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    # 设置OpenGL上下文共享，解决QtWebEngineWidgets问题
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
+
 except ImportError as e:
     logger.info(f"PyQt5导入失败: {e}")
     logger.info("请安装PyQt5: pip install PyQt5")
@@ -47,7 +53,7 @@ except ImportError as e:
 try:
     from optimization.webgpu_chart_renderer import initialize_webgpu_chart_renderer
     # 初始化WebGPU图表渲染器（包含自动降级功能）
-    initialize_webgpu_chart_renderer(max_workers=os.cpu_count() * 2, enable_progressive=True)
+    initialize_webgpu_chart_renderer(max_workers=os.cpu_count(), enable_progressive=True)
     logger.info("WebGPU硬件加速渲染系统初始化成功")
 except ImportError:
     logger.warning("WebGPU模块不可用，将使用标准渲染")
@@ -95,15 +101,6 @@ class FactorWeaveQuantApplication:
             # 抑制TensorFlow/Keras警告
             import os
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-            try:
-                import tensorflow as tf
-                # TensorFlow使用标准logging，保持原有调用
-                tf.get_logger()  # Loguru自动管理日志级别
-                import warnings
-                warnings.filterwarnings('ignore', message='Compiled the loaded model*')
-                logger.info("TensorFlow警告已抑制")
-            except ImportError:
-                pass
 
             # 3. 设置异常处理器
             setup_exception_handler(self.app)
@@ -118,7 +115,7 @@ class FactorWeaveQuantApplication:
             # 6. 创建主窗口协调器
             self._create_main_window()
 
-            logger.info(" FactorWeave-Quant  2.0 初始化完成")
+            logger.info("FactorWeave-Quant  2.0 初始化完成")
             return True
 
         except Exception as e:
@@ -137,12 +134,6 @@ class FactorWeaveQuantApplication:
         os.makedirs(cache_dir, exist_ok=True)
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = f"--user-data-dir={cache_dir}"
 
-        # 设置Qt应用程序属性
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-        # 设置OpenGL上下文共享，解决QtWebEngineWidgets问题
-        QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
-
         # 创建应用程序实例
         self.app = QApplication(sys.argv)
         self.app.setApplicationName("FactorWeave-Quant ")
@@ -160,7 +151,7 @@ class FactorWeaveQuantApplication:
         # 设置全局样式
         self._setup_global_styles()
 
-        logger.info(" Qt应用程序创建完成")
+        logger.info("Qt应用程序创建完成")
 
     def _register_qt_meta_types(self) -> None:
         """注册Qt元类型"""
@@ -286,10 +277,10 @@ class FactorWeaveQuantApplication:
 
         # 使用服务引导器注册所有服务
         if not bootstrap_services():
-            logger.error(" 服务注册失败")
+            logger.error("服务注册失败")
             return False
 
-        logger.info(" 所有服务注册完成")
+        logger.info("所有服务注册完成")
         return True
 
     def _create_main_window(self) -> None:
@@ -310,7 +301,7 @@ class FactorWeaveQuantApplication:
             self.main_window_coordinator.initialize()
             logger.info("主窗口协调器初始化完成")
 
-            logger.info(" 主窗口协调器创建完成")
+            logger.info("主窗口协调器创建完成")
         except Exception as e:
             logger.error(f" 主窗口协调器创建失败: {e}")
             logger.error(traceback.format_exc())
@@ -352,14 +343,14 @@ class FactorWeaveQuantApplication:
             if self.service_container:
                 # 清理所有服务
                 self.service_container.dispose()
-                logger.info(" 服务容器已清理")
+                logger.info("服务容器已清理")
 
             # 停止事件循环
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 loop.stop()
 
-            logger.info(" 资源清理完成")
+            logger.info("资源清理完成")
 
         except Exception as e:
             logger.error(f"清理资源时出错: {e}")

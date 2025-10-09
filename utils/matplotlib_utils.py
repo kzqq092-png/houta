@@ -9,7 +9,6 @@ from typing import Optional
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-
 def safe_tight_layout(figure: Figure, **kwargs) -> bool:
     """
     安全地应用tight_layout，如果失败则使用subplots_adjust作为备选
@@ -41,7 +40,6 @@ def safe_tight_layout(figure: Figure, **kwargs) -> bool:
         )
         return False
 
-
 def suppress_matplotlib_warnings():
     """抑制matplotlib相关的警告"""
     warnings.filterwarnings("ignore", category=UserWarning,
@@ -52,7 +50,6 @@ def suppress_matplotlib_warnings():
                             message=".*Axes decorations.*")
     warnings.filterwarnings("ignore", category=UserWarning,
                             message=".*cannot be made large enough.*")
-
 
 def configure_matplotlib_for_gui():
     """为GUI环境配置matplotlib"""
@@ -72,7 +69,6 @@ def configure_matplotlib_for_gui():
         'axes.formatter.useoffset': False,  # 禁用科学计数法
         'font.size': 8,  # 设置默认字体大小
     })
-
 
 def safe_figure_layout(figure: Figure,
                        left: float = 0.02,
@@ -105,7 +101,6 @@ def safe_figure_layout(figure: Figure,
             top=0.95, bottom=0.05,
             hspace=0.2, wspace=0.2
         )
-
 
 # 在模块导入时自动配置
 configure_matplotlib_for_gui()

@@ -14,7 +14,6 @@ from pathlib import Path
 
 logger = logger
 
-
 @dataclass
 class NotificationConfig:
     """通知配置数据类"""
@@ -42,7 +41,6 @@ class NotificationConfig:
     # 元数据
     created_at: str = ""
     updated_at: str = ""
-
 
 @dataclass
 class AlertRule:
@@ -78,7 +76,6 @@ class AlertRule:
     created_at: str = ""
     updated_at: str = ""
 
-
 @dataclass
 class AlertHistory:
     """告警历史数据类"""
@@ -93,7 +90,6 @@ class AlertHistory:
     current_value: float = 0.0
     threshold_value: float = 0.0
     recommendation: str = ""
-
 
 class AlertConfigDatabase:
     """告警配置数据库管理类"""
@@ -512,10 +508,8 @@ class AlertConfigDatabase:
             logger.error(f"配置文件迁移失败: {e}")
             return False
 
-
 # 全局数据库实例
 _alert_config_db = None
-
 
 def get_alert_config_database() -> AlertConfigDatabase:
     """获取告警配置数据库实例（单例模式）"""

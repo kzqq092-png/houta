@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/architecture-simplification/requirements.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-09-26T14:22:40.949Z",
+      "trigger": "initial",
+      "approvalId": "approval_1758896560926_whrnsg7kv",
+      "approvalTitle": "架构精简重构需求规范 - 从164个组件精简到15个核心服务"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2025-09-26T14:24:06.467Z",
+      "trigger": "approved",
+      "approvalId": "approval_1758896560926_whrnsg7kv",
+      "approvalTitle": "架构精简重构需求规范 - 从164个组件精简到15个核心服务"
+    }
+  ]
+}

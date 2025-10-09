@@ -12,7 +12,6 @@ import os
 
 logger = logger
 
-
 def get_config() -> Dict[str, Any]:
     """
     获取系统配置
@@ -58,7 +57,6 @@ def get_config() -> Dict[str, Any]:
             'import': {'batch_size': 100}
         }
 
-
 def get_data_validator():
     """
     获取数据验证器
@@ -75,7 +73,6 @@ def get_data_validator():
     except Exception as e:
         logger.warning(f"数据验证器初始化失败，使用默认验证器: {e}")
         return DefaultDataValidator()
-
 
 class DefaultDataValidator:
     """默认数据验证器"""
@@ -98,7 +95,6 @@ class DefaultDataValidator:
 
         # 简单验证：6位数字
         return len(code) == 6 and code.isdigit()
-
 
 def get_performance_monitor():
     """

@@ -160,7 +160,7 @@ class SettingsDialog(QDialog):
         self.font_size_spin = QSpinBox()
         self.font_size_spin.setRange(8, 24)
         self.font_size_spin.setValue(12)
-        self.font_size_spin.setSuffix(" pt")
+        self.font_size_spin.setSuffix("pt")
         appearance_layout.addRow("字体大小:", self.font_size_spin)
 
         basic_layout.addWidget(appearance_group)
@@ -194,14 +194,14 @@ class SettingsDialog(QDialog):
         self.update_interval_spin = QSpinBox()
         self.update_interval_spin.setRange(1, 60)
         self.update_interval_spin.setValue(5)
-        self.update_interval_spin.setSuffix(" 分钟")
+        self.update_interval_spin.setSuffix("分钟")
         data_layout.addRow("数据更新间隔:", self.update_interval_spin)
 
         # 缓存大小限制
         self.cache_size_spin = QSpinBox()
         self.cache_size_spin.setRange(100, 10000)
         self.cache_size_spin.setValue(1000)
-        self.cache_size_spin.setSuffix(" MB")
+        self.cache_size_spin.setSuffix("MB")
         data_layout.addRow("缓存大小限制:", self.cache_size_spin)
 
         basic_layout.addWidget(data_group)
@@ -299,7 +299,7 @@ class SettingsDialog(QDialog):
         self.memory_limit_spin = QSpinBox()
         self.memory_limit_spin.setRange(1, 64)
         self.memory_limit_spin.setValue(8)
-        self.memory_limit_spin.setSuffix(" GB")
+        self.memory_limit_spin.setSuffix("GB")
         quick_layout.addRow("内存限制:", self.memory_limit_spin)
 
         # 线程数
@@ -315,7 +315,7 @@ class SettingsDialog(QDialog):
         button_layout = QVBoxLayout(button_group)
 
         # 打开高级配置按钮
-        self.advanced_config_btn = QPushButton(" 高级配置管理")
+        self.advanced_config_btn = QPushButton("高级配置管理")
         self.advanced_config_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
@@ -333,7 +333,7 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(self.advanced_config_btn)
 
         # 应用快速配置按钮
-        self.apply_quick_config_btn = QPushButton(" 应用快速配置")
+        self.apply_quick_config_btn = QPushButton("应用快速配置")
         self.apply_quick_config_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
@@ -350,7 +350,7 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(self.apply_quick_config_btn)
 
         # 重置为默认按钮
-        self.reset_duckdb_btn = QPushButton(" 重置为默认")
+        self.reset_duckdb_btn = QPushButton("重置为默认")
         self.reset_duckdb_btn.setStyleSheet("""
             QPushButton {
                 background-color: #6c757d;

@@ -9,7 +9,6 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 import pandas as pd
 
-
 @dataclass
 class StockInfo:
     """股票基本信息"""
@@ -37,7 +36,6 @@ class StockInfo:
             'pe_ratio': self.pe_ratio,
             'pb_ratio': self.pb_ratio
         }
-
 
 @dataclass
 class KlineData:
@@ -79,7 +77,6 @@ class KlineData:
             'count': self.count
         }
 
-
 @dataclass
 class MarketData:
     """市场数据"""
@@ -110,7 +107,6 @@ class MarketData:
             'change': self.change,
             'change_pct': self.change_pct
         }
-
 
 @dataclass
 class QueryParams:

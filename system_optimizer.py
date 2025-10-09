@@ -21,9 +21,9 @@ from enum import Enum
 
 # 核心模块导入
 from core.services.base_service import AsyncBaseService
-from core.performance import PerformanceMonitor, get_performance_monitor
 from core.config import ConfigManager
 from core.events import EventBus
+from core.performance.unified_monitor import UnifiedPerformanceMonitor
 
 # 工具模块导入
 from utils.cache import Cache
@@ -111,7 +111,7 @@ class SystemOptimizerService(AsyncBaseService):
 
     def __init__(self,
                  config_manager: Optional[ConfigManager] = None,
-                 performance_monitor: Optional[PerformanceMonitor] = None,
+                 performance_monitor: Optional[UnifiedPerformanceMonitor] = None,
                  event_bus: Optional[EventBus] = None):
         """
         初始化系统优化器服务

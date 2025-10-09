@@ -55,7 +55,6 @@ if AKSHARE_AVAILABLE:
 
 # 获取默认插件
 
-
 def get_default_plugin():
     """获取默认的情绪数据源插件"""
     # 现在优先使用FMP插件，然后是其他独立插件
@@ -70,7 +69,6 @@ def get_default_plugin():
             else:
                 raise RuntimeError("没有可用的情绪数据源插件")
 
-
 def get_plugin_by_name(name: str):
     """根据名称获取插件"""
     if name in AVAILABLE_PLUGINS:
@@ -79,11 +77,9 @@ def get_plugin_by_name(name: str):
         available_names = list(AVAILABLE_PLUGINS.keys())
         raise ValueError(f"未找到名为 {name} 的插件。可用插件: {available_names}")
 
-
 def list_available_plugins():
     """列出所有可用的插件"""
     return list(AVAILABLE_PLUGINS.keys())
-
 
 def check_plugin_availability():
     """检查插件可用性"""

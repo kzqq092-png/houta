@@ -68,8 +68,9 @@ except ImportError:
 
         def info(self, msg): logger.info(f"[INFO] {msg}")
         def error(self, msg): logger.info(f"[ERROR] {msg}")
-        def warning(self, msg): logger.info(f"[WARNING] {msg}")
+        def warning(self, msg): logger.info(f" {msg}")
         def debug(self, msg): logger.info(f"[DEBUG] {msg}")
+
 
 class IndustryManager(QObject):
     """行业管理器类"""

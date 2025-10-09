@@ -25,11 +25,9 @@ from .enhanced_models import (
 
 logger = logger
 
-
 class DataValidationError(Exception):
     """数据验证错误"""
     pass
-
 
 class FinancialStatementConverter:
     """财务报表数据转换器"""
@@ -348,7 +346,6 @@ class FinancialStatementConverter:
         # 计算财务比率
         return calculate_financial_ratios(statement)
 
-
 class MacroEconomicDataConverter:
     """宏观经济数据转换器"""
 
@@ -607,7 +604,6 @@ class MacroEconomicDataConverter:
         macro_data.calculate_changes(previous_period_value, same_period_last_year_value)
 
         return macro_data
-
 
 class BatchDataConverter:
     """批量数据转换器"""

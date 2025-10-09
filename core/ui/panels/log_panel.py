@@ -14,7 +14,6 @@ from .base_panel import BasePanel
 from gui.widgets.log_widget import LogWidget
 from core.events.event_bus import EventBus
 
-
 class LogPanel(BasePanel):
     """日志面板类"""
 

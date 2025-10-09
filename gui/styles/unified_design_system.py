@@ -15,14 +15,12 @@ import os
 
 logger = logging.getLogger(__name__)
 
-
 class ColorScheme(Enum):
     """颜色方案枚举"""
     LIGHT = "light"
     DARK = "dark"
     AUTO = "auto"
     HIGH_CONTRAST = "high_contrast"
-
 
 class ComponentSize(Enum):
     """组件尺寸枚举"""
@@ -32,7 +30,6 @@ class ComponentSize(Enum):
     LARGE = "lg"
     EXTRA_LARGE = "xl"
 
-
 class IconSize(Enum):
     """图标尺寸枚举"""
     TINY = 12
@@ -40,7 +37,6 @@ class IconSize(Enum):
     MEDIUM = 24
     LARGE = 32
     EXTRA_LARGE = 48
-
 
 @dataclass
 class ColorPalette:
@@ -120,7 +116,6 @@ class ColorPalette:
     shadow_medium: str = "rgba(0, 0, 0, 0.16)"
     shadow_dark: str = "rgba(0, 0, 0, 0.24)"
 
-
 @dataclass
 class DarkColorPalette(ColorPalette):
     """深色主题调色板"""
@@ -138,7 +133,6 @@ class DarkColorPalette(ColorPalette):
     border_light: str = "#383838"
     border_medium: str = "#4C4C4C"
     border_dark: str = "#6C6C6C"
-
 
 @dataclass
 class Typography:
@@ -213,7 +207,6 @@ class Typography:
     button_weight: int = 500
     button_line_height: float = 1.4
 
-
 @dataclass
 class Spacing:
     """间距系统数据类"""
@@ -243,7 +236,6 @@ class Spacing:
     margin_lg: int = 24
     margin_xl: int = 32
 
-
 @dataclass
 class BorderRadius:
     """圆角系统数据类"""
@@ -256,7 +248,6 @@ class BorderRadius:
     xxl: int = 16
     full: str = "50%"
 
-
 @dataclass
 class Shadows:
     """阴影系统数据类"""
@@ -268,7 +259,6 @@ class Shadows:
     xl: str = "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
     xxl: str = "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
     inner: str = "inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)"
-
 
 @dataclass
 class ComponentStyles:
@@ -314,7 +304,6 @@ class ComponentStyles:
     tooltip_padding_y: int = 4
     tooltip_border_radius: int = 4
     tooltip_max_width: int = 300
-
 
 class DesignTokens:
     """设计令牌管理器"""
@@ -413,7 +402,6 @@ class DesignTokens:
             'dark': self.colors.border_dark
         }
         return border_colors.get(level, self.colors.border_light)
-
 
 class StyleSheetGenerator:
     """样式表生成器"""
@@ -694,7 +682,6 @@ class StyleSheetGenerator:
         }}
         """
 
-
 class UnifiedDesignSystem:
     """统一设计系统主类"""
     
@@ -812,15 +799,12 @@ class UnifiedDesignSystem:
             'timestamp': logger.info.__name__  # 简化实现
         }
 
-
 # 全局实例
 unified_design_system = UnifiedDesignSystem()
-
 
 def get_unified_design_system() -> UnifiedDesignSystem:
     """获取统一设计系统实例"""
     return unified_design_system
-
 
 def apply_design_system(app: QApplication, color_scheme: ColorScheme = ColorScheme.LIGHT):
     """应用设计系统到应用程序"""

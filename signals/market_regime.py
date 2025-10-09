@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from scipy import stats
 from loguru import logger
 
-
 def detect_market_regime(df, price_col='close', window=200, threshold=0.1, regime_window=20):
     """
     检测市场状态（牛市、熊市或震荡市）
@@ -61,7 +60,6 @@ def detect_market_regime(df, price_col='close', window=200, threshold=0.1, regim
 
     return result_df
 
-
 def detect_market_volatility(df, price_col='close', window=20, high_vol_percentile=0.8):
     """
     检测市场波动率状态
@@ -101,7 +99,6 @@ def detect_market_volatility(df, price_col='close', window=20, high_vol_percenti
                   high_vol_percentile, 'high_volatility'] = 1
 
     return result_df
-
 
 def identify_trend_reversal(df, price_col='close', short_window=20, long_window=50, signal_threshold=0.02):
     """
@@ -192,7 +189,6 @@ def identify_trend_reversal(df, price_col='close', short_window=20, long_window=
                     result_df.loc[result_df.index[i-1], 'trend_reversal'] = 0
 
     return result_df
-
 
 def plot_market_regimes(df, price_col='close', figsize=(15, 10)):
     """

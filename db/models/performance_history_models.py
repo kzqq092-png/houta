@@ -13,7 +13,6 @@ from pathlib import Path
 from dataclasses import dataclass, asdict
 from loguru import logger
 
-
 @dataclass
 class RiskHistoryRecord:
     """风险历史记录"""
@@ -35,7 +34,6 @@ class RiskHistoryRecord:
     risk_level: str
     portfolio_value: float = 0.0
     notes: str = ""
-
 
 @dataclass
 class ExecutionHistoryRecord:
@@ -59,7 +57,6 @@ class ExecutionHistoryRecord:
     order_status: str  # 'filled', 'partial', 'cancelled'
     venue: str = ""
     notes: str = ""
-
 
 class PerformanceHistoryManager:
     """性能历史数据管理器"""
@@ -476,10 +473,8 @@ class PerformanceHistoryManager:
             self.logger.error(f"清理旧记录失败: {e}")
             return False
 
-
 # 全局实例
 _performance_history_manager = None
-
 
 def get_performance_history_manager() -> PerformanceHistoryManager:
     """获取性能历史数据管理器实例"""

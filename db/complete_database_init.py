@@ -28,7 +28,6 @@ from typing import Dict, List, Any, Optional
 # Loguru配置在core.loguru_config中统一管理s - %(levelname)s - %(message)s')
 logger = logger
 
-
 class CompleteDatabaseInitializer:
     """完整数据库初始化器"""
 
@@ -73,7 +72,7 @@ class CompleteDatabaseInitializer:
 
     def _init_hikyuu_system_db(self):
         """初始化HIkyuu系统数据库"""
-        logger.info("  创建HIkyuu系统数据库表...")
+        logger.info("创建HIkyuu系统数据库表...")
 
         with sqlite3.connect(self.sqlite_db_path) as conn:
             cursor = conn.cursor()
@@ -449,7 +448,7 @@ class CompleteDatabaseInitializer:
 
     def _init_factorweave_system_db(self):
         """初始化FactorWeave系统数据库"""
-        logger.info("  创建FactorWeave系统数据库表...")
+        logger.info("创建FactorWeave系统数据库表...")
 
         with sqlite3.connect(self.factorweave_db_path) as conn:
             cursor = conn.cursor()
@@ -486,7 +485,7 @@ class CompleteDatabaseInitializer:
 
     def _insert_sqlite_initial_data(self):
         """插入SQLite初始数据"""
-        logger.info("  插入SQLite初始数据...")
+        logger.info("插入SQLite初始数据...")
 
         with sqlite3.connect(self.sqlite_db_path) as conn:
             cursor = conn.cursor()
@@ -830,7 +829,7 @@ class CompleteDatabaseInitializer:
 
     def _insert_duckdb_initial_data(self, conn):
         """插入DuckDB初始数据"""
-        logger.info("  插入DuckDB初始数据...")
+        logger.info("插入DuckDB初始数据...")
 
         # 插入测试分析缓存数据（移除智能性能洞察相关数据）
         test_cache_data = [
@@ -902,7 +901,7 @@ class CompleteDatabaseInitializer:
 
     def create_indexes(self):
         """创建性能优化索引"""
-        logger.info(" 创建性能优化索引...")
+        logger.info("创建性能优化索引...")
 
         # SQLite索引
         with sqlite3.connect(self.sqlite_db_path) as conn:
@@ -928,8 +927,7 @@ class CompleteDatabaseInitializer:
 
             conn.commit()
 
-        logger.info(" 索引创建完成")
-
+        logger.info("索引创建完成")
 
 def main():
     """主函数"""
@@ -942,11 +940,11 @@ def main():
     if initializer.initialize_all_databases():
         logger.info("\n 数据库系统初始化成功！")
         logger.info("\n 初始化内容:")
-        logger.info("   SQLite系统数据库 (OLTP)")
-        logger.info("   DuckDB分析数据库 (OLAP)")
-        logger.info("   完整表结构和索引")
-        logger.info("   初始配置和数据")
-        logger.info("   性能优化配置")
+        logger.info(" SQLite系统数据库 (OLTP)")
+        logger.info(" DuckDB分析数据库 (OLAP)")
+        logger.info(" 完整表结构和索引")
+        logger.info(" 初始配置和数据")
+        logger.info(" 性能优化配置")
 
         logger.info("\n 数据库文件:")
         logger.info(f"   SQLite: {initializer.sqlite_db_path}")
@@ -957,7 +955,6 @@ def main():
     else:
         logger.info("\n 数据库系统初始化失败！")
         return False
-
 
 if __name__ == "__main__":
     success = main()

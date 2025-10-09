@@ -4,7 +4,6 @@ import warnings
 from indicators_algo import calc_ma
 from loguru import logger
 
-
 def add_basic_indicators(df):
     """
     添加基本技术指标
@@ -97,7 +96,6 @@ def add_basic_indicators(df):
     result = result.fillna(method='bfill').fillna(method='ffill').fillna(0)
 
     return result
-
 
 def calculate_base_indicators(df):
     """
@@ -224,7 +222,6 @@ def calculate_base_indicators(df):
 
     return df
 
-
 def create_advanced_nonlinear_features(df):
     """
     创建高级非线性特征
@@ -282,7 +279,6 @@ def create_advanced_nonlinear_features(df):
         df['volatility_change'] = df['volatility_10d'].pct_change()
 
     return df
-
 
 def create_time_series_features(df):
     """

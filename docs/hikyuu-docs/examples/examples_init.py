@@ -24,7 +24,6 @@ if not os.path.exists(config_file):
     if not os.path.exists(config_file):
         raise ("未找到配置文件，请先使用数据导入工具导入数据（将自动生成配置文件）！！!")
 
-
 # starttime = time.time()
 # print "Loading Day Data ..."
 hikyuu_init(config_file)

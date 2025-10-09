@@ -17,7 +17,6 @@ from plugins.sentiment_data_source_interface import SentimentData, SentimentResp
 
 import requests
 
-
 class VIXSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
     """VIX恐慌指数插件"""
 
@@ -735,12 +734,10 @@ class VIXSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
 
         return max(0.0, min(100.0, round(composite_score, 2)))
 
-
 # 插件工厂函数
 def create_vix_sentiment_plugin() -> VIXSentimentPlugin:
     """创建VIX恐慌指数插件实例"""
     return VIXSentimentPlugin()
-
 
 if __name__ == "__main__":
     # 测试插件

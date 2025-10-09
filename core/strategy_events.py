@@ -18,7 +18,6 @@ from .strategy_extensions import (
 
 logger = logger
 
-
 class EventType(Enum):
     """事件类型"""
     STRATEGY_STARTED = "strategy_started"
@@ -35,7 +34,6 @@ class EventType(Enum):
     ORDER_FILLED = "order_filled"
     PERFORMANCE_UPDATED = "performance_updated"
 
-
 @dataclass
 class BaseEvent:
     """基础事件类"""
@@ -43,7 +41,6 @@ class BaseEvent:
     strategy_id: str
     event_type: EventType = field(init=False)
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class StrategyStartedEvent(BaseEvent):
@@ -54,7 +51,6 @@ class StrategyStartedEvent(BaseEvent):
     def __post_init__(self):
         self.event_type = EventType.STRATEGY_STARTED
 
-
 @dataclass
 class StrategyStoppedEvent(BaseEvent):
     """策略停止事件"""
@@ -64,7 +60,6 @@ class StrategyStoppedEvent(BaseEvent):
     def __post_init__(self):
         self.event_type = EventType.STRATEGY_STOPPED
 
-
 @dataclass
 class StrategyPausedEvent(BaseEvent):
     """策略暂停事件"""
@@ -73,14 +68,12 @@ class StrategyPausedEvent(BaseEvent):
     def __post_init__(self):
         self.event_type = EventType.STRATEGY_PAUSED
 
-
 @dataclass
 class StrategyResumedEvent(BaseEvent):
     """策略恢复事件"""
 
     def __post_init__(self):
         self.event_type = EventType.STRATEGY_RESUMED
-
 
 @dataclass
 class SignalGeneratedEvent(BaseEvent):
@@ -89,7 +82,6 @@ class SignalGeneratedEvent(BaseEvent):
 
     def __post_init__(self):
         self.event_type = EventType.SIGNAL_GENERATED
-
 
 @dataclass
 class TradeExecutedEvent(BaseEvent):
@@ -100,7 +92,6 @@ class TradeExecutedEvent(BaseEvent):
     def __post_init__(self):
         self.event_type = EventType.TRADE_EXECUTED
 
-
 @dataclass
 class PositionUpdatedEvent(BaseEvent):
     """持仓更新事件"""
@@ -109,7 +100,6 @@ class PositionUpdatedEvent(BaseEvent):
 
     def __post_init__(self):
         self.event_type = EventType.POSITION_UPDATED
-
 
 @dataclass
 class StrategyErrorEvent(BaseEvent):
@@ -121,7 +111,6 @@ class StrategyErrorEvent(BaseEvent):
     def __post_init__(self):
         self.event_type = EventType.STRATEGY_ERROR
 
-
 @dataclass
 class MarketOpenedEvent(BaseEvent):
     """市场开盘事件"""
@@ -130,7 +119,6 @@ class MarketOpenedEvent(BaseEvent):
     def __post_init__(self):
         self.event_type = EventType.MARKET_OPENED
 
-
 @dataclass
 class MarketClosedEvent(BaseEvent):
     """市场收盘事件"""
@@ -138,7 +126,6 @@ class MarketClosedEvent(BaseEvent):
 
     def __post_init__(self):
         self.event_type = EventType.MARKET_CLOSED
-
 
 @dataclass
 class BarUpdatedEvent(BaseEvent):
@@ -150,7 +137,6 @@ class BarUpdatedEvent(BaseEvent):
     def __post_init__(self):
         self.event_type = EventType.BAR_UPDATED
 
-
 @dataclass
 class OrderFilledEvent(BaseEvent):
     """订单成交事件"""
@@ -159,7 +145,6 @@ class OrderFilledEvent(BaseEvent):
     def __post_init__(self):
         self.event_type = EventType.ORDER_FILLED
 
-
 @dataclass
 class PerformanceUpdatedEvent(BaseEvent):
     """性能更新事件"""
@@ -167,7 +152,6 @@ class PerformanceUpdatedEvent(BaseEvent):
 
     def __post_init__(self):
         self.event_type = EventType.PERFORMANCE_UPDATED
-
 
 class IEventHandler(ABC):
     """事件处理器接口"""
@@ -194,7 +178,6 @@ class IEventHandler(ABC):
             bool: 是否可以处理
         """
         pass
-
 
 class EventBus:
     """
@@ -362,7 +345,6 @@ class EventBus:
             'global_handlers': len(self._global_handlers)
         }
 
-
 class LoggingEventHandler(IEventHandler):
     """日志事件处理器"""
 
@@ -401,7 +383,6 @@ class LoggingEventHandler(IEventHandler):
     def can_handle(self, event_type: EventType) -> bool:
         """可以处理所有事件类型"""
         return True
-
 
 class MetricsEventHandler(IEventHandler):
     """指标收集事件处理器"""
@@ -447,7 +428,6 @@ class MetricsEventHandler(IEventHandler):
         for key in self.metrics:
             self.metrics[key] = 0
 
-
 # 全局事件总线实例
 global_event_bus = EventBus()
 
@@ -459,7 +439,6 @@ default_metrics_handler = MetricsEventHandler()
 global_event_bus.subscribe_all(default_logging_handler)
 global_event_bus.subscribe_all(default_metrics_handler)
 
-
 def publish_strategy_event(event: BaseEvent) -> None:
     """
     发布策略事件的便捷函数
@@ -468,7 +447,6 @@ def publish_strategy_event(event: BaseEvent) -> None:
         event: 事件对象
     """
     global_event_bus.publish(event)
-
 
 def get_event_metrics() -> Dict[str, Any]:
     """

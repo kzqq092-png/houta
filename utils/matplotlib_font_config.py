@@ -17,7 +17,6 @@ try:
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
-
 class MatplotlibFontConfig:
     """matplotlib字体配置管理器"""
 
@@ -66,7 +65,7 @@ class MatplotlibFontConfig:
             bool: 配置是否成功
         """
         if not MATPLOTLIB_AVAILABLE:
-            logger.info(" matplotlib不可用，跳过字体配置")
+            logger.info("matplotlib不可用，跳过字体配置")
             return False
 
         # 检查是否已经配置过
@@ -88,7 +87,7 @@ class MatplotlibFontConfig:
                 logger.info(f"SUCCESS: matplotlib中文字体配置成功，使用字体: {fonts[0]}")
                 return True
             else:
-                logger.info(" matplotlib中文字体配置可能有问题")
+                logger.info("matplotlib中文字体配置可能有问题")
                 return False
 
         except Exception as e:
@@ -160,7 +159,6 @@ class MatplotlibFontConfig:
         except Exception as e:
             logger.info(f"ERROR: 重置字体配置失败: {e}")
 
-
 def configure_matplotlib_chinese_font(font_size: int = 10, force_config: bool = False) -> bool:
     """
     便捷函数：配置matplotlib中文字体
@@ -174,11 +172,9 @@ def configure_matplotlib_chinese_font(font_size: int = 10, force_config: bool = 
     """
     return MatplotlibFontConfig.configure_chinese_font(font_size, force_config)
 
-
 # 自动配置（当模块被导入时）
 if __name__ != "__main__":
     configure_matplotlib_chinese_font()
-
 
 if __name__ == "__main__":
     # 测试脚本
@@ -199,6 +195,6 @@ if __name__ == "__main__":
         for i, font in enumerate(available_fonts[:10]):  # 显示前10个
             logger.info(f"   {i+1}. {font}")
     else:
-        logger.info("   未找到中文字体")
+        logger.info(" 未找到中文字体")
 
     logger.info("\n=== 测试完成 ===")

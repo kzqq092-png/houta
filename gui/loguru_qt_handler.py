@@ -11,7 +11,6 @@ import threading
 import time
 from typing import Dict, Any, Optional
 
-
 class LoguruQtHandler(QObject):
     """纯Loguru的Qt UI处理器 - 替代BaseLogManager的Qt信号"""
 
@@ -197,7 +196,6 @@ class LoguruQtHandler(QObject):
         except:
             pass  # 忽略析构错误
 
-
 class LoguruQtSignalBridge:
     """Loguru Qt信号桥接器 - 提供便捷的信号连接"""
 
@@ -232,16 +230,13 @@ class LoguruQtSignalBridge:
         """获取底层处理器"""
         return self.handler
 
-
 # 全局Qt处理器实例
 qt_handler = LoguruQtHandler()
 qt_bridge = LoguruQtSignalBridge()
 
-
 def get_qt_handler() -> LoguruQtHandler:
     """获取全局Qt处理器"""
     return qt_handler
-
 
 def get_qt_bridge() -> LoguruQtSignalBridge:
     """获取全局Qt信号桥接器"""

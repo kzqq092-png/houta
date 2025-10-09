@@ -14,7 +14,6 @@ from datetime import datetime
 
 logger = logger
 
-
 class IndicatorCategory(Enum):
     """指标分类"""
     TREND = "trend"                    # 趋势指标
@@ -25,7 +24,6 @@ class IndicatorCategory(Enum):
     SUPPORT_RESISTANCE = "support_resistance"  # 支撑阻力指标
     CUSTOM = "custom"                  # 自定义指标
 
-
 class ParameterType(Enum):
     """参数类型"""
     INTEGER = "integer"
@@ -33,7 +31,6 @@ class ParameterType(Enum):
     BOOLEAN = "boolean"
     STRING = "string"
     ENUM = "enum"
-
 
 @dataclass
 class ParameterDef:
@@ -46,7 +43,6 @@ class ParameterDef:
     description: str = ""
     enum_values: Optional[List[str]] = None
     required: bool = True
-
 
 @dataclass
 class IndicatorMetadata:
@@ -68,7 +64,6 @@ class IndicatorMetadata:
             self.input_columns = ["close"]
         if self.tags is None:
             self.tags = []
-
 
 @dataclass
 class StandardKlineData:
@@ -102,7 +97,6 @@ class StandardKlineData:
             'volume': self.volume
         }, index=self.datetime_index)
 
-
 @dataclass
 class StandardIndicatorResult:
     """标准指标结果格式"""
@@ -120,7 +114,6 @@ class StandardIndicatorResult:
         """获取所有列名"""
         return list(self.data.columns)
 
-
 @dataclass
 class IndicatorCalculationContext:
     """指标计算上下文"""
@@ -135,7 +128,6 @@ class IndicatorCalculationContext:
     def __post_init__(self):
         if self.extra_params is None:
             self.extra_params = {}
-
 
 class IIndicatorPlugin(ABC):
     """
@@ -327,7 +319,6 @@ class IIndicatorPlugin(ABC):
             "plugin_info": self.plugin_info
         }
 
-
 class IndicatorPluginAdapter:
     """
     指标插件适配器
@@ -454,7 +445,6 @@ class IndicatorPluginAdapter:
         self._parameters_cache.clear()
         self.logger.info(f"指标插件缓存已清理: {self.plugin_id}")
 
-
 def validate_indicator_plugin_interface(plugin_instance) -> bool:
     """
     验证插件是否实现了必要的接口
@@ -500,7 +490,6 @@ def validate_indicator_plugin_interface(plugin_instance) -> bool:
 
     return True
 
-
 def create_indicator_plugin_adapter(plugin_instance, plugin_id: str) -> Optional[IndicatorPluginAdapter]:
     """
     创建指标插件适配器
@@ -524,17 +513,14 @@ def create_indicator_plugin_adapter(plugin_instance, plugin_id: str) -> Optional
         logger.error(f"创建指标插件适配器失败: {plugin_id} - {e}")
         return None
 
-
 # 工具函数
 def convert_dataframe_to_standard_kline(df: pd.DataFrame) -> StandardKlineData:
     """将DataFrame转换为标准K线数据"""
     return StandardKlineData.from_dataframe(df)
 
-
 def convert_standard_result_to_dataframe(result: StandardIndicatorResult) -> pd.DataFrame:
     """将标准指标结果转换为DataFrame"""
     return result.data
-
 
 def merge_indicator_results(results: List[StandardIndicatorResult]) -> pd.DataFrame:
     """合并多个指标结果"""

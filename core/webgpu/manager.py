@@ -19,7 +19,6 @@ from .fallback import FallbackRenderer, RenderBackend
 
 logger = logger
 
-
 @dataclass
 class WebGPUConfig:
     """WebGPU配置"""
@@ -34,7 +33,6 @@ class WebGPUConfig:
     max_render_time_ms: float = 100.0
     max_memory_usage_mb: float = 512.0
     min_fps: float = 30.0
-
 
 class WebGPUManager:
     """WebGPU管理器
@@ -420,11 +418,9 @@ class WebGPUManager:
         if self._fallback_renderer:
             self._fallback_renderer.clear()
 
-
 # 全局WebGPU管理器实例
 _webgpu_manager = None
 _manager_lock = threading.Lock()
-
 
 def get_webgpu_manager(config: Optional[WebGPUConfig] = None) -> WebGPUManager:
     """获取全局WebGPU管理器实例"""
@@ -435,12 +431,10 @@ def get_webgpu_manager(config: Optional[WebGPUConfig] = None) -> WebGPUManager:
             _webgpu_manager = WebGPUManager(config)
         return _webgpu_manager
 
-
 def initialize_webgpu_manager(config: Optional[WebGPUConfig] = None) -> bool:
     """初始化全局WebGPU管理器"""
     manager = get_webgpu_manager(config)
     return manager.initialize()
-
 
 def render_chart_webgpu(chart_type: str, data, style: Dict[str, Any] = None) -> bool:
     """

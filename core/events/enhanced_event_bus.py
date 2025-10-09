@@ -36,7 +36,6 @@ from .event_bus import EventBus, SimpleEventHandler
 from .events import BaseEvent
 from .event_handler import EventHandler, AsyncEventHandler
 
-
 class EventPriority(Enum):
     """事件优先级"""
     CRITICAL = 1
@@ -44,7 +43,6 @@ class EventPriority(Enum):
     NORMAL = 3
     LOW = 4
     BACKGROUND = 5
-
 
 class EventStatus(Enum):
     """事件状态"""
@@ -55,7 +53,6 @@ class EventStatus(Enum):
     RETRYING = "retrying"
     CANCELLED = "cancelled"
 
-
 class BackpressureStrategy(Enum):
     """背压策略"""
     DROP_OLDEST = "drop_oldest"
@@ -63,7 +60,6 @@ class BackpressureStrategy(Enum):
     BLOCK = "block"
     BUFFER = "buffer"
     SAMPLE = "sample"
-
 
 @dataclass
 class EventMetadata:
@@ -94,7 +90,6 @@ class EventMetadata:
             data['priority'] = EventPriority(data['priority'])
         return cls(**data)
 
-
 @dataclass
 class EnhancedEvent:
     """增强版事件"""
@@ -119,7 +114,6 @@ class EnhancedEvent:
             metadata=EventMetadata.from_dict(data['metadata'])
         )
 
-
 class EventRouter:
     """智能事件路由器"""
 
@@ -142,7 +136,6 @@ class EventRouter:
                 logger.error(f"路由规则执行失败: {e}")
 
         return targets or ["default"]
-
 
 class EventPersistence:
     """事件持久化管理器"""
@@ -268,7 +261,6 @@ class EventPersistence:
         except Exception as e:
             logger.error(f"记录处理结果失败: {e}")
 
-
 class BackpressureManager:
     """背压管理器"""
 
@@ -306,7 +298,6 @@ class BackpressureManager:
     def update_queue_size(self, queue_name: str, size: int):
         """更新队列大小"""
         self.queue_sizes[queue_name] = size
-
 
 class EventAggregator:
     """事件聚合器"""
@@ -396,7 +387,6 @@ class EventAggregator:
             data=aggregated_data,
             metadata=aggregated_metadata
         )
-
 
 class EnhancedEventBus(EventBus):
     """增强版事件总线"""
@@ -833,10 +823,8 @@ class EnhancedEventBus(EventBus):
 
         logger.info("增强版事件总线已关闭")
 
-
 # 全局实例
 _enhanced_event_bus: Optional[EnhancedEventBus] = None
-
 
 def get_enhanced_event_bus() -> EnhancedEventBus:
     """获取增强版事件总线实例"""
@@ -844,7 +832,6 @@ def get_enhanced_event_bus() -> EnhancedEventBus:
     if _enhanced_event_bus is None:
         _enhanced_event_bus = EnhancedEventBus()
     return _enhanced_event_bus
-
 
 def initialize_enhanced_event_bus(
     async_execution: bool = True,

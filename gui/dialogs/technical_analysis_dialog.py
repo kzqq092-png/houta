@@ -21,7 +21,6 @@ from PyQt5.QtGui import QFont
 
 logger = logger
 
-
 class TechnicalAnalysisDialog(QDialog):
     """技术分析对话框"""
 

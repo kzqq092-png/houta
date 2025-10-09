@@ -11,7 +11,6 @@
 - 参数配置
 """
 
-from core.unified_indicator_service import UnifiedIndicatorServiceEnhanced
 from core.indicator_extensions import IndicatorCategory, ParameterType
 import sys
 import os
@@ -29,7 +28,6 @@ from PyQt5.QtGui import QFont, QIcon, QPalette
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
 
 class IndicatorPreviewThread(QThread):
     """指标预览计算线程"""
@@ -54,7 +52,6 @@ class IndicatorPreviewThread(QThread):
             })
         except Exception as e:
             self.preview_error.emit(self.indicator_name, str(e))
-
 
 class ParameterWidget(QFrame):
     """参数配置组件"""
@@ -153,7 +150,6 @@ class ParameterWidget(QFrame):
             index = self.input_widget.findText(str(value))
             if index >= 0:
                 self.input_widget.setCurrentIndex(index)
-
 
 class IndicatorSelectionDialog(QDialog):
     """指标选择对话框"""
@@ -632,7 +628,6 @@ class IndicatorSelectionDialog(QDialog):
     def get_selected_indicators(self):
         """获取选中的指标配置"""
         return self.selected_indicators.copy()
-
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

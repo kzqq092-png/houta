@@ -29,10 +29,8 @@ from ..data.unified_quality_models import (
 from ..data_validator import ValidationLevel, ValidationResult
 from ..importdata.task_status_manager import TaskStatus, get_task_status_manager
 
-
 # 使用统一模型中的枚举
 QualityCheckType = QualityDimension  # 兼容性别名
-
 
 # 使用统一模型中的数据结构
 @dataclass
@@ -45,10 +43,8 @@ class QualityCheckResult:
     details: Dict[str, Any] = field(default_factory=dict)
     execution_time: float = 0.0
 
-
 # 使用统一质量报告
 UnifiedQualityReport = UnifiedDataQualityMetrics
-
 
 class QualityRuleEngine:
     """质量规则引擎"""
@@ -98,7 +94,6 @@ class QualityRuleEngine:
         if data_type not in self.rules:
             self.rules[data_type] = {}
         self.rules[data_type][rule_name] = rule_config
-
 
 class UnifiedDataQualityMonitor:
     """
@@ -1130,11 +1125,9 @@ class UnifiedDataQualityMonitor:
         except Exception as e:
             logger.error(f"关闭质量监控器失败: {e}")
 
-
 # 全局单例实例
 _unified_quality_monitor: Optional[UnifiedDataQualityMonitor] = None
 _monitor_lock = threading.Lock()
-
 
 def get_unified_quality_monitor() -> UnifiedDataQualityMonitor:
     """获取全局统一质量监控器实例"""
@@ -1146,7 +1139,6 @@ def get_unified_quality_monitor() -> UnifiedDataQualityMonitor:
                 _unified_quality_monitor = UnifiedDataQualityMonitor()
 
     return _unified_quality_monitor
-
 
 def initialize_unified_quality_monitor(db_path: Optional[str] = None,
                                        enable_persistence: bool = True,

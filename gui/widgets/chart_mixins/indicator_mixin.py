@@ -15,7 +15,6 @@ from datetime import datetime
 from core.indicator_service import get_indicator_metadata, calculate_indicator
 from core.indicator_adapter import get_indicator_english_name
 
-
 class IndicatorMixin:
     """指标渲染混入类"""
 

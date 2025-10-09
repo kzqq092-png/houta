@@ -21,7 +21,6 @@ import warnings
 
 from .base_strategy import BaseStrategy, StrategyParameter
 
-
 class ParameterOptimizationMethod(Enum):
     """参数优化方法"""
     GRID_SEARCH = "grid_search"          # 网格搜索
@@ -29,7 +28,6 @@ class ParameterOptimizationMethod(Enum):
     BAYESIAN = "bayesian"                # 贝叶斯优化
     GENETIC = "genetic"                  # 遗传算法
     PARTICLE_SWARM = "particle_swarm"    # 粒子群优化
-
 
 @dataclass
 class ParameterRange:
@@ -63,7 +61,6 @@ class ParameterRange:
 
         return []
 
-
 @dataclass
 class ParameterOptimizationResult:
     """参数优化结果"""
@@ -73,7 +70,6 @@ class ParameterOptimizationResult:
     total_evaluations: int = 0
     optimization_time: float = 0.0
     convergence_info: Dict[str, Any] = field(default_factory=dict)
-
 
 class ParameterValidator:
     """高性能参数验证器"""
@@ -221,7 +217,6 @@ class ParameterValidator:
             stats['cache_size'] = len(self._validation_cache)
 
         return stats
-
 
 class StrategyParameterManager:
     """策略参数管理器 - 高性能参数管理和优化"""
@@ -532,11 +527,9 @@ class StrategyParameterManager:
         except:
             pass
 
-
 # 全局参数管理器实例
 _parameter_manager: Optional[StrategyParameterManager] = None
 _manager_lock = threading.RLock()
-
 
 def get_parameter_manager() -> StrategyParameterManager:
     """获取全局参数管理器实例
@@ -551,7 +544,6 @@ def get_parameter_manager() -> StrategyParameterManager:
             _parameter_manager = StrategyParameterManager()
 
         return _parameter_manager
-
 
 def initialize_parameter_manager() -> StrategyParameterManager:
     """初始化参数管理器

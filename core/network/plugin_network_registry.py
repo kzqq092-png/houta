@@ -16,7 +16,6 @@ from core.network.universal_network_config import (
 
 logger = logging.getLogger(__name__)
 
-
 class PluginNetworkRegistry:
     """插件网络配置注册表"""
     
@@ -467,10 +466,8 @@ class PluginNetworkRegistry:
         
         return results
 
-
 # 全局注册表实例
 _plugin_network_registry = None
-
 
 def get_plugin_network_registry() -> PluginNetworkRegistry:
     """获取插件网络配置注册表实例"""
@@ -478,7 +475,6 @@ def get_plugin_network_registry() -> PluginNetworkRegistry:
     if _plugin_network_registry is None:
         _plugin_network_registry = PluginNetworkRegistry()
     return _plugin_network_registry
-
 
 def auto_register_plugins() -> Dict[str, bool]:
     """自动注册所有支持网络配置的插件"""

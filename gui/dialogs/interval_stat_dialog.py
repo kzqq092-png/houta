@@ -33,7 +33,6 @@ except ImportError:
 
 logger = logger
 
-
 class IntervalStatDialog(QDialog):
     """区间统计对话框"""
 

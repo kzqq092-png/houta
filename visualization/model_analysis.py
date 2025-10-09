@@ -7,7 +7,6 @@ from loguru import logger
 
 logger = logger
 
-
 class ModelAnalysis:
     def __init__(self):
         pass

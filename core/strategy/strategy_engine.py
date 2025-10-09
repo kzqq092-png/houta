@@ -22,7 +22,6 @@ from .strategy_registry import get_strategy_registry
 from .strategy_database import get_strategy_database_manager
 from core.performance import measure_performance
 
-
 class StrategyCache:
     """策略缓存管理器"""
 
@@ -127,7 +126,6 @@ class StrategyCache:
                       key=lambda k: self._access_times[k])
         self._remove_key(lru_key)
         self.logger.debug(f"LRU淘汰缓存项: {lru_key}")
-
 
 class StrategyEngine:
     """策略执行引擎"""
@@ -533,11 +531,9 @@ class StrategyEngine:
             elif result_type == 'cache_miss':
                 self._execution_stats['cache_misses'] += 1
 
-
 # 全局单例实例
 _strategy_engine = None
 _engine_lock = threading.Lock()
-
 
 def get_strategy_engine() -> StrategyEngine:
     """获取策略执行引擎单例"""
@@ -549,7 +545,6 @@ def get_strategy_engine() -> StrategyEngine:
                 _strategy_engine = StrategyEngine()
 
     return _strategy_engine
-
 
 def initialize_strategy_engine(max_workers: int = None, cache_size: int = 1000,
                                cache_ttl: int = 3600) -> StrategyEngine:

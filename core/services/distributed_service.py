@@ -18,7 +18,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logger
 
-
 @dataclass
 class NodeInfo:
     """节点信息"""
@@ -54,7 +53,6 @@ class NodeInfo:
                 data['last_heartbeat'])
         return cls(**data)
 
-
 @dataclass
 class DistributedTask:
     """分布式任务"""
@@ -81,7 +79,6 @@ class DistributedTask:
             if data[time_field]:
                 data[time_field] = data[time_field].isoformat()
         return data
-
 
 class NodeDiscovery:
     """节点发现服务"""
@@ -230,7 +227,6 @@ class NodeDiscovery:
 
         except Exception as e:
             logger.error(f"处理节点信息失败: {e}")
-
 
 class TaskScheduler:
     """任务调度器"""
@@ -385,7 +381,6 @@ class TaskScheduler:
             "iterations": 100,
             "processed_by": node.node_id
         }
-
 
 class DistributedService:
     """分布式服务主类"""

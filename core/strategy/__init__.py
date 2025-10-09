@@ -47,7 +47,6 @@ __author__ = "FactorWeave 团队"
 _managers_initialized = False
 logger = logger.bind(module=__name__)
 
-
 def initialize_strategy_system(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     初始化策略管理系统
@@ -125,7 +124,6 @@ def initialize_strategy_system(config: Optional[Dict[str, Any]] = None) -> Dict[
         logger.error(f"策略管理系统初始化失败: {e}")
         raise
 
-
 def get_system_managers() -> Dict[str, Any]:
     """
     获取系统管理器实例
@@ -142,7 +140,6 @@ def get_system_managers() -> Dict[str, Any]:
         'performance_evaluator': get_performance_evaluator(),
         'lifecycle_manager': get_lifecycle_manager()
     }
-
 
 def get_system_stats() -> Dict[str, Any]:
     """
@@ -171,7 +168,6 @@ def get_system_stats() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"获取系统统计失败: {e}")
         return {'error': str(e)}
-
 
 def shutdown_strategy_system():
     """关闭策略管理系统"""
@@ -206,7 +202,6 @@ def shutdown_strategy_system():
     except Exception as e:
         logger.error(f"关闭策略管理系统失败: {e}")
 
-
 def _register_builtin_strategies(registry: StrategyRegistry):
     """注册内置策略"""
     try:
@@ -229,7 +224,6 @@ def _register_builtin_strategies(registry: StrategyRegistry):
 
 # 便捷函数
 
-
 def create_strategy(strategy_name: str, **kwargs) -> Optional[BaseStrategy]:
     """
     创建策略实例
@@ -247,7 +241,6 @@ def create_strategy(strategy_name: str, **kwargs) -> Optional[BaseStrategy]:
     except Exception as e:
         logger.error(f"创建策略实例失败 {strategy_name}: {e}")
         return None
-
 
 def execute_strategy(strategy_name: str, data, **kwargs) -> tuple:
     """
@@ -268,7 +261,6 @@ def execute_strategy(strategy_name: str, data, **kwargs) -> tuple:
         logger.error(f"执行策略失败 {strategy_name}: {e}")
         return [], {'success': False, 'error_message': str(e)}
 
-
 def list_strategies(category: Optional[str] = None,
                     strategy_type: Optional[StrategyType] = None) -> List[str]:
     """
@@ -288,7 +280,6 @@ def list_strategies(category: Optional[str] = None,
         logger.error(f"列出策略失败: {e}")
         return []
 
-
 def list_available_strategies() -> List[str]:
     """
     列出所有可用策略（简化版本）
@@ -297,7 +288,6 @@ def list_available_strategies() -> List[str]:
         策略名称列表
     """
     return list_strategies()
-
 
 def get_strategy_info(strategy_name: str) -> Optional[Dict[str, Any]]:
     """
@@ -315,7 +305,6 @@ def get_strategy_info(strategy_name: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"获取策略信息失败 {strategy_name}: {e}")
         return None
-
 
 def optimize_strategy_parameters(strategy_name: str, data,
                                  parameter_ranges: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -339,7 +328,6 @@ def optimize_strategy_parameters(strategy_name: str, data,
     except Exception as e:
         logger.error(f"参数优化失败 {strategy_name}: {e}")
         return {'success': False, 'error_message': str(e)}
-
 
 def evaluate_strategy_performance(strategy_name: str, signals: List[StrategySignal],
                                   data, **kwargs) -> Dict[str, Any]:
@@ -366,7 +354,6 @@ def evaluate_strategy_performance(strategy_name: str, signals: List[StrategySign
     except Exception as e:
         logger.error(f"性能评估失败 {strategy_name}: {e}")
         return {'success': False, 'error_message': str(e), 'strategy_name': strategy_name}
-
 
 # 导出的公共接口
 __all__ = [

@@ -23,14 +23,12 @@ from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 logger = logger
 
-
 class TaskType(Enum):
     """任务类型"""
     ONE_TIME = "one_time"  # 一次性任务
     RECURRING = "recurring"  # 重复任务
     CRON = "cron"  # Cron表达式任务
     INTERVAL = "interval"  # 间隔任务
-
 
 class TaskStatus(Enum):
     """任务状态"""
@@ -40,7 +38,6 @@ class TaskStatus(Enum):
     FAILED = "failed"  # 执行失败
     CANCELLED = "cancelled"  # 已取消
     PAUSED = "paused"  # 已暂停
-
 
 @dataclass
 class TaskExecution:
@@ -58,7 +55,6 @@ class TaskExecution:
         data = asdict(self)
         data['status'] = self.status.value
         return data
-
 
 @dataclass
 class ScheduledTask:
@@ -120,7 +116,6 @@ class ScheduledTask:
 
         task = cls(task_type=task_type, status=status, executions=executions, **data)
         return task
-
 
 class CronParser:
     """Cron表达式解析器"""
@@ -232,7 +227,6 @@ class CronParser:
 
         # 处理单个值
         return value == int(pattern)
-
 
 class TaskScheduler(QObject):
     """任务调度器"""
@@ -680,10 +674,8 @@ class TaskScheduler(QObject):
         except Exception as e:
             logger.error(f"恢复待执行任务失败: {e}")
 
-
 # 全局服务实例
 _task_scheduler = None
-
 
 def get_task_scheduler() -> TaskScheduler:
     """获取任务调度器实例"""

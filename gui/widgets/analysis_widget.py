@@ -36,7 +36,7 @@ try:
     from utils.matplotlib_font_config import configure_matplotlib_chinese_font
     configure_matplotlib_chinese_font()
 except ImportError:
-    logger.info(" 无法导入字体配置工具，使用默认配置")
+    logger.info("无法导入字体配置工具，使用默认配置")
 import importlib
 import traceback
 import os
@@ -377,32 +377,32 @@ class AnalysisWidget(QWidget):
     def _add_tabs_to_widget(self):
         """添加标签页到Tab控件"""
         # 技术分析
-        self.tab_widget.addTab(self.technical_tab, " 技术分析")
+        self.tab_widget.addTab(self.technical_tab, "技术分析")
 
         # 形态识别
-        self.tab_widget.addTab(self.pattern_tab, " 形态识别")
+        self.tab_widget.addTab(self.pattern_tab, "形态识别")
 
         # 趋势分析
-        self.tab_widget.addTab(self.trend_tab, " 趋势分析")
+        self.tab_widget.addTab(self.trend_tab, "趋势分析")
 
         # 波浪分析
-        self.tab_widget.addTab(self.wave_tab, " 波浪分析")
+        self.tab_widget.addTab(self.wave_tab, "波浪分析")
 
         # 情绪分析
-        self.tab_widget.addTab(self.sentiment_tab, " 情绪分析")
+        self.tab_widget.addTab(self.sentiment_tab, "情绪分析")
 
         # 板块资金流
-        self.tab_widget.addTab(self.sector_flow_tab, " 板块资金")
+        self.tab_widget.addTab(self.sector_flow_tab, "板块资金")
 
         # 热点分析
-        self.tab_widget.addTab(self.hotspot_tab, " 热点分析")
+        self.tab_widget.addTab(self.hotspot_tab, "热点分析")
 
         # 情绪报告
-        self.tab_widget.addTab(self.sentiment_report_tab, " 情绪报告")
+        self.tab_widget.addTab(self.sentiment_report_tab, "情绪报告")
 
         # K线技术分析 - 新增
         if hasattr(self, 'kline_technical_tab') and self.kline_technical_tab:
-            self.tab_widget.addTab(self.kline_technical_tab, " K线技术")
+            self.tab_widget.addTab(self.kline_technical_tab, "K线技术")
 
     def _connect_tab_signals(self):
         """连接标签页信号 - 修复版"""
@@ -427,13 +427,13 @@ class AnalysisWidget(QWidget):
             # 【修复】设置pattern_tab的parent_widget并建立反向连接
             if hasattr(self.pattern_tab, 'set_parent_widget'):
                 self.pattern_tab.set_parent_widget(self)
-                logger.info(" 已设置pattern_tab的parent_widget")
+                logger.info("已设置pattern_tab的parent_widget")
             elif hasattr(self.pattern_tab, 'parent_widget'):
                 self.pattern_tab.parent_widget = self
                 # 手动连接信号
                 if hasattr(self.pattern_tab, '_connect_parent_signals'):
                     self.pattern_tab._connect_parent_signals()
-                logger.info(" 已设置pattern_tab的parent_widget（手动方式）")
+                logger.info("已设置pattern_tab的parent_widget（手动方式）")
 
         except Exception as e:
             logger.error(f"连接标签页信号失败: {e}")

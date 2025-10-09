@@ -30,7 +30,6 @@ _plotly_modules = get_plotly()
 make_subplots = getattr(_plotly_modules.get(
     'subplots'), 'make_subplots', None) if _plotly_modules.get('subplots') else None
 
-
 class Visualization:
     def __init__(self):
         self.chart_utils = ChartUtils()
@@ -165,7 +164,6 @@ class Visualization:
             logger.error(f"绘制交易分析失败: {str(e)}")
             raise
 
-
 def plot_feature_importance_comparison(feature_importances_list, model_names, feature_names, top_n=15, figsize=(12, 10)):
     """
     比较多个模型的特征重要性
@@ -224,7 +222,6 @@ def plot_feature_importance_comparison(feature_importances_list, model_names, fe
     plt.tight_layout()
 
     return plt.gcf()
-
 
 def plot_signal_over_time(df, signal_col='signal', figsize=(15, 8)):
     """

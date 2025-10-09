@@ -186,12 +186,12 @@ class ToastNotification(QFrame):
     def _set_icon(self):
         """设置图标"""
         icons = {
-            FeedbackType.SUCCESS: "✅",
-            FeedbackType.ERROR: "❌",
-            FeedbackType.WARNING: "⚠️",
+            FeedbackType.SUCCESS: "[SUCCESS]",
+            FeedbackType.ERROR: "[ERROR]",
+            FeedbackType.WARNING: "",
             FeedbackType.INFO: "ℹ️",
             FeedbackType.LOADING: "⏳",
-            FeedbackType.PROGRESS: "📊"
+            FeedbackType.PROGRESS: ""
         }
 
         icon_text = icons.get(self.config.feedback_type, "ℹ️")

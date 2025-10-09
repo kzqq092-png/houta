@@ -477,7 +477,7 @@ class DataQualityControlCenter(QWidget):
         # 标题和控制区域
         header_layout = QHBoxLayout()
 
-        title_label = QLabel("✅ 数据质量控制中心")
+        title_label = QLabel("数据质量控制中心")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -491,7 +491,7 @@ class DataQualityControlCenter(QWidget):
         header_layout.addStretch()
 
         # 控制按钮
-        scan_btn = QPushButton("🔍 质量扫描")
+        scan_btn = QPushButton("质量扫描")
         scan_btn.clicked.connect(self.start_quality_scan)
         scan_btn.setStyleSheet("""
             QPushButton {
@@ -534,19 +534,19 @@ class DataQualityControlCenter(QWidget):
 
         # 质量概览选项卡
         overview_tab = self.create_overview_tab()
-        self.tab_widget.addTab(overview_tab, "📊 质量概览")
+        self.tab_widget.addTab(overview_tab, "质量概览")
 
         # 质量规则选项卡
         rules_tab = self.create_rules_tab()
-        self.tab_widget.addTab(rules_tab, "📋 质量规则")
+        self.tab_widget.addTab(rules_tab, "质量规则")
 
         # 质量问题选项卡
         issues_tab = self.create_issues_tab()
-        self.tab_widget.addTab(issues_tab, "⚠️ 质量问题")
+        self.tab_widget.addTab(issues_tab, "质量问题")
 
         # 质量报告选项卡
         reports_tab = self.create_reports_tab()
-        self.tab_widget.addTab(reports_tab, "📄 质量报告")
+        self.tab_widget.addTab(reports_tab, "质量报告")
 
         layout.addWidget(self.tab_widget)
 
@@ -578,7 +578,7 @@ class DataQualityControlCenter(QWidget):
         layout = QVBoxLayout(widget)
 
         # 质量评分仪表盘
-        gauges_group = QGroupBox("📊 质量评分仪表盘")
+        gauges_group = QGroupBox("质量评分仪表盘")
         gauges_layout = QGridLayout(gauges_group)
 
         # 创建各种质量评分仪表盘
@@ -605,7 +605,7 @@ class DataQualityControlCenter(QWidget):
         layout.addWidget(gauges_group)
 
         # 快速统计
-        stats_group = QGroupBox("📋 快速统计")
+        stats_group = QGroupBox("快速统计")
         stats_group.setContentsMargins(10, 10, 10, 10)
         stats_group.setStyleSheet("QGroupBox { border: none; }")
         stats_layout = QGridLayout(stats_group)
@@ -722,11 +722,11 @@ class DataQualityControlCenter(QWidget):
         control_layout.addStretch()
 
         # 批量操作
-        resolve_selected_btn = QPushButton("✅ 标记已解决")
+        resolve_selected_btn = QPushButton("标记已解决")
         resolve_selected_btn.clicked.connect(self.resolve_selected_issues)
         control_layout.addWidget(resolve_selected_btn)
 
-        export_issues_btn = QPushButton("📄 导出问题")
+        export_issues_btn = QPushButton("导出问题")
         export_issues_btn.clicked.connect(self.export_issues)
         control_layout.addWidget(export_issues_btn)
 
@@ -752,7 +752,7 @@ class DataQualityControlCenter(QWidget):
         layout.addWidget(self.issues_table)
 
         # 问题详情
-        details_group = QGroupBox("🔍 问题详情")
+        details_group = QGroupBox("问题详情")
         details_layout = QVBoxLayout(details_group)
 
         self.issue_details_text = QTextEdit()
@@ -774,7 +774,7 @@ class DataQualityControlCenter(QWidget):
         layout = QVBoxLayout(widget)
 
         # 报告生成控制
-        control_group = QGroupBox("📊 报告生成")
+        control_group = QGroupBox("报告生成")
         control_layout = QFormLayout(control_group)
 
         # 报告类型
@@ -797,26 +797,26 @@ class DataQualityControlCenter(QWidget):
         control_layout.addRow("输出格式:", self.report_format_combo)
 
         # 生成按钮
-        generate_btn = QPushButton("📄 生成报告")
+        generate_btn = QPushButton("生成报告")
         generate_btn.clicked.connect(self.generate_quality_report)
         control_layout.addRow("", generate_btn)
 
         layout.addWidget(control_group)
 
         # 报告预览
-        preview_group = QGroupBox("📋 报告预览")
+        preview_group = QGroupBox("报告预览")
         preview_layout = QVBoxLayout(preview_group)
 
         self.report_preview = QTextEdit()
         self.report_preview.setReadOnly(True)
         self.report_preview.setText("""
-📊 数据质量综合报告
+ 数据质量综合报告
 
 生成时间: 2024-01-15 14:30:00
 数据源: 股票行情数据
 记录总数: 1,234,567
 
-📈 质量指标总览:
+质量指标总览:
 • 整体质量评分: 85.2%
 • 完整性: 92.1%
 • 准确性: 88.5%
@@ -824,18 +824,18 @@ class DataQualityControlCenter(QWidget):
 • 有效性: 87.2%
 • 唯一性: 94.8%
 
-⚠️ 质量问题统计:
+ 质量问题统计:
 • 严重问题: 3个
 • 高级问题: 12个
 • 中级问题: 45个
 • 低级问题: 156个
 
-📋 规则执行情况:
+ 规则执行情况:
 • 活跃规则: 24个
 • 规则通过率: 94.8%
 • 平均执行时间: 125ms
 
-💡 改进建议:
+[INFO] 改进建议:
 • 加强价格数据的范围检查
 • 完善交易量的异常检测
 • 优化重复数据的清理流程
@@ -1235,18 +1235,18 @@ class DataQualityControlCenter(QWidget):
 严重程度: {issue.severity.value.upper()}
 检测时间: {issue.detected_at.strftime('%Y-%m-%d %H:%M:%S')}
 
-📊 影响范围:
+ 影响范围:
 • 目标列: {issue.column}
 • 影响行数: {issue.affected_rows}
 • 状态: {'已解决' if issue.resolved else '未解决'}
 
-📝 问题描述:
+ 问题描述:
 {issue.description}
 
-🔍 示例数据:
+ 示例数据:
 {', '.join(issue.sample_values[:5])}
 
-{'✅ 解决说明: ' + issue.resolution_note if issue.resolved and issue.resolution_note else ''}
+{'解决说明: ' + issue.resolution_note if issue.resolved and issue.resolution_note else ''}
                 """
 
                 self.issue_details_text.setText(details_text.strip())

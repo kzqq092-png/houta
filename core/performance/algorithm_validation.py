@@ -19,7 +19,6 @@ import warnings
 
 logger = logger
 
-
 @dataclass
 class ValidationResult:
     """验证结果"""
@@ -31,7 +30,6 @@ class ValidationResult:
     is_valid: bool
     validation_method: str
     notes: str
-
 
 class FinancialAlgorithmValidator:
     """
@@ -521,10 +519,8 @@ class FinancialAlgorithmValidator:
         self.validation_history.clear()
         logger.info("验证历史已清除")
 
-
 # 全局验证器实例
 _validator_instance: Optional[FinancialAlgorithmValidator] = None
-
 
 def get_algorithm_validator() -> FinancialAlgorithmValidator:
     """获取全局算法验证器实例"""
@@ -534,7 +530,6 @@ def get_algorithm_validator() -> FinancialAlgorithmValidator:
         _validator_instance = FinancialAlgorithmValidator()
 
     return _validator_instance
-
 
 def validate_hikyuu_metrics(returns: pd.Series,
                             calculated_metrics: Dict[str, float]) -> Dict[str, bool]:

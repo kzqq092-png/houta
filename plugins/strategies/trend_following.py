@@ -25,13 +25,11 @@ warnings.filterwarnings('ignore')
 
 # 导入统一策略管理系统
 
-
 class TrendDirection(Enum):
     """趋势方向"""
     UP = "up"           # 上升趋势
     DOWN = "down"       # 下降趋势
     SIDEWAYS = "sideways"  # 横盘趋势
-
 
 @register_strategy("MovingAverageTrend", metadata={
     "description": "基于移动平均线的趋势跟踪策略",
@@ -138,7 +136,6 @@ class MovingAverageTrendStrategy(BaseStrategy):
         """获取所需的数据列"""
         return ['open', 'high', 'low', 'close', 'volume']
 
-
 @register_strategy("Breakout", metadata={
     "description": "基于价格突破的趋势策略",
     "author": "FactorWeave 团队",
@@ -238,7 +235,6 @@ class BreakoutStrategy(BaseStrategy):
         """获取所需的数据列"""
         return ['open', 'high', 'low', 'close', 'volume']
 
-
 @register_strategy("Momentum", metadata={
     "description": "基于动量指标的趋势策略",
     "author": "FactorWeave 团队",
@@ -337,7 +333,6 @@ class MomentumStrategy(BaseStrategy):
     def get_required_columns(self) -> List[str]:
         """获取所需的数据列"""
         return ['open', 'high', 'low', 'close', 'volume']
-
 
 @register_strategy("AdaptiveTrend", metadata={
     "description": "自适应趋势跟踪策略",
@@ -494,7 +489,6 @@ class AdaptiveTrendStrategy(BaseStrategy):
         """获取所需的数据列"""
         return ['open', 'high', 'low', 'close', 'volume']
 
-
 class TrendFollowingManager:
     """趋势跟踪策略管理器（向后兼容）"""
 
@@ -558,11 +552,9 @@ class TrendFollowingManager:
 
         return consensus_signals
 
-
 def create_trend_following_manager() -> TrendFollowingManager:
     """创建趋势跟踪管理器（向后兼容函数）"""
     return TrendFollowingManager()
-
 
 if __name__ == "__main__":
     # 测试代码

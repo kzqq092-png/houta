@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-
 def generate_enhanced_trading_signals(df):
     """
     根据模型预测生成交易信号
@@ -104,7 +103,6 @@ def generate_enhanced_trading_signals(df):
         result_df.loc[result_df.index[i], 'position'] = current_position
 
     return result_df
-
 
 def optimize_signal_generation(df):
     """

@@ -11,6 +11,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import QColor, QKeySequence
 from .pattern_tab_pro import PatternAnalysisTabPro
 
+
 class PatternAnalysisTab(PatternAnalysisTabPro):
     """形态分析标签页 - 继承专业版功能，保持向后兼容"""
 
@@ -193,11 +194,11 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         menu = QMenu(self)
 
         # 查看详情
-        detail_action = menu.addAction(" 查看详情")
+        detail_action = menu.addAction("查看详情")
         detail_action.triggered.connect(self.show_pattern_detail)
 
         # 导出选中
-        export_action = menu.addAction(" 导出选中")
+        export_action = menu.addAction("导出选中")
         export_action.triggered.connect(self.export_selected_pattern)
 
         menu.exec_(self.patterns_table.mapToGlobal(position))
@@ -325,7 +326,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         try:
             # 记录开始回测
             if True:  # 使用Loguru日志
-                logger.info(" 用户点击开始回测按钮")
+                logger.info("用户点击开始回测按钮")
             else:
                 logger.info("[Pattern]  用户点击开始回测按钮")
 
@@ -354,7 +355,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
 
             # 启动异步回测
             if True:  # 使用Loguru日志
-                logger.info(" 启动异步回测线程")
+                logger.info("启动异步回测线程")
             self.run_analysis_async(self._backtest_async)
 
         except Exception as e:
@@ -375,7 +376,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         try:
             # 记录异步执行开始
             if True:  # 使用Loguru日志
-                logger.info(" === 异步回测线程开始执行 ===")
+                logger.info("=== 异步回测线程开始执行 ===")
             else:
                 logger.info("[Pattern]  === 异步回测线程开始执行 ===")
 
@@ -386,7 +387,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
 
             # 第一步：获取真实形态识别结果
             if True:  # 使用Loguru日志
-                logger.info(" 开始真实形态识别...")
+                logger.info("开始真实形态识别...")
 
             patterns = self._get_real_patterns()
             if not patterns:
@@ -397,7 +398,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
 
             # 第二步：基于形态生成交易信号
             if True:  # 使用Loguru日志
-                logger.info(" 开始生成交易信号...")
+                logger.info("开始生成交易信号...")
 
             signal_data = self._generate_trading_signals_from_patterns(patterns, period)
             if signal_data is None or signal_data.empty:
@@ -405,7 +406,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
 
             # 第三步：使用专业回测引擎
             if True:  # 使用Loguru日志
-                logger.info(" 启动专业回测引擎...")
+                logger.info("启动专业回测引擎...")
 
             try:
                 from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
@@ -487,7 +488,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
 
             # 执行真实形态识别
             if True:  # 使用Loguru日志
-                logger.info(" 执行实时形态识别...")
+                logger.info("执行实时形态识别...")
 
             from analysis.pattern_manager import PatternManager
             from analysis.pattern_recognition import PatternRecognizer
@@ -635,7 +636,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         """简化回测逻辑（当专业引擎不可用时）"""
         try:
             if True:  # 使用Loguru日志
-                logger.info(" 运行简化回测...")
+                logger.info("运行简化回测...")
 
             # 计算基础统计
             pattern_stats = self._calculate_pattern_effectiveness(patterns, signal_data)
@@ -695,12 +696,12 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         """更新回测显示 - 真实数据增强版"""
         try:
             if True:  # 使用Loguru日志
-                logger.info(" 开始更新回测显示")
+                logger.info("开始更新回测显示")
 
             # 确保有backtest_text组件
             if not hasattr(self, 'backtest_text'):
                 if True:  # 使用Loguru日志
-                    logger.error(" backtest_text组件不存在")
+                    logger.error("backtest_text组件不存在")
                 return
 
             # 格式化显示文本
@@ -751,12 +752,12 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                         avg_conf = stats['avg_confidence']
                         text += f" {pattern_type}: {stats['count']}个 (成功率{success_rate:.1%}, 平均置信度{avg_conf:.1%})\n"
 
-            text += f"\n⏰ 生成时间: {time_str}"
+            text += f"\n[TIME] 生成时间: {time_str}"
 
             self.backtest_text.setText(text)
 
             if True:  # 使用Loguru日志
-                logger.info(" 回测显示更新完成")
+                logger.info("回测显示更新完成")
 
         except Exception as e:
             error_msg = f"更新回测显示失败: {str(e)}"
@@ -793,7 +794,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             # 处理回测结果
             if isinstance(results, dict) and 'backtest' in results:
                 if True:  # 使用Loguru日志
-                    logger.info(" 检测到回测结果，开始更新回测显示")
+                    logger.info("检测到回测结果，开始更新回测显示")
                 self._update_backtest_display(results['backtest'])
 
             # 调用父类方法处理其他结果

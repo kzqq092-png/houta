@@ -12,13 +12,13 @@ from typing import Dict, List, Any, Optional, Callable
 import numpy as np
 import pandas as pd
 from PyQt5.QtCore import pyqtSignal
+import os
 
 # 导入现有渲染器
 from .chart_renderer import ChartRenderer as BaseChartRenderer, RenderPriority
 from core.webgpu import get_webgpu_manager, WebGPUConfig, RenderBackend
 
 logger = logger
-
 
 class WebGPUChartRenderer(BaseChartRenderer):
     """
@@ -32,7 +32,7 @@ class WebGPUChartRenderer(BaseChartRenderer):
     webgpu_status_changed = pyqtSignal(str, dict)  # 状态, 详细信息
     backend_switched = pyqtSignal(str, str)  # 从, 到
 
-    def __init__(self, max_workers: int = 8, enable_progressive: bool = True,
+    def __init__(self, max_workers: int = os.cpu_count(), enable_progressive: bool = True,
                  enable_webgpu: bool = True):
         """
         初始化WebGPU图表渲染器
@@ -411,13 +411,11 @@ class WebGPUChartRenderer(BaseChartRenderer):
 
         return results
 
-
 # 全局WebGPU图表渲染器实例
 _webgpu_chart_renderer = None
 _renderer_lock = threading.Lock()
 
-
-def get_webgpu_chart_renderer(max_workers: int = 8, enable_progressive: bool = True) -> WebGPUChartRenderer:
+def get_webgpu_chart_renderer(max_workers: int = os.cpu_count(), enable_progressive: bool = True) -> WebGPUChartRenderer:
     """获取全局WebGPU图表渲染器实例"""
     global _webgpu_chart_renderer
 
@@ -426,8 +424,7 @@ def get_webgpu_chart_renderer(max_workers: int = 8, enable_progressive: bool = T
             _webgpu_chart_renderer = WebGPUChartRenderer(max_workers, enable_progressive)
         return _webgpu_chart_renderer
 
-
-def initialize_webgpu_chart_renderer(max_workers: int = 8, enable_progressive: bool = True) -> WebGPUChartRenderer:
+def initialize_webgpu_chart_renderer(max_workers: int = os.cpu_count(), enable_progressive: bool = True) -> WebGPUChartRenderer:
     """初始化全局WebGPU图表渲染器"""
     global _webgpu_chart_renderer
 

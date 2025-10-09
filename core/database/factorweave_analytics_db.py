@@ -107,7 +107,7 @@ class FactorWeaveAnalyticsDB:
         # 初始化性能优化器
         if OPTIMIZER_AVAILABLE and DUCKDB_AVAILABLE:
             self.optimizer = DuckDBPerformanceOptimizer(str(self.db_path))
-            logger.info(" DuckDB性能优化器已启用")
+            logger.info("DuckDB性能优化器已启用")
         else:
             self.optimizer = None
 
@@ -130,7 +130,7 @@ class FactorWeaveAnalyticsDB:
     def _connect(self):
         """连接到DuckDB数据库"""
         if not DUCKDB_AVAILABLE:
-            logger.warning(" DuckDB不可用，分析数据库功能将被禁用")
+            logger.warning("DuckDB不可用，分析数据库功能将被禁用")
             self.conn = None
             return
 
@@ -152,7 +152,7 @@ class FactorWeaveAnalyticsDB:
                     # 显示性能建议
                     recommendations = self.optimizer.get_performance_recommendations()
                     if recommendations:
-                        logger.info(" 性能优化建议:")
+                        logger.info("性能优化建议:")
                         for rec in recommendations[:3]:  # 只显示前3条
                             logger.info(f"  {rec}")
                 else:
@@ -164,7 +164,7 @@ class FactorWeaveAnalyticsDB:
                     except UnicodeDecodeError as e:
                         logger.warning(f"DuckDB路径编码问题，使用内存数据库: {e}")
                         self.conn = duckdb.connect(":memory:")
-                        logger.info(" 使用内存DuckDB连接作为回退方案")
+                        logger.info("使用内存DuckDB连接作为回退方案")
                     self._apply_basic_optimization()
             else:
                 # 使用默认连接
@@ -175,7 +175,7 @@ class FactorWeaveAnalyticsDB:
                 except UnicodeDecodeError as e:
                     logger.warning(f"DuckDB路径编码问题，使用内存数据库: {e}")
                     self.conn = duckdb.connect(":memory:")
-                    logger.info(" 使用内存DuckDB连接作为回退方案")
+                    logger.info("使用内存DuckDB连接作为回退方案")
 
                 # 应用基本优化配置
                 self._apply_basic_optimization()
@@ -191,7 +191,7 @@ class FactorWeaveAnalyticsDB:
                 except UnicodeDecodeError as ue:
                     logger.warning(f"DuckDB路径编码问题，使用内存数据库: {ue}")
                     self.conn = duckdb.connect(":memory:")
-                    logger.info(" 使用内存DuckDB连接作为最终回退方案")
+                    logger.info("使用内存DuckDB连接作为最终回退方案")
                 self._apply_basic_optimization()
             except Exception as e2:
                 logger.error(f" DuckDB基本连接也失败: {e2}")
@@ -398,7 +398,7 @@ class FactorWeaveAnalyticsDB:
             # 创建性能优化的索引
             self._create_optimized_indexes()
 
-            logger.info(" FactorWeave分析数据库表结构初始化完成")
+            logger.info("FactorWeave分析数据库表结构初始化完成")
 
         except Exception as e:
             logger.error(f" 分析数据库表初始化失败: {e}")
@@ -455,7 +455,7 @@ class FactorWeaveAnalyticsDB:
             except Exception as e:
                 logger.warning(f"创建索引失败: {e}")
 
-        logger.info(" 性能优化索引创建完成")
+        logger.info("性能优化索引创建完成")
 
     def execute_query(self, sql: str, params: List = None) -> pd.DataFrame:
         """执行查询并返回DataFrame"""

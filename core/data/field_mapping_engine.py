@@ -524,9 +524,11 @@ class FieldMappingEngine:
         # 对于数值字段，检查是否包含有效数值
         if column_name in ['open', 'high', 'low', 'close', 'volume', 'value']:
             try:
-                pd.to_numeric(non_null_data.head(10))
-                return True
-            except:
+                numeric_data = pd.to_numeric(non_null_data.head(10), errors='coerce')
+                # 检查转换后是否有有效的数值
+                valid_count = int(numeric_data.notna().sum())  # 确保是标量
+                return valid_count > 0
+            except Exception:
                 return False
 
         return True

@@ -16,7 +16,7 @@ from typing import Optional, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
 from core.stock_screener import StockScreener
-from core.services.unified_data_manager import UnifiedDataManager
+from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
 from components.stock_screener import StockScreenerWidget
 from pylab import mpl
 from gui.ui_components import BaseAnalysisPanel
@@ -484,7 +484,7 @@ class FundFlowWidget(BaseAnalysisTab):
             overview_layout = QVBoxLayout(overview_group)
 
             # 标题
-            title = QLabel(" 板块资金流概览")
+            title = QLabel("板块资金流概览")
             title.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
             overview_layout.addWidget(title)
 
@@ -526,7 +526,7 @@ class FundFlowWidget(BaseAnalysisTab):
             data_layout = QVBoxLayout(data_group)
 
             # 标题
-            title = QLabel(" 资金流数据")
+            title = QLabel("资金流数据")
             title.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
             data_layout.addWidget(title)
 
@@ -585,7 +585,7 @@ class FundFlowWidget(BaseAnalysisTab):
             controls_layout = QHBoxLayout(controls_group)
 
             # 刷新按钮
-            self.refresh_btn = QPushButton(" 刷新数据")
+            self.refresh_btn = QPushButton("刷新数据")
             self.refresh_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #4CAF50;
@@ -603,7 +603,7 @@ class FundFlowWidget(BaseAnalysisTab):
             controls_layout.addWidget(self.refresh_btn)
 
             # 导出按钮
-            self.export_btn = QPushButton(" 导出数据")
+            self.export_btn = QPushButton("导出数据")
             self.export_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #2196F3;
@@ -634,7 +634,7 @@ class FundFlowWidget(BaseAnalysisTab):
     def init_data_updates(self):
         """延迟初始化数据更新，避免阻塞UI"""
         try:
-            logger.info(" 开始初始化资金流数据更新...")
+            logger.info("开始初始化资金流数据更新...")
 
             # 使用TET框架获取数据
             self.init_tet_data_source()
@@ -653,7 +653,7 @@ class FundFlowWidget(BaseAnalysisTab):
     def init_tet_data_source(self):
         """初始化TET数据源"""
         try:
-            from core.services.unified_data_manager import UnifiedDataManager
+            from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
             from core.services.sector_fund_flow_service import SectorFundFlowService
             from core.containers.service_container import get_service_container
             from utils.manager_factory import get_manager_factory, get_data_manager
@@ -670,18 +670,18 @@ class FundFlowWidget(BaseAnalysisTab):
                 try:
                     self.unified_data_manager = container.resolve(UnifiedDataManager)
                     self.sector_fund_flow_service = container.resolve(SectorFundFlowService)
-                    logger.info(" 从服务容器获取TET数据源成功")
+                    logger.info("从服务容器获取TET数据源成功")
                 except Exception as e:
                     logger.error(f" 从服务容器获取服务失败: {e}")
                     # 降级到直接实例化
-                    self.unified_data_manager = UnifiedDataManager()
+                    self.unified_data_manager = get_unified_data_manager()
                     self.sector_fund_flow_service = SectorFundFlowService()
-                    logger.info(" 直接实例化TET数据源")
+                    logger.info("直接实例化TET数据源")
             else:
                 # 直接实例化
-                self.unified_data_manager = UnifiedDataManager()
+                self.unified_data_manager = get_unified_data_manager()
                 self.sector_fund_flow_service = SectorFundFlowService()
-                logger.info(" 直接实例化TET数据源")
+                logger.info("直接实例化TET数据源")
 
         except Exception as e:
             logger.error(f" 初始化TET数据源失败: {e}")
@@ -774,7 +774,7 @@ class FundFlowWidget(BaseAnalysisTab):
     def _perform_data_refresh(self):
         """执行数据刷新"""
         try:
-            logger.info(" 开始执行数据刷新...")
+            logger.info("开始执行数据刷新...")
 
             # 获取资金流数据
             fund_flow_data = self._get_fund_flow_data_via_tet()
@@ -784,11 +784,11 @@ class FundFlowWidget(BaseAnalysisTab):
                 self._update_ui_with_data(fund_flow_data)
                 if hasattr(self, 'status_label'):
                     self.status_label.setText("状态: 数据更新完成")
-                logger.info(" 数据刷新完成")
+                logger.info("数据刷新完成")
             else:
                 if hasattr(self, 'status_label'):
                     self.status_label.setText("状态: 未获取到有效数据")
-                logger.info(" 未获取到有效数据")
+                logger.info("未获取到有效数据")
 
         except Exception as e:
             logger.error(f" 执行数据刷新失败: {e}")
@@ -801,7 +801,7 @@ class FundFlowWidget(BaseAnalysisTab):
     def _get_fallback_fund_flow_data(self) -> dict:
         """获取降级资金流数据"""
         try:
-            logger.info(" 使用降级数据，请检查数据源配置")
+            logger.info("使用降级数据，请检查数据源配置")
 
             # 生成简单的模拟数据用于演示
             industries = ["医药生物", "计算机", "电子", "通信", "传媒", "电气设备", "机械设备", "汽车", "食品饮料", "银行"]
@@ -862,7 +862,7 @@ class FundFlowWidget(BaseAnalysisTab):
             # 更新数据显示
             self._update_data_displays(data)
 
-            logger.info(" UI更新完成")
+            logger.info("UI更新完成")
 
         except Exception as e:
             logger.error(f" 更新UI失败: {e}")
@@ -1740,7 +1740,7 @@ class FundFlowWidget(BaseAnalysisTab):
             if hasattr(self, 'update_timer'):
                 self.update_timer.stop()
 
-            logger.info(" 资金流组件已关闭")
+            logger.info("资金流组件已关闭")
 
         except Exception as e:
             logger.error(f" 关闭资金流组件时出错: {e}")
@@ -1752,7 +1752,7 @@ class FundFlowWidget(BaseAnalysisTab):
         """设置K线数据 - 简化版本"""
         try:
             if kdata is not None:
-                logger.info(" 资金流组件接收到K线数据")
+                logger.info("资金流组件接收到K线数据")
                 # 触发数据更新
                 QTimer.singleShot(500, self.update_data_async)
         except Exception as e:

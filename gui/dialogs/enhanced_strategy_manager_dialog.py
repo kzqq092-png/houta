@@ -581,7 +581,7 @@ class EnhancedStrategyManagerDialog(QDialog):
         self.initial_capital_spin = QDoubleSpinBox()
         self.initial_capital_spin.setRange(1000, 10000000)
         self.initial_capital_spin.setValue(100000)
-        self.initial_capital_spin.setSuffix(" 元")
+        self.initial_capital_spin.setSuffix("元")
 
         self.commission_rate_spin = QDoubleSpinBox()
         self.commission_rate_spin.setRange(0, 0.01)

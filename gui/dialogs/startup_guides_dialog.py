@@ -65,7 +65,7 @@ class StartupGuidesDialog(QDialog):
         header_layout = QHBoxLayout(header_frame)
 
         # 标题文本
-        title_label = QLabel(" 欢迎使用 FactorWeave-Quant 2.0")
+        title_label = QLabel("欢迎使用 FactorWeave-Quant 2.0")
         title_font = QFont()
         title_font.setPointSize(18)
         title_font.setBold(True)
@@ -137,7 +137,7 @@ class StartupGuidesDialog(QDialog):
 
         layout.addWidget(welcome_text)
 
-        self.tab_widget.addTab(welcome_widget, " 欢迎")
+        self.tab_widget.addTab(welcome_widget, "欢迎")
 
     def _create_features_tab(self):
         """创建功能介绍页"""
@@ -150,28 +150,28 @@ class StartupGuidesDialog(QDialog):
         scroll_layout = QVBoxLayout(scroll_widget)
 
         # 功能分组
-        self._add_feature_group(scroll_layout, " 数据分析", [
+        self._add_feature_group(scroll_layout, "数据分析", [
             ("实时行情", "获取实时股票、期货、数字货币行情数据"),
             ("历史数据", "访问丰富的历史数据，支持多种时间周期"),
             ("数据质量", "内置数据质量检查和清洗功能"),
             ("多源整合", "支持多个数据源的整合和对比")
         ])
 
-        self._add_feature_group(scroll_layout, " 技术分析", [
+        self._add_feature_group(scroll_layout, "技术分析", [
             ("技术指标", "100+种内置技术指标，支持自定义开发"),
             ("图表分析", "专业的K线图表，支持多种图表类型"),
             ("形态识别", "自动识别经典技术形态"),
             ("趋势分析", "智能趋势识别和预测")
         ])
 
-        self._add_feature_group(scroll_layout, " 策略系统", [
+        self._add_feature_group(scroll_layout, "策略系统", [
             ("策略开发", "可视化策略开发环境"),
             ("回测引擎", "高性能的策略回测系统"),
             ("风险管理", "完善的风险控制机制"),
             ("实盘交易", "支持多种券商接口的实盘交易")
         ])
 
-        self._add_feature_group(scroll_layout, " AI功能", [
+        self._add_feature_group(scroll_layout, "AI功能", [
             ("情绪分析", "多源市场情绪数据分析"),
             ("智能预测", "基于机器学习的价格预测"),
             ("模式识别", "AI驱动的市场模式识别"),
@@ -182,7 +182,7 @@ class StartupGuidesDialog(QDialog):
         scroll_area.setWidgetResizable(True)
         layout.addWidget(scroll_area)
 
-        self.tab_widget.addTab(features_widget, " 功能")
+        self.tab_widget.addTab(features_widget, "功能")
 
     def _add_feature_group(self, layout, title, features):
         """添加功能分组"""
@@ -263,7 +263,7 @@ class StartupGuidesDialog(QDialog):
 
         layout.addWidget(steps_text)
 
-        self.tab_widget.addTab(quickstart_widget, " 快速开始")
+        self.tab_widget.addTab(quickstart_widget, "快速开始")
 
     def _create_settings_tab(self):
         """创建设置页"""
@@ -327,7 +327,7 @@ class StartupGuidesDialog(QDialog):
 
         layout.addStretch()
 
-        self.tab_widget.addTab(settings_widget, " 设置")
+        self.tab_widget.addTab(settings_widget, "设置")
 
     def _create_footer(self, parent_layout):
         """创建底部按钮区域"""

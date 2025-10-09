@@ -17,7 +17,6 @@ from .environment import GPUSupportLevel, GPUCapabilities
 
 logger = logger
 
-
 class CompatibilityLevel(Enum):
     """兼容性级别"""
     EXCELLENT = "excellent"     # 完全兼容，推荐使用
@@ -25,7 +24,6 @@ class CompatibilityLevel(Enum):
     FAIR = "fair"              # 兼容性一般，可能有小问题
     POOR = "poor"              # 兼容性差，不推荐
     INCOMPATIBLE = "incompatible"  # 不兼容
-
 
 @dataclass
 class CompatibilityIssue:
@@ -36,7 +34,6 @@ class CompatibilityIssue:
     workaround: Optional[str] = None
     affects_performance: bool = False
 
-
 @dataclass
 class CompatibilityReport:
     """兼容性报告"""
@@ -45,7 +42,6 @@ class CompatibilityReport:
     issues: List[CompatibilityIssue]
     performance_score: float  # 0-100
     recommendations: List[str]
-
 
 class GPUCompatibilityChecker:
     """GPU兼容性检查器"""
@@ -280,13 +276,7 @@ class GPUCompatibilityChecker:
         vendor = capabilities.vendor.lower()
         if "nvidia" in vendor:
             # 模拟NVIDIA驱动版本检查
-            issues.append(CompatibilityIssue(
-                issue_type="driver",
-                severity="info",
-                description="建议更新到最新NVIDIA驱动以获得最佳性能",
-                workaround="访问NVIDIA官网下载最新驱动",
-                affects_performance=False
-            ))
+            pass
         elif "amd" in vendor or "advanced micro devices" in vendor:
             # 模拟AMD驱动版本检查
             pass

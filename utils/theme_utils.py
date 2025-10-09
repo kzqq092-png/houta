@@ -1,7 +1,6 @@
 import json
 import re
 
-
 def load_theme_json_with_comments(path):
     """
     加载带注释的JSON主题配置文件，支持//和#注释。

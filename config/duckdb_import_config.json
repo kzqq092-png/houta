@@ -1,0 +1,30 @@
+{
+  "task_name": "",
+  "description": "",
+  "created_time": "2025-09-24T22:11:27.134963",
+  "data_source": "HIkyuu",
+  "asset_type": "股票",
+  "data_types": [
+    "K线数据"
+  ],
+  "symbols": [],
+  "start_date": "2024-09-24T22:11:27.134963",
+  "end_date": "2025-09-24T22:11:27.134963",
+  "frequency": "daily",
+  "batch_size": 1000,
+  "max_workers": 4,
+  "retry_times": 3,
+  "timeout_seconds": 30,
+  "database_path": "db/kline_stock.duckdb",
+  "table_prefix": "",
+  "use_compression": true,
+  "enable_ai_optimization": true,
+  "enable_auto_tuning": true,
+  "enable_distributed_execution": false,
+  "enable_intelligent_caching": true,
+  "enable_data_quality_monitoring": true,
+  "validate_data": true,
+  "remove_duplicates": true,
+  "fill_missing_values": true,
+  "outlier_detection": true
+}

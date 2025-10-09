@@ -34,7 +34,6 @@ from .unified_data_manager import UnifiedDataManager, DataRequest
 
 logger = logger.bind(module=__name__)
 
-
 @dataclass
 class AssetAwareDataRequest(DataRequest):
     """资产感知数据请求"""
@@ -66,7 +65,6 @@ class AssetAwareDataRequest(DataRequest):
             strategy=self.route_strategy,
             metadata=self.metadata
         )
-
 
 class AssetAwareUnifiedDataManager(UnifiedDataManager):
     """
@@ -667,11 +665,9 @@ class AssetAwareUnifiedDataManager(UnifiedDataManager):
                 'error': str(e)
             }
 
-
 # 全局实例
 _asset_aware_manager: Optional[AssetAwareUnifiedDataManager] = None
 _manager_lock = threading.Lock()
-
 
 def get_asset_aware_unified_data_manager(
     service_container: ServiceContainer = None,
@@ -689,7 +685,6 @@ def get_asset_aware_unified_data_manager(
             )
 
         return _asset_aware_manager
-
 
 def initialize_asset_aware_unified_data_manager(
     service_container: ServiceContainer = None,

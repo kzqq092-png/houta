@@ -323,8 +323,7 @@ class MainWindowCoordinator(QObject):
     def show_performance_evaluation(self):
         """显示性能评估"""
         try:
-            from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
-
+            
             # 获取要评估的形态名称
             patterns = []
             try:

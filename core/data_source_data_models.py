@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-
 @dataclass
 class StockInfo:
     """股票/证券基本信息"""
@@ -32,7 +31,6 @@ class StockInfo:
             'list_date': self.list_date.isoformat() if self.list_date else None,
             'extra_info': self.extra_info
         }
-
 
 @dataclass
 class KlineData:
@@ -60,7 +58,6 @@ class KlineData:
             'frequency': self.frequency,
             'extra_info': self.extra_info
         }
-
 
 @dataclass
 class MarketData:
@@ -91,7 +88,6 @@ class MarketData:
             'extra_info': self.extra_info
         }
 
-
 @dataclass
 class QueryParams:
     """查询参数"""
@@ -101,7 +97,6 @@ class QueryParams:
     period: str = "D"                        # 周期 (D-日, W-周, M-月)
     count: Optional[int] = None              # 数量限制
     extra_params: Dict[str, Any] = field(default_factory=dict)  # 额外参数
-
 
 # HealthCheckResult类已移至core/data_source_extensions.py进行统一管理
 # 请从core.data_source_extensions导入HealthCheckResult

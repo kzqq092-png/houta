@@ -22,7 +22,6 @@ from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 logger = logger
 
-
 class ProgressStatus(Enum):
     """进度状态"""
     PENDING = "pending"  # 待开始
@@ -31,7 +30,6 @@ class ProgressStatus(Enum):
     COMPLETED = "completed"  # 已完成
     FAILED = "failed"  # 已失败
     CANCELLED = "cancelled"  # 已取消
-
 
 @dataclass
 class ProgressCheckpoint:
@@ -57,7 +55,6 @@ class ProgressCheckpoint:
         """从字典创建"""
         status = ProgressStatus(data.pop('status'))
         return cls(status=status, **data)
-
 
 @dataclass
 class TaskProgress:
@@ -109,7 +106,6 @@ class TaskProgress:
         checkpoints = [ProgressCheckpoint.from_dict(cp_data) for cp_data in checkpoints_data]
 
         return cls(status=status, checkpoints=checkpoints, **data)
-
 
 class ProgressDatabase:
     """进度数据库管理器"""
@@ -348,7 +344,6 @@ class ProgressDatabase:
         except Exception as e:
             logger.error(f"清理旧进度记录失败: {e}")
             return 0
-
 
 class ProgressPersistenceManager(QObject):
     """进度持久化管理器"""
@@ -655,10 +650,8 @@ class ProgressPersistenceManager(QObject):
         except Exception as e:
             logger.error(f"清理旧进度记录失败: {e}")
 
-
 # 全局服务实例
 _progress_persistence_manager = None
-
 
 def get_progress_persistence_manager() -> ProgressPersistenceManager:
     """获取进度持久化管理器实例"""

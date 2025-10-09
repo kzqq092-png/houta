@@ -9,7 +9,6 @@ from loguru import logger
 
 logger = logger
 
-
 class DataUsageTermsDialog(QDialog):
     """数据使用条款对话框"""
 
@@ -412,7 +411,6 @@ class DataUsageTermsDialog(QDialog):
             logger.error(f"请求条款同意时发生事件循环冲突: {e}")
             # 降级处理：假设用户已同意（在实际部署时应该更严格）
             return True
-
 
 class DataUsageManager:
     """数据使用管理器"""

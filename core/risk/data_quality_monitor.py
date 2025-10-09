@@ -20,7 +20,6 @@ from collections import deque
 
 from loguru import logger
 
-
 class QualityLevel(Enum):
     """数据质量等级"""
     EXCELLENT = "excellent"  # 优秀 (>= 0.95)
@@ -28,7 +27,6 @@ class QualityLevel(Enum):
     FAIR = "fair"           # 一般 (>= 0.70)
     POOR = "poor"           # 较差 (>= 0.50)
     CRITICAL = "critical"   # 严重 (< 0.50)
-
 
 class QualityMetric(Enum):
     """质量指标类型"""
@@ -38,7 +36,6 @@ class QualityMetric(Enum):
     CONSISTENCY = "consistency"      # 一致性
     VALIDITY = "validity"            # 有效性
     UNIQUENESS = "uniqueness"        # 唯一性
-
 
 @dataclass
 class QualityIssue:
@@ -50,7 +47,6 @@ class QualityIssue:
     threshold: float
     recommendation: str
     timestamp: datetime = field(default_factory=datetime.now)
-
 
 @dataclass
 class QualityReport:
@@ -86,7 +82,6 @@ class QualityReport:
             "timestamp": self.timestamp.isoformat()
         }
 
-
 class DataQualityThresholds:
     """数据质量阈值配置"""
     
@@ -119,7 +114,6 @@ class DataQualityThresholds:
         self.outlier_ratio_threshold = 0.05  # 5%异常值
         self.price_change_threshold = 0.20   # 20%价格变化
         self.volume_spike_threshold = 5.0    # 5倍成交量激增
-
 
 class DataQualityMonitor:
     """

@@ -26,7 +26,6 @@ from ..plugin_types import DataType, AssetType
 
 logger = logger
 
-
 def generate_table_name(plugin_name: str, data_type: Union[DataType, str],
                         period: Optional[str] = None) -> str:
     """
@@ -66,7 +65,6 @@ def generate_table_name(plugin_name: str, data_type: Union[DataType, str],
     except Exception as e:
         logger.error(f"生成表名失败: {e}")
         return f"unknown_table_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
 
 def validate_symbol_format(symbol: str, market: Optional[str] = None) -> bool:
     """
@@ -126,7 +124,6 @@ def validate_symbol_format(symbol: str, market: Optional[str] = None) -> bool:
         logger.error(f"验证股票代码格式失败: {e}")
         return False
 
-
 def standardize_market_code(market: str) -> str:
     """
     标准化市场代码
@@ -182,7 +179,6 @@ def standardize_market_code(market: str) -> str:
         logger.error(f"标准化市场代码失败: {e}")
         return "UNKNOWN"
 
-
 def normalize_symbol(symbol: str, market: Optional[str] = None) -> str:
     """
     标准化股票代码
@@ -217,7 +213,6 @@ def normalize_symbol(symbol: str, market: Optional[str] = None) -> str:
     except Exception as e:
         logger.error(f"标准化股票代码失败: {e}")
         return symbol
-
 
 def build_select_query(table_name: str, columns: Optional[List[str]] = None,
                        where_conditions: Optional[Dict[str, Any]] = None,
@@ -275,7 +270,6 @@ def build_select_query(table_name: str, columns: Optional[List[str]] = None,
         logger.error(f"构建SELECT查询失败: {e}")
         return f'SELECT * FROM "{table_name}"'
 
-
 def build_insert_query(table_name: str, data: Dict[str, Any],
                        on_conflict: str = 'REPLACE') -> Tuple[str, List[Any]]:
     """
@@ -311,7 +305,6 @@ def build_insert_query(table_name: str, data: Dict[str, Any],
     except Exception as e:
         logger.error(f"构建INSERT查询失败: {e}")
         return f'INSERT INTO "{table_name}" DEFAULT VALUES', []
-
 
 def build_update_query(table_name: str, data: Dict[str, Any],
                        where_conditions: Dict[str, Any]) -> Tuple[str, List[Any]]:
@@ -356,7 +349,6 @@ def build_update_query(table_name: str, data: Dict[str, Any],
         logger.error(f"构建UPDATE查询失败: {e}")
         return f'UPDATE "{table_name}" SET id = id', []
 
-
 def execute_query(db_path: str, query: str, params: Optional[List[Any]] = None,
                   fetch_results: bool = True) -> Optional[pd.DataFrame]:
     """
@@ -385,7 +377,6 @@ def execute_query(db_path: str, query: str, params: Optional[List[Any]] = None,
     except Exception as e:
         logger.error(f"执行SQL查询失败: {e}")
         return None
-
 
 def batch_insert_data(db_path: str, table_name: str, data: pd.DataFrame,
                       chunk_size: int = 1000, if_exists: str = 'append') -> bool:
@@ -423,7 +414,6 @@ def batch_insert_data(db_path: str, table_name: str, data: pd.DataFrame,
         logger.error(f"批量插入数据失败: {e}")
         return False
 
-
 def export_table_to_csv(db_path: str, table_name: str, output_path: str,
                         where_conditions: Optional[Dict[str, Any]] = None) -> bool:
     """
@@ -454,7 +444,6 @@ def export_table_to_csv(db_path: str, table_name: str, output_path: str,
         logger.error(f"导出表数据失败: {e}")
         return False
 
-
 def import_csv_to_table(db_path: str, table_name: str, csv_path: str,
                         if_exists: str = 'append') -> bool:
     """
@@ -484,7 +473,6 @@ def import_csv_to_table(db_path: str, table_name: str, csv_path: str,
     except Exception as e:
         logger.error(f"从CSV导入数据失败: {e}")
         return False
-
 
 def get_table_info(db_path: str, table_name: str) -> Optional[Dict[str, Any]]:
     """
@@ -535,7 +523,6 @@ def get_table_info(db_path: str, table_name: str) -> Optional[Dict[str, Any]]:
         logger.error(f"获取表信息失败: {e}")
         return None
 
-
 def list_all_tables(db_path: str) -> List[str]:
     """
     列出数据库中的所有表
@@ -556,7 +543,6 @@ def list_all_tables(db_path: str) -> List[str]:
     except Exception as e:
         logger.error(f"列出数据库表失败: {e}")
         return []
-
 
 def create_index(db_path: str, table_name: str, columns: List[str],
                  index_name: Optional[str] = None, unique: bool = False) -> bool:
@@ -597,7 +583,6 @@ def create_index(db_path: str, table_name: str, columns: List[str],
         logger.error(f"创建索引失败: {e}")
         return False
 
-
 def optimize_database(db_path: str) -> bool:
     """
     优化数据库
@@ -629,7 +614,6 @@ def optimize_database(db_path: str) -> bool:
     except Exception as e:
         logger.error(f"数据库优化失败: {e}")
         return False
-
 
 def backup_database(source_db_path: str, backup_db_path: str) -> bool:
     """

@@ -16,7 +16,6 @@ import threading
 
 logger = logging.getLogger(__name__)
 
-
 class HealthStatus(Enum):
     """健康状态枚举"""
     HEALTHY = "healthy"
@@ -24,7 +23,6 @@ class HealthStatus(Enum):
     CRITICAL = "critical"
     FAILED = "failed"
     UNKNOWN = "unknown"
-
 
 class RecoveryAction(Enum):
     """恢复动作枚举"""
@@ -34,7 +32,6 @@ class RecoveryAction(Enum):
     ISOLATE_NODE = "isolate_node"
     NOTIFY_ADMIN = "notify_admin"
     AUTO_HEAL = "auto_heal"
-
 
 @dataclass
 class HealthMetrics:
@@ -47,7 +44,6 @@ class HealthMetrics:
     response_time: float = 0.0
     active_connections: int = 0
     timestamp: datetime = field(default_factory=datetime.now)
-
 
 @dataclass
 class FailureEvent:
@@ -62,7 +58,6 @@ class FailureEvent:
     resolved: bool = False
     resolution_time: Optional[datetime] = None
 
-
 @dataclass
 class RecoveryPlan:
     """恢复计划数据类"""
@@ -72,7 +67,6 @@ class RecoveryPlan:
     priority: int
     dependencies: List[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
-
 
 class HealthMonitor:
     """健康监控器"""
@@ -226,7 +220,6 @@ class HealthMonitor:
             logger.error(f"获取健康趋势失败: {e}")
             return {'status': 'error', 'error': str(e)}
 
-
 class FailureDetector:
     """故障检测器"""
     
@@ -352,7 +345,6 @@ class FailureDetector:
         except Exception as e:
             logger.error(f"获取故障统计失败: {e}")
             return {'error': str(e)}
-
 
 class RecoveryEngine:
     """恢复引擎"""
@@ -484,7 +476,6 @@ class RecoveryEngine:
         except Exception as e:
             logger.error(f"获取恢复统计失败: {e}")
             return {'error': str(e)}
-
 
 class FaultToleranceManager:
     """故障容错管理器主类"""
@@ -638,10 +629,8 @@ class FaultToleranceManager:
             logger.error(f"获取节点状态失败: {e}")
             return {'error': str(e)}
 
-
 # 全局实例
 fault_tolerance_manager = FaultToleranceManager()
-
 
 def get_fault_tolerance_manager() -> FaultToleranceManager:
     """获取故障容错管理器实例"""

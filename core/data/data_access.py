@@ -11,9 +11,9 @@ import pandas as pd
 
 from .models import StockInfo, KlineData, MarketData, QueryParams
 from .repository import StockRepository, KlineRepository, MarketRepository
+from core.services.uni_plugin_data_manager import UniPluginDataManager
 
 logger = logger
-
 
 class DataAccess:
     """
@@ -22,20 +22,23 @@ class DataAccess:
     提供统一的数据访问接口，内部使用仓库模式管理不同类型的数据。
     """
 
-    def __init__(self, data_manager=None):
+    def __init__(self, data_manager=None, uni_plugin_manager: Optional[UniPluginDataManager] = None):
         """
         初始化数据访问层
 
         Args:
-            data_manager: 数据管理器实例（可选）
+            data_manager: 数据管理器实例（可选，向后兼容）
+            uni_plugin_manager: 统一插件数据管理器（优先使用）
         """
         self.logger = logger
 
-        # 初始化各个仓库
-        self.stock_repo = StockRepository(data_manager)
-        # KlineRepository使用asset_service参数，不是data_manager
-        self.kline_repo = KlineRepository(asset_service=data_manager)
-        self.market_repo = MarketRepository(data_manager)
+        # 优先使用UniPluginDataManager
+        self.uni_plugin_manager = uni_plugin_manager
+
+        # 初始化各个仓库 - 传入UniPluginDataManager
+        self.stock_repo = StockRepository(data_manager, uni_plugin_manager)
+        self.kline_repo = KlineRepository(asset_service=data_manager, uni_plugin_manager=uni_plugin_manager)
+        self.market_repo = MarketRepository(data_manager, uni_plugin_manager)
 
         # 连接状态
         self._connected = False

@@ -18,7 +18,6 @@ from datetime import datetime
 # 基础日志配置
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class PerformanceWidgetConfig:
     """性能Widget配置"""
@@ -26,7 +25,6 @@ class PerformanceWidgetConfig:
     max_data_points: int = 100   # 最大数据点数
     enable_animations: bool = True
     auto_scale: bool = True
-
 
 class PerformanceWidgetManager:
     """性能Widget管理器"""
@@ -71,10 +69,8 @@ class PerformanceWidgetManager:
             except Exception as e:
                 logger.error(f"更新widget失败 {widget_id}: {e}")
 
-
 # 全局管理器实例
 _widget_manager = None
-
 
 def get_performance_widget_manager() -> PerformanceWidgetManager:
     """获取性能Widget管理器实例"""
@@ -82,7 +78,6 @@ def get_performance_widget_manager() -> PerformanceWidgetManager:
     if _widget_manager is None:
         _widget_manager = PerformanceWidgetManager()
     return _widget_manager
-
 
 # 导出的公共接口
 __all__ = [

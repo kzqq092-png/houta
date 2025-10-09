@@ -7,8 +7,6 @@ from PyQt5.QtGui import *
 from typing import Optional, Dict, Any
 from loguru import logger
 
-
-
 class ConverterDialog(QDialog):
     """单位转换器对话框，优化UI和功能"""
 

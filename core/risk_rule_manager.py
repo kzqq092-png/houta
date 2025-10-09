@@ -13,7 +13,6 @@ from pathlib import Path
 from dataclasses import dataclass, asdict
 from loguru import logger
 
-
 @dataclass
 class RiskRule:
     """风险规则数据类"""
@@ -50,7 +49,6 @@ class RiskRule:
     last_triggered: str = ""
     trigger_count: int = 0
 
-
 @dataclass
 class RiskAlert:
     """风险告警记录"""
@@ -66,7 +64,6 @@ class RiskAlert:
     created_at: str = ""
     acknowledged_at: str = ""
     resolved_at: str = ""
-
 
 class RiskRuleManager:
     """风险规则管理器"""
@@ -522,10 +519,8 @@ class RiskRuleManager:
             acknowledged_at=row[10], resolved_at=row[11]
         )
 
-
 # 全局实例
 _risk_rule_manager = None
-
 
 def get_risk_rule_manager() -> RiskRuleManager:
     """获取风险规则管理器实例"""

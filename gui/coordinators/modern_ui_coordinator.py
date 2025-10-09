@@ -16,13 +16,11 @@ import threading
 
 logger = logging.getLogger(__name__)
 
-
 class UIStyle(Enum):
     """UI风格枚举"""
     ENHANCED = "enhanced"
     MODERN = "modern"
     UNIFIED = "unified"
-
 
 class ComponentType(Enum):
     """组件类型枚举"""
@@ -32,7 +30,6 @@ class ComponentType(Enum):
     WINDOW = "window"
     PANEL = "panel"
 
-
 class ComponentState(Enum):
     """组件状态枚举"""
     ACTIVE = "active"
@@ -40,7 +37,6 @@ class ComponentState(Enum):
     LOADING = "loading"
     ERROR = "error"
     HIDDEN = "hidden"
-
 
 @dataclass
 class ComponentInfo:
@@ -55,7 +51,6 @@ class ComponentInfo:
     metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
     last_updated: datetime = field(default_factory=datetime.now)
-
 
 @dataclass
 class StyleConfig:
@@ -88,7 +83,6 @@ class StyleConfig:
     border_radius_small: int = 4
     border_radius_normal: int = 8
     border_radius_large: int = 12
-
 
 class ComponentRegistry:
     """组件注册表"""
@@ -173,7 +167,6 @@ class ComponentRegistry:
         except Exception as e:
             logger.error(f"创建组件失败: {e}")
             return None
-
 
 class StyleManager:
     """样式管理器"""
@@ -356,7 +349,6 @@ class StyleManager:
         except Exception as e:
             logger.error(f"设置全局样式失败: {e}")
 
-
 class ComponentLifecycleManager:
     """组件生命周期管理器"""
     
@@ -490,7 +482,6 @@ class ComponentLifecycleManager:
         except Exception as e:
             logger.error(f"销毁组件失败: {e}")
             return False
-
 
 class ModernUICoordinator(QObject):
     """现代UI协调器主类"""
@@ -701,10 +692,8 @@ class ModernUICoordinator(QObject):
             logger.error(f"获取协调器状态失败: {e}")
             return {'error': str(e)}
 
-
 # 全局实例
 modern_ui_coordinator = ModernUICoordinator()
-
 
 def get_modern_ui_coordinator() -> ModernUICoordinator:
     """获取现代UI协调器实例"""

@@ -11,7 +11,6 @@ from utils.theme import Theme, ThemeManager
 
 __all__ = ['Theme', 'ThemeManager']
 
-
 class ChartManager:
     """Manages chart creation and updates"""
 
@@ -41,7 +40,6 @@ class ChartManager:
             ax.yaxis.label.set_color(colors['text'])
             ax.title.set_color(colors['text'])
             ax.grid(True, color=colors['grid'], alpha=0.3)
-
 
 class WidgetFactory:
     """Factory class for creating common widgets"""

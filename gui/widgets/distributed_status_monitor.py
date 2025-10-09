@@ -51,7 +51,8 @@ from PyQt5.QtGui import (
 
 # 导入核心分布式服务组件
 try:
-    from core.services.enhanced_distributed_service import EnhancedDistributedService
+    # EnhancedDistributedService 不存在，使用 DistributedService
+    from core.services.distributed_service import DistributedService as EnhancedDistributedService
     from core.services.fault_tolerance_manager import FaultToleranceManager
     from core.ui_integration.ui_business_logic_adapter import get_ui_adapter
     from loguru import logger
@@ -59,6 +60,8 @@ try:
 except ImportError as e:
     logger = logging.getLogger(__name__)
     CORE_AVAILABLE = False
+    EnhancedDistributedService = None
+    FaultToleranceManager = None
     logger.warning(f"核心分布式服务不可用: {e}")
 
 logger = logger.bind(module=__name__) if hasattr(logger, 'bind') else logging.getLogger(__name__)
@@ -574,7 +577,7 @@ class DistributedStatusMonitor(QWidget):
         # 标题和控制区域
         header_layout = QHBoxLayout()
 
-        title_label = QLabel("🌐 分布式状态监控")
+        title_label = QLabel("分布式状态监控")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -588,7 +591,7 @@ class DistributedStatusMonitor(QWidget):
         header_layout.addStretch()
 
         # 控制按钮
-        refresh_btn = QPushButton("🔄 刷新状态")
+        refresh_btn = QPushButton("刷新状态")
         refresh_btn.clicked.connect(self.refresh_cluster_status)
         refresh_btn.setStyleSheet("""
             QPushButton {
@@ -643,7 +646,7 @@ class DistributedStatusMonitor(QWidget):
 
         # 故障监控选项卡
         fault_tab = self.create_fault_monitoring_tab()
-        self.tab_widget.addTab(fault_tab, "⚠️ 故障监控")
+        self.tab_widget.addTab(fault_tab, "故障监控")
 
         layout.addWidget(self.tab_widget)
 
@@ -675,7 +678,7 @@ class DistributedStatusMonitor(QWidget):
         layout = QVBoxLayout(widget)
 
         # 集群统计信息
-        stats_group = QGroupBox("📊 集群统计")
+        stats_group = QGroupBox("集群统计")
         stats_layout = QGridLayout(stats_group)
 
         # 节点统计
@@ -702,7 +705,7 @@ class DistributedStatusMonitor(QWidget):
         layout.addWidget(stats_group)
 
         # 资源使用概览
-        resources_group = QGroupBox("💾 集群资源使用")
+        resources_group = QGroupBox("集群资源使用")
         resources_layout = QGridLayout(resources_group)
 
         # CPU使用率
@@ -732,7 +735,7 @@ class DistributedStatusMonitor(QWidget):
         layout.addWidget(resources_group)
 
         # 任务执行统计
-        tasks_group = QGroupBox("📋 任务执行统计")
+        tasks_group = QGroupBox("任务执行统计")
         tasks_layout = QGridLayout(tasks_group)
 
         # 活跃任务
@@ -771,18 +774,18 @@ class DistributedStatusMonitor(QWidget):
         self.cluster_health_text.setText("""
 🟢 集群整体状态: 健康
 
-✅ 所有关键服务正常运行
-✅ 节点间通信良好
-✅ 负载分布均衡
-✅ 故障恢复机制工作正常
+所有关键服务正常运行
+节点间通信良好
+负载分布均衡
+故障恢复机制工作正常
 
-📊 性能指标:
+ 性能指标:
 • 平均响应时间: 45ms
 • 数据一致性: 99.9%
 • 可用性: 99.95%
 • 吞吐量: 1,234 任务/分钟
 
-⚠️ 注意事项:
+ 注意事项:
 • 建议定期进行负载均衡
 • 监控磁盘空间使用情况
         """)
@@ -954,7 +957,7 @@ class DistributedStatusMonitor(QWidget):
         layout.addWidget(fault_stats_group)
 
         # 故障列表
-        faults_group = QGroupBox("📋 故障列表")
+        faults_group = QGroupBox("故障列表")
         faults_layout = QVBoxLayout(faults_group)
 
         self.faults_table = QTableWidget()
@@ -975,7 +978,7 @@ class DistributedStatusMonitor(QWidget):
         layout.addWidget(faults_group)
 
         # 自动恢复配置
-        recovery_group = QGroupBox("🔧 自动恢复配置")
+        recovery_group = QGroupBox("自动恢复配置")
         recovery_layout = QFormLayout(recovery_group)
 
         # 启用自动恢复
@@ -993,7 +996,7 @@ class DistributedStatusMonitor(QWidget):
         self.recovery_timeout_spin = QSpinBox()
         self.recovery_timeout_spin.setRange(30, 600)
         self.recovery_timeout_spin.setValue(120)
-        self.recovery_timeout_spin.setSuffix(" 秒")
+        self.recovery_timeout_spin.setSuffix("秒")
         recovery_layout.addRow("恢复超时:", self.recovery_timeout_spin)
 
         # 故障通知

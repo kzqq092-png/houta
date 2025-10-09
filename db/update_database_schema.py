@@ -18,7 +18,6 @@ from typing import Dict, List, Any, Optional
 # Loguru配置在core.loguru_config中统一管理s - %(levelname)s - %(message)s')
 logger = logger
 
-
 class DatabaseSchemaUpdater:
     """数据库架构更新器"""
 
@@ -30,7 +29,7 @@ class DatabaseSchemaUpdater:
 
     def update_all_databases(self):
         """更新所有数据库"""
-        logger.info(" 开始更新FactorWeave-Quant数据库架构")
+        logger.info("开始更新FactorWeave-Quant数据库架构")
 
         try:
             # 1. 更新SQLite数据库
@@ -45,7 +44,7 @@ class DatabaseSchemaUpdater:
             # 4. 验证更新结果
             self.verify_update_results()
 
-            logger.info(" 数据库架构更新完成")
+            logger.info("数据库架构更新完成")
             return True
 
         except Exception as e:
@@ -56,19 +55,19 @@ class DatabaseSchemaUpdater:
 
     def update_sqlite_databases(self):
         """更新SQLite数据库"""
-        logger.info(" 更新SQLite数据库架构...")
+        logger.info("更新SQLite数据库架构...")
 
         # 确保数据库文件存在
         if not self.sqlite_db_path.exists():
-            logger.info("  创建新的SQLite数据库...")
+            logger.info("创建新的SQLite数据库...")
             self._create_sqlite_database()
         else:
-            logger.info("  更新现有SQLite数据库...")
+            logger.info("更新现有SQLite数据库...")
             self._update_existing_sqlite_database()
 
         # 确保FactorWeave系统数据库存在
         if not self.factorweave_db_path.exists():
-            logger.info("  创建FactorWeave系统数据库...")
+            logger.info("创建FactorWeave系统数据库...")
             self._create_factorweave_database()
 
     def _create_sqlite_database(self):
@@ -165,7 +164,7 @@ class DatabaseSchemaUpdater:
 
     def update_duckdb_database(self):
         """更新DuckDB分析数据库"""
-        logger.info(" 更新DuckDB分析数据库...")
+        logger.info("更新DuckDB分析数据库...")
 
         conn = duckdb.connect(str(self.duckdb_analytics_path))
 
@@ -265,7 +264,7 @@ class DatabaseSchemaUpdater:
                 column_names = {col[0] for col in columns}
 
                 if 'recognition_time' not in column_names and 'detection_time' in column_names:
-                    logger.info("    pattern_recognition_results表使用detection_time列，无需修改")
+                    logger.info("  pattern_recognition_results表使用detection_time列，无需修改")
 
                 # 检查是否缺少其他必要列
                 required_columns = {
@@ -314,7 +313,7 @@ class DatabaseSchemaUpdater:
 
     def insert_initial_data(self):
         """插入初始数据"""
-        logger.info(" 插入初始数据...")
+        logger.info("插入初始数据...")
 
         self._insert_sqlite_initial_data()
         self._insert_duckdb_initial_data()
@@ -413,7 +412,7 @@ class DatabaseSchemaUpdater:
 
     def verify_update_results(self):
         """验证更新结果"""
-        logger.info(" 验证数据库更新结果...")
+        logger.info("验证数据库更新结果...")
 
         # 验证SQLite数据库
         with sqlite3.connect(self.sqlite_db_path) as conn:
@@ -820,7 +819,6 @@ class DatabaseSchemaUpdater:
         for method in table_methods:
             cursor.execute(method())
 
-
 def main():
     """主函数"""
     logger.info("=" * 60)
@@ -832,17 +830,16 @@ def main():
     if updater.update_all_databases():
         logger.info("\n 数据库架构更新成功！")
         logger.info("\n 更新内容:")
-        logger.info("   SQLite系统数据库架构")
-        logger.info("   DuckDB分析数据库架构")
-        logger.info("   缺失表和列的创建")
-        logger.info("   初始配置和数据")
-        logger.info("   性能优化索引")
+        logger.info(" SQLite系统数据库架构")
+        logger.info(" DuckDB分析数据库架构")
+        logger.info(" 缺失表和列的创建")
+        logger.info(" 初始配置和数据")
+        logger.info(" 性能优化索引")
 
         return True
     else:
         logger.info("\n 数据库架构更新失败！")
         return False
-
 
 if __name__ == "__main__":
     success = main()

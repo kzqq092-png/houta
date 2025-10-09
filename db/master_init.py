@@ -22,7 +22,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # 配置日志 - Loguru配置在core.loguru_config中统一管理
 logger = logger
 
-
 class MasterDatabaseInitializer:
     """主数据库初始化器"""
 
@@ -202,7 +201,6 @@ class MasterDatabaseInitializer:
 
         logger.error(f"错误报告已生成: {error_path}")
 
-
 def main():
     """主函数"""
     logger.info("=" * 60)
@@ -215,19 +213,18 @@ def main():
     if success:
         logger.info("\n 数据库系统初始化成功！")
         logger.info("\n 初始化内容:")
-        logger.info("   SQLite系统数据库 (OLTP)")
-        logger.info("   DuckDB分析数据库 (OLAP)")
-        logger.info("   完整表结构和索引")
-        logger.info("   初始配置和数据")
-        logger.info("   形态算法代码")
-        logger.info("   系统完整性验证")
+        logger.info(" SQLite系统数据库 (OLTP)")
+        logger.info(" DuckDB分析数据库 (OLAP)")
+        logger.info(" 完整表结构和索引")
+        logger.info(" 初始配置和数据")
+        logger.info(" 形态算法代码")
+        logger.info(" 系统完整性验证")
 
         return True
     else:
         logger.info("\n 数据库系统初始化失败！")
         logger.info("请查看错误报告了解详细信息。")
         return False
-
 
 if __name__ == "__main__":
     success = main()

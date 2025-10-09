@@ -28,7 +28,6 @@ from ..plugin_types import AssetType
 
 logger = logger
 
-
 class TableType(Enum):
     """表类型枚举"""
     # 基础数据类型
@@ -58,7 +57,6 @@ class TableType(Enum):
     SECTOR_FUND_FLOW_DAILY = "sector_fund_flow_daily"
     SECTOR_FUND_FLOW_INTRADAY = "sector_fund_flow_intraday"
 
-
 @dataclass
 class TableSchema:
     """表结构定义"""
@@ -69,7 +67,6 @@ class TableSchema:
     partitions: Optional[Dict[str, Any]] = None  # 分区定义
     constraints: Optional[List[str]] = None  # 约束条件
     version: str = "1.0"
-
 
 class TableSchemaRegistry:
     """表结构注册表"""
@@ -132,6 +129,7 @@ class TableSchemaRegistry:
             columns={
                 'symbol': 'VARCHAR NOT NULL',
                 'datetime': 'TIMESTAMP NOT NULL',
+                'frequency': 'VARCHAR NOT NULL DEFAULT \'1d\'',
                 'open': 'DECIMAL(10,4) NOT NULL',
                 'high': 'DECIMAL(10,4) NOT NULL',
                 'low': 'DECIMAL(10,4) NOT NULL',
@@ -164,11 +162,13 @@ class TableSchemaRegistry:
                 'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
                 'data_quality_score': 'DECIMAL(3,2)'
             },
-            primary_key=['symbol', 'datetime'],
+            primary_key=['symbol', 'datetime', 'frequency'],
             indexes=[
                 {'name': 'idx_symbol', 'columns': ['symbol']},
                 {'name': 'idx_datetime', 'columns': ['datetime']},
+                {'name': 'idx_frequency', 'columns': ['frequency']},
                 {'name': 'idx_symbol_datetime', 'columns': ['symbol', 'datetime']},
+                {'name': 'idx_symbol_frequency', 'columns': ['symbol', 'frequency']},
                 {'name': 'idx_volume', 'columns': ['volume']},
                 {'name': 'idx_amount', 'columns': ['amount']},
                 {'name': 'idx_data_source', 'columns': ['data_source']}
@@ -812,7 +812,6 @@ class TableSchemaRegistry:
         """获取所有表结构"""
         return self._schemas.copy()
 
-
 class DynamicTableManager:
     """动态表管理器"""
 
@@ -1295,10 +1294,8 @@ CREATE TABLE {table_name} (
                 'error': str(e)
             }
 
-
 # 全局表管理器实例
 _table_manager: Optional[DynamicTableManager] = None
-
 
 def get_table_manager() -> DynamicTableManager:
     """获取全局表管理器实例"""

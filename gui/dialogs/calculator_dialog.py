@@ -9,7 +9,6 @@ from loguru import logger
 
 logger = logger
 
-
 class CalculatorDialog(QDialog):
     """计算器对话框，优化UI和功能"""
 

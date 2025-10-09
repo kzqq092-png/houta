@@ -38,7 +38,6 @@ except ImportError:
 # 性能监控组件
 from .unified_monitor import PerformanceMetric, PerformanceCategory, MetricType
 
-
 class CollectionMode(Enum):
     """收集模式"""
     REALTIME = "realtime"      # 实时收集
@@ -46,14 +45,12 @@ class CollectionMode(Enum):
     ADAPTIVE = "adaptive"      # 自适应收集
     ON_DEMAND = "on_demand"    # 按需收集
 
-
 class MetricPriority(Enum):
     """指标优先级"""
     CRITICAL = 1    # 关键指标（CPU、内存）
     HIGH = 2        # 高优先级（磁盘、网络）
     MEDIUM = 3      # 中等优先级（进程、线程）
     LOW = 4         # 低优先级（扩展指标）
-
 
 @dataclass
 class CollectionConfig:
@@ -89,7 +86,6 @@ class CollectionConfig:
     disk_threshold: float = 90.0      # 磁盘使用率阈值
     network_threshold: float = 100.0  # 网络使用率阈值（MB/s）
 
-
 @dataclass
 class MetricCollectionResult:
     """指标收集结果"""
@@ -98,7 +94,6 @@ class MetricCollectionResult:
     success: bool
     error_message: Optional[str] = None
     timestamp: datetime = field(default_factory=datetime.now)
-
 
 class SystemMetricsCollector:
     """系统指标收集器"""
@@ -622,7 +617,6 @@ class SystemMetricsCollector:
 
         return metrics
 
-
 class RealTimeMetricsCollector:
     """
     实时性能指标收集器
@@ -1030,11 +1024,9 @@ class RealTimeMetricsCollector:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
-
 # 全局单例实例
 _collector_instance: Optional[RealTimeMetricsCollector] = None
 _collector_lock = threading.RLock()
-
 
 def get_metrics_collector() -> RealTimeMetricsCollector:
     """获取全局指标收集器实例"""
@@ -1046,7 +1038,6 @@ def get_metrics_collector() -> RealTimeMetricsCollector:
             _collector_instance.start()
 
         return _collector_instance
-
 
 def initialize_metrics_collector(config: Optional[CollectionConfig] = None) -> RealTimeMetricsCollector:
     """初始化全局指标收集器"""

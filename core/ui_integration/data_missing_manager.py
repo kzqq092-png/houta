@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
+from core.services.unified_data_manager import get_unified_data_manager
 数据缺失智能管理器
 负责检测数据缺失、分析原因、提供解决方案
 """
@@ -25,7 +26,6 @@ except ImportError as e:
     print(f"导入核心组件失败: {e}")
     logger = None
 
-
 class DataAvailabilityStatus(Enum):
     """数据可用性状态"""
     AVAILABLE = "available"  # 数据可用
@@ -33,7 +33,6 @@ class DataAvailabilityStatus(Enum):
     PARTIAL = "partial"  # 部分数据
     OUTDATED = "outdated"  # 数据过期
     ERROR = "error"  # 错误状态
-
 
 @dataclass
 class DataAvailabilityInfo:
@@ -48,7 +47,6 @@ class DataAvailabilityInfo:
     error_message: str = ""
     last_check: datetime = field(default_factory=datetime.now)
     priority: int = 1  # 1-5, 5最高优先级
-
 
 @dataclass
 class DataDownloadTask:
@@ -65,7 +63,6 @@ class DataDownloadTask:
     created_at: datetime = field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-
 
 class DataMissingManager:
     """数据缺失智能管理器"""
@@ -96,7 +93,7 @@ class DataMissingManager:
         try:
             self.asset_identifier = AssetTypeIdentifier()
             self.data_router = DataRouter()
-            self.data_manager = AssetAwareUnifiedDataManager()
+            self.data_manager = AssetAwareget_unified_data_manager()
             self.db_manager = AssetSeparatedDatabaseManager()
 
             if logger:
@@ -493,10 +490,8 @@ class DataMissingManager:
             if logger:
                 logger.error(f"关闭数据缺失管理器失败: {e}")
 
-
 # 全局实例
 _data_missing_manager = None
-
 
 def get_data_missing_manager() -> DataMissingManager:
     """获取数据缺失管理器单例"""

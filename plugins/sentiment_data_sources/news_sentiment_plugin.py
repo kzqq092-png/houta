@@ -15,7 +15,6 @@ from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPl
 from plugins.sentiment_data_sources.config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
-
 class NewsSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
     """新闻情绪分析插件"""
 
@@ -528,12 +527,10 @@ class NewsSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
             avg_score = np.mean([data.value for data in sentiment_data])
             return max(0.0, min(100.0, round(avg_score, 2)))
 
-
 # 插件工厂函数
 def create_news_sentiment_plugin() -> NewsSentimentPlugin:
     """创建新闻情绪分析插件实例"""
     return NewsSentimentPlugin()
-
 
 if __name__ == "__main__":
     # 测试插件

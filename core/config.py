@@ -32,7 +32,6 @@ __all__ = [
     'restore_config'
 ]
 
-
 def validate_config(config: Dict[str, Any]) -> bool:
     """验证配置是否有效
 
@@ -86,7 +85,6 @@ def validate_config(config: Dict[str, Any]) -> bool:
     except Exception as e:
         logger.error(f"配置验证失败: {str(e)}")
         return False
-
 
 def migrate_config(config: Dict[str, Any], current_version: str) -> Dict[str, Any]:
     """迁移配置到最新版本
@@ -148,7 +146,6 @@ def migrate_config(config: Dict[str, Any], current_version: str) -> Dict[str, An
         logger.error(f"配置迁移失败: {str(e)}")
         return config
 
-
 def backup_config(config_manager: ConfigManager, backup_dir: str = "backups") -> Optional[str]:
     """备份当前配置
 
@@ -180,7 +177,6 @@ def backup_config(config_manager: ConfigManager, backup_dir: str = "backups") ->
     except Exception as e:
         logger.error(f"配置备份失败: {str(e)}")
         return None
-
 
 def restore_config(config_manager: ConfigManager, backup_path: str) -> bool:
     """从备份恢复配置
@@ -215,7 +211,6 @@ def restore_config(config_manager: ConfigManager, backup_path: str) -> bool:
     except Exception as e:
         logger.error(f"恢复配置失败: {str(e)}")
         return False
-
 
 # 创建全局配置管理器实例
 config_manager = ConfigManager()

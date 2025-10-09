@@ -19,14 +19,12 @@ from concurrent.futures import ThreadPoolExecutor
 
 logger = logger
 
-
 class ImportMode(Enum):
     """导入模式"""
     REAL_TIME = "real_time"      # 实时导入
     BATCH = "batch"              # 批量导入
     SCHEDULED = "scheduled"      # 定时导入
     MANUAL = "manual"            # 手动导入
-
 
 class DataFrequency(Enum):
     """数据频率"""
@@ -40,7 +38,6 @@ class DataFrequency(Enum):
     WEEKLY = "weekly"           # 周线
     MONTHLY = "monthly"         # 月线
 
-
 class ImportStatus(Enum):
     """导入状态"""
     PENDING = "pending"         # 等待中
@@ -49,7 +46,6 @@ class ImportStatus(Enum):
     FAILED = "failed"           # 失败
     PAUSED = "paused"          # 暂停
     CANCELLED = "cancelled"     # 已取消
-
 
 @dataclass
 class DataSourceConfig:
@@ -75,7 +71,6 @@ class DataSourceConfig:
     def from_dict(cls, data: Dict[str, Any]) -> 'DataSourceConfig':
         """从字典创建"""
         return cls(**data)
-
 
 @dataclass
 class ImportTaskConfig:
@@ -110,7 +105,6 @@ class ImportTaskConfig:
         data['frequency'] = DataFrequency(data['frequency'])
         data['mode'] = ImportMode(data['mode'])
         return cls(**data)
-
 
 @dataclass
 class ImportProgress:
@@ -155,7 +149,6 @@ class ImportProgress:
         """从字典创建"""
         data['status'] = ImportStatus(data['status'])
         return cls(**data)
-
 
 class ImportConfigManager:
     """
@@ -659,7 +652,6 @@ class ImportConfigManager:
             logger.error(f"配置导入失败: {e}")
             return False
 
-
 def main():
     """测试函数"""
     # 创建配置管理器
@@ -705,7 +697,6 @@ def main():
     # 获取统计信息
     stats = manager.get_statistics()
     logger.info(f"统计信息: {json.dumps(stats, ensure_ascii=False, indent=2)}")
-
 
 if __name__ == "__main__":
     main()

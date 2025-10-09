@@ -10,7 +10,6 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any
 
-
 def calculate_sentiment(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
     """
     计算情绪指标
@@ -46,7 +45,6 @@ def calculate_sentiment(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
     result['Sentiment'] = sentiment
 
     return result
-
 
 def calculate_volatility(df: pd.DataFrame, timeperiod: int = 10, smooth_type: str = 'SMA') -> pd.DataFrame:
     """
@@ -91,7 +89,6 @@ def calculate_volatility(df: pd.DataFrame, timeperiod: int = 10, smooth_type: st
 
     return result
 
-
 def demo_usage():
     """
     演示如何使用自定义指标
@@ -128,7 +125,6 @@ def demo_usage():
         df_sentiment, timeperiod=10, smooth_type='EMA')
     print("\n波动率指标:")
     print(df_volatility[['close', 'Sentiment', 'Volatility']].head())
-
 
 if __name__ == '__main__':
     demo_usage()

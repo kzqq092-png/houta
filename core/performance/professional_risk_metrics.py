@@ -18,7 +18,6 @@ import warnings
 
 logger = logger
 
-
 class ProfessionalRiskMetrics:
     """
     专业风险指标计算器
@@ -711,7 +710,6 @@ class ProfessionalRiskMetrics:
                 'status': 'calculation_failed'
             }
         }
-
 
 class FinancialMetricsValidator:
     """

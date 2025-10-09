@@ -11,9 +11,7 @@ from pathlib import Path
 from .base_service import ConfigurableService
 from ..events import ThemeChangedEvent
 
-
 logger = logger
-
 
 class ThemeService(ConfigurableService):
     """

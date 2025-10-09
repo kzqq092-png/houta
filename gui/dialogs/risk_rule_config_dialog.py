@@ -142,7 +142,7 @@ class RiskRuleConfigDialog(QDialog):
         self.duration_spin = QSpinBox()
         self.duration_spin.setRange(1, 86400)  # 1秒到1天
         self.duration_spin.setValue(60)
-        self.duration_spin.setSuffix(" 秒")
+        self.duration_spin.setSuffix("秒")
         condition_form.addRow("持续时间:", self.duration_spin)
 
         condition_group.setLayout(condition_form)
@@ -155,13 +155,13 @@ class RiskRuleConfigDialog(QDialog):
         self.check_interval_spin = QSpinBox()
         self.check_interval_spin.setRange(1, 3600)  # 1秒到1小时
         self.check_interval_spin.setValue(60)
-        self.check_interval_spin.setSuffix(" 秒")
+        self.check_interval_spin.setSuffix("秒")
         advanced_form.addRow("检查频率:", self.check_interval_spin)
 
         self.silence_period_spin = QSpinBox()
         self.silence_period_spin.setRange(0, 86400)  # 0秒到1天
         self.silence_period_spin.setValue(300)
-        self.silence_period_spin.setSuffix(" 秒")
+        self.silence_period_spin.setSuffix("秒")
         advanced_form.addRow("静默期:", self.silence_period_spin)
 
         self.max_alerts_spin = QSpinBox()

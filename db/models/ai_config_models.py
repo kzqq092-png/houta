@@ -14,7 +14,6 @@ from pathlib import Path
 
 logger = logger
 
-
 class AIPredictionConfigManager:
     """AI预测配置管理器"""
 
@@ -319,10 +318,8 @@ class AIPredictionConfigManager:
             logger.error(f"重置配置失败: {e}")
             raise
 
-
 # 全局配置管理器实例
 _config_manager = None
-
 
 def get_ai_config_manager() -> AIPredictionConfigManager:
     """获取全局AI配置管理器实例"""

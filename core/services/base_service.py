@@ -3,10 +3,14 @@ from loguru import logger
 基础服务模块
 
 定义所有服务的基础接口和通用功能。
+为架构精简重构提供增强的服务基类。
 """
 
+import time
+import threading
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+from datetime import datetime
 from ..events import EventBus, get_event_bus
 
 
@@ -18,6 +22,7 @@ class BaseService(ABC):
     基础服务接口
 
     所有业务服务都应该继承此类。
+    为架构精简重构提供统一的服务基础设施。
     """
 
     def __init__(self, event_bus: Optional[EventBus] = None):
@@ -31,6 +36,19 @@ class BaseService(ABC):
         self._initialized = False
         self._disposed = False
         self._name = self.__class__.__name__
+
+        # 架构精简重构增强功能
+        self._initialization_time: Optional[float] = None
+        self._last_health_check: Optional[datetime] = None
+        self._dependencies: List[str] = []
+        self._service_id = f"{self._name}_{id(self)}"
+        self._lock = threading.RLock()
+        self._metrics: Dict[str, Any] = {
+            "initialization_count": 0,
+            "error_count": 0,
+            "last_error": None,
+            "operation_count": 0
+        }
 
     @property
     def name(self) -> str:
@@ -52,22 +70,82 @@ class BaseService(ABC):
         """获取事件总线"""
         return self._event_bus
 
+    @property
+    def service_id(self) -> str:
+        """获取服务唯一标识"""
+        return self._service_id
+
+    @property
+    def initialization_time(self) -> Optional[float]:
+        """获取初始化时间（秒）"""
+        return self._initialization_time
+
+    @property
+    def dependencies(self) -> List[str]:
+        """获取服务依赖列表"""
+        return self._dependencies.copy()
+
+    @property
+    def metrics(self) -> Dict[str, Any]:
+        """获取服务指标 - 支持字典和对象类型"""
+        with self._lock:
+            # 支持多种metrics类型
+            if isinstance(self._metrics, dict):
+                return self._metrics.copy()
+            elif hasattr(self._metrics, 'to_dict'):
+                return self._metrics.to_dict()
+            elif hasattr(self._metrics, '__dict__'):
+                return vars(self._metrics).copy()
+            else:
+                return {'metrics': str(self._metrics)}
+
     def initialize(self) -> None:
         """
         初始化服务
 
         子类可以重写此方法来执行初始化逻辑。
+        为架构精简重构提供增强的初始化流程。
         """
         if self._initialized:
             logger.warning(f"Service {self._name} is already initialized")
             return
 
+        start_time = time.time()
+
         try:
+            with self._lock:
+                self._metrics["initialization_count"] += 1
+
+            logger.info(f"Initializing service {self._name} for architecture simplification")
+
+            # 执行实际初始化
             self._do_initialize()
+
+            # 记录初始化时间
+            self._initialization_time = time.time() - start_time
             self._initialized = True
-            logger.info(f"Service {self._name} initialized successfully")
+            self._last_health_check = datetime.now()
+
+            logger.info(f"Service {self._name} initialized successfully in {self._initialization_time:.3f}s")
+
+            # 发送初始化成功事件
+            self._event_bus.publish(f"service.{self._name}.initialized",
+                                    service_id=self._service_id,
+                                    initialization_time=self._initialization_time
+                                    )
+
         except Exception as e:
+            with self._lock:
+                self._metrics["error_count"] += 1
+                self._metrics["last_error"] = str(e)
+
             logger.error(f"Failed to initialize service {self._name}: {e}")
+
+            # 发送初始化失败事件
+            self._event_bus.publish(f"service.{self._name}.initialization_failed",
+                                    service_id=self._service_id,
+                                    error=str(e)
+                                    )
             raise
 
     def dispose(self) -> None:
@@ -121,6 +199,95 @@ class BaseService(ABC):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.dispose()
+
+    def perform_health_check(self) -> Dict[str, Any]:
+        """
+        执行健康检查
+
+        Returns:
+            健康检查结果
+        """
+        self._last_health_check = datetime.now()
+
+        health_status = {
+            "service_name": self._name,
+            "service_id": self._service_id,
+            "status": "healthy" if self._initialized and not self._disposed else "unhealthy",
+            "initialized": self._initialized,
+            "disposed": self._disposed,
+            "initialization_time": self._initialization_time,
+            "last_check": self._last_health_check.isoformat(),
+            "metrics": self.metrics  # 这里调用属性，返回字典
+        }
+
+        # 子类可以重写此方法添加自定义健康检查
+        try:
+            custom_health = self._do_health_check()
+            if custom_health:
+                health_status.update(custom_health)
+        except Exception as e:
+            health_status["custom_health_error"] = str(e)
+            with self._lock:
+                self._metrics["error_count"] += 1
+                self._metrics["last_error"] = str(e)
+
+        return health_status
+
+    def _do_health_check(self) -> Optional[Dict[str, Any]]:
+        """
+        执行自定义健康检查
+
+        子类可以重写此方法来实现特定的健康检查逻辑。
+
+        Returns:
+            自定义健康检查结果，或None
+        """
+        return None
+
+    def add_dependency(self, dependency_name: str) -> None:
+        """
+        添加服务依赖
+
+        Args:
+            dependency_name: 依赖的服务名称
+        """
+        if dependency_name not in self._dependencies:
+            self._dependencies.append(dependency_name)
+            logger.debug(f"Service {self._name} added dependency: {dependency_name}")
+
+    def remove_dependency(self, dependency_name: str) -> None:
+        """
+        移除服务依赖
+
+        Args:
+            dependency_name: 依赖的服务名称
+        """
+        if dependency_name in self._dependencies:
+            self._dependencies.remove(dependency_name)
+            logger.debug(f"Service {self._name} removed dependency: {dependency_name}")
+
+    def increment_operation_count(self) -> None:
+        """增加操作计数"""
+        with self._lock:
+            self._metrics["operation_count"] += 1
+
+    def get_service_info(self) -> Dict[str, Any]:
+        """
+        获取服务信息
+
+        Returns:
+            服务信息字典
+        """
+        return {
+            "service_name": self._name,
+            "service_id": self._service_id,
+            "initialized": self._initialized,
+            "disposed": self._disposed,
+            "initialization_time": self._initialization_time,
+            "dependencies": self.dependencies,
+            "metrics": self.metrics,
+            "last_health_check": self._last_health_check.isoformat() if self._last_health_check else None
+        }
 
 
 class AsyncBaseService(BaseService):

@@ -1,0 +1,104 @@
+{
+  "timestamp": "2025-09-27T02:07:43.637822",
+  "overall_compatibility_score": 87.225,
+  "compatibility_checks": {
+    "api_interface": {
+      "weight": 30,
+      "score": 85
+    },
+    "data_format": {
+      "weight": 25,
+      "score": 90
+    },
+    "behavior_consistency": {
+      "weight": 20,
+      "score": 88
+    },
+    "performance_impact": {
+      "weight": 15,
+      "score": 87.5
+    },
+    "error_handling": {
+      "weight": 10,
+      "score": 85
+    }
+  },
+  "test_results": [
+    {
+      "test_name": "API接口兼容性测试",
+      "passed": true,
+      "execution_time": 1.0300000212737359e-05,
+      "error_message": "",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "数据格式兼容性测试",
+      "passed": true,
+      "execution_time": 2.2700000045006163e-05,
+      "error_message": "",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "行为一致性测试",
+      "passed": true,
+      "execution_time": 6.400001439033076e-06,
+      "error_message": "",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "性能影响评估",
+      "passed": true,
+      "execution_time": 0.011600299998463015,
+      "error_message": "",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "错误处理兼容性测试",
+      "passed": true,
+      "execution_time": 9.60000033956021e-06,
+      "error_message": "",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "服务迁移测试",
+      "passed": true,
+      "execution_time": 4.300000000512227e-06,
+      "error_message": "",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "配置兼容性测试",
+      "passed": true,
+      "execution_time": 7.700000423938036e-06,
+      "error_message": "",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "事件系统兼容性测试",
+      "passed": false,
+      "execution_time": 0.10014419999970414,
+      "error_message": "测试未通过",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "并发访问兼容性测试",
+      "passed": true,
+      "execution_time": 0.05248659999961092,
+      "error_message": "",
+      "compatibility_score": 0.0
+    },
+    {
+      "test_name": "回退机制测试",
+      "passed": true,
+      "execution_time": 9.800000043469481e-06,
+      "error_message": "",
+      "compatibility_score": 0.0
+    }
+  ],
+  "summary": {
+    "total_tests": 10,
+    "passed_tests": 9,
+    "success_rate": 90.0,
+    "total_execution_time": 0.16444849967956543
+  }
+}

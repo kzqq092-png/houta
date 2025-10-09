@@ -13,7 +13,6 @@ from datetime import datetime
 
 from ..signal_aggregator import TradingSignal, SignalType, SignalStrength
 
-
 class ISignalDetector(ABC):
     """信号检测器接口"""
 
@@ -32,7 +31,6 @@ class ISignalDetector(ABC):
     def signal_type(self) -> SignalType:
         """信号类型"""
         pass
-
 
 class BaseSignalDetector(ISignalDetector):
     """信号检测器基类"""
@@ -102,7 +100,6 @@ class BaseSignalDetector(ISignalDetector):
     def _internal_detect(self, data: Dict[str, Any]) -> List[TradingSignal]:
         """内部检测实现"""
         pass
-
 
 class FundamentalSignalDetector(BaseSignalDetector):
     """基本面信号检测器"""
@@ -267,7 +264,6 @@ class FundamentalSignalDetector(BaseSignalDetector):
             )
         return None
 
-
 class VolumeSignalDetector(BaseSignalDetector):
     """成交量信号检测器"""
 
@@ -397,7 +393,6 @@ class VolumeSignalDetector(BaseSignalDetector):
             logger.info(f"价量背离检测错误: {e}")
 
         return None
-
 
 class SignalDetectorRegistry:
     """信号检测器注册中心"""

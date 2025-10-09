@@ -19,24 +19,29 @@ from enum import Enum
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
 from .import_config_manager import ImportConfigManager, ImportTaskConfig, ImportProgress, ImportStatus
-from .intelligent_config_manager import IntelligentConfigManager, ConfigOptimizationLevel, ConfigRecommendationType
+from .intelligent_config_manager import (
+    IntelligentConfigManager,
+    ConfigOptimizationLevel,
+    ConfigRecommendationType
+)
 from core.database.table_manager import TableType
-from ..services.unified_data_manager import UnifiedDataManager
+from ..services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
 from ..real_data_provider import RealDataProvider
 from ..services.ai_prediction_service import AIPredictionService, PredictionType
 from ..services.deep_analysis_service import DeepAnalysisService, PerformanceMetric, AnomalyInfo
 from ..performance.factorweave_performance_integration import FactorWeavePerformanceIntegrator
+from ..performance.unified_monitor import get_performance_monitor
 from ..services.enhanced_performance_bridge import EnhancedPerformanceBridge, get_enhanced_performance_bridge
 from ..risk_monitoring.enhanced_risk_monitor import EnhancedRiskMonitor, get_enhanced_risk_monitor
-from ..performance.cache_manager import MultiLevelCacheManager, CacheLevel
 from ..services.distributed_service import DistributedService, NodeDiscovery, NodeInfo
-from ..services.enhanced_distributed_service import EnhancedDistributedService, get_enhanced_distributed_service
 from optimization.auto_tuner import AutoTuner, TuningTask, OptimizationConfig
+from optimization.algorithm_optimizer import PerformanceEvaluator
 from ..services.enhanced_data_manager import DataQualityMonitor
 from ..data.enhanced_models import DataQualityMetrics, DataQuality
 from ..data_validator import ValidationLevel, ValidationResult
 from ..events.enhanced_event_bus import get_enhanced_event_bus, EventPriority, EnhancedEventBus
 from ..async_management.enhanced_async_manager import get_enhanced_async_manager, TaskPriority, ResourceRequirement
+from ..performance.cache_manager import MultiLevelCacheManager, CacheLevel
 
 logger = logger
 
@@ -101,7 +106,7 @@ class DataImportExecutionEngine(QObject):
 
         # 配置管理器 - 支持智能配置
         if enable_intelligent_config:
-            self.config_manager = config_manager or IntelligentConfigManager()
+            self.config_manager = config_manager or None
             self.enable_intelligent_config = True
         else:
             self.config_manager = config_manager or ImportConfigManager()
@@ -309,7 +314,7 @@ class DataImportExecutionEngine(QObject):
                 'default_ttl_minutes': 60
             }
 
-            cache_manager = MultiLevelCacheManager(cache_config)
+            cache_manager = None
             logger.info("多级缓存管理器初始化成功")
             return cache_manager
 
@@ -941,7 +946,7 @@ class DataImportExecutionEngine(QObject):
             return task_config
 
         try:
-            logger.info(" 开始AutoTuner自动调优...")
+            logger.info("开始AutoTuner自动调优...")
 
             # 创建调优配置
             tuning_config = OptimizationConfig(
@@ -989,7 +994,7 @@ class DataImportExecutionEngine(QObject):
                 logger.info(f" AutoTuner优化完成: batch_size={task_config.batch_size}, max_workers={task_config.max_workers}")
                 logger.info(f" 预期性能提升: {tuning_result.get('improvement_percentage', 0):.1f}%")
             else:
-                logger.warning(" AutoTuner调优未找到更优参数，保持原配置")
+                logger.warning("AutoTuner调优未找到更优参数，保持原配置")
 
         except Exception as e:
             logger.error(f"AutoTuner调优失败: {e}")
@@ -1465,10 +1470,10 @@ class DataImportExecutionEngine(QObject):
         """确保数据管理器已初始化"""
         if not self._data_manager_initialized:
             try:
-                logger.info(" 延迟初始化数据管理器...")
-                self.data_manager = UnifiedDataManager()
+                logger.info("延迟初始化数据管理器...")
+                self.data_manager = get_unified_data_manager()
                 self._data_manager_initialized = True
-                logger.info(" 数据管理器延迟初始化完成")
+                logger.info("数据管理器延迟初始化完成")
             except Exception as e:
                 logger.error(f" 数据管理器初始化失败: {e}")
                 # 创建一个最小的数据管理器替代
@@ -1479,10 +1484,10 @@ class DataImportExecutionEngine(QObject):
         """确保真实数据提供器已初始化"""
         if not self._real_data_provider_initialized:
             try:
-                logger.info(" 延迟初始化真实数据提供器...")
+                logger.info("延迟初始化真实数据提供器...")
                 self.real_data_provider = RealDataProvider()
                 self._real_data_provider_initialized = True
-                logger.info(" 真实数据提供器延迟初始化完成")
+                logger.info("真实数据提供器延迟初始化完成")
             except Exception as e:
                 logger.error(f" 真实数据提供器初始化失败: {e}")
                 # 创建一个最小的替代
@@ -1553,7 +1558,7 @@ class DataImportExecutionEngine(QObject):
 
             # 智能配置优化（最高优先级）
             if self.enable_intelligent_config:
-                logger.info(" 开始智能配置优化...")
+                logger.info("开始智能配置优化...")
                 intelligent_config = self._apply_intelligent_optimization(task_config, ConfigOptimizationLevel.BALANCED)
                 if intelligent_config:
                     task_config = intelligent_config
@@ -1562,7 +1567,7 @@ class DataImportExecutionEngine(QObject):
             # 检查缓存的配置优化
             cached_config = self._get_cached_configuration(task_config)
             if cached_config and self.enable_intelligent_caching:
-                logger.info(" 使用缓存的配置优化")
+                logger.info("使用缓存的配置优化")
                 task_config.batch_size = cached_config.get('optimal_batch_size', task_config.batch_size)
                 task_config.max_workers = cached_config.get('optimal_workers', task_config.max_workers)
 
@@ -1572,7 +1577,7 @@ class DataImportExecutionEngine(QObject):
 
             # AI优化任务参数
             if self.enable_ai_optimization:
-                logger.info(" 开始AI优化任务参数...")
+                logger.info("开始AI优化任务参数...")
                 task_config = self._optimize_task_parameters(task_config)
 
                 # 缓存优化后的配置
@@ -1585,12 +1590,12 @@ class DataImportExecutionEngine(QObject):
 
             # 检查是否可以分布式执行
             if self.enable_distributed_execution and self._can_distribute_task(task_config):
-                logger.info(" 任务符合分布式执行条件，尝试分布式执行...")
+                logger.info("任务符合分布式执行条件，尝试分布式执行...")
                 if self._distribute_task(task_config):
                     logger.info(f"任务 {task_id} 已分布式执行")
                     return True
                 else:
-                    logger.info(" 分布式执行失败，回退到本地执行")
+                    logger.info("分布式执行失败，回退到本地执行")
 
             # 检查任务是否已在运行
             with self._task_lock:
@@ -1754,13 +1759,13 @@ class DataImportExecutionEngine(QObject):
             logger.info(f" 执行数据类型: {data_type}")
 
             if data_type == "K线数据":
-                logger.info(" 开始导入K线数据")
+                logger.info("开始导入K线数据")
                 self._import_kline_data(task_config, result)
             elif data_type == "实时行情":
-                logger.info(" 开始导入实时行情")
+                logger.info("开始导入实时行情")
                 self._import_realtime_data(task_config, result)
             elif data_type == "基本面数据":
-                logger.info(" 开始导入基本面数据")
+                logger.info("开始导入基本面数据")
                 self._import_fundamental_data(task_config, result)
             else:
                 logger.warning(f" 不支持的数据类型，默认使用K线数据: {data_type}")
@@ -1840,48 +1845,28 @@ class DataImportExecutionEngine(QObject):
                     del self._running_tasks[task_config.task_id]
 
     def _save_kdata_to_database(self, symbol: str, kdata: 'pd.DataFrame', task_config: ImportTaskConfig):
-        """保存K线数据到数据库（按数据源分离存储）"""
+        """保存K线数据到数据库（使用新的增强资产数据库管理器）"""
         try:
-            # 获取数据源分离存储管理器
-            from ..database.data_source_separated_storage import get_separated_storage_manager
-            from ..database.table_manager import TableType
+            # 使用新的增强资产数据库管理器
+            from ..enhanced_asset_database_manager import EnhancedAssetDatabaseManager
+            from ..plugin_types import AssetType, DataType
 
-            storage_manager = get_separated_storage_manager()
+            asset_manager = EnhancedAssetDatabaseManager()
 
-            # 获取数据源插件ID
-            data_source = getattr(task_config, 'data_source', 'unknown_source')
+            # 根据股票代码确定资产类型
+            asset_type = AssetType.STOCK_A if symbol.endswith(('.SZ', '.SH')) else AssetType.STOCK
 
-            # 确保数据源已注册
-            if not storage_manager.get_storage_config(data_source):
-                # 自动注册数据源
-                from ..database.data_source_separated_storage import DataSourceIsolationLevel
-                success = storage_manager.register_data_source(
-                    plugin_id=data_source,
-                    plugin_name=data_source,
-                    isolation_level=DataSourceIsolationLevel.DATABASE
-                )
-                if not success:
-                    logger.error(f"注册数据源失败: {data_source}")
-                    return
-                logger.info(f"自动注册数据源: {data_source}")
-
-            # 确定数据周期
-            frequency = task_config.frequency.value if hasattr(task_config, 'frequency') else 'D'
-
-            # 保存数据到指定数据源的专用存储
-            success = storage_manager.save_data_to_source(
-                plugin_id=data_source,
-                table_type=TableType.KLINE_DATA,
+            # 保存数据到新架构
+            success = asset_manager.store_standardized_data(
                 data=kdata,
-                symbol=symbol,
-                period=frequency,
-                upsert=True
+                asset_type=asset_type,
+                data_type=DataType.HISTORICAL_KLINE
             )
 
             if success:
-                logger.info(f"K线数据保存到数据源专用存储成功: {symbol} -> {data_source}, {len(kdata)}条记录")
+                logger.info(f"K线数据保存到新架构成功: {symbol} -> {asset_type.value}, {len(kdata)}条记录")
             else:
-                logger.error(f"K线数据保存到数据源专用存储失败: {symbol} -> {data_source}")
+                logger.error(f"K线数据保存到新架构失败: {symbol} -> {asset_type.value}")
 
         except Exception as e:
             logger.error(f"保存K线数据到数据库失败 {symbol}: {e}")
@@ -2139,96 +2124,45 @@ class DataImportExecutionEngine(QObject):
             raise Exception(f"K线数据导入失败: {e}")
 
     def _batch_save_kdata_to_database(self, all_kdata_list: list, task_config: ImportTaskConfig):
-        """批量保存K线数据到数据库"""
+        """批量保存K线数据到数据库（使用新的增强资产数据库管理器）"""
         try:
             if not all_kdata_list:
                 logger.warning("没有数据需要保存")
                 return
 
-            # 获取DuckDB操作实例
-            from ..database.duckdb_operations import get_duckdb_operations
-            from ..database.table_manager import get_table_manager
+            # 使用新的增强资产数据库管理器
+            from ..enhanced_asset_database_manager import EnhancedAssetDatabaseManager
+            from ..plugin_types import AssetType, DataType
+            import pandas as pd
 
-            duckdb_ops = get_duckdb_operations()
-            table_manager = get_table_manager()
-
-            if not duckdb_ops or not table_manager:
-                logger.warning("DuckDB操作或表管理器不可用，跳过数据保存")
-                return
-
-            # 确定表名和频率
-            frequency = task_config.frequency.value if hasattr(task_config, 'frequency') else 'D'
-
-            # 频率映射：将长格式转换为短格式
-            frequency_map = {
-                'daily': 'd',
-                'weekly': 'w',
-                'monthly': 'm',
-                '1min': '1m',
-                '5min': '5m',
-                '15min': '15m',
-                '30min': '30m',
-                '1h': '1h',
-                'tick': 'tick'
-            }
-            frequency = frequency_map.get(frequency, frequency)
-
-            # 使用数据源分离存储管理器
-            from ..database.data_source_separated_storage import get_separated_storage_manager
-            from ..database.table_manager import TableType
-
-            separated_storage = get_separated_storage_manager()
-            data_source = getattr(task_config, 'data_source', 'import_engine')
-
-            # 获取插件的独立数据库路径
-            db_path = separated_storage.get_database_path(data_source)
-            if not db_path:
-                # 如果没有配置，自动注册并创建独立数据库
-                logger.info(f"数据源未注册，自动注册: {data_source}")
-                success = separated_storage.register_data_source(
-                    plugin_id=data_source,
-                    plugin_name=data_source
-                )
-                if success:
-                    db_path = separated_storage.get_database_path(data_source)
-                else:
-                    logger.error(f"注册数据源失败: {data_source}")
-                    return
-
-            # 为数据源创建表
-            table_name = separated_storage.create_table_for_data_source(
-                plugin_id=data_source,
-                table_type=TableType.KLINE_DATA,
-                period=frequency
-            )
-
-            if not table_name:
-                logger.error("创建或获取数据表失败，跳过数据保存")
-                return
+            asset_manager = EnhancedAssetDatabaseManager()
 
             # 合并所有数据
-            import pandas as pd
             combined_data = pd.concat(all_kdata_list, ignore_index=True)
 
             # 标准化数据字段，确保与表结构匹配
             combined_data = self._standardize_kline_data_fields(combined_data)
 
-            logger.info(f" 准备批量插入 {len(combined_data)} 条K线数据记录")
+            logger.info(f"准备批量插入 {len(combined_data)} 条K线数据记录")
 
-            # 使用分离存储管理器保存数据（自动处理数据库、表创建和数据插入）
-            success = separated_storage.save_data_to_source(
-                plugin_id=data_source,
-                table_type=TableType.KLINE_DATA,
-                data=combined_data,
-                period=frequency,
-                upsert=True
-            )
+            # 根据股票代码确定资产类型（批量处理时取第一个符号作为示例）
+            if not combined_data.empty and 'symbol' in combined_data.columns:
+                first_symbol = combined_data['symbol'].iloc[0]
+                asset_type = AssetType.STOCK_A if str(first_symbol).endswith(('.SZ', '.SH')) else AssetType.STOCK
 
-            if success:
-                logger.info(f" 批量保存K线数据成功到独立数据库: {db_path}")
-                logger.info(f" 数据已保存到表: {table_name}")
+                # 保存数据到新架构
+                success = asset_manager.store_standardized_data(
+                    data=combined_data,
+                    asset_type=asset_type,
+                    data_type=DataType.HISTORICAL_KLINE
+                )
+
+                if success:
+                    logger.info(f"批量保存K线数据成功到新架构: {asset_type.value}, {len(combined_data)}条记录")
+                else:
+                    logger.error(f"批量保存K线数据失败到新架构: {asset_type.value}")
             else:
-                logger.error(f" 批量保存K线数据失败到数据源: {data_source}")
+                logger.error("数据为空或缺少symbol字段，无法保存")
 
         except Exception as e:
             logger.error(f"批量保存K线数据到数据库失败: {e}")

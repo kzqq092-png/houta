@@ -108,7 +108,7 @@ class NodeManagerDialog(QDialog):
         self.discovery_interval_spin = QSpinBox()
         self.discovery_interval_spin.setRange(1, 60)
         self.discovery_interval_spin.setValue(5)
-        self.discovery_interval_spin.setSuffix(" 秒")
+        self.discovery_interval_spin.setSuffix("秒")
         settings_layout.addRow("发现间隔:", self.discovery_interval_spin)
 
         self.auto_connect_check = QCheckBox("自动连接发现的节点")

@@ -12,7 +12,6 @@ import traceback
 import json
 import os
 
-
 class LoguruLogWidget(QWidget):
     """纯Loguru日志控件类"""
 

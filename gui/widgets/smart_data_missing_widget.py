@@ -100,7 +100,7 @@ class DataSourceRecommendationWidget(QWidget):
 
         # 添加推荐的数据源
         for source in self.missing_info.suggested_sources:
-            item = QListWidgetItem(f"📊 {source}")
+            item = QListWidgetItem(f" {source}")
             item.setData(Qt.UserRole, source)
 
             # 根据数据源设置不同的描述
@@ -248,7 +248,7 @@ class SmartDataMissingPrompt(QWidget):
         title_layout = QHBoxLayout()
 
         # 警告图标
-        icon_label = QLabel("⚠️")
+        icon_label = QLabel("")
         icon_label.setFont(QFont("Arial", 24))
         title_layout.addWidget(icon_label)
 

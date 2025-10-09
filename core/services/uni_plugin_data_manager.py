@@ -6,7 +6,7 @@
 
 作者: FactorWeave-Quant团队
 版本: 1.0
-日期: 2024-09-17
+日期: 2024-09-19
 """
 
 import asyncio
@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Any, Union, Tuple
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
+import re
 
 from loguru import logger
 from core.plugin_types import AssetType, DataType, PluginType
@@ -23,6 +24,9 @@ from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthChe
 from core.tet_data_pipeline import TETDataPipeline, StandardQuery, StandardData
 from core.data_source_router import DataSourceRouter, RoutingStrategy
 from core.plugin_manager import PluginManager
+from core.plugin_center import PluginCenter
+from core.tet_router_engine import TETRouterEngine
+from core.data_quality_risk_manager import DataQualityRiskManager
 
 logger = logger.bind(module=__name__)
 
@@ -42,654 +46,19 @@ class RequestContext:
     timestamp: datetime = field(default_factory=datetime.now)
 
 
-@dataclass
-class PluginMetrics:
-    """插件性能指标"""
-    plugin_id: str
-    total_requests: int = 0
-    success_requests: int = 0
-    failed_requests: int = 0
-    avg_response_time: float = 0.0
-    last_success_time: Optional[datetime] = None
-    last_failure_time: Optional[datetime] = None
-    quality_score: float = 1.0
-    availability_score: float = 1.0
-
-
-@dataclass
-class ValidationResult:
-    """数据验证结果"""
-    is_valid: bool
-    quality_score: float
-    consistency_score: float
-    anomaly_score: float
-    validation_details: Dict[str, Any] = field(default_factory=dict)
-    recommendations: List[str] = field(default_factory=list)
-
-
-class PluginCenter:
-    """
-    插件中心 - 统一插件管理
-    
-    基于现有PluginManager增强，专注于数据源插件的统一管理
-    """
-    
-    def __init__(self, plugin_manager: PluginManager):
-        """
-        初始化插件中心
-        
-        Args:
-            plugin_manager: 现有的插件管理器实例
-        """
-        self.plugin_manager = plugin_manager
-        self.data_source_plugins: Dict[str, IDataSourcePlugin] = {}
-        self.plugin_configs: Dict[str, Dict[str, Any]] = {}
-        self.plugin_health: Dict[str, HealthCheckResult] = {}
-        self.plugin_metrics: Dict[str, PluginMetrics] = {}
-        
-        # 线程安全
-        self._lock = threading.RLock()
-        
-        logger.info("插件中心初始化完成")
-    
-    def discover_and_register_plugins(self) -> Dict[str, str]:
-        """
-        发现并注册所有数据源插件
-        
-        Returns:
-            Dict[str, str]: 注册结果 {plugin_id: status}
-        """
-        registration_results = {}
-        
-        try:
-            with self._lock:
-                # 1. 获取所有已加载的插件
-                all_plugins = self.plugin_manager.get_all_plugins()
-                
-                # 2. 筛选数据源插件
-                for plugin_name, plugin_instance in all_plugins.items():
-                    try:
-                        if self._is_data_source_plugin(plugin_instance):
-                            result = self._register_data_source_plugin(plugin_name, plugin_instance)
-                            registration_results[plugin_name] = "success" if result else "failed"
-                        else:
-                            registration_results[plugin_name] = "skipped_not_data_source"
-                            
-                    except Exception as e:
-                        logger.error(f"注册插件失败 {plugin_name}: {e}")
-                        registration_results[plugin_name] = f"error: {str(e)}"
-                
-                logger.info(f"插件发现和注册完成，成功注册 {len(self.data_source_plugins)} 个数据源插件")
-                
-        except Exception as e:
-            logger.error(f"插件发现和注册过程异常: {e}")
-            
-        return registration_results
-    
-    def _is_data_source_plugin(self, plugin_instance) -> bool:
-        """检查是否为数据源插件"""
-        # 检查是否实现了IDataSourcePlugin接口
-        if not isinstance(plugin_instance, IDataSourcePlugin):
-            return False
-            
-        # 检查插件信息中的类型
-        if hasattr(plugin_instance, 'plugin_info'):
-            plugin_info = plugin_instance.plugin_info
-            if hasattr(plugin_info, 'plugin_type'):
-                return plugin_info.plugin_type == PluginType.DATA_SOURCE
-                
-        return True
-    
-    def _register_data_source_plugin(self, plugin_id: str, plugin: IDataSourcePlugin) -> bool:
-        """注册数据源插件"""
-        try:
-            # 存储插件实例
-            self.data_source_plugins[plugin_id] = plugin
-            
-            # 初始化插件指标
-            self.plugin_metrics[plugin_id] = PluginMetrics(plugin_id=plugin_id)
-            
-            # 加载插件配置
-            self._load_plugin_config(plugin_id, plugin)
-            
-            # 初始健康检查
-            self._perform_initial_health_check(plugin_id, plugin)
-            
-            logger.info(f"数据源插件注册成功: {plugin_id}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"注册数据源插件失败 {plugin_id}: {e}")
-            return False
-    
-    def _load_plugin_config(self, plugin_id: str, plugin: IDataSourcePlugin) -> None:
-        """加载插件配置"""
-        try:
-            # 从插件获取默认配置
-            if hasattr(plugin, 'get_default_config'):
-                default_config = plugin.get_default_config()
-                self.plugin_configs[plugin_id] = default_config
-            else:
-                self.plugin_configs[plugin_id] = {}
-                
-        except Exception as e:
-            logger.warning(f"加载插件配置失败 {plugin_id}: {e}")
-            self.plugin_configs[plugin_id] = {}
-    
-    def _perform_initial_health_check(self, plugin_id: str, plugin: IDataSourcePlugin) -> None:
-        """执行初始健康检查"""
-        try:
-            health_result = plugin.health_check()
-            self.plugin_health[plugin_id] = health_result
-            
-            if health_result.is_healthy:
-                logger.info(f"插件健康检查通过: {plugin_id}")
-            else:
-                logger.warning(f"插件健康检查失败: {plugin_id} - {health_result.message}")
-                
-        except Exception as e:
-            logger.error(f"插件健康检查异常 {plugin_id}: {e}")
-            # 创建失败的健康检查结果
-            self.plugin_health[plugin_id] = HealthCheckResult(
-                is_healthy=False,
-                message=f"健康检查异常: {str(e)}",
-                details={"error": str(e)}
-            )
-    
-    def get_available_plugins(self, data_type: DataType, 
-                            asset_type: Optional[AssetType] = None,
-                            market: Optional[str] = None) -> List[str]:
-        """
-        获取可用的插件列表
-        
-        Args:
-            data_type: 数据类型
-            asset_type: 资产类型（可选）
-            market: 市场代码（可选）
-            
-        Returns:
-            List[str]: 可用插件ID列表
-        """
-        available_plugins = []
-        
-        with self._lock:
-            for plugin_id, plugin in self.data_source_plugins.items():
-                try:
-                    # 检查健康状态
-                    if plugin_id in self.plugin_health:
-                        health = self.plugin_health[plugin_id]
-                        if not health.is_healthy:
-                            continue
-                    
-                    # 检查插件能力
-                    plugin_info = plugin.plugin_info
-                    
-                    # 检查支持的数据类型
-                    if data_type not in plugin_info.supported_data_types:
-                        continue
-                    
-                    # 检查支持的资产类型
-                    if asset_type and asset_type not in plugin_info.supported_asset_types:
-                        continue
-                    
-                    # 检查支持的市场
-                    if market and hasattr(plugin_info, 'supported_markets'):
-                        if market not in plugin_info.supported_markets:
-                            continue
-                    
-                    available_plugins.append(plugin_id)
-                    
-                except Exception as e:
-                    logger.warning(f"检查插件可用性失败 {plugin_id}: {e}")
-        
-        return available_plugins
-    
-    def get_plugin(self, plugin_id: str) -> Optional[IDataSourcePlugin]:
-        """获取插件实例"""
-        return self.data_source_plugins.get(plugin_id)
-    
-    def update_plugin_metrics(self, plugin_id: str, success: bool, 
-                            response_time: float, quality_score: float = None) -> None:
-        """更新插件性能指标"""
-        if plugin_id not in self.plugin_metrics:
-            return
-            
-        metrics = self.plugin_metrics[plugin_id]
-        metrics.total_requests += 1
-        
-        if success:
-            metrics.success_requests += 1
-            metrics.last_success_time = datetime.now()
-            if quality_score is not None:
-                # 使用指数移动平均更新质量分数
-                alpha = 0.1
-                metrics.quality_score = alpha * quality_score + (1 - alpha) * metrics.quality_score
-        else:
-            metrics.failed_requests += 1
-            metrics.last_failure_time = datetime.now()
-        
-        # 更新平均响应时间
-        alpha = 0.1
-        metrics.avg_response_time = alpha * response_time + (1 - alpha) * metrics.avg_response_time
-        
-        # 更新可用性分数
-        if metrics.total_requests > 0:
-            metrics.availability_score = metrics.success_requests / metrics.total_requests
-
-
-class TETRouterEngine:
-    """
-    TET智能路由引擎
-    
-    基于现有DataSourceRouter和TETDataPipeline增强
-    """
-    
-    def __init__(self, data_source_router: DataSourceRouter, tet_pipeline: TETDataPipeline):
-        """
-        初始化TET路由引擎
-        
-        Args:
-            data_source_router: 数据源路由器
-            tet_pipeline: TET数据管道
-        """
-        self.router = data_source_router
-        self.pipeline = tet_pipeline
-        self.routing_strategies = {
-            'HEALTH_PRIORITY': self._health_priority_strategy,
-            'QUALITY_WEIGHTED': self._quality_weighted_strategy,
-            'ROUND_ROBIN': self._round_robin_strategy,
-            'CIRCUIT_BREAKER': self._circuit_breaker_strategy
-        }
-        self.default_strategy = 'HEALTH_PRIORITY'
-        
-        logger.info("TET路由引擎初始化完成")
-    
-    def register_plugin(self, plugin_id: str, plugin: IDataSourcePlugin, 
-                       priority: int = 50, weight: float = 1.0) -> bool:
-        """
-        向TET路由器注册插件
-        
-        Args:
-            plugin_id: 插件ID
-            plugin: 插件实例
-            priority: 优先级
-            weight: 权重
-            
-        Returns:
-            bool: 注册是否成功
-        """
-        try:
-            # 创建插件适配器
-            from core.data_source_extensions import DataSourcePluginAdapter
-            adapter = DataSourcePluginAdapter(plugin, plugin_id)
-            
-            # 注册到路由器
-            success = self.router.register_data_source(plugin_id, adapter, priority, weight)
-            
-            if success:
-                logger.info(f"插件注册到TET路由器成功: {plugin_id}")
-            else:
-                logger.warning(f"插件注册到TET路由器失败: {plugin_id}")
-                
-            return success
-            
-        except Exception as e:
-            logger.error(f"注册插件到TET路由器异常 {plugin_id}: {e}")
-            return False
-    
-    def select_optimal_plugin(self, available_plugins: List[str], 
-                            context: RequestContext,
-                            plugin_center: PluginCenter,
-                            strategy: str = None) -> Optional[str]:
-        """
-        选择最优插件
-        
-        Args:
-            available_plugins: 可用插件列表
-            context: 请求上下文
-            plugin_center: 插件中心
-            strategy: 路由策略
-            
-        Returns:
-            Optional[str]: 选中的插件ID
-        """
-        if not available_plugins:
-            logger.warning("没有可用的插件")
-            return None
-        
-        strategy_name = strategy or self.default_strategy
-        strategy_func = self.routing_strategies.get(strategy_name, self._health_priority_strategy)
-        
-        try:
-            selected_plugin = strategy_func(available_plugins, context, plugin_center)
-            if selected_plugin:
-                logger.debug(f"路由策略 {strategy_name} 选择插件: {selected_plugin}")
-            return selected_plugin
-            
-        except Exception as e:
-            logger.error(f"插件选择失败 - 策略: {strategy_name}, 错误: {e}")
-            # 降级到简单的第一个可用插件
-            return available_plugins[0] if available_plugins else None
-    
-    def _health_priority_strategy(self, available_plugins: List[str], 
-                                context: RequestContext,
-                                plugin_center: PluginCenter) -> Optional[str]:
-        """基于健康状态的优先级策略"""
-        best_plugin = None
-        best_score = -1
-        
-        for plugin_id in available_plugins:
-            score = 0
-            
-            # 健康状态权重 (50%)
-            if plugin_id in plugin_center.plugin_health:
-                health = plugin_center.plugin_health[plugin_id]
-                if health.is_healthy:
-                    score += 50
-            
-            # 质量分数权重 (30%)
-            if plugin_id in plugin_center.plugin_metrics:
-                metrics = plugin_center.plugin_metrics[plugin_id]
-                score += metrics.quality_score * 30
-            
-            # 可用性分数权重 (20%)
-            if plugin_id in plugin_center.plugin_metrics:
-                metrics = plugin_center.plugin_metrics[plugin_id]
-                score += metrics.availability_score * 20
-            
-            if score > best_score:
-                best_score = score
-                best_plugin = plugin_id
-        
-        return best_plugin
-    
-    def _quality_weighted_strategy(self, available_plugins: List[str],
-                                 context: RequestContext,
-                                 plugin_center: PluginCenter) -> Optional[str]:
-        """基于质量权重的策略"""
-        import random
-        
-        # 计算每个插件的权重
-        weights = []
-        plugins = []
-        
-        for plugin_id in available_plugins:
-            weight = 1.0  # 默认权重
-            
-            if plugin_id in plugin_center.plugin_metrics:
-                metrics = plugin_center.plugin_metrics[plugin_id]
-                weight = metrics.quality_score * metrics.availability_score
-            
-            weights.append(weight)
-            plugins.append(plugin_id)
-        
-        if not weights:
-            return None
-        
-        # 加权随机选择
-        total_weight = sum(weights)
-        if total_weight == 0:
-            return random.choice(plugins)
-        
-        r = random.uniform(0, total_weight)
-        cumulative_weight = 0
-        
-        for i, weight in enumerate(weights):
-            cumulative_weight += weight
-            if r <= cumulative_weight:
-                return plugins[i]
-        
-        return plugins[-1]
-    
-    def _round_robin_strategy(self, available_plugins: List[str],
-                            context: RequestContext,
-                            plugin_center: PluginCenter) -> Optional[str]:
-        """轮询策略"""
-        if not hasattr(self, '_round_robin_index'):
-            self._round_robin_index = 0
-        
-        if available_plugins:
-            plugin = available_plugins[self._round_robin_index % len(available_plugins)]
-            self._round_robin_index += 1
-            return plugin
-        
-        return None
-    
-    def _circuit_breaker_strategy(self, available_plugins: List[str],
-                                context: RequestContext,
-                                plugin_center: PluginCenter) -> Optional[str]:
-        """熔断器策略"""
-        # 过滤掉故障率过高的插件
-        healthy_plugins = []
-        
-        for plugin_id in available_plugins:
-            if plugin_id in plugin_center.plugin_metrics:
-                metrics = plugin_center.plugin_metrics[plugin_id]
-                # 如果总请求数大于10且成功率小于50%，则认为不健康
-                if metrics.total_requests > 10:
-                    success_rate = metrics.success_requests / metrics.total_requests
-                    if success_rate >= 0.5:
-                        healthy_plugins.append(plugin_id)
-                else:
-                    # 请求数较少，给机会
-                    healthy_plugins.append(plugin_id)
-            else:
-                # 没有指标，给机会
-                healthy_plugins.append(plugin_id)
-        
-        # 在健康的插件中使用健康优先策略
-        if healthy_plugins:
-            return self._health_priority_strategy(healthy_plugins, context, plugin_center)
-        
-        # 如果没有健康的插件，返回第一个可用的插件
-        return available_plugins[0] if available_plugins else None
-
-
-class RiskManager:
-    """
-    风险管理器
-    
-    负责数据质量监控、异常检测、熔断器管理等
-    """
-    
-    def __init__(self):
-        """初始化风险管理器"""
-        self.quality_thresholds = {
-            'completeness': 0.95,    # 数据完整性阈值
-            'accuracy': 0.90,        # 数据准确性阈值
-            'timeliness': 300,       # 数据时效性阈值(秒)
-            'consistency': 0.85      # 数据一致性阈值
-        }
-        
-        self.execution_history: Dict[str, List[Dict]] = {}
-        self._lock = threading.RLock()
-        
-        logger.info("风险管理器初始化完成")
-    
-    def execute_with_monitoring(self, plugin_id: str, func, **params) -> Tuple[Any, ValidationResult]:
-        """
-        带监控的执行
-        
-        Args:
-            plugin_id: 插件ID
-            func: 执行函数
-            **params: 函数参数
-            
-        Returns:
-            Tuple[Any, ValidationResult]: (执行结果, 验证结果)
-        """
-        start_time = datetime.now()
-        validation_result = None
-        
-        try:
-            # 执行数据获取
-            result = func(**params)
-            
-            # 数据质量检查
-            validation_result = self._validate_data_quality(result)
-            
-            # 记录成功执行
-            execution_time = (datetime.now() - start_time).total_seconds()
-            self._record_execution(plugin_id, True, execution_time, validation_result.quality_score)
-            
-            return result, validation_result
-            
-        except Exception as e:
-            # 记录失败执行
-            execution_time = (datetime.now() - start_time).total_seconds()
-            self._record_execution(plugin_id, False, execution_time, 0.0, str(e))
-            
-            # 创建失败的验证结果
-            validation_result = ValidationResult(
-                is_valid=False,
-                quality_score=0.0,
-                consistency_score=0.0,
-                anomaly_score=1.0,
-                validation_details={"error": str(e)},
-                recommendations=["检查插件连接状态", "尝试其他数据源"]
-            )
-            
-            raise
-    
-    def _validate_data_quality(self, data: Any) -> ValidationResult:
-        """验证数据质量"""
-        try:
-            if data is None:
-                return ValidationResult(
-                    is_valid=False,
-                    quality_score=0.0,
-                    consistency_score=0.0,
-                    anomaly_score=1.0,
-                    recommendations=["数据为空，检查数据源"]
-                )
-            
-            if isinstance(data, pd.DataFrame):
-                return self._validate_dataframe_quality(data)
-            elif isinstance(data, list):
-                return self._validate_list_quality(data)
-            else:
-                # 对于其他类型的数据，进行基本检查
-                return ValidationResult(
-                    is_valid=True,
-                    quality_score=0.8,
-                    consistency_score=0.8,
-                    anomaly_score=0.1
-                )
-                
-        except Exception as e:
-            logger.error(f"数据质量验证异常: {e}")
-            return ValidationResult(
-                is_valid=False,
-                quality_score=0.0,
-                consistency_score=0.0,
-                anomaly_score=1.0,
-                validation_details={"validation_error": str(e)}
-            )
-    
-    def _validate_dataframe_quality(self, df: pd.DataFrame) -> ValidationResult:
-        """验证DataFrame数据质量"""
-        if df.empty:
-            return ValidationResult(
-                is_valid=False,
-                quality_score=0.0,
-                consistency_score=0.0,
-                anomaly_score=1.0,
-                recommendations=["DataFrame为空"]
-            )
-        
-        # 计算完整性分数
-        completeness_score = 1.0 - (df.isnull().sum().sum() / (df.shape[0] * df.shape[1]))
-        
-        # 计算一致性分数 (基于数据类型一致性)
-        consistency_score = 0.9  # 简化计算
-        
-        # 计算异常分数 (基于数值列的异常值检测)
-        anomaly_score = 0.1  # 简化计算
-        
-        # 计算整体质量分数
-        quality_score = (completeness_score * 0.4 + 
-                        consistency_score * 0.4 + 
-                        (1 - anomaly_score) * 0.2)
-        
-        return ValidationResult(
-            is_valid=quality_score >= 0.7,
-            quality_score=quality_score,
-            consistency_score=consistency_score,
-            anomaly_score=anomaly_score,
-            validation_details={
-                "row_count": len(df),
-                "column_count": len(df.columns),
-                "null_count": df.isnull().sum().sum(),
-                "completeness_score": completeness_score
-            }
-        )
-    
-    def _validate_list_quality(self, data: List) -> ValidationResult:
-        """验证列表数据质量"""
-        if not data:
-            return ValidationResult(
-                is_valid=False,
-                quality_score=0.0,
-                consistency_score=0.0,
-                anomaly_score=1.0,
-                recommendations=["列表为空"]
-            )
-        
-        # 计算完整性 (非None元素比例)
-        non_none_count = sum(1 for item in data if item is not None)
-        completeness_score = non_none_count / len(data)
-        
-        # 简化的质量评估
-        quality_score = completeness_score * 0.8 + 0.2  # 给基础分数
-        
-        return ValidationResult(
-            is_valid=quality_score >= 0.6,
-            quality_score=quality_score,
-            consistency_score=0.8,
-            anomaly_score=0.1,
-            validation_details={
-                "item_count": len(data),
-                "non_none_count": non_none_count,
-                "completeness_score": completeness_score
-            }
-        )
-    
-    def _record_execution(self, plugin_id: str, success: bool, 
-                         execution_time: float, quality_score: float = 0.0,
-                         error_message: str = None) -> None:
-        """记录执行历史"""
-        with self._lock:
-            if plugin_id not in self.execution_history:
-                self.execution_history[plugin_id] = []
-            
-            record = {
-                'timestamp': datetime.now(),
-                'success': success,
-                'execution_time': execution_time,
-                'quality_score': quality_score,
-                'error_message': error_message
-            }
-            
-            self.execution_history[plugin_id].append(record)
-            
-            # 保留最近100条记录
-            if len(self.execution_history[plugin_id]) > 100:
-                self.execution_history[plugin_id] = self.execution_history[plugin_id][-100:]
-
-
 class UniPluginDataManager:
     """
     统一插件数据管理器
-    
+
     HIkyuu-UI系统的统一数据访问入口，协调插件中心、TET路由引擎和风险管理器
     """
-    
-    def __init__(self, plugin_manager: PluginManager, 
+
+    def __init__(self, plugin_manager: PluginManager,
                  data_source_router: DataSourceRouter,
                  tet_pipeline: TETDataPipeline):
         """
         初始化统一插件数据管理器
-        
+
         Args:
             plugin_manager: 插件管理器
             data_source_router: 数据源路由器
@@ -697,8 +66,14 @@ class UniPluginDataManager:
         """
         self.plugin_center = PluginCenter(plugin_manager)
         self.tet_engine = TETRouterEngine(data_source_router, tet_pipeline)
-        self.risk_manager = RiskManager()
-        
+        self.risk_manager = DataQualityRiskManager()
+
+        # 保存路由器引用以便注册插件
+        self.data_source_router = data_source_router
+
+        # 数据标准化器
+        self.data_normalizer = self._create_data_normalizer()
+
         # 性能统计
         self.stats = {
             "total_requests": 0,
@@ -707,61 +82,240 @@ class UniPluginDataManager:
             "cache_hits": 0,
             "avg_response_time": 0.0
         }
-        
+
         # 缓存
         self._cache: Dict[str, Tuple[Any, datetime]] = {}
         self._cache_ttl = timedelta(minutes=5)
-        
+
         # 线程池
         self._executor = ThreadPoolExecutor(max_workers=4)
-        
-        logger.info("统一插件数据管理器初始化完成")
-    
-    def initialize(self) -> None:
-        """初始化管理器"""
+
+        # 延迟初始化标志
+
+        self._is_initialized = False
+
+        logger.info("UniPluginDataManager构造完成，等待initialize()调用")
+
+        logger.info("UniPluginDataManager依赖装配完成")
+
+    def _register_plugins_to_router(self) -> None:
+        """将插件中心的插件注册到TET路由器"""
         try:
-            # 1. 发现和注册插件
-            registration_results = self.plugin_center.discover_and_register_plugins()
-            
-            # 2. 将插件注册到TET路由引擎
+            logger.info("[DISCOVERY] 开始发现插件...")
+            # 发现并注册插件
+            plugins = self.plugin_center.discover_and_register_plugins()
+            logger.info(f"插件中心发现 {len(plugins)} 个插件")
+
+            # 获取数据源插件并注册到路由器
+            data_source_plugins = self.plugin_center.data_source_plugins
+            logger.info(f"[DISCOVERY] 找到 {len(data_source_plugins)} 个数据源插件")
             registered_count = 0
-            for plugin_id, plugin in self.plugin_center.data_source_plugins.items():
-                if self.tet_engine.register_plugin(plugin_id, plugin):
-                    registered_count += 1
-            
-            logger.info(f"统一插件数据管理器初始化完成，注册了 {registered_count} 个插件到TET引擎")
-            
+
+            for plugin_id, plugin_instance in data_source_plugins.items():
+                try:
+                    # 创建数据源适配器
+                    from core.data_source_extensions import DataSourcePluginAdapter
+                    adapter = DataSourcePluginAdapter(plugin_instance, plugin_id)
+
+                    # 注册到路由器
+                    success = self.data_source_router.register_data_source(
+                        plugin_id,
+                        adapter,
+                        priority=50,  # 默认优先级
+                        weight=1.0    # 默认权重
+                    )
+
+                    if success:
+                        registered_count += 1
+                        logger.info(f"数据源插件注册到路由器成功: {plugin_id}")
+                    else:
+                        logger.warning(f"数据源插件注册到路由器失败: {plugin_id}")
+
+                except Exception as e:
+                    logger.error(f"注册插件到路由器失败 {plugin_id}: {e}")
+
+            logger.info(f"成功注册 {registered_count} 个数据源插件到TET路由器")
+
         except Exception as e:
-            logger.error(f"统一插件数据管理器初始化失败: {e}")
-            raise
-    
+            logger.error(f"注册插件到路由器过程失败: {e}")
+
+    def initialize(self) -> None:
+        """统一的初始化入口，控制插件注册时机"""
+        if self._is_initialized:
+            logger.info("UniPluginDataManager已初始化，跳过重复初始化")
+            return
+
+        logger.info("开始初始化UniPluginDataManager...")
+
+        # 现在才执行插件注册
+        self._register_plugins_to_router()
+
+        # 验证注册结果
+        router_source_count = len(self.data_source_router.data_sources)
+        logger.info(f"插件注册完成，TET路由器中有 {router_source_count} 个数据源")
+
+        if router_source_count == 0:
+            logger.warning("TET路由器中没有数据源，这可能导致数据获取失败")
+        else:
+            logger.info("TET路由器数据源注册成功")
+
+        self._is_initialized = True
+        logger.info("UniPluginDataManager初始化完成")
+
+    def _create_data_normalizer(self):
+        """创建数据标准化器"""
+        class StockDataNormalizer:
+            def normalize_stock_list(self, raw_data: List[Dict], source: str) -> List[Dict[str, Any]]:
+                if not raw_data:
+                    return []
+
+                logger.info(f"[NORMALIZE] 标准化 {source} 数据源的股票列表，原始数量: {len(raw_data)}")
+
+                normalized_stocks = []
+                seen_codes = set()
+
+                for raw_stock in raw_data:
+                    try:
+                        code = self._extract_code(raw_stock)
+                        name = self._extract_name(raw_stock)
+
+                        if not code or not name:
+                            continue
+
+                        std_code, market = self._normalize_code(code, source)
+
+                        if std_code in seen_codes:
+                            continue
+                        seen_codes.add(std_code)
+
+                        normalized_stock = {
+                            'code': std_code,
+                            'name': name.strip(),
+                            'market': market,
+                            'display_code': std_code.split('.')[0] if '.' in std_code else std_code,
+                            'source': source,
+                            **{k: v for k, v in raw_stock.items() if k not in ['code', 'name']}
+                        }
+                        normalized_stocks.append(normalized_stock)
+
+                    except Exception:
+                        continue
+
+                normalized_stocks.sort(key=lambda x: x['code'])
+                logger.info(f"{source} 标准化完成，标准化数量: {len(normalized_stocks)}")
+                return normalized_stocks
+
+            def _extract_code(self, raw: Dict) -> str:
+                for field in ['code', 'symbol', 'ts_code', 'stock_code', 'SECUCODE']:
+                    if field in raw and raw[field]:
+                        return str(raw[field]).strip()
+                return ""
+
+            def _extract_name(self, raw: Dict) -> str:
+                for field in ['name', 'sec_name', 'stock_name', 'SECUABBR']:
+                    if field in raw and raw[field]:
+                        return str(raw[field]).strip()
+                return ""
+
+            def _normalize_code(self, code: str, source: str) -> tuple:
+                if 'eastmoney' in source:
+                    return self._normalize_eastmoney_code(code)
+                elif 'sina' in source:
+                    return self._normalize_sina_code(code)
+                elif 'tushare' in source:
+                    return self._normalize_tushare_code(code)
+                else:
+                    return self._infer_market_from_code(code)
+
+            def _normalize_eastmoney_code(self, code: str) -> tuple:
+                if '.' in code:
+                    parts = code.split('.')
+                    if len(parts) == 2:
+                        market_code, stock_code = parts
+                        if market_code in ['0', 'SZ']:
+                            return f"{stock_code}.SZ", "SZ"
+                        elif market_code in ['1', 'SH']:
+                            return f"{stock_code}.SH", "SH"
+                return self._infer_market_from_code(code)
+
+            def _normalize_sina_code(self, code: str) -> tuple:
+                code_lower = code.lower()
+                if code_lower.startswith('sz'):
+                    return f"{code[2:]}.SZ", "SZ"
+                elif code_lower.startswith('sh'):
+                    return f"{code[2:]}.SH", "SH"
+                return self._infer_market_from_code(code)
+
+            def _normalize_tushare_code(self, code: str) -> tuple:
+                if '.' in code:
+                    parts = code.split('.')
+                    if len(parts) == 2:
+                        stock_code, market_code = parts
+                        return f"{stock_code}.{market_code.upper()}", market_code.upper()
+                return self._infer_market_from_code(code)
+
+            def _infer_market_from_code(self, code: str) -> tuple:
+                numeric_code = re.sub(r'[^\d]', '', code)
+                if not numeric_code:
+                    return f"{code}.SZ", "SZ"
+
+                if numeric_code.startswith('6'):
+                    return f"{numeric_code}.SH", "SH"
+                elif numeric_code.startswith(('00', '30')):
+                    return f"{numeric_code}.SZ", "SZ"
+                elif numeric_code.startswith('68'):
+                    return f"{numeric_code}.SH", "SH"
+                elif numeric_code.startswith('8'):
+                    return f"{numeric_code}.BJ", "BJ"
+                else:
+                    return f"{numeric_code}.SZ", "SZ"
+
+        return StockDataNormalizer()
+
     def get_stock_list(self, market: str = None, **params) -> List[Dict[str, Any]]:
         """
         获取股票列表 - 统一入口
-        
+
         Args:
             market: 市场代码
             **params: 其他参数
-            
+
         Returns:
-            List[Dict[str, Any]]: 股票列表
+            List[Dict[str, Any]]: 标准化的股票列表
         """
         context = RequestContext(
             asset_type=AssetType.STOCK,
             data_type=DataType.ASSET_LIST,
             market=market
         )
-        
-        return self._execute_data_request(context, 'get_asset_list', **params)
-    
+
+        # 执行数据请求
+        result = self._execute_data_request(context, 'get_asset_list', **params)
+
+        # 数据标准化处理
+        if result is not None and isinstance(result, list):
+            plugin_id = getattr(context, 'actual_plugin_id', 'unknown')
+            logger.info(f"[PROCESS] 开始标准化股票列表数据，来源插件: {plugin_id}")
+
+            normalized_result = self.data_normalizer.normalize_stock_list(result, plugin_id)
+
+            logger.info(f"[METRICS] 股票列表标准化完成: 原始 {len(result)} -> 标准化 {len(normalized_result)}")
+            return normalized_result
+
+        # 如果结果是DataFrame，直接返回（不需要标准化）
+        if result is not None:
+            return result
+
+        return []
+
     def get_fund_list(self, market: str = None, **params) -> List[Dict[str, Any]]:
         """
         获取基金列表 - 统一入口
-        
+
         Args:
             market: 市场代码
             **params: 其他参数
-            
+
         Returns:
             List[Dict[str, Any]]: 基金列表
         """
@@ -770,17 +324,17 @@ class UniPluginDataManager:
             data_type=DataType.ASSET_LIST,
             market=market
         )
-        
+
         return self._execute_data_request(context, 'get_asset_list', **params)
-    
+
     def get_index_list(self, market: str = None, **params) -> List[Dict[str, Any]]:
         """
         获取指数列表 - 统一入口
-        
+
         Args:
             market: 市场代码
             **params: 其他参数
-            
+
         Returns:
             List[Dict[str, Any]]: 指数列表
         """
@@ -789,219 +343,526 @@ class UniPluginDataManager:
             data_type=DataType.ASSET_LIST,
             market=market
         )
-        
+
         return self._execute_data_request(context, 'get_asset_list', **params)
-    
-    def get_kdata(self, symbol: str, freq: str = "D", 
-                  start_date: str = None, end_date: str = None, 
-                  count: int = None, **params) -> pd.DataFrame:
+
+    def get_kline_data(self, symbol: str, asset_type: AssetType,
+                       start_date: datetime = None, end_date: datetime = None,
+                       frequency: str = "1d", **params) -> pd.DataFrame:
         """
         获取K线数据 - 统一入口
-        
+
         Args:
-            symbol: 股票代码
-            freq: 频率
+            symbol: 标的代码
+            asset_type: 资产类型
             start_date: 开始日期
             end_date: 结束日期
-            count: 数据数量
+            frequency: 数据频率
             **params: 其他参数
-            
+
         Returns:
             pd.DataFrame: K线数据
         """
         context = RequestContext(
-            asset_type=AssetType.STOCK,
+            asset_type=asset_type,
             data_type=DataType.HISTORICAL_KLINE,
             symbol=symbol
         )
-        
-        return self._execute_data_request(
-            context, 'get_kdata',
-            symbol=symbol, freq=freq, start_date=start_date, 
-            end_date=end_date, count=count, **params
-        )
-    
-    def get_real_time_quotes(self, symbols: List[str], **params) -> List[Dict[str, Any]]:
+
+        # 准备参数
+        kline_params = {
+            'symbol': symbol,
+            'start_date': start_date,
+            'end_date': end_date,
+            'frequency': frequency,
+            **params
+        }
+
+        return self._execute_data_request(context, 'get_kline_data', **kline_params)
+
+    def get_real_time_data(self, symbols: List[str], asset_type: AssetType,
+                           **params) -> pd.DataFrame:
         """
-        获取实时行情 - 统一入口
-        
+        获取实时数据 - 统一入口
+
         Args:
-            symbols: 股票代码列表
+            symbols: 标的代码列表
+            asset_type: 资产类型
             **params: 其他参数
-            
+
         Returns:
-            List[Dict[str, Any]]: 实时行情数据
+            pd.DataFrame: 实时数据
         """
         context = RequestContext(
-            asset_type=AssetType.STOCK,
+            asset_type=asset_type,
             data_type=DataType.REAL_TIME_QUOTE
         )
-        
-        return self._execute_data_request(
-            context, 'get_real_time_quotes',
-            symbols=symbols, **params
-        )
-    
+
+        # 准备参数
+        realtime_params = {
+            'symbols': symbols,
+            **params
+        }
+
+        return self._execute_data_request(context, 'get_real_time_data', **realtime_params)
+
     def _execute_data_request(self, context: RequestContext, method_name: str, **params) -> Any:
         """
         执行数据请求的核心逻辑
-        
+
         Args:
             context: 请求上下文
             method_name: 方法名
             **params: 方法参数
-            
+
         Returns:
             Any: 请求结果
         """
         start_time = datetime.now()
         self.stats["total_requests"] += 1
-        
+
         try:
             # 1. 检查缓存
             cache_key = self._generate_cache_key(context, method_name, **params)
             cached_result = self._get_from_cache(cache_key)
             if cached_result is not None:
                 self.stats["cache_hits"] += 1
+                logger.info(f"[CACHE] 缓存命中 - 方法: {method_name}, 数据类型: {context.data_type.value}")
                 return cached_result
-            
+
             # 2. 获取可用插件
+            logger.info(f"[TET] TET框架开始数据请求处理 - 方法: {method_name}, 资产类型: {context.asset_type.value}, 数据类型: {context.data_type.value}")
+
             available_plugins = self.plugin_center.get_available_plugins(
                 context.data_type, context.asset_type, context.market
             )
-            
+
             if not available_plugins:
-                raise RuntimeError(f"没有可用的插件支持数据类型: {context.data_type}")
-            
-            # 3. 选择最优插件
+                raise RuntimeError(f"没有可用的插件支持数据类型: {context.data_type.value}/{context.asset_type.value}")
+
+            logger.info(f"[DISCOVERY] TET插件发现阶段完成 - 找到 {len(available_plugins)} 个可用插件: {available_plugins}")
+
+            # 2.1 过滤出真正可用的插件（检查连接状态）
+            connected_plugins = self._filter_connected_plugins(available_plugins)
+            logger.info(f"[CONNECTION] TET连接状态检查 - {len(connected_plugins)} 个插件已连接: {connected_plugins}")
+
+            if not connected_plugins:
+                logger.warning("没有已连接的插件，尝试连接可用插件...")
+                connected_plugins = self._attempt_plugin_connections(available_plugins)
+
+                if not connected_plugins:
+                    raise RuntimeError(f"所有插件都无法连接，数据类型: {context.data_type.value}/{context.asset_type.value}")
+
+            # 3. TET路由引擎选择最优插件（仅从已连接的插件中选择）
+            logger.info(f"[ROUTING] TET路由引擎开始智能插件选择（从 {len(connected_plugins)} 个已连接插件中选择）...")
             selected_plugin_id = self.tet_engine.select_optimal_plugin(
-                available_plugins, context, self.plugin_center
+                connected_plugins, context, self.plugin_center
             )
-            
+
             if not selected_plugin_id:
-                raise RuntimeError("无法选择合适的插件")
-            
+                raise RuntimeError("TET路由引擎无法从已连接插件中选择合适的插件")
+
+            logger.info(f"TET路由引擎选择最优插件: {selected_plugin_id} (已验证连接状态)")
+
             # 4. 获取插件实例
             plugin = self.plugin_center.get_plugin(selected_plugin_id)
             if not plugin:
                 raise RuntimeError(f"无法获取插件实例: {selected_plugin_id}")
-            
-            # 5. 执行数据获取
-            method = getattr(plugin, method_name)
-            result, validation_result = self.risk_manager.execute_with_monitoring(
-                selected_plugin_id, method, **params
+
+            # 5. 检查插件是否有指定方法
+            if not hasattr(plugin, method_name):
+                # 尝试其他可能的方法名
+                alternate_methods = self._get_alternate_method_names(method_name)
+                actual_method = None
+                for alt_method in alternate_methods:
+                    if hasattr(plugin, alt_method):
+                        actual_method = alt_method
+                        break
+
+                if not actual_method:
+                    raise RuntimeError(f"插件 {selected_plugin_id} 不支持方法 {method_name}")
+
+                method_name = actual_method
+
+            # 6. 执行数据获取（带质量监控和故障转移）
+            logger.info(f"[EXTRACT] TET数据提取阶段开始 - 插件: {selected_plugin_id}, 方法: {method_name}")
+
+            # 尝试执行数据获取，如果失败则进行故障转移
+            result, validation_result = self._execute_with_failover(
+                connected_plugins, selected_plugin_id, method_name, context, params
             )
-            
-            # 6. 更新插件指标
+
+            # 7. 更新插件指标
             execution_time = (datetime.now() - start_time).total_seconds()
+
+            # 从故障转移结果中获取实际使用的插件ID
+            actual_plugin_id = getattr(validation_result, 'plugin_id', selected_plugin_id)
+
             self.plugin_center.update_plugin_metrics(
-                selected_plugin_id, True, execution_time, validation_result.quality_score
+                actual_plugin_id, validation_result.is_valid, execution_time, validation_result.quality_score
             )
-            
-            # 7. 缓存结果
-            if validation_result.is_valid:
+
+            # 8. 更新TET路由引擎健康状态
+            logger.info(f"[METRICS] TET路由引擎更新插件健康状态 - 插件: {actual_plugin_id}, 成功: {validation_result.is_valid}")
+            self.tet_engine.update_plugin_health(
+                actual_plugin_id, validation_result.is_valid, execution_time
+            )
+
+            # 9. 缓存结果（仅当数据有效时）
+            if validation_result.is_valid and validation_result.quality_score >= 0.3:
                 self._cache_result(cache_key, result)
-            
-            # 8. 更新统计信息
+                logger.info(f"[CACHE] TET数据缓存 - 质量分数: {validation_result.quality_score:.3f} >= 0.3，结果已缓存")
+
+            # 10. 更新统计信息
             self.stats["successful_requests"] += 1
             self._update_avg_response_time(execution_time)
-            
-            logger.debug(f"数据请求成功 - 插件: {selected_plugin_id}, 方法: {method_name}, 用时: {execution_time:.3f}s")
-            
+
+            logger.info(f"[COMPLETE] TET框架数据请求完成 - 插件: {actual_plugin_id}, 方法: {method_name}, "
+                        f"用时: {execution_time:.3f}s, 质量分数: {validation_result.quality_score:.3f}")
+
+            # 将实际使用的插件ID设置到context中，供后续标准化使用
+            context.actual_plugin_id = actual_plugin_id
+
             return result
-            
+
         except Exception as e:
             # 更新失败统计
             self.stats["failed_requests"] += 1
             execution_time = (datetime.now() - start_time).total_seconds()
             self._update_avg_response_time(execution_time)
-            
-            logger.error(f"数据请求失败 - 方法: {method_name}, 错误: {e}")
+
+            logger.error(f"[ERROR] TET框架数据请求失败 - 方法: {method_name}, 错误: {e}")
             raise
-    
+
+    def _get_alternate_method_names(self, method_name: str) -> List[str]:
+        """获取替代方法名"""
+        alternates = {
+            'get_asset_list': ['get_stock_list', 'get_symbol_list', 'get_instruments'],
+            'get_kline_data': ['get_kdata', 'get_bars', 'get_candles', 'fetch_data'],
+            'get_real_time_data': ['get_realtime_data', 'get_quote', 'get_tick'],
+            'get_stock_list': ['get_asset_list', 'get_symbol_list'],
+        }
+
+        return alternates.get(method_name, [])
+
     def _generate_cache_key(self, context: RequestContext, method_name: str, **params) -> str:
         """生成缓存键"""
         import hashlib
-        import json
-        
-        # 创建缓存键的组件
-        key_components = {
-            'method': method_name,
-            'asset_type': context.asset_type.value if context.asset_type else None,
-            'data_type': context.data_type.value if context.data_type else None,
-            'symbol': context.symbol,
-            'market': context.market,
-            'params': params
-        }
-        
-        # 序列化并生成哈希
-        key_str = json.dumps(key_components, sort_keys=True, default=str)
-        return hashlib.md5(key_str.encode()).hexdigest()
-    
+
+        key_parts = [
+            method_name,
+            context.asset_type.value if context.asset_type else "unknown",
+            context.data_type.value if context.data_type else "unknown",
+            context.market or "all",
+            context.symbol or "all"
+        ]
+
+        # 添加参数hash
+        if params:
+            # 排序参数以确保一致性
+            sorted_params = sorted(params.items())
+            param_str = str(sorted_params)
+            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:8]
+            key_parts.append(param_hash)
+
+        return ":".join(key_parts)
+
     def _get_from_cache(self, cache_key: str) -> Optional[Any]:
         """从缓存获取数据"""
         if cache_key in self._cache:
-            cached_data, cached_time = self._cache[cache_key]
-            if datetime.now() - cached_time < self._cache_ttl:
-                return cached_data
+            data, timestamp = self._cache[cache_key]
+            if datetime.now() - timestamp < self._cache_ttl:
+                return data
             else:
-                # 清理过期缓存
+                # 缓存过期，删除
                 del self._cache[cache_key]
+
         return None
-    
+
     def _cache_result(self, cache_key: str, result: Any) -> None:
         """缓存结果"""
-        self._cache[cache_key] = (result, datetime.now())
-        
-        # 限制缓存大小
-        if len(self._cache) > 1000:
-            # 删除最旧的缓存项
-            oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][1])
-            del self._cache[oldest_key]
-    
-    def _update_avg_response_time(self, response_time: float) -> None:
+        try:
+            self._cache[cache_key] = (result, datetime.now())
+
+            # 限制缓存大小
+            if len(self._cache) > 1000:
+                # 删除最旧的缓存项
+                oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][1])
+                del self._cache[oldest_key]
+
+        except Exception as e:
+            logger.warning(f"缓存结果失败: {e}")
+
+    def _update_avg_response_time(self, execution_time: float) -> None:
         """更新平均响应时间"""
         total_requests = self.stats["total_requests"]
-        if total_requests == 1:
-            self.stats["avg_response_time"] = response_time
-        else:
-            # 使用指数移动平均
-            alpha = 0.1
-            self.stats["avg_response_time"] = (
-                alpha * response_time + (1 - alpha) * self.stats["avg_response_time"]
-            )
-    
-    def get_stats(self) -> Dict[str, Any]:
+        current_avg = self.stats["avg_response_time"]
+
+        # 计算新的平均值
+        self.stats["avg_response_time"] = (current_avg * (total_requests - 1) + execution_time) / total_requests
+
+    def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息"""
-        return self.stats.copy()
-    
-    def clear_cache(self) -> None:
-        """清理缓存"""
-        self._cache.clear()
-        logger.info("缓存已清理")
-    
-    def health_check(self) -> Dict[str, Any]:
-        """健康检查"""
-        health_status = {
-            "status": "healthy",
-            "timestamp": datetime.now(),
-            "plugin_center": {
-                "total_plugins": len(self.plugin_center.data_source_plugins),
-                "healthy_plugins": sum(
-                    1 for health in self.plugin_center.plugin_health.values()
-                    if health.is_healthy
-                )
+        plugin_stats = self.plugin_center.get_statistics()
+        quality_stats = self.risk_manager.get_quality_statistics()
+        tet_routing_stats = self.tet_engine.get_routing_statistics()
+
+        return {
+            **self.stats,
+            'plugin_stats': plugin_stats,
+            'quality_stats': quality_stats,
+            'tet_framework_stats': {
+                'routing_engine': tet_routing_stats,
+                'total_tet_requests': self.stats["total_requests"],
+                'tet_success_rate': self.stats["successful_requests"] / max(1, self.stats["total_requests"]),
+                'tet_avg_response_time': self.stats["avg_response_time"],
+                'tet_cache_efficiency': self.stats["cache_hits"] / max(1, self.stats["total_requests"]),
+                'tet_enabled': True,
+                'framework_version': 'TET-2.0-Enhanced'
             },
-            "cache": {
-                "cache_size": len(self._cache),
-                "cache_hit_rate": (
-                    self.stats["cache_hits"] / max(self.stats["total_requests"], 1)
-                )
-            },
-            "performance": self.stats
+            'cache_size': len(self._cache),
+            'cache_hit_rate': self.stats["cache_hits"] / max(1, self.stats["total_requests"])
         }
-        
-        return health_status
+
+    def clear_cache(self) -> None:
+        """清空缓存"""
+        self._cache.clear()
+        logger.info("缓存已清空")
+
+    def get_plugin_status(self) -> Dict[str, Any]:
+        """获取所有插件状态"""
+        return {
+            'plugin_center': self.plugin_center.get_statistics(),
+            'tet_engine': self.tet_engine.get_all_plugin_status(),
+            'quality_manager': self.risk_manager.get_quality_statistics()
+        }
+
+    def get_tet_framework_status(self) -> Dict[str, Any]:
+        """获取TET框架详细状态"""
+        tet_stats = self.tet_engine.get_routing_statistics()
+        plugin_stats = self.plugin_center.get_statistics()
+
+        return {
+            'framework_info': {
+                'name': 'TET Framework (Transform-Extract-Transform)',
+                'version': 'TET-2.0-Enhanced',
+                'status': 'Active',
+                'description': '智能数据源路由和插件管理框架'
+            },
+            'routing_engine': {
+                'registered_plugins': tet_stats.get('registered_plugins', 0),
+                'intelligent_routing_enabled': tet_stats.get('intelligent_routing_enabled', False),
+                'adaptive_weights_enabled': tet_stats.get('adaptive_weights_enabled', False),
+                'cache_size': tet_stats.get('cache_size', 0),
+                'strategy_performance': tet_stats.get('strategy_performance', {})
+            },
+            'plugin_center': {
+                'total_plugins': plugin_stats.get('total_plugins', 0),
+                'active_plugins': plugin_stats.get('active_plugins', 0),
+                'data_source_plugins': plugin_stats.get('data_source_plugins', 0)
+            },
+            'performance_metrics': {
+                'total_requests': self.stats["total_requests"],
+                'successful_requests': self.stats["successful_requests"],
+                'failed_requests': self.stats["failed_requests"],
+                'success_rate': self.stats["successful_requests"] / max(1, self.stats["total_requests"]),
+                'avg_response_time': self.stats["avg_response_time"],
+                'cache_hits': self.stats["cache_hits"],
+                'cache_hit_rate': self.stats["cache_hits"] / max(1, self.stats["total_requests"])
+            },
+            'data_quality': self.risk_manager.get_quality_statistics()
+        }
+
+    def _filter_connected_plugins(self, plugin_ids: List[str]) -> List[str]:
+        """过滤出已连接的插件"""
+        connected_plugins = []
+
+        for plugin_id in plugin_ids:
+            try:
+                plugin = self.plugin_center.get_plugin(plugin_id)
+                if plugin and self._check_plugin_connection(plugin, plugin_id):
+                    connected_plugins.append(plugin_id)
+                else:
+                    logger.debug(f"插件 {plugin_id} 未连接或不可用")
+            except Exception as e:
+                logger.warning(f"检查插件连接状态失败 {plugin_id}: {e}")
+
+        return connected_plugins
+
+    def _check_plugin_connection(self, plugin, plugin_id: str) -> bool:
+        """检查插件连接状态"""
+        try:
+            # 检查插件是否有连接状态方法
+            if hasattr(plugin, 'is_connected'):
+                return plugin.is_connected()
+            elif hasattr(plugin, 'connected'):
+                return plugin.connected
+            elif hasattr(plugin, '_connected'):
+                return plugin._connected
+            elif hasattr(plugin, 'connection_status'):
+                return plugin.connection_status
+            else:
+                # 如果没有连接状态方法，尝试调用一个轻量级方法来测试
+                if hasattr(plugin, 'get_plugin_info'):
+                    plugin.get_plugin_info()
+                    return True
+                elif hasattr(plugin, 'health_check'):
+                    result = plugin.health_check()
+                    return getattr(result, 'is_healthy', True)
+                else:
+                    # 默认认为插件可用
+                    logger.debug(f"插件 {plugin_id} 没有连接状态检查方法，默认认为可用")
+                    return True
+        except Exception as e:
+            logger.warning(f"插件连接检查异常 {plugin_id}: {e}")
+            return False
+
+    def _attempt_plugin_connections(self, plugin_ids: List[str]) -> List[str]:
+        """尝试连接插件"""
+        connected_plugins = []
+
+        for plugin_id in plugin_ids:
+            try:
+                plugin = self.plugin_center.get_plugin(plugin_id)
+                if plugin and self._attempt_plugin_connection(plugin, plugin_id):
+                    connected_plugins.append(plugin_id)
+                    logger.info(f"插件连接成功: {plugin_id}")
+                else:
+                    logger.warning(f" 插件连接失败: {plugin_id}")
+            except Exception as e:
+                logger.error(f"[ERROR] 插件连接异常 {plugin_id}: {e}")
+
+        return connected_plugins
+
+    def _attempt_plugin_connection(self, plugin, plugin_id: str) -> bool:
+        """尝试连接单个插件"""
+        try:
+            # 如果插件已经连接，直接返回
+            if self._check_plugin_connection(plugin, plugin_id):
+                return True
+
+            # 尝试连接插件
+            if hasattr(plugin, 'connect'):
+                result = plugin.connect()
+                if result:
+                    logger.info(f"插件 {plugin_id} 连接成功")
+                    return True
+                else:
+                    logger.warning(f"插件 {plugin_id} 连接失败")
+                    return False
+            elif hasattr(plugin, 'initialize'):
+                plugin.initialize()
+                logger.info(f"插件 {plugin_id} 初始化成功")
+                return True
+            else:
+                # 没有连接方法，假设插件可用
+                logger.debug(f"插件 {plugin_id} 没有连接方法，假设可用")
+                return True
+
+        except Exception as e:
+            logger.error(f"插件连接尝试失败 {plugin_id}: {e}")
+            return False
+
+    def _execute_with_failover(self, connected_plugins: List[str], primary_plugin_id: str,
+                               method_name: str, context: RequestContext, params: Dict[str, Any]):
+        """带故障转移的执行方法"""
+        failed_plugins = []
+        last_error = None
+
+        # 将主选插件放在第一位，其他插件作为备选
+        plugin_order = [primary_plugin_id] + [p for p in connected_plugins if p != primary_plugin_id]
+
+        for attempt, plugin_id in enumerate(plugin_order, 1):
+            try:
+                logger.info(f"[RETRY] 尝试插件 {plugin_id} (第 {attempt}/{len(plugin_order)} 次尝试)")
+
+                plugin = self.plugin_center.get_plugin(plugin_id)
+                if not plugin:
+                    logger.warning(f" 无法获取插件实例: {plugin_id}")
+                    failed_plugins.append(plugin_id)
+                    continue
+
+                # 再次检查连接状态
+                if not self._check_plugin_connection(plugin, plugin_id):
+                    logger.warning(f" 插件 {plugin_id} 连接状态异常，尝试重连...")
+                    if not self._attempt_plugin_connection(plugin, plugin_id):
+                        logger.error(f"[ERROR] 插件 {plugin_id} 重连失败")
+                        failed_plugins.append(plugin_id)
+                        continue
+
+                # 检查插件是否支持该方法
+                if not hasattr(plugin, method_name):
+                    alternate_methods = self._get_alternate_method_names(method_name)
+                    actual_method = None
+                    for alt_method in alternate_methods:
+                        if hasattr(plugin, alt_method):
+                            actual_method = alt_method
+                            break
+
+                    if not actual_method:
+                        logger.warning(f" 插件 {plugin_id} 不支持方法 {method_name}")
+                        failed_plugins.append(plugin_id)
+                        continue
+
+                    method_name = actual_method
+
+                # 执行方法
+                method = getattr(plugin, method_name)
+
+                # 准备参数
+                method_params = params.copy()
+                if method_name == 'get_asset_list' and 'asset_type' not in method_params:
+                    method_params['asset_type'] = context.asset_type
+                if 'market' not in method_params and context.market:
+                    method_params['market'] = context.market
+
+                # 执行并监控
+                result, validation_result = self.risk_manager.execute_with_monitoring(
+                    plugin_id, method, **method_params
+                )
+
+                if validation_result.is_valid:
+                    if attempt > 1:
+                        logger.info(f"[FAILOVER] TET故障转移成功 - 插件: {plugin_id} (第 {attempt} 次尝试)")
+                    else:
+                        logger.info(f"TET数据获取成功 - 插件: {plugin_id}")
+
+                    # 更新TET路由引擎，记录成功的插件
+                    self.tet_engine.record_plugin_performance(
+                        plugin_id, True, 0.1, context  # 成功执行，响应时间很短
+                    )
+
+                    return result, validation_result
+                else:
+                    logger.warning(f" 插件 {plugin_id} 返回数据质量不合格: {validation_result.quality_score}")
+                    failed_plugins.append(plugin_id)
+                    last_error = f"数据质量不合格: {validation_result.quality_score}"
+
+            except Exception as e:
+                logger.error(f"[ERROR] 插件 {plugin_id} 执行失败: {e}")
+                failed_plugins.append(plugin_id)
+                last_error = str(e)
+
+                # 更新TET路由引擎，记录失败的插件
+                self.tet_engine.record_plugin_performance(
+                    plugin_id, False, 1.0, context  # 失败执行，响应时间较长
+                )
+
+        # 所有插件都失败了
+        error_msg = f"TET故障转移失败 - 所有插件都无法提供有效数据。失败插件: {failed_plugins}"
+        if last_error:
+            error_msg += f"，最后错误: {last_error}"
+
+        logger.error(f"[ERROR] {error_msg}")
+        raise RuntimeError(error_msg)
+
+    def shutdown(self) -> None:
+        """关闭管理器"""
+        try:
+            self._executor.shutdown(wait=True)
+            logger.info("统一插件数据管理器已关闭")
+        except Exception as e:
+            logger.error(f"关闭统一插件数据管理器失败: {e}")
 
 
 # 全局实例管理

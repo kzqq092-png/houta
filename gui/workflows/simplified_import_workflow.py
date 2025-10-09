@@ -197,20 +197,20 @@ class WelcomePage(QWizardPage):
         self.mode_group = QButtonGroup()
 
         # 快速导入
-        self.quick_mode = QRadioButton("🚀 快速导入")
+        self.quick_mode = QRadioButton("快速导入")
         self.quick_mode.setChecked(True)
         self.quick_mode.setFont(QFont("Microsoft YaHei UI", 12, QFont.Bold))
         quick_desc = QLabel("适合常见数据格式，自动检测配置，一键导入")
         quick_desc.setStyleSheet("color: #666; margin-left: 20px;")
 
         # 引导导入
-        self.guided_mode = QRadioButton("📋 引导导入")
+        self.guided_mode = QRadioButton("引导导入")
         self.guided_mode.setFont(QFont("Microsoft YaHei UI", 12, QFont.Bold))
         guided_desc = QLabel("逐步引导配置，适合复杂数据源或特殊需求")
         guided_desc.setStyleSheet("color: #666; margin-left: 20px;")
 
         # 模板导入
-        self.template_mode = QRadioButton("📄 模板导入")
+        self.template_mode = QRadioButton("模板导入")
         self.template_mode.setFont(QFont("Microsoft YaHei UI", 12, QFont.Bold))
         template_desc = QLabel("使用预设模板，快速导入常见数据类型")
         template_desc.setStyleSheet("color: #666; margin-left: 20px;")
@@ -239,7 +239,7 @@ class WelcomePage(QWizardPage):
 
         popular_templates = self.template_manager.get_popular_templates()
         for template in popular_templates:
-            item = QListWidgetItem(f"📊 {template.name}")
+            item = QListWidgetItem(f" {template.name}")
             item.setToolTip(template.description)
             item.setData(Qt.UserRole, template.template_id)
             self.template_list.addItem(item)
@@ -303,11 +303,11 @@ class DataSourcePage(QWizardPage):
         # CSV文件
         self.csv_radio = QRadioButton("CSV文件")
         self.csv_radio.setChecked(True)
-        self.csv_radio.setIcon(QIcon("📄"))
+        self.csv_radio.setIcon(QIcon("🗄️"))
 
         # Excel文件
         self.excel_radio = QRadioButton("Excel文件")
-        self.excel_radio.setIcon(QIcon("📊"))
+        self.excel_radio.setIcon(QIcon(""))
 
         # 数据库
         self.db_radio = QRadioButton("数据库")
@@ -315,7 +315,7 @@ class DataSourcePage(QWizardPage):
 
         # API接口
         self.api_radio = QRadioButton("API接口")
-        self.api_radio.setIcon(QIcon("🌐"))
+        self.api_radio.setIcon(QIcon(""))
 
         self.source_group.addButton(self.csv_radio, DataSourceType.CSV_FILE.value)
         self.source_group.addButton(self.excel_radio, DataSourceType.EXCEL_FILE.value)
@@ -612,10 +612,10 @@ class PreviewPage(QWizardPage):
             self.preview_text.setPlainText(preview_content)
 
             # 模拟质量检查结果
-            quality_result = """✅ 数据完整性: 100%
-✅ 格式正确性: 99.8%
-⚠️  发现 3 个异常值
-✅ 时间序列连续性: 正常"""
+            quality_result = """数据完整性: 100%
+格式正确性: 99.8%
+  发现 3 个异常值
+时间序列连续性: 正常"""
 
             self.quality_text.setPlainText(quality_result)
 
@@ -734,7 +734,7 @@ class CompletionPage(QWizardPage):
         # 成功图标和消息
         success_layout = QHBoxLayout()
 
-        success_icon = QLabel("✅")
+        success_icon = QLabel("[SUCCESS]")
         success_icon.setFont(QFont("Arial", 48))
         success_icon.setAlignment(Qt.AlignCenter)
 
@@ -767,9 +767,9 @@ class CompletionPage(QWizardPage):
         action_group = QGroupBox("后续操作")
         action_layout = QVBoxLayout(action_group)
 
-        self.view_data_btn = QPushButton("📊 查看导入的数据")
-        self.quality_report_btn = QPushButton("📋 查看质量报告")
-        self.save_template_btn = QPushButton("💾 保存为模板")
+        self.view_data_btn = QPushButton("查看导入的数据")
+        self.quality_report_btn = QPushButton("查看质量报告")
+        self.save_template_btn = QPushButton("保存为模板")
 
         action_layout.addWidget(self.view_data_btn)
         action_layout.addWidget(self.quality_report_btn)

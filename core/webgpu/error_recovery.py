@@ -23,7 +23,6 @@ from abc import ABC, abstractmethod
 
 logger = logger
 
-
 class ErrorCategory(Enum):
     """错误类别"""
     WEBGPU_NOT_SUPPORTED = "webgpu_not_supported"
@@ -40,7 +39,6 @@ class ErrorCategory(Enum):
     PERFORMANCE_DEGRADATION = "performance_degradation"
     UNKNOWN_ERROR = "unknown_error"
 
-
 class ErrorSeverity(Enum):
     """错误严重程度"""
     CRITICAL = "critical"      # 严重错误，需要立即降级
@@ -48,7 +46,6 @@ class ErrorSeverity(Enum):
     MEDIUM = "medium"         # 中等错误，可以重试
     LOW = "low"              # 轻微错误，记录即可
     WARNING = "warning"       # 警告，不影响功能
-
 
 class RecoveryStrategy(Enum):
     """恢复策略"""
@@ -60,7 +57,6 @@ class RecoveryStrategy(Enum):
     RESTART_CONTEXT = "restart_context"   # 重启上下文
     USER_INTERVENTION = "user_intervention"  # 需要用户干预
     NO_RECOVERY = "no_recovery"          # 无法恢复
-
 
 @dataclass
 class ErrorInfo:
@@ -75,7 +71,6 @@ class ErrorInfo:
     timestamp: float = field(default_factory=time.time)
     context: Dict[str, Any] = field(default_factory=dict)
 
-
 @dataclass
 class RecoveryResult:
     """恢复结果"""
@@ -86,7 +81,6 @@ class RecoveryResult:
     new_engine: Optional[str] = None
     performance_impact: float = 0.0  # 性能影响百分比
 
-
 @dataclass
 class ErrorStatistics:
     """错误统计信息"""
@@ -96,7 +90,6 @@ class ErrorStatistics:
     recovery_success_rate: float = 0.0
     most_common_error: Optional[ErrorCategory] = None
     error_trend: List[float] = field(default_factory=list)  # 按时间的错误频率
-
 
 class ErrorDetector:
     """错误检测器"""
@@ -203,7 +196,6 @@ class ErrorDetector:
         # 默认为中等
         return ErrorSeverity.MEDIUM
 
-
 class RecoveryStrategyManager:
     """恢复策略管理器"""
 
@@ -272,7 +264,6 @@ class RecoveryStrategyManager:
         """获取错误类别对应的恢复策略"""
         return self.strategy_map.get(category, [RecoveryStrategy.NO_RECOVERY])
 
-
 class RecoveryAction(ABC):
     """恢复动作抽象基类"""
 
@@ -280,7 +271,6 @@ class RecoveryAction(ABC):
     def execute(self, context: Dict[str, Any]) -> RecoveryResult:
         """执行恢复动作"""
         pass
-
 
 class RetryAction(RecoveryAction):
     """重试动作"""
@@ -324,7 +314,6 @@ class RetryAction(RecoveryAction):
             message=f"重试失败，已尝试 {self.max_retries} 次",
             duration=time.time() - start_time
         )
-
 
 class FallbackEngineAction(RecoveryAction):
     """降级引擎动作"""
@@ -396,7 +385,6 @@ class FallbackEngineAction(RecoveryAction):
         impact = ((from_performance - to_performance) / from_performance) * 100
         return max(0, impact)
 
-
 class ReduceQualityAction(RecoveryAction):
     """降低质量动作"""
 
@@ -453,7 +441,6 @@ class ReduceQualityAction(RecoveryAction):
 
         return new_settings
 
-
 class ClearCacheAction(RecoveryAction):
     """清理缓存动作"""
 
@@ -500,7 +487,6 @@ class ClearCacheAction(RecoveryAction):
                 message=f"缓存清理失败: {e}",
                 duration=time.time() - start_time
             )
-
 
 class ErrorRecoveryManager:
     """错误恢复管理器"""
@@ -737,10 +723,8 @@ class ErrorRecoveryManager:
         except Exception as e:
             logger.error(f"导出错误报告失败: {e}")
 
-
 # 全局错误恢复管理器实例
 _global_error_manager: Optional[ErrorRecoveryManager] = None
-
 
 def get_error_recovery_manager() -> ErrorRecoveryManager:
     """获取全局错误恢复管理器"""
@@ -749,13 +733,11 @@ def get_error_recovery_manager() -> ErrorRecoveryManager:
         _global_error_manager = ErrorRecoveryManager()
     return _global_error_manager
 
-
 def handle_webgpu_error(error_message: str, exception: Optional[Exception] = None,
                         context: Optional[Dict[str, Any]] = None) -> Optional[RecoveryResult]:
     """处理WebGPU错误的快捷函数"""
     manager = get_error_recovery_manager()
     return manager.handle_error(error_message, exception, context)
-
 
 def setup_error_recovery_context(current_engine: str = "webgpu",
                                  switch_engine_function: Optional[Callable] = None,
@@ -768,7 +750,6 @@ def setup_error_recovery_context(current_engine: str = "webgpu",
     }
 
     return context
-
 
 if __name__ == "__main__":
     # 错误处理测试示例

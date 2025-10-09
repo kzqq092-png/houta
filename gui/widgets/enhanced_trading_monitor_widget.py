@@ -47,7 +47,6 @@ from core.strategy_extensions import Signal, SignalType, Position
 
 logger = logger
 
-
 class RealTimeChart(QWidget):
     """实时图表组件"""
 
@@ -161,7 +160,6 @@ class RealTimeChart(QWidget):
         self.figure.tight_layout()
         self.canvas.draw()
 
-
 class SignalMonitorWidget(QWidget):
     """信号监控组件"""
 
@@ -271,7 +269,6 @@ class SignalMonitorWidget(QWidget):
             self.signal_table.setItem(row, 3, signal_item)
             self.signal_table.setItem(row, 4, QTableWidgetItem(f"{signal.price:.2f}"))
             self.signal_table.setItem(row, 5, QTableWidgetItem(f"{signal.strength:.2f}"))
-
 
 class OrderMonitorWidget(QWidget):
     """订单监控组件"""
@@ -393,7 +390,6 @@ class OrderMonitorWidget(QWidget):
 
             self.order_table.setItem(row, 7, status_item)
 
-
 class PositionMonitorWidget(QWidget):
     """持仓监控组件"""
 
@@ -483,7 +479,6 @@ class PositionMonitorWidget(QWidget):
             self.position_table.setItem(row, 5, pnl_item)
             self.position_table.setItem(row, 6, pnl_pct_item)
             self.position_table.setItem(row, 7, QTableWidgetItem(position.timestamp.strftime("%H:%M:%S")))
-
 
 class RiskMonitorWidget(QWidget):
     """风险监控组件"""
@@ -606,7 +601,6 @@ class RiskMonitorWidget(QWidget):
             item = QListWidgetItem("无风险警告")
             item.setBackground(QColor(144, 238, 144))  # 浅绿色背景
             self.warning_list.addItem(item)
-
 
 class PerformanceAnalysisWidget(QWidget):
     """性能分析组件"""
@@ -785,7 +779,6 @@ class PerformanceAnalysisWidget(QWidget):
 - 卖出: {sum(1 for t in trade_history if t.action == 'SELL')} 笔
 """
             self.trade_distribution_text.setText(distribution_text)
-
 
 class EnhancedTradingMonitorWidget(QWidget):
     """增强交易监控组件"""
@@ -1079,7 +1072,6 @@ class EnhancedTradingMonitorWidget(QWidget):
             self.chart_timer.stop()
 
         event.accept()
-
 
 # 测试代码
 if __name__ == "__main__":

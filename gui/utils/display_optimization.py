@@ -23,14 +23,12 @@ import threading
 
 logger = logging.getLogger(__name__)
 
-
 class DisplayType(Enum):
     """显示器类型枚举"""
     STANDARD = "standard"      # 标准显示器
     HIGH_DPI = "high_dpi"     # 高DPI显示器
     RETINA = "retina"         # Retina显示器
     ULTRA_HIGH_DPI = "ultra_high_dpi"  # 超高DPI显示器
-
 
 class TouchCapability(Enum):
     """触摸能力枚举"""
@@ -39,14 +37,12 @@ class TouchCapability(Enum):
     MULTI_TOUCH = "multi"     # 多点触摸
     PEN_TOUCH = "pen"         # 笔触摸
 
-
 class ScalingMode(Enum):
     """缩放模式枚举"""
     SYSTEM = "system"         # 系统缩放
     APPLICATION = "application"  # 应用程序缩放
     CUSTOM = "custom"         # 自定义缩放
     AUTO = "auto"             # 自动缩放
-
 
 @dataclass
 class DisplayInfo:
@@ -65,7 +61,6 @@ class DisplayInfo:
     refresh_rate: float = 60.0
     is_primary: bool = False
 
-
 @dataclass
 class TouchTarget:
     """触摸目标数据类"""
@@ -73,7 +68,6 @@ class TouchTarget:
     recommended_size: int = 48  # 推荐触摸目标尺寸
     spacing: int = 8          # 触摸目标间距
     edge_margin: int = 16     # 边缘边距
-
 
 @dataclass
 class DPIConfig:
@@ -100,7 +94,6 @@ class DPIConfig:
                 edge_margin=self.touch_targets.edge_margin
             )
         )
-
 
 class DisplayDetector:
     """显示器检测器"""
@@ -245,7 +238,6 @@ class DisplayDetector:
         """根据名称获取显示器信息"""
         return self.displays.get(name)
 
-
 class DPIOptimizer:
     """DPI优化器"""
 
@@ -324,7 +316,6 @@ class DPIOptimizer:
     def get_current_config(self) -> Optional[DPIConfig]:
         """获取当前配置"""
         return self.current_config
-
 
 class TouchOptimizer:
     """触摸优化器"""
@@ -421,7 +412,6 @@ class TouchOptimizer:
         except Exception as e:
             logger.error(f"优化滚动条失败: {e}")
 
-
 class IconScaler:
     """图标缩放器"""
 
@@ -482,7 +472,6 @@ class IconScaler:
         self.icon_cache.clear()
         self.pixmap_cache.clear()
 
-
 class FontScaler:
     """字体缩放器"""
 
@@ -537,7 +526,6 @@ class FontScaler:
     def clear_cache(self):
         """清空缓存"""
         self.font_cache.clear()
-
 
 class DisplayOptimizationManager(QObject):
     """显示优化管理器主类"""
@@ -786,15 +774,12 @@ class DisplayOptimizationManager(QObject):
             logger.error(f"获取优化统计失败: {e}")
             return {'error': str(e)}
 
-
 # 全局实例
 display_optimization_manager = DisplayOptimizationManager()
-
 
 def get_display_optimization_manager() -> DisplayOptimizationManager:
     """获取显示优化管理器实例"""
     return display_optimization_manager
-
 
 def optimize_application_for_display():
     """为当前显示器优化应用程序"""
@@ -805,7 +790,6 @@ def optimize_application_for_display():
     if app:
         for widget in app.topLevelWidgets():
             manager.register_widget(widget)
-
 
 def setup_high_dpi_support():
     """设置高DPI支持"""
@@ -825,12 +809,10 @@ def setup_high_dpi_support():
     except Exception as e:
         logger.error(f"设置高DPI支持失败: {e}")
 
-
 def apply_touch_optimizations(widget: QWidget):
     """为组件应用触摸优化"""
     manager = get_display_optimization_manager()
     manager.register_widget(widget)
-
 
 class DisplayOptimizer:
     """显示优化器"""
@@ -856,7 +838,6 @@ class DisplayOptimizer:
             logger.info(f"高DPI缩放已{'启用' if enabled else '禁用'}")
         except Exception as e:
             logger.error(f"设置高DPI缩放失败: {e}")
-
 
 class VirtualizationManager:
     """虚拟化管理器"""
@@ -887,7 +868,6 @@ class VirtualizationManager:
     def is_virtualized(self, widget: QWidget) -> bool:
         """检查组件是否启用虚拟化"""
         return self.virtualized_widgets.get(id(widget), False)
-
 
 class MemoryManager:
     """内存管理器"""

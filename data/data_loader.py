@@ -19,7 +19,6 @@ from utils.cache import Cache
 # 配置日志
 logger = logger
 
-
 @dataclass
 class DataValidationResult:
     """数据验证结果"""
@@ -27,15 +26,12 @@ class DataValidationResult:
     errors: List[str]
     warnings: List[str]
 
-
 class DataLoadError(Exception):
     """数据加载错误"""
     pass
 
-
 # 创建全局缓存实例
 data_cache = Cache(cache_dir=".cache/data", default_ttl=30*60)
-
 
 def retry_on_failure(max_retries: int = 3, delay_seconds: int = 1):
     """重试装饰器"""
@@ -54,7 +50,6 @@ def retry_on_failure(max_retries: int = 3, delay_seconds: int = 1):
             return None
         return wrapper
     return decorator
-
 
 @retry_on_failure(max_retries=3)
 def fetch_fundamental_data(stock, use_cache: bool = True) -> pd.DataFrame:
@@ -97,7 +92,6 @@ def fetch_fundamental_data(stock, use_cache: bool = True) -> pd.DataFrame:
         logger.error(f"获取基本面数据失败: {str(e)}")
         raise DataLoadError(f"获取基本面数据失败: {str(e)}")
 
-
 def validate_fundamental_data(df: pd.DataFrame) -> DataValidationResult:
     """验证基本面数据"""
     errors = []
@@ -131,7 +125,6 @@ def validate_fundamental_data(df: pd.DataFrame) -> DataValidationResult:
         warnings=warnings
     )
 
-
 def handle_outliers(df: pd.DataFrame, method: str = 'zscore', threshold: float = 3.0) -> pd.DataFrame:
     """
     处理异常值
@@ -161,7 +154,6 @@ def handle_outliers(df: pd.DataFrame, method: str = 'zscore', threshold: float =
             df_clean.loc[mask, col] = df[col].median()
 
     return df_clean
-
 
 @retry_on_failure(max_retries=3)
 def fetch_macroeconomic_data(use_cache: bool = True) -> pd.DataFrame:
@@ -195,7 +187,6 @@ def fetch_macroeconomic_data(use_cache: bool = True) -> pd.DataFrame:
         logger.error(f"获取宏观经济数据失败: {str(e)}")
         raise DataLoadError(f"获取宏观经济数据失败: {str(e)}")
 
-
 def validate_macroeconomic_data(df: pd.DataFrame) -> DataValidationResult:
     """验证宏观经济数据"""
     errors = []
@@ -226,7 +217,6 @@ def validate_macroeconomic_data(df: pd.DataFrame) -> DataValidationResult:
         errors=errors,
         warnings=warnings
     )
-
 
 def integrate_multiple_data_sources(df_kdata: pd.DataFrame,
                                     fundamental_data: pd.DataFrame,
@@ -301,7 +291,6 @@ def integrate_multiple_data_sources(df_kdata: pd.DataFrame,
         logger.error(f"整合数据失败: {str(e)}")
         raise DataLoadError(f"整合数据失败: {str(e)}")
 
-
 def merge_chunk_data(chunk: pd.DataFrame, data: pd.DataFrame, prefix: str) -> pd.DataFrame:
     """合并数据块"""
     # 只保留chunk日期范围内的数据
@@ -310,7 +299,6 @@ def merge_chunk_data(chunk: pd.DataFrame, data: pd.DataFrame, prefix: str) -> pd
     # 添加前缀并合并
     filtered_data = filtered_data.add_prefix(prefix)
     return chunk.join(filtered_data, how='left')
-
 
 def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
     """处理缺失值"""
@@ -334,7 +322,6 @@ def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df.fillna(0)
 
     return df
-
 
 @lru_cache(maxsize=100)
 def load_stock_data(file_path: str) -> pd.DataFrame:
@@ -360,7 +347,6 @@ def load_stock_data(file_path: str) -> pd.DataFrame:
     except Exception as e:
         logger.error(f"加载股票数据失败: {str(e)}")
         raise DataLoadError(f"加载股票数据失败: {str(e)}")
-
 
 def validate_stock_data(df: pd.DataFrame) -> DataValidationResult:
     """验证股票数据"""
@@ -403,7 +389,6 @@ def validate_stock_data(df: pd.DataFrame) -> DataValidationResult:
         warnings=warnings
     )
 
-
 def create_simulated_fundamental_data():
     """
     创建模拟的基本面数据
@@ -442,7 +427,6 @@ def create_simulated_fundamental_data():
     df['debt_to_equity'] = df['liabilities'] / df['equity']  # 负债权益比
 
     return df
-
 
 def create_simulated_macroeconomic_data():
     """
@@ -496,7 +480,6 @@ def create_simulated_macroeconomic_data():
 
     return df
 
-
 def align_and_process_data(kdata, freq='D', method='ffill'):
     """对数据进行对齐处理"""
     if kdata.empty:
@@ -518,7 +501,6 @@ def align_and_process_data(kdata, freq='D', method='ffill'):
         reindexed_data = reindexed_data.fillna(method=method)
 
     return reindexed_data
-
 
 @retry_on_failure(max_retries=3)
 def fetch_fundamental_data_akshare(stock_code: str, use_cache: bool = True) -> pd.DataFrame:
@@ -564,7 +546,6 @@ def fetch_fundamental_data_akshare(stock_code: str, use_cache: bool = True) -> p
     except Exception as e:
         logger.info(f"akshare获取财务数据失败: {str(e)}")
         return pd.DataFrame()
-
 
 def generate_quality_report(df: pd.DataFrame, context: str = "数据质量") -> Dict[str, Any]:
     """

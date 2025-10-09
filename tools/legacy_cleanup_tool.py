@@ -20,7 +20,6 @@ import importlib.util
 
 from loguru import logger
 
-
 class LegacyCleanupTool:
     """传统代码清理工具"""
     
@@ -592,7 +591,6 @@ if __name__ == "__main__":
         logger.info(f"生成验证脚本: {script_path}")
         return str(script_path)
 
-
 def main():
     """主函数 - 命令行接口"""
     import argparse
@@ -662,7 +660,6 @@ def main():
     except Exception as e:
         logger.error(f"清理失败: {e}")
         return 1
-
 
 if __name__ == "__main__":
     exit(main())

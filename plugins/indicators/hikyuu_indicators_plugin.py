@@ -27,7 +27,6 @@ from core.indicator_extensions import (
 
 logger = logger
 
-
 class HikyuuIndicatorsPlugin(IIndicatorPlugin):
     """
     HIkyuu指标插件

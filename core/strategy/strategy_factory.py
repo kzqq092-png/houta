@@ -17,7 +17,6 @@ from .base_strategy import BaseStrategy, StrategyParameter
 from .strategy_registry import StrategyRegistry
 from .strategy_database import get_strategy_database_manager
 
-
 class StrategyFactory:
     """策略工厂 - 统一的策略创建和管理"""
 
@@ -636,11 +635,9 @@ class StrategyFactory:
         with self._lock:
             return iter(self._instances.values())
 
-
 # 全局策略工厂实例
 _strategy_factory: Optional[StrategyFactory] = None
 _factory_lock = threading.RLock()
-
 
 def get_strategy_factory() -> StrategyFactory:
     """获取全局策略工厂实例
@@ -657,7 +654,6 @@ def get_strategy_factory() -> StrategyFactory:
             _strategy_factory = StrategyFactory(registry)
 
         return _strategy_factory
-
 
 def initialize_strategy_factory(registry: StrategyRegistry = None) -> StrategyFactory:
     """初始化策略工厂
@@ -678,7 +674,6 @@ def initialize_strategy_factory(registry: StrategyRegistry = None) -> StrategyFa
         return _strategy_factory
 
 # 模块级别的便捷函数，用于向后兼容
-
 
 def create_strategy(strategy_name: str, instance_name: str = None, **kwargs) -> Optional[BaseStrategy]:
     """创建策略实例的便捷函数

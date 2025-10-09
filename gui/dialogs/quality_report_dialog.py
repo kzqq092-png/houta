@@ -35,7 +35,6 @@ try:
 except ImportError:
     PLOTLY_AVAILABLE = False
 
-
 class QualityReportDialog(QDialog):
     """数据质量报告对话框"""
 
@@ -472,12 +471,10 @@ class QualityReportDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "导出失败", f"导出失败: {str(e)}")
 
-
 def show_quality_report_dialog(reports: List[Dict[str, Any]], parent=None):
     """显示数据质量报告对话框"""
     dialog = QualityReportDialog(reports, parent)
     dialog.exec_()
-
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

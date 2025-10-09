@@ -20,7 +20,6 @@ from core.performance import measure_performance
 
 logger = logger
 
-
 class ProcessingPriority(Enum):
     """处理优先级"""
     CRITICAL = 1    # 关键数据（K线主图）
@@ -28,7 +27,6 @@ class ProcessingPriority(Enum):
     NORMAL = 3      # 普通优先级（主要指标）
     LOW = 4         # 低优先级（次要指标）
     BACKGROUND = 5  # 后台处理（装饰元素）
-
 
 @dataclass
 class ProcessingTask:
@@ -43,7 +41,6 @@ class ProcessingTask:
     def __post_init__(self):
         if self.created_time is None:
             self.created_time = time.time()
-
 
 class AsyncDataProcessor:
     """异步数据处理器"""
@@ -418,10 +415,8 @@ class AsyncDataProcessor:
             logger.warning("数组并行处理无有效结果")
             return np.array([])
 
-
 # 全局异步处理器实例
 _global_processor = None
-
 
 def get_async_processor() -> AsyncDataProcessor:
     """获取全局异步处理器实例"""
@@ -430,7 +425,6 @@ def get_async_processor() -> AsyncDataProcessor:
         _global_processor = AsyncDataProcessor()
         _global_processor.start()
     return _global_processor
-
 
 def initialize_processor(max_workers: int = None, enable_monitoring: bool = True):
     """初始化全局处理器"""
@@ -441,7 +435,6 @@ def initialize_processor(max_workers: int = None, enable_monitoring: bool = True
     _global_processor = AsyncDataProcessor(max_workers, enable_monitoring)
     _global_processor.start()
 
-
 def shutdown_processor():
     """关闭全局处理器"""
     global _global_processor
@@ -451,13 +444,11 @@ def shutdown_processor():
 
 # 便捷函数
 
-
 def submit_task(task_id: str, data: Any, processor: Callable,
                 priority: ProcessingPriority = ProcessingPriority.NORMAL,
                 callback: Optional[Callable] = None) -> bool:
     """提交任务到全局处理器"""
     return get_async_processor().submit_task(task_id, data, processor, priority, callback)
-
 
 def process_dataframe_async(df: pd.DataFrame, processor: Callable,
                             chunk_size: int = 1000,
@@ -465,13 +456,11 @@ def process_dataframe_async(df: pd.DataFrame, processor: Callable,
     """异步处理DataFrame"""
     return get_async_processor().process_dataframe_chunks(df, processor, chunk_size, priority)
 
-
 def process_array_async(data: np.ndarray, processor: Callable,
                         num_splits: int = None,
                         priority: ProcessingPriority = ProcessingPriority.NORMAL) -> np.ndarray:
     """异步处理数组"""
     return get_async_processor().process_array_parallel(data, processor, num_splits, priority)
-
 
 # 导出接口
 __all__ = [

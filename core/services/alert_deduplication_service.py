@@ -1,21 +1,30 @@
-from loguru import logger
 """
 告警去重服务
 
-防止重复告警，提供智能告警管理
+提供告警消息去重、聚合和管理功能，避免重复告警对系统造成干扰。
+支持基于时间窗口、消息内容、告警级别等多种去重策略。
+
+作者: FactorWeave-Quant团队
+版本: 1.0
+日期: 2025-09-29
 """
 
+import threading
 import time
-from typing import Dict, List, Optional, Set
 from datetime import datetime, timedelta
-from dataclasses import dataclass
+from typing import Dict, List, Optional, Set, Tuple, Any
+from dataclasses import dataclass, field
 from enum import Enum
+from collections import defaultdict, deque
+import hashlib
+import json
 
-logger = logger
+from loguru import logger
 
 
 class AlertLevel(Enum):
     """告警级别"""
+    DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -26,205 +35,393 @@ class AlertLevel(Enum):
 class AlertMessage:
     """告警消息"""
     id: str
-    timestamp: datetime
     level: AlertLevel
     category: str
     message: str
-    metric_name: str
-    current_value: float
-    threshold_value: float
-    recommendation: str = ""
+    source: str
+    timestamp: datetime = field(default_factory=datetime.now)
+    metadata: Dict[str, Any] = field(default_factory=dict)
     is_resolved: bool = False
-    resolved_timestamp: Optional[datetime] = None
+    resolution_time: Optional[datetime] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            "id": self.id,
+            "level": self.level.value,
+            "category": self.category,
+            "message": self.message,
+            "source": self.source,
+            "timestamp": self.timestamp.isoformat(),
+            "metadata": self.metadata,
+            "is_resolved": self.is_resolved,
+            "resolution_time": self.resolution_time.isoformat() if self.resolution_time else None
+        }
+
+    def get_fingerprint(self) -> str:
+        """获取告警指纹用于去重"""
+        content = f"{self.category}:{self.message}:{self.source}"
+        return hashlib.md5(content.encode()).hexdigest()
+
+
+class DeduplicationStrategy(Enum):
+    """去重策略"""
+    TIME_WINDOW = "time_window"      # 时间窗口去重
+    CONTENT_HASH = "content_hash"    # 内容哈希去重
+    LEVEL_BASED = "level_based"      # 基于级别去重
+    HYBRID = "hybrid"                # 混合策略
+
+
+@dataclass
+class DeduplicationConfig:
+    """去重配置"""
+    strategy: DeduplicationStrategy = DeduplicationStrategy.HYBRID
+    time_window_minutes: int = 5
+    max_duplicates: int = 10
+    level_weights: Dict[AlertLevel, float] = field(default_factory=lambda: {
+        AlertLevel.DEBUG: 0.1,
+        AlertLevel.INFO: 0.3,
+        AlertLevel.WARNING: 0.5,
+        AlertLevel.ERROR: 0.8,
+        AlertLevel.CRITICAL: 1.0
+    })
 
 
 class AlertDeduplicationService:
-    """告警去重服务"""
+    """
+    告警去重服务
 
-    def __init__(self, dedup_window_minutes: int = 5, max_history_size: int = 1000):
+    提供智能的告警去重功能，避免重复告警对系统造成干扰。
+    支持多种去重策略和配置选项。
+    """
+
+    def __init__(self, config: DeduplicationConfig = None):
         """
         初始化告警去重服务
 
         Args:
-            dedup_window_minutes: 去重时间窗口（分钟）
-            max_history_size: 最大历史记录数量
+            config: 去重配置
         """
-        self.dedup_window = timedelta(minutes=dedup_window_minutes)
-        self.max_history_size = max_history_size
+        self.config = config or DeduplicationConfig()
+        self.logger = logger.bind(module="AlertDeduplicationService")
 
-        # 告警历史和去重缓存
-        self.alert_history: List[AlertMessage] = []
-        self.active_alerts: Dict[str, AlertMessage] = {}  # 活跃告警
-        self.suppressed_alerts: Set[str] = set()  # 被抑制的告警ID
+        # 告警存储
+        self._alerts: Dict[str, AlertMessage] = {}
+        self._alert_history: deque = deque(maxlen=10000)
+        self._fingerprint_cache: Dict[str, List[str]] = defaultdict(list)
 
-        # 统计信息
-        self.stats = {
-            'total_alerts': 0,
-            'suppressed_alerts': 0,
-            'resolved_alerts': 0,
-            'active_alerts': 0
+        # 去重统计
+        self._dedup_stats = {
+            "total_alerts": 0,
+            "deduplicated_alerts": 0,
+            "active_alerts": 0,
+            "resolved_alerts": 0
         }
 
-    def process_alert(self, alert: AlertMessage) -> bool:
+        # 线程安全
+        self._lock = threading.RLock()
+
+        # 清理定时器
+        self._cleanup_timer = None
+        self._start_cleanup_timer()
+
+        self.logger.info("告警去重服务初始化完成")
+
+    def process_alert(self, level: AlertLevel, category: str, message: str,
+                      source: str, metadata: Dict[str, Any] = None) -> Optional[AlertMessage]:
         """
-        处理告警消息，进行去重检查
+        处理告警消息
 
         Args:
-            alert: 告警消息
+            level: 告警级别
+            category: 告警类别
+            message: 告警消息
+            source: 告警源
+            metadata: 元数据
 
         Returns:
-            是否应该发送告警（True=发送，False=抑制）
+            AlertMessage: 如果是新告警则返回告警对象，如果被去重则返回None
         """
-        try:
-            self.stats['total_alerts'] += 1
+        with self._lock:
+            # 创建告警消息
+            alert_id = self._generate_alert_id(level, category, message, source)
+            alert = AlertMessage(
+                id=alert_id,
+                level=level,
+                category=category,
+                message=message,
+                source=source,
+                metadata=metadata or {}
+            )
 
-            # 生成告警唯一标识
-            alert_key = self._generate_alert_key(alert)
-            alert.id = alert_key
+            # 检查是否需要去重
+            if self._should_deduplicate(alert):
+                self._dedup_stats["deduplicated_alerts"] += 1
+                self.logger.debug(f"告警被去重: {alert.id}")
+                return None
 
-            # 检查是否在去重窗口内
-            if self._is_duplicate_alert(alert_key, alert.timestamp):
-                self.stats['suppressed_alerts'] += 1
-                self.suppressed_alerts.add(alert_key)
-                logger.debug(f"告警被去重抑制: {alert.message}")
-                return False
+            # 存储告警
+            self._alerts[alert.id] = alert
+            self._alert_history.append(alert)
+            self._update_fingerprint_cache(alert)
 
-            # 检查是否是告警恢复
-            if self._is_alert_recovery(alert):
-                self._handle_alert_recovery(alert)
-                return True
+            # 更新统计
+            self._dedup_stats["total_alerts"] += 1
+            self._dedup_stats["active_alerts"] += 1
 
-            # 添加到活跃告警
-            self.active_alerts[alert_key] = alert
-            self.stats['active_alerts'] = len(self.active_alerts)
+            self.logger.info(f"新告警: {alert.level.value} - {alert.category} - {alert.message}")
+            return alert
 
-            # 添加到历史记录
-            self.alert_history.append(alert)
-            self._cleanup_old_history()
-
-            logger.info(f"新告警: {alert.level.value} - {alert.message}")
-            return True
-
-        except Exception as e:
-            logger.error(f"处理告警失败: {e}")
-            return True  # 出错时默认发送告警
-
-    def resolve_alert(self, alert_key: str) -> bool:
+    def resolve_alert(self, alert_id: str) -> bool:
         """
         解决告警
 
         Args:
-            alert_key: 告警唯一标识
+            alert_id: 告警ID
 
         Returns:
-            是否成功解决
+            bool: 是否成功解决
         """
-        try:
-            if alert_key in self.active_alerts:
-                alert = self.active_alerts[alert_key]
+        with self._lock:
+            if alert_id in self._alerts:
+                alert = self._alerts[alert_id]
                 alert.is_resolved = True
-                alert.resolved_timestamp = datetime.now()
+                alert.resolution_time = datetime.now()
 
-                # 从活跃告警中移除
-                del self.active_alerts[alert_key]
-                self.stats['resolved_alerts'] += 1
-                self.stats['active_alerts'] = len(self.active_alerts)
+                self._dedup_stats["active_alerts"] -= 1
+                self._dedup_stats["resolved_alerts"] += 1
 
-                logger.info(f"告警已解决: {alert.message}")
+                self.logger.info(f"告警已解决: {alert_id}")
                 return True
 
             return False
 
-        except Exception as e:
-            logger.error(f"解决告警失败: {e}")
-            return False
+    def get_active_alerts(self, level: AlertLevel = None,
+                          category: str = None) -> List[AlertMessage]:
+        """
+        获取活跃告警
 
-    def get_active_alerts(self) -> List[AlertMessage]:
-        """获取活跃告警列表"""
-        return list(self.active_alerts.values())
+        Args:
+            level: 过滤级别
+            category: 过滤类别
+
+        Returns:
+            List[AlertMessage]: 活跃告警列表
+        """
+        with self._lock:
+            alerts = [alert for alert in self._alerts.values() if not alert.is_resolved]
+
+            if level:
+                alerts = [alert for alert in alerts if alert.level == level]
+
+            if category:
+                alerts = [alert for alert in alerts if alert.category == category]
+
+            return sorted(alerts, key=lambda x: x.timestamp, reverse=True)
 
     def get_alert_history(self, hours: int = 24) -> List[AlertMessage]:
         """
         获取告警历史
 
         Args:
-            hours: 获取最近多少小时的历史
+            hours: 历史时间范围（小时）
 
         Returns:
-            告警历史列表
+            List[AlertMessage]: 历史告警列表
         """
         cutoff_time = datetime.now() - timedelta(hours=hours)
-        return [alert for alert in self.alert_history if alert.timestamp >= cutoff_time]
 
-    def get_statistics(self) -> Dict[str, int]:
-        """获取统计信息"""
-        return self.stats.copy()
+        with self._lock:
+            history = [alert for alert in self._alert_history
+                       if alert.timestamp >= cutoff_time]
 
-    def clear_history(self):
-        """清空历史记录"""
-        self.alert_history.clear()
-        self.suppressed_alerts.clear()
-        logger.info("告警历史已清空")
+            return sorted(history, key=lambda x: x.timestamp, reverse=True)
 
-    def _generate_alert_key(self, alert: AlertMessage) -> str:
-        """生成告警唯一标识"""
-        return f"{alert.category}_{alert.metric_name}_{alert.level.value}"
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        获取去重统计信息
 
-    def _is_duplicate_alert(self, alert_key: str, timestamp: datetime) -> bool:
-        """检查是否是重复告警"""
-        if alert_key in self.active_alerts:
-            last_alert = self.active_alerts[alert_key]
-            time_diff = timestamp - last_alert.timestamp
-            return time_diff < self.dedup_window
+        Returns:
+            Dict[str, Any]: 统计信息
+        """
+        with self._lock:
+            stats = self._dedup_stats.copy()
+
+            # 计算去重率
+            total = stats["total_alerts"] + stats["deduplicated_alerts"]
+            if total > 0:
+                stats["deduplication_rate"] = stats["deduplicated_alerts"] / total
+            else:
+                stats["deduplication_rate"] = 0.0
+
+            # 添加级别分布
+            level_distribution = defaultdict(int)
+            for alert in self._alerts.values():
+                level_distribution[alert.level.value] += 1
+
+            stats["level_distribution"] = dict(level_distribution)
+
+            return stats
+
+    def _should_deduplicate(self, alert: AlertMessage) -> bool:
+        """
+        判断是否应该去重
+
+        Args:
+            alert: 告警消息
+
+        Returns:
+            bool: 是否应该去重
+        """
+        if self.config.strategy == DeduplicationStrategy.TIME_WINDOW:
+            return self._check_time_window_dedup(alert)
+        elif self.config.strategy == DeduplicationStrategy.CONTENT_HASH:
+            return self._check_content_hash_dedup(alert)
+        elif self.config.strategy == DeduplicationStrategy.LEVEL_BASED:
+            return self._check_level_based_dedup(alert)
+        elif self.config.strategy == DeduplicationStrategy.HYBRID:
+            return self._check_hybrid_dedup(alert)
+
         return False
 
-    def _is_alert_recovery(self, alert: AlertMessage) -> bool:
-        """检查是否是告警恢复"""
-        # 如果当前值回到正常范围，认为是恢复
-        if alert.level == AlertLevel.INFO and "恢复" in alert.message:
-            return True
+    def _check_time_window_dedup(self, alert: AlertMessage) -> bool:
+        """时间窗口去重检查"""
+        fingerprint = alert.get_fingerprint()
+        cutoff_time = datetime.now() - timedelta(minutes=self.config.time_window_minutes)
 
-        # 检查阈值恢复
-        alert_key = self._generate_alert_key(alert)
-        if alert_key in self.active_alerts:
-            if alert.current_value < alert.threshold_value:
+        # 检查相同指纹的告警
+        similar_alerts = [
+            existing_alert for existing_alert in self._alerts.values()
+            if (existing_alert.get_fingerprint() == fingerprint and
+                existing_alert.timestamp >= cutoff_time and
+                not existing_alert.is_resolved)
+        ]
+
+        return len(similar_alerts) >= self.config.max_duplicates
+
+    def _check_content_hash_dedup(self, alert: AlertMessage) -> bool:
+        """内容哈希去重检查"""
+        fingerprint = alert.get_fingerprint()
+
+        # 检查是否存在相同指纹的活跃告警
+        for existing_alert in self._alerts.values():
+            if (existing_alert.get_fingerprint() == fingerprint and
+                    not existing_alert.is_resolved):
                 return True
 
         return False
 
-    def _handle_alert_recovery(self, alert: AlertMessage):
-        """处理告警恢复"""
-        alert_key = self._generate_alert_key(alert)
-        if alert_key in self.active_alerts:
-            self.resolve_alert(alert_key)
-            logger.info(f"告警已自动恢复: {alert.message}")
+    def _check_level_based_dedup(self, alert: AlertMessage) -> bool:
+        """基于级别的去重检查"""
+        # 高级别告警不去重
+        if alert.level in [AlertLevel.ERROR, AlertLevel.CRITICAL]:
+            return False
 
-    def _cleanup_old_history(self):
-        """清理旧的历史记录"""
-        if len(self.alert_history) > self.max_history_size:
-            # 保留最新的记录
-            self.alert_history = self.alert_history[-self.max_history_size:]
+        # 低级别告警更容易被去重
+        fingerprint = alert.get_fingerprint()
+        level_weight = self.config.level_weights.get(alert.level, 0.5)
+        max_allowed = int(self.config.max_duplicates * level_weight)
 
-        # 清理过期的活跃告警（超过1小时未更新）
-        cutoff_time = datetime.now() - timedelta(hours=1)
-        expired_keys = [
-            key for key, alert in self.active_alerts.items()
-            if alert.timestamp < cutoff_time
-        ]
+        similar_count = sum(1 for existing_alert in self._alerts.values()
+                            if (existing_alert.get_fingerprint() == fingerprint and
+                                not existing_alert.is_resolved))
 
-        for key in expired_keys:
-            del self.active_alerts[key]
+        return similar_count >= max_allowed
 
-        self.stats['active_alerts'] = len(self.active_alerts)
+    def _check_hybrid_dedup(self, alert: AlertMessage) -> bool:
+        """混合策略去重检查"""
+        # 结合时间窗口和级别策略
+        return (self._check_time_window_dedup(alert) or
+                self._check_level_based_dedup(alert))
+
+    def _generate_alert_id(self, level: AlertLevel, category: str,
+                           message: str, source: str) -> str:
+        """生成告警ID"""
+        content = f"{level.value}:{category}:{message}:{source}:{time.time()}"
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
+
+    def _update_fingerprint_cache(self, alert: AlertMessage) -> None:
+        """更新指纹缓存"""
+        fingerprint = alert.get_fingerprint()
+        self._fingerprint_cache[fingerprint].append(alert.id)
+
+        # 限制缓存大小
+        if len(self._fingerprint_cache[fingerprint]) > 100:
+            self._fingerprint_cache[fingerprint] = self._fingerprint_cache[fingerprint][-50:]
+
+    def _start_cleanup_timer(self) -> None:
+        """启动清理定时器"""
+        def cleanup():
+            self._cleanup_expired_alerts()
+            # 重新设置定时器
+            self._cleanup_timer = threading.Timer(300, cleanup)  # 5分钟清理一次
+            self._cleanup_timer.daemon = True
+            self._cleanup_timer.start()
+
+        self._cleanup_timer = threading.Timer(300, cleanup)
+        self._cleanup_timer.daemon = True
+        self._cleanup_timer.start()
+
+    def _cleanup_expired_alerts(self) -> None:
+        """清理过期告警"""
+        with self._lock:
+            cutoff_time = datetime.now() - timedelta(hours=24)
+            expired_ids = []
+
+            for alert_id, alert in self._alerts.items():
+                if alert.timestamp < cutoff_time and alert.is_resolved:
+                    expired_ids.append(alert_id)
+
+            for alert_id in expired_ids:
+                del self._alerts[alert_id]
+
+            if expired_ids:
+                self.logger.info(f"清理了 {len(expired_ids)} 个过期告警")
+
+    def dispose(self) -> None:
+        """清理资源"""
+        if self._cleanup_timer:
+            self._cleanup_timer.cancel()
+
+        self.logger.info("告警去重服务已停止")
 
 
 # 全局服务实例
-_alert_deduplication_service = None
+_alert_deduplication_service: Optional[AlertDeduplicationService] = None
 
 
-def get_alert_deduplication_service() -> AlertDeduplicationService:
-    """获取告警去重服务实例"""
+def get_alert_deduplication_service(config: DeduplicationConfig = None) -> AlertDeduplicationService:
+    """
+    获取告警去重服务的全局实例
+
+    Args:
+        config: 去重配置
+
+    Returns:
+        AlertDeduplicationService: 服务实例
+    """
     global _alert_deduplication_service
+
     if _alert_deduplication_service is None:
-        _alert_deduplication_service = AlertDeduplicationService()
+        _alert_deduplication_service = AlertDeduplicationService(config)
+
+    return _alert_deduplication_service
+
+
+def initialize_alert_deduplication_service(config: DeduplicationConfig = None) -> AlertDeduplicationService:
+    """
+    初始化告警去重服务
+
+    Args:
+        config: 去重配置
+
+    Returns:
+        AlertDeduplicationService: 服务实例
+    """
+    global _alert_deduplication_service
+
+    if _alert_deduplication_service is not None:
+        _alert_deduplication_service.dispose()
+
+    _alert_deduplication_service = AlertDeduplicationService(config)
     return _alert_deduplication_service

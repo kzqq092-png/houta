@@ -72,7 +72,7 @@ class UnifiedTableNameGenerator:
         },
         'plugin_name': {
             'examples.akshare_stock_plugin': 'examples_akshare_stock_plugin',
-            'examples.eastmoney_stock_plugin': 'examples_eastmoney_stock_plugin',
+            'data_sources.eastmoney_plugin': 'data_sources_eastmoney_plugin',
             'examples.sina_stock_plugin': 'examples_sina_stock_plugin',
             'examples.tongdaxin_stock_plugin': 'examples_tongdaxin_stock_plugin'
         },

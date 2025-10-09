@@ -16,7 +16,6 @@ try:
 except ImportError:
     talib = None
 
-
 class WaveAnalyzer:
     """Wave analysis tools for trading system"""
 

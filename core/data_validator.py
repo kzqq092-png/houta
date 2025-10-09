@@ -13,6 +13,7 @@ from enum import Enum
 from dataclasses import dataclass
 import warnings
 # 纯Loguru架构，移除旧的日志导入
+
 class ValidationLevel(Enum):
     """验证级别枚举"""
     BASIC = "basic"          # 基础验证
@@ -148,8 +149,7 @@ class ProfessionalDataValidator:
             # 记录验证结果
             logger.info(
                 f"K线数据验证完成 - 股票: {stock_code}, 质量分数: {quality_score:.2f}, "
-                f"等级: {quality_level.value}, 错误: {len(errors)}, 警告: {len(warnings)}",
-                LogLevel.INFO
+                f"等级: {quality_level.value}, 错误: {len(errors)}, 警告: {len(warnings)}"
             )
 
             return ValidationResult(
@@ -426,7 +426,11 @@ def create_data_validator(validation_level: ValidationLevel = ValidationLevel.PR
     """
     return ProfessionalDataValidator(validation_level=validation_level)
 
+# 创建别名以保持向后兼容
+DataValidator = ProfessionalDataValidator
+
 # 便捷函数
+
 def validate_kline_data(data: pd.DataFrame, stock_code: str = None) -> ValidationResult:
     """
     快速验证K线数据

@@ -36,7 +36,6 @@ FACTOR_LABELS = {
     'sharpe': '夏普比率'
 }
 
-
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
         try:
@@ -46,12 +45,10 @@ def load_settings():
             return DEFAULT_SETTINGS.copy()
     return DEFAULT_SETTINGS.copy()
 
-
 def save_settings(settings):
     os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
     with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(settings, f, ensure_ascii=False, indent=2)
-
 
 class IntervalStatSettingsDialog(QDialog):
     def __init__(self, parent=None):

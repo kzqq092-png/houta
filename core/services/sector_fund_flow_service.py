@@ -93,19 +93,19 @@ class SectorFundFlowService(QObject):
     def initialize(self) -> bool:
         """初始化服务"""
         try:
-            logger.info(" 初始化板块资金流服务...")
+            logger.info("初始化板块资金流服务...")
             import time
             start_time = time.time()
 
             # 检查数据管理器
-            logger.info(" 检查数据管理器状态...")
+            logger.info("检查数据管理器状态...")
             if self.data_manager:
-                logger.info(" 数据管理器可用")
+                logger.info("数据管理器可用")
             else:
-                logger.warning(" 数据管理器不可用")
+                logger.warning("数据管理器不可用")
 
             # 启动自动刷新
-            logger.info(" 配置自动刷新设置...")
+            logger.info("配置自动刷新设置...")
             if self.config.enable_auto_refresh:
                 refresh_start = time.time()
                 self._start_auto_refresh()
@@ -129,7 +129,7 @@ class SectorFundFlowService(QObject):
     def cleanup(self) -> None:
         """清理服务资源"""
         try:
-            logger.info(" 清理板块资金流服务...")
+            logger.info("清理板块资金流服务...")
 
             # 停止自动刷新
             self._refresh_timer.stop()
@@ -142,7 +142,7 @@ class SectorFundFlowService(QObject):
                 self._cache.clear()
                 self._cache_timestamps.clear()
 
-            logger.info(" 板块资金流服务清理完成")
+            logger.info("板块资金流服务清理完成")
 
         except Exception as e:
             logger.error(f" 清理板块资金流服务失败: {e}")
@@ -165,7 +165,7 @@ class SectorFundFlowService(QObject):
                 logger.info(f"📦 使用缓存的板块资金流排行数据: {indicator}")
                 return self._get_from_cache(cache_key)
 
-            logger.info(f"🔄 获取板块资金流排行数据: {indicator}")
+            logger.info(f"获取板块资金流排行数据: {indicator}")
 
             # 使用智能数据源选择获取数据
             df = self._get_data_with_smart_routing(indicator)
@@ -177,16 +177,16 @@ class SectorFundFlowService(QObject):
                 # 更新缓存
                 self._update_cache(cache_key, df)
 
-                logger.info(f"✅ 板块资金流排行数据获取成功: {len(df)} 条记录")
+                logger.info(f"板块资金流排行数据获取成功: {len(df)} 条记录")
                 self.data_updated.emit({'type': 'sector_flow_rank', 'data': df})
 
                 return df
             else:
-                logger.warning("⚠️ 未获取到板块资金流排行数据")
+                logger.warning("未获取到板块资金流排行数据")
                 return pd.DataFrame()
 
         except Exception as e:
-            logger.error(f"❌ 获取板块资金流排行失败: {e}")
+            logger.error(f"[ERROR] 获取板块资金流排行失败: {e}")
             self.error_occurred.emit(f"获取板块资金流排行失败: {str(e)}")
             return pd.DataFrame()
 
@@ -339,7 +339,7 @@ class SectorFundFlowService(QObject):
         with self._cache_lock:
             self._cache.clear()
             self._cache_timestamps.clear()
-        logger.info(" 缓存已清理")
+        logger.info("缓存已清理")
 
     def _start_auto_refresh(self) -> None:
         """启动自动刷新"""
@@ -351,7 +351,7 @@ class SectorFundFlowService(QObject):
     def _auto_refresh(self) -> None:
         """自动刷新数据（后台线程执行，避免阻塞UI线程）"""
         try:
-            logger.info("⏰ 调度自动刷新任务...")
+            logger.info("[TIME] 调度自动刷新任务...")
             # 将实际刷新任务放入线程池，避免在Qt定时器回调（主线程）中执行重IO/CPU工作
             self._executor.submit(self._run_auto_refresh_task)
         except Exception as e:
@@ -368,7 +368,7 @@ class SectorFundFlowService(QObject):
     def _detect_optimal_data_sources(self) -> None:
         """智能检测板块资金流数据的最优数据源"""
         try:
-            logger.info("🔍 开始检测板块资金流数据源...")
+            logger.info("开始检测板块资金流数据源...")
 
             # 重置数据源注册表
             self._available_sources.clear()
@@ -376,11 +376,11 @@ class SectorFundFlowService(QObject):
 
             # 1. 检查TET框架可用性
             if hasattr(self.data_manager, 'tet_enabled') and self.data_manager.tet_enabled:
-                logger.info("✅ TET框架可用，检测插件化数据源...")
+                logger.info("TET框架可用，检测插件化数据源...")
                 self._detect_tet_data_sources()
 
             # 2. 检查传统数据源
-            logger.info("🔍 检测传统数据源...")
+            logger.info("检测传统数据源...")
             self._detect_legacy_data_sources()
 
             # 3. 根据健康状态和功能支持排序
@@ -390,7 +390,7 @@ class SectorFundFlowService(QObject):
             self._log_detection_results()
 
         except Exception as e:
-            logger.error(f"❌ 数据源检测失败: {e}")
+            logger.error(f"[ERROR] 数据源检测失败: {e}")
             # 设置默认的降级方案
             self._set_fallback_sources()
 
@@ -398,7 +398,7 @@ class SectorFundFlowService(QObject):
         """检测TET框架中支持SECTOR_FUND_FLOW的数据源"""
         try:
             if not (hasattr(self.data_manager, 'tet_pipeline') and self.data_manager.tet_pipeline):
-                logger.warning("⚠️ TET管道不可用")
+                logger.warning("TET管道不可用")
                 return
 
             from ..plugin_types import DataType
@@ -408,8 +408,20 @@ class SectorFundFlowService(QObject):
             if hasattr(tet_pipeline, 'router') and tet_pipeline.router:
                 router = tet_pipeline.router
 
+                # 创建路由请求对象用于获取可用数据源
+                from core.data_source_router import RoutingRequest
+                from core.plugin_types import AssetType, DataType
+
+                routing_request = RoutingRequest(
+                    asset_type=AssetType.STOCK,
+                    data_type=DataType.SECTOR_FUND_FLOW,
+                    symbol="",  # 板块资金流不需要具体股票代码
+                    priority=0,
+                    timeout_ms=5000
+                )
+
                 # 检查每个注册的数据源
-                for source_id in router.get_available_sources():
+                for source_id in router.get_available_sources(routing_request):
                     try:
                         # 检查是否支持SECTOR_FUND_FLOW
                         supports_fund_flow = self._check_source_supports_fund_flow(source_id, router)
@@ -421,14 +433,14 @@ class SectorFundFlowService(QObject):
                                 'supports_fund_flow': True,
                                 'router': router
                             }
-                            logger.info(f"✅ 发现TET数据源: {source_id} (健康度: {health_score:.2f})")
+                            logger.info(f"发现TET数据源: {source_id} (健康度: {health_score:.2f})")
                         else:
                             logger.debug(f"🔶 数据源 {source_id} 不支持板块资金流")
                     except Exception as e:
-                        logger.warning(f"⚠️ 检测数据源 {source_id} 失败: {e}")
+                        logger.warning(f" 检测数据源 {source_id} 失败: {e}")
 
         except Exception as e:
-            logger.error(f"❌ TET数据源检测失败: {e}")
+            logger.error(f"[ERROR] TET数据源检测失败: {e}")
 
     def _detect_legacy_data_sources(self) -> None:
         """检测传统数据源的板块资金流支持"""
@@ -448,11 +460,11 @@ class SectorFundFlowService(QObject):
                                     'supports_fund_flow': True,
                                     'instance': source_instance
                                 }
-                                logger.info(f"✅ 发现传统数据源: {source_id} (健康度: {health_score:.2f})")
+                                logger.info(f"发现传统数据源: {source_id} (健康度: {health_score:.2f})")
                             else:
                                 logger.debug(f"🔶 传统数据源 {source_id} 不支持板块资金流")
                         except Exception as e:
-                            logger.warning(f"⚠️ 检测传统数据源 {source_id} 失败: {e}")
+                            logger.warning(f" 检测传统数据源 {source_id} 失败: {e}")
 
             # 特别检查HIkyuu（明确标注不支持板块资金流）
             if 'hikyuu' in self._available_sources:
@@ -461,7 +473,7 @@ class SectorFundFlowService(QObject):
                 logger.info("ℹ️ HIkyuu数据源：专注K线数据，不适用于板块资金流")
 
         except Exception as e:
-            logger.error(f"❌ 传统数据源检测失败: {e}")
+            logger.error(f"[ERROR] 传统数据源检测失败: {e}")
 
     def _check_source_supports_fund_flow(self, source_id: str, router) -> bool:
         """检查TET数据源是否支持板块资金流"""
@@ -590,12 +602,12 @@ class SectorFundFlowService(QObject):
             self._optimal_sources = [source_id for source_id, _ in sorted_sources]
 
         except Exception as e:
-            logger.error(f"❌ 数据源排序失败: {e}")
+            logger.error(f"[ERROR] 数据源排序失败: {e}")
 
     def _log_detection_results(self) -> None:
         """输出数据源检测结果"""
         try:
-            logger.info("📊 板块资金流数据源检测结果:")
+            logger.info("板块资金流数据源检测结果:")
             logger.info(f"   总计发现数据源: {len(self._available_sources)} 个")
 
             fund_flow_count = sum(1 for info in self._available_sources.values()
@@ -603,25 +615,25 @@ class SectorFundFlowService(QObject):
             logger.info(f"   支持板块资金流: {fund_flow_count} 个")
 
             if self._optimal_sources:
-                logger.info("🏆 推荐数据源优先级排序:")
+                logger.info("[AWARD] 推荐数据源优先级排序:")
                 for i, source_id in enumerate(self._optimal_sources[:3], 1):
                     info = self._available_sources[source_id]
                     logger.info(f"   {i}. {source_id} (健康度: {info['health_score']:.2f}, 类型: {info['type']})")
 
                 # 设置当前最优数据源
                 self._current_source = self._optimal_sources[0]
-                logger.info(f"✅ 自动选择最优数据源: {self._current_source}")
+                logger.info(f"自动选择最优数据源: {self._current_source}")
             else:
-                logger.warning("⚠️ 未发现支持板块资金流的数据源，将使用模拟数据")
+                logger.warning("未发现支持板块资金流的数据源，将使用模拟数据")
                 self._current_source = "mock"
 
         except Exception as e:
-            logger.error(f"❌ 输出检测结果失败: {e}")
+            logger.error(f"[ERROR] 输出检测结果失败: {e}")
 
     def _set_fallback_sources(self) -> None:
         """设置降级数据源方案"""
         try:
-            logger.warning("🔄 设置降级数据源方案...")
+            logger.warning("设置降级数据源方案...")
 
             # 尝试默认的降级顺序
             fallback_order = ['akshare', 'eastmoney', 'mock']
@@ -631,7 +643,7 @@ class SectorFundFlowService(QObject):
                 if hasattr(self.data_manager, '_data_sources'):
                     if source_id in self.data_manager._data_sources:
                         self._current_source = source_id
-                        logger.info(f"✅ 降级使用数据源: {source_id}")
+                        logger.info(f"降级使用数据源: {source_id}")
                         return
 
             # 最终降级到模拟模式
@@ -639,7 +651,7 @@ class SectorFundFlowService(QObject):
             logger.info("ℹ️ 降级到模拟数据模式")
 
         except Exception as e:
-            logger.error(f"❌ 设置降级方案失败: {e}")
+            logger.error(f"[ERROR] 设置降级方案失败: {e}")
             self._current_source = "mock"
 
     def _get_data_with_smart_routing(self, indicator: str = "今日") -> pd.DataFrame:
@@ -653,7 +665,7 @@ class SectorFundFlowService(QObject):
             return self._try_optimal_legacy_sources(indicator)
 
         except Exception as e:
-            logger.error(f"❌ 智能路由获取数据失败: {e}")
+            logger.error(f"[ERROR] 智能路由获取数据失败: {e}")
             return pd.DataFrame()
 
     def _try_tet_data_acquisition(self, indicator: str) -> Optional[pd.DataFrame]:
@@ -666,7 +678,7 @@ class SectorFundFlowService(QObject):
             if not (hasattr(self.data_manager, 'tet_pipeline') and self.data_manager.tet_pipeline):
                 return None
 
-            logger.info("🔄 通过TET框架智能路由获取板块资金流数据...")
+            logger.info("通过TET框架智能路由获取板块资金流数据...")
 
             from ..plugin_types import AssetType, DataType
             from ..tet_data_pipeline import StandardQuery
@@ -686,30 +698,30 @@ class SectorFundFlowService(QObject):
                 if isinstance(result.data, pd.DataFrame) and not result.data.empty:
                     # 记录实际使用的数据源
                     actual_source = getattr(result, 'source_id', 'TET路由选择')
-                    logger.info(f"✅ TET框架成功获取数据，实际数据源: {actual_source}")
+                    logger.info(f"TET框架成功获取数据，实际数据源: {actual_source}")
                     self._current_source = actual_source
                     return result.data
                 elif isinstance(result.data, list) and len(result.data) > 0:
                     df = pd.DataFrame(result.data)
                     actual_source = getattr(result, 'source_id', 'TET路由选择')
-                    logger.info(f"✅ TET框架成功获取数据，实际数据源: {actual_source}")
+                    logger.info(f"TET框架成功获取数据，实际数据源: {actual_source}")
                     self._current_source = actual_source
                     return df
                 else:
-                    logger.warning("⚠️ TET框架返回空数据")
+                    logger.warning("TET框架返回空数据")
             else:
-                logger.warning("⚠️ TET框架处理失败")
+                logger.warning("TET框架处理失败")
 
             return None
 
         except Exception as e:
-            logger.warning(f"⚠️ TET框架获取数据失败: {e}")
+            logger.warning(f" TET框架获取数据失败: {e}")
             return None
 
     def _try_optimal_legacy_sources(self, indicator: str) -> pd.DataFrame:
         """尝试使用最优传统数据源获取数据"""
         try:
-            logger.info("🔄 降级到传统数据源模式...")
+            logger.info("降级到传统数据源模式...")
 
             # 按优先级尝试可用的数据源
             for source_id in self._optimal_sources:
@@ -718,26 +730,26 @@ class SectorFundFlowService(QObject):
                     if not source_info or not source_info.get('supports_fund_flow', False):
                         continue
 
-                    logger.info(f"🔄 尝试数据源: {source_id}")
+                    logger.info(f"尝试数据源: {source_id}")
                     df = self._get_data_from_specific_source(source_id, source_info, indicator)
 
                     if not df.empty:
-                        logger.info(f"✅ 成功从 {source_id} 获取数据: {len(df)} 条记录")
+                        logger.info(f"成功从 {source_id} 获取数据: {len(df)} 条记录")
                         self._current_source = source_id
                         return df
                     else:
-                        logger.warning(f"⚠️ 数据源 {source_id} 返回空数据")
+                        logger.warning(f" 数据源 {source_id} 返回空数据")
 
                 except Exception as e:
-                    logger.warning(f"⚠️ 数据源 {source_id} 获取失败: {e}")
+                    logger.warning(f" 数据源 {source_id} 获取失败: {e}")
                     continue
 
             # 最后尝试通过数据管理器的通用方法
-            logger.info("🔄 尝试数据管理器通用方法...")
+            logger.info("尝试数据管理器通用方法...")
             return self._fallback_to_data_manager()
 
         except Exception as e:
-            logger.error(f"❌ 传统数据源获取失败: {e}")
+            logger.error(f"[ERROR] 传统数据源获取失败: {e}")
             return pd.DataFrame()
 
     def _get_data_from_specific_source(self, source_id: str, source_info: Dict, indicator: str) -> pd.DataFrame:

@@ -17,7 +17,6 @@ import threading
 
 logger = logging.getLogger(__name__)
 
-
 class ThemeType(Enum):
     """主题类型枚举"""
     LIGHT = "light"
@@ -26,7 +25,6 @@ class ThemeType(Enum):
     CUSTOM = "custom"
     HIGH_CONTRAST = "high_contrast"
 
-
 class ThemeCategory(Enum):
     """主题分类枚举"""
     SYSTEM = "system"
@@ -34,7 +32,6 @@ class ThemeCategory(Enum):
     CREATIVE = "creative"
     ACCESSIBILITY = "accessibility"
     USER_DEFINED = "user_defined"
-
 
 @dataclass
 class ThemeColors:
@@ -85,7 +82,6 @@ class ThemeColors:
     overlay_light: str = "rgba(255, 255, 255, 0.8)"
     overlay_dark: str = "rgba(0, 0, 0, 0.5)"
 
-
 @dataclass
 class DarkThemeColors(ThemeColors):
     """深色主题颜色配置"""
@@ -112,7 +108,6 @@ class DarkThemeColors(ThemeColors):
     
     overlay_light: str = "rgba(255, 255, 255, 0.1)"
     overlay_dark: str = "rgba(0, 0, 0, 0.7)"
-
 
 @dataclass
 class HighContrastThemeColors(ThemeColors):
@@ -143,7 +138,6 @@ class HighContrastThemeColors(ThemeColors):
     error: str = "#FF0000"
     info: str = "#0000FF"
 
-
 @dataclass
 class ThemeTypography:
     """主题字体配置数据类"""
@@ -168,7 +162,6 @@ class ThemeTypography:
     line_height_normal: float = 1.4
     line_height_relaxed: float = 1.6
 
-
 @dataclass
 class ThemeSpacing:
     """主题间距配置数据类"""
@@ -190,7 +183,6 @@ class ThemeSpacing:
     margin_md: int = 16
     margin_lg: int = 24
     margin_xl: int = 32
-
 
 @dataclass
 class ThemeEffects:
@@ -216,7 +208,6 @@ class ThemeEffects:
     opacity_hover: float = 0.8
     opacity_pressed: float = 0.9
 
-
 @dataclass
 class ThemeConfig:
     """主题配置数据类"""
@@ -234,7 +225,6 @@ class ThemeConfig:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 class ThemeRegistry:
     """主题注册表"""
@@ -365,7 +355,6 @@ class ThemeRegistry:
         """按类型获取主题"""
         with self.lock:
             return [theme for theme in self.themes.values() if theme.theme_type == theme_type]
-
 
 class ThemeStylesheetGenerator:
     """主题样式表生成器"""
@@ -701,7 +690,6 @@ class ThemeStylesheetGenerator:
             logger.error(f"生成组件样式表失败: {e}")
             return ""
 
-
 class ThemePersistence:
     """主题持久化管理"""
     
@@ -841,7 +829,6 @@ class ThemePersistence:
             preferences[key] = self.settings.value(key)
         self.settings.endGroup()
         return preferences
-
 
 class UnifiedThemeManager(QObject):
     """统一主题管理器主类"""
@@ -1213,15 +1200,12 @@ class UnifiedThemeManager(QObject):
             logger.error(f"获取管理器状态失败: {e}")
             return {'error': str(e)}
 
-
 # 全局实例
 unified_theme_manager = UnifiedThemeManager()
-
 
 def get_unified_theme_manager() -> UnifiedThemeManager:
     """获取统一主题管理器实例"""
     return unified_theme_manager
-
 
 def apply_theme(app: QApplication, theme_name: str = "light"):
     """应用主题到应用程序"""

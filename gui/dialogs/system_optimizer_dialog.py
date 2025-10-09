@@ -235,13 +235,13 @@ class SystemOptimizerDialog(QDialog):
         self.log_retention_spin = QSpinBox()
         self.log_retention_spin.setRange(1, 365)
         self.log_retention_spin.setValue(30)
-        self.log_retention_spin.setSuffix(" 天")
+        self.log_retention_spin.setSuffix("天")
         advanced_layout.addRow("日志保留天数:", self.log_retention_spin)
 
         self.max_file_size_spin = QSpinBox()
         self.max_file_size_spin.setRange(1, 1000)
         self.max_file_size_spin.setValue(100)
-        self.max_file_size_spin.setSuffix(" MB")
+        self.max_file_size_spin.setSuffix("MB")
         advanced_layout.addRow("大文件阈值:", self.max_file_size_spin)
 
         # 进度显示

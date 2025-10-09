@@ -18,7 +18,6 @@ from enum import Enum
 
 logger = logger
 
-
 class GPUType(Enum):
     """GPU类型"""
     INTEGRATED = "integrated"    # 集成显卡
@@ -26,12 +25,10 @@ class GPUType(Enum):
     VIRTUAL = "virtual"          # 虚拟GPU
     UNKNOWN = "unknown"          # 未知类型
 
-
 class PowerPreference(Enum):
     """电源偏好"""
     LOW_POWER = "low-power"      # 低功耗（集成显卡）
     HIGH_PERFORMANCE = "high-performance"  # 高性能（独立显卡）
-
 
 @dataclass
 class GPUAdapterInfo:
@@ -46,7 +43,6 @@ class GPUAdapterInfo:
     is_default: bool
     supports_webgpu: bool
     performance_score: float
-
 
 class EnhancedGPUDetector:
     """增强的GPU检测器"""
@@ -118,8 +114,6 @@ class EnhancedGPUDetector:
             if current_block:
                 gpu_blocks.append(current_block)
 
-            logger.info(f"解析到 {len(gpu_blocks)} 个GPU信息块")
-
             for i, gpu_info in enumerate(gpu_blocks, 1):
                 try:
                     # 提取GPU信息
@@ -164,8 +158,6 @@ class EnhancedGPUDetector:
                         performance_score=self._calculate_performance_score(gpu_type, memory_mb)
                     )
                     adapters.append(adapter)
-
-                    logger.info(f"解析GPU {i}: {gpu_name} ({vendor}) - {memory_mb}MB - {gpu_type.value}")
 
                 except Exception as e:
                     logger.warning(f"解析GPU信息失败: {e}, gpu_info: {gpu_info}")
@@ -534,10 +526,8 @@ class EnhancedGPUDetector:
         else:
             return 50.0
 
-
 # 全局实例
 _gpu_detector = None
-
 
 def get_gpu_detector() -> EnhancedGPUDetector:
     """获取GPU检测器实例"""

@@ -144,9 +144,15 @@ class MainWindowCoordinator(BaseCoordinator):
             try:
                 from ..services import AssetService
                 self._asset_service = self.service_container.resolve(AssetService)
-                logger.info(" AssetService初始化成功")
+                logger.info("AssetService初始化成功")
             except Exception as e:
                 logger.warning(f" AssetService初始化失败: {e}")
+
+            # 初始化增强UI组件
+            self._initialize_enhanced_ui_components()
+
+            # 如果AssetService初始化失败，设置为None
+            if not hasattr(self, '_asset_service'):
                 self._asset_service = None
 
             # 初始化窗口
@@ -331,6 +337,9 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 连接面板之间的信号
             self._connect_panel_signals()
+
+            # 集成增强UI组件
+            self._integrate_enhanced_components_to_ui()
 
             logger.info("UI panels created successfully")
 
@@ -1369,14 +1378,14 @@ FactorWeave-Quant  2.0 (重构版本)
             if service_container and service_container.is_registered(PluginManager):
                 try:
                     plugin_manager = service_container.resolve(PluginManager)
-                    logger.info(" 从服务容器获取插件管理器成功")
+                    logger.info("从服务容器获取插件管理器成功")
 
                     # 验证插件管理器是否已初始化
                     if plugin_manager and hasattr(plugin_manager, 'enhanced_plugins'):
                         all_plugins = plugin_manager.get_all_plugins()
                         logger.info(f" 插件管理器已初始化，包含 {len(all_plugins)} 个插件")
                     else:
-                        logger.warning(" 插件管理器未完全初始化，尝试重新初始化")
+                        logger.warning("插件管理器未完全初始化，尝试重新初始化")
                         if plugin_manager and hasattr(plugin_manager, 'initialize'):
                             plugin_manager.initialize()
 
@@ -1385,12 +1394,12 @@ FactorWeave-Quant  2.0 (重构版本)
                     logger.error(traceback.format_exc())
                     plugin_manager = None
             else:
-                logger.warning(" PluginManager未在服务容器中注册")
+                logger.warning("PluginManager未在服务容器中注册")
 
             # 方法2：如果方法1失败，尝试创建并初始化新实例
             if not plugin_manager:
                 try:
-                    logger.info(" 创建新的插件管理器实例...")
+                    logger.info("创建新的插件管理器实例...")
 
                     # 获取必要的依赖
                     from utils.config_manager import ConfigManager
@@ -1412,13 +1421,13 @@ FactorWeave-Quant  2.0 (重构版本)
 
                     # 初始化插件管理器
                     plugin_manager.initialize()
-                    logger.info(" 插件管理器实例创建并初始化成功")
+                    logger.info("插件管理器实例创建并初始化成功")
 
                     # 将新实例注册到服务容器（如果可能）
                     if service_container:
                         try:
                             service_container.register_instance(PluginManager, plugin_manager)
-                            logger.info(" 新插件管理器实例已注册到服务容器")
+                            logger.info("新插件管理器实例已注册到服务容器")
                         except Exception as reg_e:
                             logger.warning(f" 注册新插件管理器实例失败: {reg_e}")
 
@@ -1432,7 +1441,7 @@ FactorWeave-Quant  2.0 (重构版本)
             if service_container and service_container.is_registered(SentimentDataService):
                 try:
                     sentiment_service = service_container.resolve(SentimentDataService)
-                    logger.info(" 获取情绪数据服务成功")
+                    logger.info("获取情绪数据服务成功")
                 except Exception as e:
                     logger.warning(f" 获取情绪数据服务失败: {e}")
 
@@ -1839,7 +1848,6 @@ FactorWeave-Quant  2.0 (重构版本)
             self.logger.error(f"性能评估模块导入失败: {e}")
             # 使用备用的策略性能评估器
             try:
-                from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 
                 evaluator = PerformanceEvaluator()
                 dialog = PerformanceEvaluationDialog(self._main_window)
@@ -2059,7 +2067,7 @@ FactorWeave-Quant  2.0 (重构版本)
             layout.addWidget(title_label)
 
             # 通用单位转换器按钮
-            unit_btn = QPushButton(" 通用单位转换器")
+            unit_btn = QPushButton("通用单位转换器")
             unit_btn.setStyleSheet("""
                 QPushButton {
                     padding: 15px;
@@ -2078,7 +2086,7 @@ FactorWeave-Quant  2.0 (重构版本)
             layout.addWidget(unit_btn)
 
             # 汇率转换器按钮
-            currency_btn = QPushButton(" 汇率转换器")
+            currency_btn = QPushButton("汇率转换器")
             currency_btn.setStyleSheet("""
                 QPushButton {
                     padding: 15px;
@@ -2608,31 +2616,6 @@ FactorWeave-Quant  2.0 (重构版本)
                 f"启动增强版数据导入系统失败:\n{str(e)}"
             )
             logger.error(f"启动增强版数据导入系统失败: {e}")
-
-    def _on_import_monitor(self) -> None:
-        """打开数据导入监控仪表板"""
-        try:
-            from gui.widgets.data_import_dashboard import DataImportDashboard
-
-            # 创建监控仪表板窗口
-            monitor_window = QMainWindow(self._main_window)
-            monitor_window.setWindowTitle("数据导入实时监控仪表板")
-            monitor_window.setWindowIcon(QIcon("icons/monitor.png"))
-            monitor_window.resize(1400, 900)
-
-            # 创建仪表板组件
-            dashboard_widget = DataImportDashboard(monitor_window)
-            monitor_window.setCentralWidget(dashboard_widget)
-
-            # 居中显示
-            self.center_dialog(monitor_window)
-            monitor_window.show()
-
-            logger.info("打开数据导入监控仪表板")
-
-        except Exception as e:
-            logger.error(f"打开导入监控仪表板失败: {e}")
-            QMessageBox.warning(self._main_window, "错误", f"无法打开导入监控仪表板: {e}")
 
     def _on_batch_import(self) -> None:
         """批量数据导入（重定向到增强版任务管理）"""
@@ -3260,3 +3243,182 @@ FactorWeave-Quant  2.0 (重构版本)
     def statusBar(self):
         """获取状态栏 - 兼容方法"""
         return self._main_window.statusBar() if self._main_window else None
+
+    def _initialize_enhanced_ui_components(self):
+        """初始化增强UI组件"""
+        try:
+            logger.info("开始初始化增强UI组件...")
+
+            # 导入增强UI组件
+            from gui.widgets.enhanced_ui import (
+                Level2DataPanel, OrderBookWidget, FundamentalAnalysisTab,
+                DataQualityMonitorTab, SmartRecommendationPanel
+            )
+
+            # 存储增强组件引用
+            self._enhanced_components = {}
+
+            # 创建Level-2数据面板
+            self._enhanced_components['level2_panel'] = Level2DataPanel(
+                parent=self._main_window,
+                event_bus=self._event_bus
+            )
+
+            # 创建订单簿组件
+            self._enhanced_components['order_book_widget'] = OrderBookWidget(
+                parent=self._main_window,
+                event_bus=self._event_bus
+            )
+
+            # 创建基本面分析标签页
+            self._enhanced_components['fundamental_analysis_tab'] = FundamentalAnalysisTab(
+                parent=self._main_window
+            )
+
+            # 创建数据质量监控标签页
+            self._enhanced_components['data_quality_monitor_tab'] = DataQualityMonitorTab(
+                parent=self._main_window
+            )
+
+            # 创建智能推荐面板
+            self._enhanced_components['smart_recommendation_panel'] = SmartRecommendationPanel(
+                parent=self._main_window
+            )
+
+            logger.info(f"成功初始化 {len(self._enhanced_components)} 个增强UI组件")
+
+        except Exception as e:
+            logger.error(f"初始化增强UI组件失败: {e}")
+            import traceback
+            logger.debug(f"详细错误: {traceback.format_exc()}")
+            self._enhanced_components = {}
+
+    def _integrate_enhanced_components_to_ui(self):
+        """将增强组件集成到UI中"""
+        try:
+            if not hasattr(self, '_enhanced_components') or not self._enhanced_components:
+                logger.warning("增强组件未初始化，跳过UI集成")
+                return
+
+            logger.info("开始集成增强UI组件到主界面...")
+
+            # 添加Level-2数据面板作为停靠窗口
+            if 'level2_panel' in self._enhanced_components:
+                level2_dock = QDockWidget("Level-2 数据", self._main_window)
+                level2_dock.setWidget(self._enhanced_components['level2_panel'])
+                level2_dock.setAllowedAreas(Qt.RightDockWidgetArea | Qt.LeftDockWidgetArea)
+                self._main_window.addDockWidget(Qt.RightDockWidgetArea, level2_dock)
+                logger.info("Level-2数据面板已添加到右侧停靠区域")
+
+            # 添加订单簿组件作为停靠窗口
+            if 'order_book_widget' in self._enhanced_components:
+                orderbook_dock = QDockWidget("订单簿深度", self._main_window)
+                orderbook_dock.setWidget(self._enhanced_components['order_book_widget'])
+                orderbook_dock.setAllowedAreas(Qt.RightDockWidgetArea | Qt.LeftDockWidgetArea)
+                self._main_window.addDockWidget(Qt.RightDockWidgetArea, orderbook_dock)
+                logger.info("订单簿组件已添加到右侧停靠区域")
+
+            # 添加数据质量监控作为停靠窗口
+            if 'data_quality_monitor_tab' in self._enhanced_components:
+                quality_dock = QDockWidget("数据质量监控", self._main_window)
+                quality_dock.setWidget(self._enhanced_components['data_quality_monitor_tab'])
+                quality_dock.setAllowedAreas(Qt.BottomDockWidgetArea | Qt.TopDockWidgetArea)
+                self._main_window.addDockWidget(Qt.BottomDockWidgetArea, quality_dock)
+                logger.info("数据质量监控已添加到底部停靠区域")
+
+            # 添加智能推荐面板作为停靠窗口
+            if 'smart_recommendation_panel' in self._enhanced_components:
+                recommendation_dock = QDockWidget("智能推荐", self._main_window)
+                recommendation_dock.setWidget(self._enhanced_components['smart_recommendation_panel'])
+                recommendation_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+                self._main_window.addDockWidget(Qt.LeftDockWidgetArea, recommendation_dock)
+                logger.info("智能推荐面板已添加到左侧停靠区域")
+
+            # 如果存在分析标签页，将基本面分析添加到其中
+            if hasattr(self, '_analysis_tabs') and 'fundamental_analysis_tab' in self._enhanced_components:
+                self._analysis_tabs.addTab(
+                    self._enhanced_components['fundamental_analysis_tab'],
+                    " 基本面分析"
+                )
+                logger.info("基本面分析标签页已添加到分析区域")
+
+            logger.info("增强UI组件集成完成")
+
+        except Exception as e:
+            logger.error(f"集成增强UI组件失败: {e}")
+            import traceback
+            logger.debug(f"详细错误: {traceback.format_exc()}")
+
+    def get_enhanced_component(self, component_name: str):
+        """获取增强组件实例"""
+        if hasattr(self, '_enhanced_components'):
+            return self._enhanced_components.get(component_name)
+        return None
+
+    # ==================== 增强功能菜单事件处理 ====================
+
+    def _on_toggle_level2_panel(self):
+        """切换Level-2数据面板显示/隐藏"""
+        try:
+            dock_widgets = self._main_window.findChildren(QDockWidget)
+            for dock in dock_widgets:
+                if dock.windowTitle() == "Level-2 数据":
+                    dock.setVisible(not dock.isVisible())
+                    logger.info(f"Level-2数据面板已{'显示' if dock.isVisible() else '隐藏'}")
+                    return
+            logger.warning("Level-2数据面板未找到")
+        except Exception as e:
+            logger.error(f"切换Level-2数据面板失败: {e}")
+
+    def _on_toggle_orderbook_panel(self):
+        """切换订单簿面板显示/隐藏"""
+        try:
+            dock_widgets = self._main_window.findChildren(QDockWidget)
+            for dock in dock_widgets:
+                if dock.windowTitle() == "订单簿深度":
+                    dock.setVisible(not dock.isVisible())
+                    logger.info(f"订单簿面板已{'显示' if dock.isVisible() else '隐藏'}")
+                    return
+            logger.warning("订单簿面板未找到")
+        except Exception as e:
+            logger.error(f"切换订单簿面板失败: {e}")
+
+    def _on_toggle_fundamental_panel(self):
+        """切换基本面分析面板显示/隐藏"""
+        try:
+            # 基本面分析在分析标签页中，通过切换标签页显示
+            if hasattr(self, '_analysis_tabs'):
+                for i in range(self._analysis_tabs.count()):
+                    if self._analysis_tabs.tabText(i) == " 基本面分析":
+                        self._analysis_tabs.setCurrentIndex(i)
+                        logger.info("基本面分析标签页已激活")
+                        return
+            logger.warning("基本面分析标签页未找到")
+        except Exception as e:
+            logger.error(f"切换基本面分析面板失败: {e}")
+
+    def _on_toggle_quality_monitor_panel(self):
+        """切换数据质量监控面板显示/隐藏"""
+        try:
+            dock_widgets = self._main_window.findChildren(QDockWidget)
+            for dock in dock_widgets:
+                if dock.windowTitle() == "数据质量监控":
+                    dock.setVisible(not dock.isVisible())
+                    logger.info(f"数据质量监控面板已{'显示' if dock.isVisible() else '隐藏'}")
+                    return
+            logger.warning("数据质量监控面板未找到")
+        except Exception as e:
+            logger.error(f"切换数据质量监控面板失败: {e}")
+
+    def _on_toggle_smart_recommendation_panel(self):
+        """切换智能推荐面板显示/隐藏"""
+        try:
+            dock_widgets = self._main_window.findChildren(QDockWidget)
+            for dock in dock_widgets:
+                if dock.windowTitle() == "智能推荐":
+                    dock.setVisible(not dock.isVisible())
+                    logger.info(f"智能推荐面板已{'显示' if dock.isVisible() else '隐藏'}")
+                    return
+            logger.warning("智能推荐面板未找到")
+        except Exception as e:
+            logger.error(f"切换智能推荐面板失败: {e}")

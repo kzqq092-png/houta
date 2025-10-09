@@ -19,14 +19,14 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime
 import json
+import pandas as pd
 
 from loguru import logger
 from core.database.duckdb_manager import DuckDBConnectionManager, DuckDBConfig
 from core.asset_type_identifier import AssetTypeIdentifier, get_asset_type_identifier
-from core.plugin_types import AssetType
+from core.plugin_types import AssetType, DataType
 
 logger = logger.bind(module=__name__)
-
 
 @dataclass
 class AssetDatabaseConfig:
@@ -55,7 +55,6 @@ class AssetDatabaseConfig:
             'threads': self.threads
         }
 
-
 @dataclass
 class AssetDatabaseInfo:
     """资产数据库信息"""
@@ -82,7 +81,6 @@ class AssetDatabaseInfo:
             'health_status': self.health_status,
             'supported_data_sources': self.supported_data_sources
         }
-
 
 class AssetSeparatedDatabaseManager:
     """
@@ -355,6 +353,18 @@ class AssetSeparatedDatabaseManager:
 
             return self._asset_databases[asset_type]
 
+    def _ensure_database_exists(self, asset_type: AssetType) -> str:
+        """
+        确保数据库存在并返回数据库路径
+
+        Args:
+            asset_type: 资产类型
+
+        Returns:
+            str: 数据库文件路径
+        """
+        return self.get_database_for_asset_type(asset_type, auto_create=True)
+
     def get_database_for_symbol(self, symbol: str, auto_create: bool = True) -> Tuple[str, AssetType]:
         """
         根据交易符号获取对应的数据库路径和资产类型
@@ -617,6 +627,266 @@ class AssetSeparatedDatabaseManager:
         except Exception as e:
             logger.error(f"清理备份文件失败: {e}")
 
+    def store_standardized_data(self, data: pd.DataFrame, asset_type: AssetType,
+                                data_type: DataType, table_name: Optional[str] = None) -> bool:
+        """
+        存储标准化数据到指定资产类型数据库
+
+        Args:
+            data: 标准化后的数据
+            asset_type: 资产类型
+            data_type: 数据类型
+            table_name: 表名（可选，默认根据数据类型生成）
+
+        Returns:
+            bool: 存储是否成功
+        """
+        if data.empty:
+            logger.warning("数据为空，跳过存储")
+            return False
+
+        try:
+            # 确保数据库存在
+            db_path = self._ensure_database_exists(asset_type)
+
+            # 生成表名
+            if not table_name:
+                table_name = self._generate_table_name(data_type, asset_type)
+
+            # 获取数据库连接并存储数据
+            with self.duckdb_manager.get_connection(db_path) as conn:
+                # 创建表结构（如果不存在）
+                self._ensure_table_exists(conn, table_name, data, data_type)
+
+                # 插入数据（使用upsert逻辑）
+                rows_affected = self._upsert_data(conn, table_name, data, data_type)
+
+                logger.info(f"成功存储 {rows_affected} 行数据到 {asset_type.value}/{table_name}")
+                return True
+
+        except Exception as e:
+            logger.error(f"存储标准化数据失败: {e}")
+            return False
+
+    def _generate_table_name(self, data_type: DataType, asset_type: AssetType) -> str:
+        """生成表名"""
+        type_mapping = {
+            DataType.HISTORICAL_KLINE: "kline",
+            DataType.REAL_TIME_QUOTE: "quotes",
+            DataType.FUNDAMENTAL: "fundamentals",
+            DataType.ASSET_LIST: "assets",
+            DataType.SECTOR_FUND_FLOW: "sector_fund_flow"
+        }
+
+        base_name = type_mapping.get(data_type, data_type.value.lower())
+        return f"{asset_type.value}_{base_name}"
+
+    def _ensure_table_exists(self, conn, table_name: str, data: pd.DataFrame, data_type: DataType):
+        """确保表存在，如果不存在则创建"""
+        try:
+            # 检查表是否存在
+            table_exists = conn.execute(f"""
+                SELECT COUNT(*) 
+                FROM information_schema.tables 
+                WHERE table_name = '{table_name}'
+            """).fetchone()[0] > 0
+
+            if not table_exists:
+                # 根据数据类型创建表结构
+                create_sql = self._generate_create_table_sql(table_name, data, data_type)
+                conn.execute(create_sql)
+                logger.info(f"创建表: {table_name}")
+
+                # 创建索引
+                self._create_table_indexes(conn, table_name, data_type)
+
+        except Exception as e:
+            logger.error(f"创建表 {table_name} 失败: {e}")
+            raise
+
+    def _generate_create_table_sql(self, table_name: str, data: pd.DataFrame, data_type: DataType) -> str:
+        """生成创建表的SQL"""
+        # 根据数据类型定义标准表结构
+        if data_type == DataType.HISTORICAL_KLINE:
+            return f"""
+                CREATE TABLE {table_name} (
+                    symbol VARCHAR,
+                    name VARCHAR,
+                    market VARCHAR,
+                    datetime TIMESTAMP,
+                    frequency VARCHAR NOT NULL DEFAULT '1d',
+                    open DOUBLE,
+                    high DOUBLE,
+                    low DOUBLE,
+                    close DOUBLE,
+                    volume DOUBLE,
+                    amount DOUBLE,
+                    turnover DOUBLE,
+                    period VARCHAR,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (symbol, datetime, frequency)
+                )
+            """
+        elif data_type == DataType.REAL_TIME_QUOTE:
+            return f"""
+                CREATE TABLE {table_name} (
+                    symbol VARCHAR,
+                    name VARCHAR,
+                    market VARCHAR,
+                    current_price DOUBLE,
+                    open DOUBLE,
+                    high DOUBLE,
+                    low DOUBLE,
+                    close DOUBLE,
+                    volume DOUBLE,
+                    amount DOUBLE,
+                    change DOUBLE,
+                    change_percent DOUBLE,
+                    timestamp TIMESTAMP,
+                    bid_price DOUBLE,
+                    ask_price DOUBLE,
+                    bid_volume DOUBLE,
+                    ask_volume DOUBLE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (symbol, timestamp)
+                )
+            """
+        elif data_type == DataType.FUNDAMENTAL:
+            return f"""
+                CREATE TABLE {table_name} (
+                    symbol VARCHAR PRIMARY KEY,
+                    name VARCHAR,
+                    market VARCHAR,
+                    industry VARCHAR,
+                    sector VARCHAR,
+                    list_date DATE,
+                    total_shares DOUBLE,
+                    float_shares DOUBLE,
+                    market_cap DOUBLE,
+                    status VARCHAR,
+                    currency VARCHAR,
+                    is_st BOOLEAN,
+                    updated_time TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+        elif data_type == DataType.ASSET_LIST:
+            return f"""
+                CREATE TABLE {table_name} (
+                    symbol VARCHAR PRIMARY KEY,
+                    name VARCHAR,
+                    market VARCHAR,
+                    asset_type VARCHAR,
+                    status VARCHAR,
+                    category VARCHAR,
+                    updated_time TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+        elif data_type == DataType.SECTOR_FUND_FLOW:
+            return f"""
+                CREATE TABLE {table_name} (
+                    sector_code VARCHAR,
+                    sector_name VARCHAR,
+                    date DATE,
+                    main_inflow DOUBLE,
+                    main_outflow DOUBLE,
+                    main_net_flow DOUBLE,
+                    retail_inflow DOUBLE,
+                    retail_outflow DOUBLE,
+                    retail_net_flow DOUBLE,
+                    total_volume DOUBLE,
+                    total_amount DOUBLE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (sector_code, date)
+                )
+            """
+        else:
+            # 通用表结构，根据DataFrame列推断
+            columns = []
+            for col in data.columns:
+                if data[col].dtype == 'object':
+                    columns.append(f"{col} VARCHAR")
+                elif data[col].dtype in ['int64', 'int32']:
+                    columns.append(f"{col} INTEGER")
+                elif data[col].dtype in ['float64', 'float32']:
+                    columns.append(f"{col} DOUBLE")
+                elif 'datetime' in str(data[col].dtype):
+                    columns.append(f"{col} TIMESTAMP")
+                else:
+                    columns.append(f"{col} VARCHAR")
+
+            columns.append("created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            return f"CREATE TABLE {table_name} ({', '.join(columns)})"
+
+    def _create_table_indexes(self, conn, table_name: str, data_type: DataType):
+        """创建表索引"""
+        try:
+            if data_type == DataType.HISTORICAL_KLINE:
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol ON {table_name}(symbol)")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_datetime ON {table_name}(datetime)")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol_datetime ON {table_name}(symbol, datetime)")
+            elif data_type == DataType.REAL_TIME_QUOTE:
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol ON {table_name}(symbol)")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_timestamp ON {table_name}(timestamp)")
+            elif data_type == DataType.FUNDAMENTAL:
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol ON {table_name}(symbol)")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_market ON {table_name}(market)")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_industry ON {table_name}(industry)")
+            # 其他数据类型的索引...
+        except Exception as e:
+            logger.warning(f"创建索引失败: {e}")
+
+    def _upsert_data(self, conn, table_name: str, data: pd.DataFrame, data_type: DataType) -> int:
+        """插入或更新数据"""
+        try:
+            # 使用DuckDB的INSERT ... ON CONFLICT语法
+            placeholders = ', '.join(['?' for _ in data.columns])
+            columns = ', '.join(data.columns)
+
+            if data_type == DataType.HISTORICAL_KLINE:
+                # K线数据使用symbol、datetime和frequency作为唯一键
+                update_fields = []
+                for col in ['open', 'high', 'low', 'close', 'volume', 'amount', 'turnover']:
+                    if col in data.columns:
+                        update_fields.append(f"{col} = EXCLUDED.{col}")
+                
+                update_clause = ', '.join(update_fields) if update_fields else "open = EXCLUDED.open"
+                
+                sql = f"""
+                    INSERT INTO {table_name} ({columns}) 
+                    VALUES ({placeholders})
+                    ON CONFLICT (symbol, datetime, frequency) DO UPDATE SET
+                    {update_clause}
+                """
+            elif data_type == DataType.REAL_TIME_QUOTE:
+                # 实时行情使用symbol和timestamp作为唯一键
+                sql = f"""
+                    INSERT INTO {table_name} ({columns}) 
+                    VALUES ({placeholders})
+                    ON CONFLICT (symbol, timestamp) DO UPDATE SET
+                    current_price = EXCLUDED.current_price,
+                    volume = EXCLUDED.volume,
+                    amount = EXCLUDED.amount
+                """
+            else:
+                # 其他数据类型的简单插入
+                sql = f"""
+                    INSERT OR REPLACE INTO {table_name} ({columns}) 
+                    VALUES ({placeholders})
+                """
+
+            # 批量插入数据
+            data_tuples = [tuple(row) for row in data.values]
+            conn.executemany(sql, data_tuples)
+
+            return len(data)
+
+        except Exception as e:
+            logger.error(f"插入数据失败: {e}")
+            raise
+
     def check_database_health(self, asset_type: AssetType) -> Dict[str, Any]:
         """检查指定资产类型数据库的健康状态"""
         try:
@@ -680,11 +950,9 @@ class AssetSeparatedDatabaseManager:
         except Exception as e:
             logger.error(f"关闭数据库连接失败: {e}")
 
-
 # 全局实例
 _asset_db_manager: Optional[AssetSeparatedDatabaseManager] = None
 _manager_lock = threading.Lock()
-
 
 def get_asset_database_manager(config: Optional[AssetDatabaseConfig] = None) -> AssetSeparatedDatabaseManager:
     """获取全局资产数据库管理器实例"""
@@ -695,7 +963,6 @@ def get_asset_database_manager(config: Optional[AssetDatabaseConfig] = None) -> 
             _asset_db_manager = AssetSeparatedDatabaseManager(config)
 
         return _asset_db_manager
-
 
 def initialize_asset_database_manager(config: Optional[AssetDatabaseConfig] = None) -> AssetSeparatedDatabaseManager:
     """初始化资产数据库管理器"""
@@ -710,7 +977,6 @@ def initialize_asset_database_manager(config: Optional[AssetDatabaseConfig] = No
 
         return _asset_db_manager
 
-
 def cleanup_asset_database_manager():
     """清理资产数据库管理器"""
     global _asset_db_manager
@@ -720,7 +986,6 @@ def cleanup_asset_database_manager():
             _asset_db_manager.close_all_connections()
             _asset_db_manager = None
             logger.info("AssetSeparatedDatabaseManager 已清理")
-
 
 def get_asset_separated_database_manager() -> AssetSeparatedDatabaseManager:
     """获取资产分数据库管理器实例（便捷函数）"""

@@ -17,7 +17,6 @@ from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthChe
 from core.plugin_types import AssetType, DataType
 from core.data_source_data_models import QueryParams, StockInfo, KlineData, MarketData
 
-
 class BondDataPlugin(IDataSourcePlugin):
     """债券数据源插件"""
 

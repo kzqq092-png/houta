@@ -19,7 +19,6 @@ from .events import ApplicationMetricRecorded
 
 logger = logger
 
-
 @dataclass
 class OperationMetrics:
     """操作指标数据类"""
@@ -52,7 +51,6 @@ class OperationMetrics:
             "success_rate": self.success_rate,
             "last_execution_time": self.last_execution_time
         }
-
 
 class ApplicationMetricsService:
     """
@@ -259,10 +257,8 @@ class ApplicationMetricsService:
         # 直接调用 measure 方法，保持向后兼容
         return self.measure(operation_name)
 
-
 # 全局单例实例
 _app_metrics_service: Optional[ApplicationMetricsService] = None
-
 
 def initialize_app_metrics_service(event_bus: EventBus) -> ApplicationMetricsService:
     """
@@ -282,7 +278,6 @@ def initialize_app_metrics_service(event_bus: EventBus) -> ApplicationMetricsSer
 
     return _app_metrics_service
 
-
 def get_app_metrics_service() -> ApplicationMetricsService:
     """
     获取应用性能度量服务实例
@@ -297,7 +292,6 @@ def get_app_metrics_service() -> ApplicationMetricsService:
         return ApplicationMetricsService()
 
     return _app_metrics_service
-
 
 def measure(operation_name: Optional[str] = None) -> Callable:
     """
@@ -316,7 +310,6 @@ def measure(operation_name: Optional[str] = None) -> Callable:
             return get_app_metrics_service().measure(operation_name or func.__name__)(func)(*args, **kwargs)
         return wrapper
     return decorator
-
 
 def measure_time(operation_name: Optional[str] = None) -> Callable:
     """

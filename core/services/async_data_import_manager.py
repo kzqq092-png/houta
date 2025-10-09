@@ -43,23 +43,23 @@ class AsyncDataImportWorker(QThread):
             self.progress_updated.emit(0, "初始化数据导入...")
 
             # 初始化导入引擎
-            logger.info(" 开始初始化导入引擎...")
+            logger.info("开始初始化导入引擎...")
             self._initialize_import_engine()
-            logger.info(" 导入引擎初始化完成")
+            logger.info("导入引擎初始化完成")
 
             if self._stop_requested:
-                logger.info(" 任务被请求停止，退出执行")
+                logger.info("任务被请求停止，退出执行")
                 return
             else:
-                logger.info(" 任务未被停止，继续执行")
+                logger.info("任务未被停止，继续执行")
 
             # 执行数据导入
-            logger.info(" 开始执行数据导入...")
+            logger.info("开始执行数据导入...")
             result = self._execute_import()
             logger.info(f" 数据导入执行完成，结果: {result}")
 
             if self._stop_requested:
-                logger.info(" 任务在执行后被请求停止")
+                logger.info("任务在执行后被请求停止")
                 return
 
             # 完成导入
@@ -94,9 +94,9 @@ class AsyncDataImportWorker(QThread):
                 service_container = get_service_container()
                 if service_container.is_registered(UnifiedDataManager):
                     data_manager = service_container.resolve(UnifiedDataManager)
-                    logger.info(" 使用服务容器中的数据管理器")
+                    logger.info("使用服务容器中的数据管理器")
                 else:
-                    logger.info(" 服务容器中未找到数据管理器，将延迟初始化")
+                    logger.info("服务容器中未找到数据管理器，将延迟初始化")
             except Exception as e:
                 logger.warning(f" 获取数据管理器失败: {e}")
 
@@ -134,13 +134,13 @@ class AsyncDataImportWorker(QThread):
             if data_sources and len(data_sources) > 1:
                 # 批量处理模式：将所有股票代码作为一个批次处理
                 logger.info(f" 开始批量处理股票代码，总数: {len(data_sources)}, 股票代码列表: {data_sources[:5]}{'...' if len(data_sources) > 5 else ''}")
-                
+
                 self.progress_updated.emit(20, f"批量导入 {len(data_sources)} 只股票数据")
-                
+
                 # 执行批量导入
                 batch_result = self._import_batch_sources(data_sources, self.import_config)
                 logger.info(f" 批量处理完成，结果: {batch_result}")
-                
+
                 result['data_sources'].append(batch_result)
                 result['imported_count'] += batch_result.get('imported_count', 0)
                 result['failed_count'] += batch_result.get('failed_count', 0)
@@ -211,7 +211,7 @@ class AsyncDataImportWorker(QThread):
 
                 # 检查导入引擎是否可用
                 if not self._import_engine:
-                    logger.error(" 导入引擎未初始化")
+                    logger.error("导入引擎未初始化")
                     return {
                         'source': source,
                         'imported_count': 0,

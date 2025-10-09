@@ -18,9 +18,7 @@ import time
 
 logger = logger
 
-
 # 移除MockDataManager，使用真正的HIkyuu数据管理器
-
 
 class StockService(CacheableService, ConfigurableService):
     """
@@ -71,7 +69,14 @@ class StockService(CacheableService, ConfigurableService):
 
                 if unified_data_manager and unified_data_manager.test_connection():
                     logger.info("Using unified data manager")
-                    self._data_access = DataAccess(unified_data_manager)
+                    # 获取UniPluginDataManager
+                    uni_plugin_manager = unified_data_manager.get_uni_plugin_manager()
+                    if uni_plugin_manager:
+                        logger.info("Using UniPluginDataManager for data access")
+                        self._data_access = DataAccess(unified_data_manager, uni_plugin_manager)
+                    else:
+                        logger.warning("UniPluginDataManager not available, using legacy mode")
+                        self._data_access = DataAccess(unified_data_manager)
                     self._data_access.connect()
                 else:
                     raise RuntimeError("Unified data manager connection test failed")

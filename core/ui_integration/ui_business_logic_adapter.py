@@ -35,19 +35,31 @@ try:
     from core.services.ai_prediction_service import AIPredictionService
     from core.performance.unified_performance_coordinator import UnifiedPerformanceCoordinator
     from core.services.unified_data_quality_monitor import UnifiedDataQualityMonitor
-    from core.services.import_orchestration_service import ImportOrchestrationService
+    # ImportOrchestrationService 不存在，暂时注释掉
+    # from core.services.import_orchestration_service import ImportOrchestrationService
     from core.ai.user_behavior_learner import UserBehaviorLearner
     from core.ai.config_recommendation_engine import ConfigRecommendationEngine
     from core.ai.config_impact_analyzer import ConfigImpactAnalyzer
     from core.performance.intelligent_cache_coordinator import IntelligentCacheCoordinator
-    from core.services.enhanced_distributed_service import EnhancedDistributedService
+    # EnhancedDistributedService 不存在，使用 DistributedService
+    from core.services.distributed_service import DistributedService as EnhancedDistributedService
     from core.ai.data_anomaly_detector import DataAnomalyDetector
     from loguru import logger
     CORE_SERVICES_AVAILABLE = True
+    # 标记编排服务不可用
+    ImportOrchestrationService = None
 except ImportError as e:
+    import logging
     logger = logging.getLogger(__name__)
     CORE_SERVICES_AVAILABLE = False
+    ImportOrchestrationService = None
     logger.warning(f"核心服务导入失败: {e}")
+    # 尝试使用loguru记录详细错误
+    try:
+        from loguru import logger as loguru_logger
+        loguru_logger.warning(f"UI适配器核心服务导入失败，具体错误: {e}")
+    except ImportError:
+        pass
 
 logger = logger.bind(module=__name__) if hasattr(logger, 'bind') else logging.getLogger(__name__)
 
@@ -181,7 +193,7 @@ class UIBusinessLogicAdapter(QObject):
                 'ai_prediction_service': AIPredictionService,
                 'performance_coordinator': UnifiedPerformanceCoordinator,
                 'quality_monitor': UnifiedDataQualityMonitor,
-                'orchestration_service': ImportOrchestrationService,
+                # 'orchestration_service': ImportOrchestrationService,  # 不存在，暂时禁用
                 'behavior_learner': UserBehaviorLearner,
                 'config_recommendation': ConfigRecommendationEngine,
                 'config_impact_analyzer': ConfigImpactAnalyzer,

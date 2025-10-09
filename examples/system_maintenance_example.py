@@ -32,7 +32,7 @@ async def example_programmatic_maintenance():
     try:
         # 初始化服务
         await service.initialize_async()
-        logger.info(" 服务初始化成功")
+        logger.info("服务初始化成功")
 
         # 分析系统状态
         logger.info("\n1. 分析系统状态...")
@@ -88,7 +88,7 @@ def example_gui_maintenance():
         logger.info("show_system_optimizer_dialog()")
         logger.info("app.exec_()")
         logger.info("```")
-        logger.info(" GUI界面示例说明完成")
+        logger.info("GUI界面示例说明完成")
 
     except Exception as e:
         logger.info(f" GUI示例失败: {e}")

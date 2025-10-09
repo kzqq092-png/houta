@@ -17,7 +17,6 @@ from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPl
 from plugins.sentiment_data_sources.config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_api_key, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
-
 class ExordeSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
     """Exorde情绪数据源插件"""
 
@@ -537,12 +536,10 @@ class ExordeSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
 
         return max(0.0, min(100.0, round(composite_score, 2)))
 
-
 # 插件工厂函数
 def create_exorde_sentiment_plugin() -> ExordeSentimentPlugin:
     """创建Exorde情绪数据插件实例"""
     return ExordeSentimentPlugin()
-
 
 if __name__ == "__main__":
     # 测试插件

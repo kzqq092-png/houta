@@ -21,7 +21,6 @@ import os
 
 import datetime
 
-
 from datetime import datetime
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
@@ -445,7 +444,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.roe_min.setDecimals(2)
             self.roe_min.setRange(0.0, 100.0)
             self.roe_min.setValue(10.0)
-            self.roe_min.setSuffix(" %")
+            self.roe_min.setSuffix("%")
             roe_layout.addWidget(self.roe_min)
 
             self.condition_layout.addLayout(roe_layout)
@@ -464,7 +463,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.inflow_min.setDecimals(2)
             self.inflow_min.setRange(0.0, 1000000.0)
             self.inflow_min.setValue(100000.0)
-            self.inflow_min.setSuffix(" 万元")
+            self.inflow_min.setSuffix("万元")
             inflow_layout.addWidget(self.inflow_min)
 
             self.condition_layout.addLayout(inflow_layout)
@@ -477,7 +476,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.volume_min.setDecimals(2)
             self.volume_min.setRange(0.0, 1000000.0)
             self.volume_min.setValue(100000.0)
-            self.volume_min.setSuffix(" 手")
+            self.volume_min.setSuffix("手")
             volume_layout.addWidget(self.volume_min)
 
             self.condition_layout.addLayout(volume_layout)

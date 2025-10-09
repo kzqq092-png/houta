@@ -26,7 +26,6 @@ from core.indicator_extensions import (
 
 logger = logger
 
-
 class TALibIndicatorsPlugin(IIndicatorPlugin):
     """
     TA-Lib指标插件

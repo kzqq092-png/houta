@@ -54,9 +54,9 @@ class UnifiedDataAccessor:
                 if not self.data_manager:
                     self.data_manager = container.get('UnifiedDataManager')
 
-                self.logger.info(" 从服务容器初始化服务成功")
+                self.logger.info("从服务容器初始化服务成功")
             else:
-                self.logger.warning(" 服务容器不可用")
+                self.logger.warning("服务容器不可用")
 
         except Exception as e:
             self.logger.error(f" 从服务容器初始化服务失败: {e}")
@@ -108,7 +108,7 @@ class UnifiedDataAccessor:
                 else:
                     self.logger.warning("数据管理器返回空数据")
 
-            self.logger.error(" 无可用的数据服务")
+            self.logger.error("无可用的数据服务")
             return None
 
         except Exception as e:
@@ -148,7 +148,7 @@ class UnifiedDataAccessor:
                 else:
                     self.logger.warning("数据管理器返回空股票列表")
 
-            self.logger.error(" 无可用的数据服务")
+            self.logger.error("无可用的数据服务")
             return []
 
         except Exception as e:
@@ -243,8 +243,9 @@ def get_unified_data_accessor() -> UnifiedDataAccessor:
         _global_accessor = UnifiedDataAccessor()
     return _global_accessor
 
-
 # 便捷函数，用于替代直接HIkyuu调用
+
+
 def get_stock_data(stock_code: str, period: str = 'D', count: int = 30) -> Optional[pd.DataFrame]:
     """便捷函数：获取股票数据"""
     return get_unified_data_accessor().get_stock_data(stock_code, period, count)

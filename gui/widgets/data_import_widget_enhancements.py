@@ -359,20 +359,20 @@ class DataQualityWidget(QWidget):
         suggestions = []
 
         if self.check_missing_cb.isChecked():
-            results.append(" 缺失值检查: 发现 15 个缺失值 (0.5%)")
-            suggestions.append(" 建议使用前向填充或均值填充处理缺失值")
+            results.append("缺失值检查: 发现 15 个缺失值 (0.5%)")
+            suggestions.append("建议使用前向填充或均值填充处理缺失值")
 
         if self.check_duplicates_cb.isChecked():
-            results.append(" 重复值检查: 发现 8 个重复记录 (0.3%)")
-            suggestions.append(" 建议删除重复记录或进行数据去重")
+            results.append("重复值检查: 发现 8 个重复记录 (0.3%)")
+            suggestions.append("建议删除重复记录或进行数据去重")
 
         if self.check_outliers_cb.isChecked():
-            results.append(" 异常值检查: 发现 23 个可能的异常值 (0.8%)")
-            suggestions.append(" 建议使用IQR方法或Z-score方法处理异常值")
+            results.append("异常值检查: 发现 23 个可能的异常值 (0.8%)")
+            suggestions.append("建议使用IQR方法或Z-score方法处理异常值")
 
         if self.check_format_cb.isChecked():
-            results.append(" 格式检查: 所有数据格式正确")
-            suggestions.append(" 数据格式良好，无需额外处理")
+            results.append("格式检查: 所有数据格式正确")
+            suggestions.append("数据格式良好，无需额外处理")
 
         self.results_text.setText("\n".join(results))
         self.suggestions_text.setText("\n".join(suggestions))

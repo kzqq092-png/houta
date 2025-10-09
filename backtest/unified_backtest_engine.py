@@ -65,7 +65,6 @@ def safe_query_result(result, default=None):
 对标专业量化软件标准
 """
 
-
 # 配置日志
 # Loguru配置在core.loguru_config中统一管理
 logger = logger
@@ -1436,8 +1435,9 @@ class UnifiedBacktestEngine:
             'CVaR(95%)': f"{self.metrics.cvar_95:.2%}",
         }
 
-
 # 便利函数
+
+
 def create_unified_backtest_engine(level: str = "professional", use_vectorized: bool = True,
                                    auto_select: bool = True) -> UnifiedBacktestEngine:
     """
@@ -1679,8 +1679,9 @@ class PortfolioBacktestEngine:
             self.logger.error(f"计算组合指标失败: {e}")
             return {}
 
-
 # 便利函数
+
+
 def create_portfolio_backtest_engine(level: str = "professional") -> PortfolioBacktestEngine:
     """创建组合回测引擎"""
     level_map = {
@@ -1698,8 +1699,8 @@ if __name__ == "__main__":
     logger.info("统一回测引擎 - FactorWeave-Quant 系统")
     logger.info("=" * 50)
     logger.info("功能特性:")
-    logger.info(" 修复了15个关键bug")
-    logger.info(" 专业级风险指标计算")
-    logger.info(" 完整的向后兼容性")
-    logger.info(" 对标专业量化软件")
+    logger.info("修复了15个关键bug")
+    logger.info("专业级风险指标计算")
+    logger.info("完整的向后兼容性")
+    logger.info("对标专业量化软件")
     logger.info("=" * 50)

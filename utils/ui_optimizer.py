@@ -16,7 +16,6 @@ import time
 # 使用系统统一组件
 from core.adapters import get_config
 
-
 class UIOptimizer(QObject):
     """UI优化器 - 提供更好的UI刷新机制"""
 
@@ -164,7 +163,6 @@ class UIOptimizer(QObject):
 
         return debounced_func
 
-
 class AsyncWorker(QThread):
     """异步工作线程"""
 
@@ -213,7 +211,6 @@ class AsyncWorker(QThread):
         """
         self.progress_updated.emit(progress)
 
-
 class UIUpdateManager:
     """UI更新管理器 - 全局单例"""
 
@@ -255,11 +252,9 @@ class UIUpdateManager:
         """函数防抖"""
         return self.optimizer.debounce_function(func, delay)
 
-
 # 全局UI更新管理器实例
 _ui_manager = None
 _manager_lock = threading.RLock()
-
 
 def get_ui_manager() -> UIUpdateManager:
     """获取全局UI更新管理器实例
@@ -277,7 +272,6 @@ def get_ui_manager() -> UIUpdateManager:
 
 # 便捷函数
 
-
 def schedule_ui_update(callback: Callable = None, delay: int = None):
     """调度UI更新的便捷函数
 
@@ -287,7 +281,6 @@ def schedule_ui_update(callback: Callable = None, delay: int = None):
     """
     manager = get_ui_manager()
     return manager.schedule_update(callback, delay)
-
 
 def create_async_worker(work_func: Callable,
                         success_callback: Callable = None,
@@ -305,7 +298,6 @@ def create_async_worker(work_func: Callable,
     manager = get_ui_manager()
     return manager.create_worker(work_func, success_callback, error_callback)
 
-
 def throttle_ui_function(delay: int = 100):
     """UI函数节流装饰器
 
@@ -316,7 +308,6 @@ def throttle_ui_function(delay: int = 100):
         manager = get_ui_manager()
         return manager.throttle(func, delay)
     return decorator
-
 
 def debounce_ui_function(delay: int = 300):
     """UI函数防抖装饰器
@@ -331,7 +322,6 @@ def debounce_ui_function(delay: int = 300):
 
 # 替换QApplication.processEvents()的便捷函数
 
-
 def safe_process_events(delay: int = 0):
     """安全的事件处理函数，替换QApplication.processEvents()
 
@@ -339,7 +329,6 @@ def safe_process_events(delay: int = 0):
         delay: 延迟时间（毫秒）
     """
     schedule_ui_update(delay=delay)
-
 
 def replace_process_events():
     """替换QApplication.processEvents()的使用

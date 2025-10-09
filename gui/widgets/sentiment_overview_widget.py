@@ -110,7 +110,7 @@ class SentimentOverviewWidget(QWidget):
         layout.setSpacing(8)
 
         # 标题
-        title_label = QLabel(" 市场情绪概览")
+        title_label = QLabel("市场情绪概览")
         title_font = QFont()
         title_font.setPointSize(10)
         title_font.setBold(True)

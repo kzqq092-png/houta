@@ -10,7 +10,6 @@
 from hikyuu import *
 from loguru import logger
 
-
 class TurtleSignal(SignalBase):
     def __init__(self, n=20):
         super(TurtleSignal, self).__init__("TurtleSignal")
@@ -29,7 +28,6 @@ class TurtleSignal(SignalBase):
                 self._add_buy_signal(k[i].datetime)
             elif (c[i] <= L[i]):
                 self._add_sell_signal(k[i].datetime)
-
 
 if __name__ == "__main__":
     from examples_init import *

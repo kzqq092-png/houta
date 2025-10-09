@@ -23,7 +23,6 @@ from PyQt5.QtWidgets import QWidget
 
 logger = logger
 
-
 class CrosshairStyle(Enum):
     """十字光标样式"""
     SOLID = "solid"           # 实线
@@ -31,7 +30,6 @@ class CrosshairStyle(Enum):
     DOTTED = "dotted"         # 点线
     CROSS_ONLY = "cross_only"  # 仅十字
     GRID = "grid"             # 网格
-
 
 @dataclass
 class CrosshairState:
@@ -49,7 +47,6 @@ class CrosshairState:
             self.x, self.y, self.visible,
             self.data_x, self.data_y, self.timestamp
         )
-
 
 @dataclass
 class CrosshairConfig:
@@ -82,7 +79,6 @@ class CrosshairConfig:
     max_fps: float = 60.0
     use_gpu_rendering: bool = True
     cache_labels: bool = True
-
 
 class GPUCrosshairEngine(QObject):
     """GPU加速十字光标引擎"""

@@ -1,0 +1,21 @@
+{
+  "id": "approval_1758351738537_sfpz1e4i8",
+  "title": "Legacy Data Source Migration Requirements",
+  "filePath": ".spec-workflow/specs/legacy-data-source-migration/requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-20T07:02:18.537Z",
+  "category": "spec",
+  "categoryName": "legacy-data-source-migration",
+  "response": "Feedback Summary (1 comments):\n\nGeneral Comments:\n1. 使用中文\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"使用中文\",\n      \"timestamp\": \"2025-09-20T07:04:15.123Z\",\n      \"id\": \"comment_1758351855123_zqjliosqq\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nGeneral Comments:\\n1. 使用中文\\n\\n\",\n  \"timestamp\": \"2025-09-20T07:04:18.966Z\"\n}",
+  "respondedAt": "2025-09-20T07:04:18.971Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "使用中文",
+      "timestamp": "2025-09-20T07:04:15.123Z",
+      "id": "comment_1758351855123_zqjliosqq"
+    }
+  ]
+}

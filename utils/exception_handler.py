@@ -232,7 +232,7 @@ def setup_exception_handler(app: Optional[QApplication] = None):
         _global_handler = LoguruExceptionHandler(app)
         sys.excepthook = _global_handler.handle_exception
 
-        logger.success(" 基于Loguru的全局异常处理器已配置")
+        logger.success("基于Loguru的全局异常处理器已配置")
         logger.info("异常信息将被结构化记录并分析")
 
     except Exception as e:

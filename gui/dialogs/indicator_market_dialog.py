@@ -396,7 +396,7 @@ class IndicatorMarketDialog(QDialog):
 
         self.price_spin = QSpinBox()
         self.price_spin.setRange(0, 9999)
-        self.price_spin.setSuffix(" 元")
+        self.price_spin.setSuffix("元")
         publish_layout.addRow("价格:", self.price_spin)
 
         self.license_combo = QComboBox()

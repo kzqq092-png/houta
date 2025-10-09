@@ -233,7 +233,12 @@ class DuckDBConnectionPool:
                 with self._lock:
                     if conn_id in self._connection_info:
                         self._connection_info[conn_id].error_count += 1
-            logger.error(f"数据库连接使用错误: {e}")
+
+            # 表不存在是正常的降级情况，使用debug级别
+            if "does not exist" in str(e) or "Table with name" in str(e):
+                logger.debug(f"数据库表不存在（正常降级）: {e}")
+            else:
+                logger.error(f"数据库连接使用错误: {e}")
             raise
 
         finally:

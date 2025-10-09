@@ -5,7 +5,6 @@ from typing import List, Optional
 from .data_source import DataSource, DataSourceType, DataFrequency, MarketDataType
 from loguru import logger
 
-
 class AkshareDataSource(DataSource):
     """Akshare数据源"""
 

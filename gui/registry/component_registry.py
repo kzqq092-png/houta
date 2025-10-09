@@ -17,7 +17,6 @@ import inspect
 
 logger = logging.getLogger(__name__)
 
-
 class ComponentState(Enum):
     """组件状态枚举"""
     UNREGISTERED = "unregistered"
@@ -32,7 +31,6 @@ class ComponentState(Enum):
     DESTROYED = "destroyed"
     ERROR = "error"
 
-
 class ComponentType(Enum):
     """组件类型枚举"""
     WIDGET = "widget"
@@ -45,14 +43,12 @@ class ComponentType(Enum):
     MENU = "menu"
     CUSTOM = "custom"
 
-
 class LoadingStrategy(Enum):
     """加载策略枚举"""
     EAGER = "eager"          # 立即加载
     LAZY = "lazy"            # 延迟加载
     ON_DEMAND = "on_demand"  # 按需加载
     PRELOAD = "preload"      # 预加载
-
 
 @dataclass
 class ComponentDependency:
@@ -61,7 +57,6 @@ class ComponentDependency:
     required: bool = True
     version: Optional[str] = None
     load_order: int = 0  # 加载顺序，数字越小越先加载
-
 
 @dataclass
 class ComponentMetadata:
@@ -78,7 +73,6 @@ class ComponentMetadata:
     properties: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
 
-
 @dataclass
 class ComponentRegistration:
     """组件注册信息数据类"""
@@ -92,7 +86,6 @@ class ComponentRegistration:
     last_loaded: Optional[datetime] = None
     last_unloaded: Optional[datetime] = None
     error_message: Optional[str] = None
-
 
 class ComponentFactory:
     """组件工厂"""
@@ -146,7 +139,6 @@ class ComponentFactory:
     def get_template(self, component_id: str) -> Dict[str, Any]:
         """获取组件模板参数"""
         return self.templates.get(component_id, {})
-
 
 class DependencyResolver:
     """依赖解析器"""
@@ -247,7 +239,6 @@ class DependencyResolver:
         """清空缓存"""
         self.resolution_cache.clear()
 
-
 class ComponentLifecycleManager:
     """组件生命周期管理器"""
     
@@ -325,7 +316,6 @@ class ComponentLifecycleManager:
                     logger.error(f"执行生命周期钩子失败: {e}")
         except Exception as e:
             logger.error(f"执行生命周期钩子失败: {e}")
-
 
 class ComponentLoader:
     """组件加载器"""
@@ -454,7 +444,6 @@ class ComponentLoader:
                     break
         
         return dependents
-
 
 class ComponentRegistry(QObject):
     """UI组件注册管理器主类"""
@@ -697,15 +686,12 @@ class ComponentRegistry(QObject):
             logger.error(f"获取注册表统计失败: {e}")
             return {'error': str(e)}
 
-
 # 全局实例
 component_registry = ComponentRegistry()
-
 
 def get_component_registry() -> ComponentRegistry:
     """获取组件注册表实例"""
     return component_registry
-
 
 def register_component(component_id: str, name: str, factory: Callable, **metadata_kwargs) -> bool:
     """注册组件的便捷函数"""
@@ -716,11 +702,9 @@ def register_component(component_id: str, name: str, factory: Callable, **metada
     )
     return get_component_registry().register_component(metadata, factory)
 
-
 def load_component(component_id: str, **kwargs) -> Optional[QWidget]:
     """加载组件的便捷函数"""
     return get_component_registry().load_component(component_id, **kwargs)
-
 
 def get_component(component_id: str) -> Optional[QWidget]:
     """获取组件的便捷函数"""

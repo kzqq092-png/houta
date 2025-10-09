@@ -12,7 +12,6 @@ from typing import Dict, Any, List
 
 logger = logger
 
-
 def init_qt_types():
     """
     集中注册所有需要跨线程使用的自定义信号和复杂数据类型。
@@ -48,7 +47,6 @@ def init_qt_types():
         logger.error(f"Failed to register custom event types: {e}")
 
     logger.info("Qt type registration completed.")
-
 
 # 确保类型注册在模块导入时就执行
 init_qt_types()

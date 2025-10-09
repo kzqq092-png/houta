@@ -15,7 +15,6 @@ from ..data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckR
 from ..plugin_types import AssetType, DataType
 from ..data_source import DataSource
 
-
 class LegacyDataSourceAdapter(IDataSourcePlugin):
     """
     传统数据源适配器

@@ -5,10 +5,8 @@ from hikyuu.trade_sys import SignalBase
 from hikyuu.indicator import MA, MACD, RSI, KDJ, CLOSE, VOL, ATR, CCI, OBV, DMI
 # 已替换为新的导入
 
-
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 from loguru import logger
-
 
 class EnhancedSignal(SignalBase):
     """

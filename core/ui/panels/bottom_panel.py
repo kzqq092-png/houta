@@ -16,7 +16,6 @@ import re
 import sys
 from datetime import datetime
 
-
 class LogHandler:
     """自定义日志处理器，将Loguru日志输出到UI（已迁移到Loguru）"""
 
@@ -50,7 +49,6 @@ class LogHandler:
         except:
             pass
 
-
     def update_level(self, level: str):
         """更新日志级别"""
         if level != self.current_level:
@@ -64,7 +62,6 @@ class LogHandler:
             self.current_level = level
             self.handler_id = logger.add(self._loguru_sink, level=level)
             logger.debug(f"UI日志处理器级别已更新为: {level}")
-
 
 class LogWidget(QTextEdit):
     """日志显示组件"""
@@ -117,12 +114,10 @@ class LogWidget(QTextEdit):
         cursor.movePosition(QTextCursor.End)
         self.setTextCursor(cursor)
 
-
     def add_log(self, timestamp: str, level: str, message: str):
         """为LogHandler兼容性提供的方法"""
         formatted_message = f"[{timestamp}] {message}"
         self.append_log(formatted_message, level)
-
 
 class BottomPanel(BasePanel):
     """底部面板 - 日志显示和系统状态"""
@@ -274,7 +269,6 @@ class BottomPanel(BasePanel):
 
         self.log_level_changed.emit(level)
 
-
         logger.info(f"日志级别已设置为: {level}")
 
     def _on_search_text_changed(self, text: str):
@@ -324,14 +318,12 @@ class BottomPanel(BasePanel):
             # 如果方法不存在，忽略
             pass
 
-
         logger.info(f"最大日志行数已设置为: {value}")
 
     def _clear_logs(self):
         """清空日志"""
         self.log_widget.clear()
         self.log_cleared.emit()
-
 
         logger.info("日志已清空")
 
@@ -358,7 +350,6 @@ class BottomPanel(BasePanel):
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(log_content)
 
-        
                 logger.info(f"日志已导出到: {filename}")
 
         except Exception as e:

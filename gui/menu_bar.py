@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QIcon
 import traceback
 from utils.theme import get_theme_manager
-from loguru import logger
+from core.importdata.intelligent_config_manager import IntelligentConfigManager
 
 
 class MainMenuBar(QMenuBar):
@@ -181,6 +181,41 @@ class MainMenuBar(QMenuBar):
 
             self.view_menu.addSeparator()
 
+            # 增强功能子菜单
+            self.enhanced_menu = self.view_menu.addMenu("[INFO] 增强功能")
+
+            # Level-2数据面板
+            self.level2_panel_action = QAction("Level-2 数据面板", self)
+            self.level2_panel_action.setCheckable(True)
+            self.level2_panel_action.setStatusTip("显示/隐藏Level-2行情数据面板")
+            self.enhanced_menu.addAction(self.level2_panel_action)
+
+            # 订单簿深度
+            self.orderbook_action = QAction("订单簿深度", self)
+            self.orderbook_action.setCheckable(True)
+            self.orderbook_action.setStatusTip("显示/隐藏订单簿深度分析")
+            self.enhanced_menu.addAction(self.orderbook_action)
+
+            # 基本面分析
+            self.fundamental_action = QAction("基本面分析", self)
+            self.fundamental_action.setCheckable(True)
+            self.fundamental_action.setStatusTip("显示/隐藏基本面分析标签页")
+            self.enhanced_menu.addAction(self.fundamental_action)
+
+            # 数据质量监控
+            self.quality_monitor_action = QAction("数据质量监控", self)
+            self.quality_monitor_action.setCheckable(True)
+            self.quality_monitor_action.setStatusTip("显示/隐藏数据质量监控面板")
+            self.enhanced_menu.addAction(self.quality_monitor_action)
+
+            # 智能推荐
+            self.smart_recommendation_action = QAction("智能推荐", self)
+            self.smart_recommendation_action.setCheckable(True)
+            self.smart_recommendation_action.setStatusTip("显示/隐藏智能推荐面板")
+            self.enhanced_menu.addAction(self.smart_recommendation_action)
+
+            self.view_menu.addSeparator()
+
             # 主题切换子菜单
             self.theme_menu = self.view_menu.addMenu("主题")
             self.default_theme_action = QAction("默认主题", self)
@@ -298,35 +333,16 @@ class MainMenuBar(QMenuBar):
                 logger.error(f"初始化策略菜单失败: {str(e)}")
 
     def init_data_menu(self):
-        """初始化数据菜单（含数据源切换）"""
+        """初始化数据菜单"""
         try:
-            # 数据源子菜单
-            self.data_source_menu = self.data_menu.addMenu("数据源切换")
-            self.data_source_hikyuu = QAction("Hikyuu", self)
-            self.data_source_eastmoney = QAction("东方财富", self)
-            self.data_source_sina = QAction("新浪", self)
-            self.data_source_tonghuashun = QAction("同花顺", self)
-            self.data_source_menu.addAction(self.data_source_hikyuu)
-            self.data_source_menu.addAction(self.data_source_eastmoney)
-            self.data_source_menu.addAction(self.data_source_sina)
-            self.data_source_menu.addAction(self.data_source_tonghuashun)
-
-            self.data_menu.addSeparator()
-
             # 数据导入子菜单 - 专业级DuckDB导入系统
             self.data_import_menu = self.data_menu.addMenu("股票数据导入")
 
             # DuckDB专业数据导入（统一入口）
-            self.enhanced_import_action = QAction("K线数据导入", self)
+            self.enhanced_import_action = QAction("K线专业数据导入", self)
             self.enhanced_import_action.setStatusTip("打开DuckDB专业数据导入系统（集成AI智能优化、任务管理、分布式执行、质量监控）")
             self.enhanced_import_action.setShortcut("Ctrl+Shift+I")
             self.data_import_menu.addAction(self.enhanced_import_action)
-
-            # 数据导入监控
-            self.import_monitor_action = QAction("导入监控仪表板", self)
-            self.import_monitor_action.setStatusTip("实时监控数据导入状态和性能")
-            self.import_monitor_action.setShortcut("Ctrl+Shift+M")
-            self.data_import_menu.addAction(self.import_monitor_action)
 
             self.data_import_menu.addSeparator()
 
@@ -405,24 +421,24 @@ class MainMenuBar(QMenuBar):
             self.tools_menu.addSeparator()
 
             # 插件管理子菜单
-            self.plugin_menu = self.tools_menu.addMenu(" 插件管理")
+            self.plugin_menu = self.tools_menu.addMenu("插件管理")
 
             # 数据源插件管理
-            self.data_source_plugin_action = QAction(" 数据源插件", self)
+            self.data_source_plugin_action = QAction("数据源插件", self)
             self.data_source_plugin_action.setStatusTip("管理数据源插件：配置、路由和监控")
             self.data_source_plugin_action.setShortcut("Ctrl+Shift+D")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.data_source_plugin_action)
 
             # 通用插件管理
-            self.plugin_manager_action = QAction(" 通用插件", self)
+            self.plugin_manager_action = QAction("通用插件", self)
             self.plugin_manager_action.setStatusTip("管理所有插件：启用、配置和监控")
             self.plugin_manager_action.setShortcut("Ctrl+Shift+P")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.plugin_manager_action)
 
             # 情绪数据插件
-            self.sentiment_plugin_action = QAction(" 情绪数据插件", self)
+            self.sentiment_plugin_action = QAction("情绪数据插件", self)
             self.sentiment_plugin_action.setStatusTip("管理情绪分析数据源插件")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.sentiment_plugin_action)
@@ -430,7 +446,7 @@ class MainMenuBar(QMenuBar):
             self.plugin_menu.addSeparator()
 
             # 插件市场
-            self.plugin_market_action = QAction(" 插件市场", self)
+            self.plugin_market_action = QAction("插件市场", self)
             self.plugin_market_action.setStatusTip("浏览和安装新插件")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.plugin_market_action)
@@ -541,7 +557,7 @@ class MainMenuBar(QMenuBar):
             self.advanced_menu.addAction(self.batch_analysis_action)
 
             # GPU加速配置
-            self.gpu_config_action = QAction(" GPU加速配置", self)
+            self.gpu_config_action = QAction("GPU加速配置", self)
             self.gpu_config_action.setStatusTip("配置GPU加速设置")
             self.advanced_menu.addAction(self.gpu_config_action)
 
@@ -951,6 +967,13 @@ class MainMenuBar(QMenuBar):
                 # ('backtest_panel_action', '_on_toggle_backtest_panel'),  # 已合并到专业回测
                 ('refresh_action', '_on_refresh'),
 
+                # 增强功能菜单
+                ('level2_panel_action', '_on_toggle_level2_panel'),
+                ('orderbook_action', '_on_toggle_orderbook_panel'),
+                ('fundamental_action', '_on_toggle_fundamental_panel'),
+                ('quality_monitor_action', '_on_toggle_quality_monitor_panel'),
+                ('smart_recommendation_action', '_on_toggle_smart_recommendation_panel'),
+
                 # 主题相关
                 ('default_theme_action', '_on_default_theme'),
                 ('light_theme_action', '_on_light_theme'),
@@ -979,7 +1002,6 @@ class MainMenuBar(QMenuBar):
                 ('data_quality_action', '_on_data_quality_check'),
                 ('data_management_center_action', '_on_data_management_center'),
                 ('enhanced_import_action', '_on_enhanced_import'),  # DuckDB专业数据导入（统一入口）
-                ('import_monitor_action', '_on_import_monitor'),
                 ('scheduled_import_action', '_on_scheduled_import'),
                 ('import_history_action', '_on_import_history'),
 

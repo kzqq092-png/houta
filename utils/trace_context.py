@@ -9,10 +9,8 @@ import contextvars
 import uuid
 from typing import Optional
 
-
 # 创建 trace_id 上下文变量
 trace_id_var = contextvars.ContextVar('trace_id', default='')
-
 
 def generate_trace_id() -> str:
     """生成新的 trace_id
@@ -21,7 +19,6 @@ def generate_trace_id() -> str:
         str: 新生成的 trace_id
     """
     return str(uuid.uuid4())[:8]
-
 
 def set_trace_id(trace_id: Optional[str] = None) -> str:
     """设置当前上下文的 trace_id
@@ -37,7 +34,6 @@ def set_trace_id(trace_id: Optional[str] = None) -> str:
     trace_id_var.set(trace_id)
     return trace_id
 
-
 def get_trace_id() -> str:
     """获取当前上下文的 trace_id
 
@@ -46,11 +42,9 @@ def get_trace_id() -> str:
     """
     return trace_id_var.get()
 
-
 def clear_trace_id():
     """清除当前上下文的 trace_id"""
     trace_id_var.set('')
-
 
 class TraceIdFilter:
     """Loguru日志过滤器，为日志记录添加 trace_id"""
@@ -66,7 +60,6 @@ class TraceIdFilter:
         """
         record["extra"]["trace_id"] = get_trace_id()
         return True
-
 
 class TraceContext:
     """trace_id 上下文管理器"""
@@ -90,7 +83,6 @@ class TraceContext:
         """退出上下文，恢复旧的 trace_id"""
         set_trace_id(self.old_trace_id)
 
-
 def with_trace_id(trace_id: Optional[str] = None):
     """装饰器：为函数调用设置 trace_id
 
@@ -103,7 +95,6 @@ def with_trace_id(trace_id: Optional[str] = None):
                 return func(*args, **kwargs)
         return wrapper
     return decorator
-
 
 # 导出主要接口
 __all__ = [

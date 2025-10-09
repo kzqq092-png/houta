@@ -8,10 +8,8 @@ from typing import List, Dict, Any, Optional
 import time
 # 已替换为新的导入
 
-
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 from loguru import logger
-
 
 class AsyncDataProcessor(QObject):
     """异步数据处理器，处理大数据量的计算和渲染"""

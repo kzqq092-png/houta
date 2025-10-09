@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-
 def filter_signals_by_strength(df, signal_col='signal', threshold=0.6, strength_cols=None):
     """
     根据信号强度过滤交易信号
@@ -56,7 +55,6 @@ def filter_signals_by_strength(df, signal_col='signal', threshold=0.6, strength_
 
     return result
 
-
 def filter_signals_by_market_regime(df, signal_col='signal', regime_col='market_regime'):
     """
     根据市场状态过滤交易信号
@@ -95,7 +93,6 @@ def filter_signals_by_market_regime(df, signal_col='signal', regime_col='market_
     print(f"按市场状态过滤后，移除了 {filtered_out} 个不符合市场状态的信号")
 
     return result
-
 
 def filter_signals_by_volatility(df, signal_col='signal', volatility_col='volatility_regime', threshold=1.5):
     """
@@ -154,7 +151,6 @@ def filter_signals_by_volatility(df, signal_col='signal', volatility_col='volati
     print(f"按波动率过滤后，移除了 {filtered_out} 个高波动率期间的信号")
 
     return result
-
 
 def combine_signal_filters(df, original_signal_col='signal', filter_cols=None):
     """
@@ -220,7 +216,6 @@ def combine_signal_filters(df, original_signal_col='signal', filter_cols=None):
             f"合并所有过滤器后，保留了 {total_signals - filtered_out} 个信号，过滤掉了 {filtered_out} 个信号 ({filter_rate:.1f}%)")
 
     return result
-
 
 def apply_confirmed_reversal_filter(df, signal_col='signal', trend_reversal_col='trend_reversal'):
     """

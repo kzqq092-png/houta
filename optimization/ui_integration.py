@@ -7,7 +7,6 @@ UI集成组件
 """
 
 from analysis.pattern_manager import PatternManager
-from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 from optimization.version_manager import VersionManager
 from optimization.auto_tuner import AutoTuner, TuningTask, OptimizationConfig
 import sys
@@ -33,12 +32,11 @@ try:
     from PyQt5.QtGui import QFont, QIcon, QPixmap, QTextCursor
     GUI_AVAILABLE = True
 except ImportError:
-    logger.info("  PyQt5 未安装，UI功能将受限")
+    logger.info("PyQt5 未安装，UI功能将受限")
     GUI_AVAILABLE = False
 
 # 导入优化系统组件
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 @dataclass
 class UIConfig:
@@ -48,7 +46,6 @@ class UIConfig:
     auto_refresh: bool = True
     refresh_interval: int = 1000  # 毫秒
     show_debug_info: bool = False
-
 
 class OptimizationWorker(QThread if GUI_AVAILABLE else QObject):
     """优化工作线程"""
@@ -110,7 +107,6 @@ class OptimizationWorker(QThread if GUI_AVAILABLE else QObject):
                     self.current_task or "unknown", str(e))
         finally:
             self.is_running = False
-
 
 class OptimizationDialog(QDialog if GUI_AVAILABLE else object):
     """优化配置对话框"""
@@ -187,7 +183,7 @@ class OptimizationDialog(QDialog if GUI_AVAILABLE else object):
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(5, 120)
         self.timeout_spin.setValue(30)
-        self.timeout_spin.setSuffix(" 分钟")
+        self.timeout_spin.setSuffix("分钟")
         advanced_layout.addRow("超时时间:", self.timeout_spin)
 
         advanced_group.setLayout(advanced_layout)
@@ -218,7 +214,6 @@ class OptimizationDialog(QDialog if GUI_AVAILABLE else object):
             target_metric=self.target_combo.currentText(),
             timeout_minutes=self.timeout_spin.value()
         )
-
 
 class VersionManagerDialog(QDialog if GUI_AVAILABLE else object):
     """版本管理对话框"""
@@ -369,7 +364,6 @@ class VersionManagerDialog(QDialog if GUI_AVAILABLE else object):
             QMessageBox.information(self, "成功", f"版本已导出到: {export_path}")
         else:
             QMessageBox.critical(self, "错误", "版本导出失败")
-
 
 class UIIntegration:
     """UI集成主类"""
@@ -644,7 +638,7 @@ class UIIntegration:
             if reply != QMessageBox.Yes:
                 return
 
-        logger.info(" 启动批量优化...")
+        logger.info("启动批量优化...")
         result = self.auto_tuner.one_click_optimize()
 
         summary = result.get("summary", {})
@@ -663,11 +657,9 @@ class UIIntegration:
         else:
             logger.info(f" {message}")
 
-
 def create_ui_integration(debug_mode: bool = False) -> UIIntegration:
     """创建UI集成实例"""
     return UIIntegration(debug_mode=debug_mode)
-
 
 # 便捷函数
 def show_pattern_menu(pattern_name: str, parent_widget=None) -> Optional['QMenu']:
@@ -675,12 +667,10 @@ def show_pattern_menu(pattern_name: str, parent_widget=None) -> Optional['QMenu'
     ui_integration = create_ui_integration()
     return ui_integration.create_pattern_context_menu(pattern_name)
 
-
 def quick_optimize_pattern(pattern_name: str):
     """快速优化形态的便捷函数"""
     ui_integration = create_ui_integration()
     ui_integration.quick_optimize(pattern_name)
-
 
 if __name__ == "__main__":
     # 测试UI集成
@@ -700,7 +690,7 @@ if __name__ == "__main__":
 
         sys.exit(app.exec_())
     else:
-        logger.info(" 测试UI集成（无GUI模式）")
+        logger.info("测试UI集成（无GUI模式）")
         ui_integration = create_ui_integration(debug_mode=True)
 
         # 测试快速优化

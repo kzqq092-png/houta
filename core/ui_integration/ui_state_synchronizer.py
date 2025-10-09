@@ -39,7 +39,6 @@ except ImportError as e:
 
 logger = logger.bind(module=__name__) if hasattr(logger, 'bind') else logging.getLogger(__name__)
 
-
 class StateChangeType(Enum):
     """状态变更类型"""
     CREATE = "create"
@@ -47,13 +46,11 @@ class StateChangeType(Enum):
     DELETE = "delete"
     SYNC = "sync"
 
-
 class StateSyncDirection(Enum):
     """状态同步方向"""
     UI_TO_BUSINESS = "ui_to_business"
     BUSINESS_TO_UI = "business_to_ui"
     BIDIRECTIONAL = "bidirectional"
-
 
 class StateConflictResolution(Enum):
     """状态冲突解决策略"""
@@ -61,7 +58,6 @@ class StateConflictResolution(Enum):
     BUSINESS_WINS = "business_wins"
     MERGE = "merge"
     USER_DECIDE = "user_decide"
-
 
 @dataclass
 class StateChange:
@@ -76,7 +72,6 @@ class StateChange:
     source: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-
 @dataclass
 class StateConflict:
     """状态冲突"""
@@ -87,7 +82,6 @@ class StateConflict:
     ui_timestamp: datetime
     business_timestamp: datetime
     conflict_fields: List[str] = field(default_factory=list)
-
 
 @dataclass
 class SyncConfiguration:
@@ -100,7 +94,6 @@ class SyncConfiguration:
     enable_persistence: bool = True
     sync_fields: Optional[Set[str]] = None  # 需要同步的字段，None表示全部
     ignore_fields: Set[str] = field(default_factory=set)  # 忽略的字段
-
 
 class StateProvider(ABC):
     """状态提供者抽象基类"""
@@ -124,7 +117,6 @@ class StateProvider(ABC):
     def list_entities(self, entity_type: str) -> List[str]:
         """列出实体ID"""
         pass
-
 
 class UIStateProvider(StateProvider):
     """UI状态提供者"""
@@ -152,7 +144,6 @@ class UIStateProvider(StateProvider):
     def list_entities(self, entity_type: str) -> List[str]:
         with self._lock:
             return list(self._states[entity_type].keys())
-
 
 class BusinessStateProvider(StateProvider):
     """业务逻辑状态提供者"""
@@ -229,7 +220,6 @@ class BusinessStateProvider(StateProvider):
         except Exception as e:
             logger.error(f"列出实体失败 ({entity_type}): {e}")
             return []
-
 
 class UIStateSynchronizer(QObject):
     """UI状态同步器"""
@@ -635,10 +625,8 @@ class UIStateSynchronizer(QObject):
             'registered_configs': list(self.sync_configs.keys())
         }
 
-
 # 全局同步器实例
 _synchronizer_instance: Optional[UIStateSynchronizer] = None
-
 
 def get_ui_synchronizer(ui_adapter=None) -> UIStateSynchronizer:
     """获取UI同步器实例（单例模式）"""
@@ -648,7 +636,6 @@ def get_ui_synchronizer(ui_adapter=None) -> UIStateSynchronizer:
         _synchronizer_instance = UIStateSynchronizer(ui_adapter)
 
     return _synchronizer_instance
-
 
 def initialize_ui_synchronizer(ui_adapter) -> UIStateSynchronizer:
     """初始化UI同步器"""

@@ -1758,7 +1758,7 @@ class UnifiedIndicatorServiceEnhanced(UnifiedIndicatorService):
 
 if __name__ == '__main__':
     # 测试统一服务
-    logger.info(" 测试统一指标服务...")
+    logger.info("测试统一指标服务...")
 
     try:
         service = UnifiedIndicatorService()
@@ -1776,7 +1776,7 @@ if __name__ == '__main__':
         logger.info(f" 共有 {len(patterns)} 个形态")
 
         service.close()
-        logger.info(" 统一指标服务测试通过")
+        logger.info("统一指标服务测试通过")
 
     except Exception as e:
         logger.info(f" 测试失败: {str(e)}")

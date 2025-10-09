@@ -10,9 +10,7 @@ from typing import Any, Dict, List, Optional, Type
 from ..events import EventBus, get_event_bus, BaseEvent
 from ..containers import ServiceContainer, get_service_container
 
-
 logger = logger
-
 
 class BaseCoordinator(ABC):
     """
@@ -199,7 +197,6 @@ class BaseCoordinator(ABC):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.dispose()
 
-
 class UICoordinator(BaseCoordinator):
     """
     UI协调器基类
@@ -268,7 +265,6 @@ class UICoordinator(BaseCoordinator):
         """清理UI组件"""
         self._ui_components.clear()
         super()._do_dispose()
-
 
 class AsyncCoordinator(BaseCoordinator):
     """

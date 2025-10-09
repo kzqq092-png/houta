@@ -531,7 +531,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
                         self.metadata.name, self._config)
 
             except ValueError:
-                result_text.setPlainText(" 配置格式错误")
+                result_text.setPlainText("配置格式错误")
                 result_text.setStyleSheet("color: red;")
 
         test_btn.clicked.connect(test_connection)
@@ -589,9 +589,13 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
         from core.data_source_extensions import ConnectionInfo
         return ConnectionInfo(
             is_connected=self.is_connected(),
-            server_info="localhost",
-            connection_params={},
-            message="健康"
+            connection_time=self.connection_time,
+            last_activity=self.last_activity,
+            connection_params={
+                "server_info": "localhost",
+                "api_timeout": self.config.get('api_timeout', 30)
+            },
+            error_message=self.last_error
         )
 
     def health_check(self):

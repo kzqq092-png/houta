@@ -74,7 +74,7 @@ class DataSourceMetrics:
 @dataclass
 class CircuitBreakerConfig:
     """熔断器配置"""
-    failure_threshold: int = 5           # 失败阈值
+    failure_threshold: int = 15          # 失败阈值
     failure_rate_threshold: float = 0.5  # 失败率阈值
     recovery_timeout_ms: int = 60000     # 恢复超时时间（毫秒）
     half_open_max_calls: int = 3         # 半开状态最大调用次数
@@ -692,21 +692,34 @@ class DataSourceRouter:
         for source_id, adapter in self.data_sources.items():
             if source_id not in available:
                 try:
+                    logger.debug(f"正在检查数据源 {source_id} 的插件信息...")
                     plugin_info = adapter.get_plugin_info()
+                    logger.debug(f"数据源 {source_id} 插件信息获取成功，支持的资产类型: {plugin_info.supported_asset_types}")
                     if asset_type in plugin_info.supported_asset_types:
                         available.append(source_id)
+                        logger.debug(f"数据源 {source_id} 支持资产类型 {asset_type}")
                 except Exception as e:
+                    import traceback
                     logger.error(f"检查数据源 {source_id} 支持的资产类型失败: {str(e)}")
+                    logger.error(f"详细错误信息: {traceback.format_exc()}")
+                    # 尝试获取适配器类型信息
+                    logger.error(f"适配器类型: {type(adapter)}")
+                    if hasattr(adapter, '__class__'):
+                        logger.error(f"适配器类名: {adapter.__class__.__name__}")
+                    if hasattr(adapter, 'get_plugin_info'):
+                        logger.error(f"适配器有get_plugin_info方法: True")
+                    else:
+                        logger.error(f"适配器没有get_plugin_info方法: False")
 
         return available
 
     def has_data_source(self, source_id: str) -> bool:
         """
         检查是否存在指定的数据源
-        
+
         Args:
             source_id: 数据源ID
-            
+
         Returns:
             bool: 数据源是否存在
         """

@@ -28,7 +28,6 @@ sys.path.insert(0, os.path.abspath(
 
 # Loguru 日志配置已在全局配置中设置，无需额外配置
 
-
 def get_indicator_english_name(name: str) -> str:
     """
     根据中文指标名称获取英文名称
@@ -90,7 +89,6 @@ def get_indicator_english_name(name: str) -> str:
         }
         return backup_mapping.get(name, name)
 
-
 def calc_talib_indicator(name: str, df: pd.DataFrame, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
     """
     计算指标的适配函数，兼容旧的 calc_talib_indicator 接口
@@ -108,7 +106,6 @@ def calc_talib_indicator(name: str, df: pd.DataFrame, params: Optional[Dict[str,
     except Exception as e:
         logger.error(f"计算指标 {name} 时发生错误: {str(e)}")
         return df
-
 
 def calc_ma(close: pd.Series, n: int) -> pd.Series:
     """
@@ -132,7 +129,6 @@ def calc_ma(close: pd.Series, n: int) -> pd.Series:
         return result['MA']
     else:
         return pd.Series([float('nan')] * len(close), index=close.index, name=f"MA{n}")
-
 
 def calc_macd(close: pd.Series, fast=12, slow=26, signal=9) -> Tuple[pd.Series, pd.Series, pd.Series]:
     """
@@ -172,7 +168,6 @@ def calc_macd(close: pd.Series, fast=12, slow=26, signal=9) -> Tuple[pd.Series, 
                       index=close.index, name="MACD_hist")
         )
 
-
 def calc_rsi(close: pd.Series, n=14) -> pd.Series:
     """
     计算RSI指标的适配函数，兼容旧的 calc_rsi 接口
@@ -195,7 +190,6 @@ def calc_rsi(close: pd.Series, n=14) -> pd.Series:
         return result['RSI']
     else:
         return pd.Series([float('nan')] * len(close), index=close.index, name=f"RSI{n}")
-
 
 def calc_kdj(df: pd.DataFrame, n=9, m1=3, m2=3) -> Tuple[pd.Series, pd.Series, pd.Series]:
     """
@@ -232,7 +226,6 @@ def calc_kdj(df: pd.DataFrame, n=9, m1=3, m2=3) -> Tuple[pd.Series, pd.Series, p
             pd.Series([float('nan')] * len(df), index=idx, name="D"),
             pd.Series([float('nan')] * len(df), index=idx, name="J")
         )
-
 
 def calc_boll(close: pd.Series, n=20, p=2) -> Tuple[pd.Series, pd.Series, pd.Series]:
     """
@@ -274,7 +267,6 @@ def calc_boll(close: pd.Series, n=20, p=2) -> Tuple[pd.Series, pd.Series, pd.Ser
                       index=close.index, name="BOLL_lower")
         )
 
-
 def calc_atr(df: pd.DataFrame, n=14) -> pd.Series:
     """
     计算ATR指标的适配函数，兼容旧的 calc_atr 接口
@@ -295,7 +287,6 @@ def calc_atr(df: pd.DataFrame, n=14) -> pd.Series:
     else:
         return pd.Series([float('nan')] * len(df), index=df.index, name=f"ATR{n}")
 
-
 def calc_obv(df: pd.DataFrame) -> pd.Series:
     """
     计算OBV指标的适配函数，兼容旧的 calc_obv 接口
@@ -314,7 +305,6 @@ def calc_obv(df: pd.DataFrame) -> pd.Series:
         return result['OBV']
     else:
         return pd.Series([float('nan')] * len(df), index=df.index, name="OBV")
-
 
 def calc_cci(df: pd.DataFrame, n=14) -> pd.Series:
     """
@@ -335,7 +325,6 @@ def calc_cci(df: pd.DataFrame, n=14) -> pd.Series:
         return result['CCI']
     else:
         return pd.Series([float('nan')] * len(df), index=df.index, name=f"CCI{n}")
-
 
 def get_talib_indicator_list() -> List[str]:
     """
@@ -382,7 +371,6 @@ def get_talib_indicator_list() -> List[str]:
         logger.error(f"获取TA-Lib指标列表失败: {e}")
         return ['MA', 'EMA', 'MACD', 'RSI', 'BBANDS']
 
-
 def get_indicator_category_by_name(name: str) -> str:
     """
     根据指标名称获取指标分类
@@ -414,7 +402,6 @@ def get_indicator_category_by_name(name: str) -> str:
     }
 
     return category_map.get(category_id, "其他")
-
 
 def get_talib_chinese_name(english_name: str) -> str:
     """
@@ -459,7 +446,6 @@ def get_talib_chinese_name(english_name: str) -> str:
     }
 
     return chinese_name_map.get(english_name.upper(), english_name)
-
 
 def get_indicator_params_config(english_name: str) -> Optional[Dict[str, Any]]:
     """
@@ -535,7 +521,6 @@ def get_indicator_params_config(english_name: str) -> Optional[Dict[str, Any]]:
 
         return default_configs.get(english_name.upper())
 
-
 def get_indicator_default_params(indicator_name: str) -> dict:
     """
     获取指标默认参数
@@ -556,7 +541,6 @@ def get_indicator_default_params(indicator_name: str) -> dict:
             default_params[param_name] = param_info.get("default")
 
     return default_params
-
 
 def get_indicator_inputs(indicator_name: str) -> list:
     """
@@ -643,7 +627,6 @@ def get_indicator_inputs(indicator_name: str) -> list:
 
     # 默认返回close
     return ['close']
-
 
 def get_all_indicators_by_category(use_chinese: bool = False) -> Dict[str, List[str]]:
     """

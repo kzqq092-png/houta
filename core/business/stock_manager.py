@@ -15,7 +15,6 @@ from datetime import datetime
 from ..data.models import StockInfo, QueryParams
 from ..data.data_access import DataAccess
 
-
 class StockManager:
     """股票管理器"""
 

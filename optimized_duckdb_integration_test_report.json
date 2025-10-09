@@ -1,0 +1,63 @@
+{
+  "test_summary": {
+    "total_tests": 7,
+    "passed_tests": 7,
+    "failed_tests": 0,
+    "success_rate": "100.0%",
+    "test_time": "2025-09-25T21:08:37.507021"
+  },
+  "test_results": [
+    {
+      "test_name": "核心组件导入测试",
+      "success": true,
+      "details": "所有核心组件导入成功",
+      "error": "",
+      "timestamp": "2025-09-25T21:08:33.896124"
+    },
+    {
+      "test_name": "UI组件测试",
+      "success": true,
+      "details": "所有UI组件导入成功",
+      "error": "",
+      "timestamp": "2025-09-25T21:08:34.067015"
+    },
+    {
+      "test_name": "数据结构测试",
+      "success": true,
+      "details": "数据源配置: True, 导入任务配置: True",
+      "error": "",
+      "timestamp": "2025-09-25T21:08:34.068019"
+    },
+    {
+      "test_name": "UI适配器功能测试",
+      "success": true,
+      "details": "连接测试: False, 配置验证: True, 任务ID: task_20250925_210835_0",
+      "error": "",
+      "timestamp": "2025-09-25T21:08:37.463713"
+    },
+    {
+      "test_name": "配置管理测试",
+      "success": true,
+      "details": "导出: True, 导入: True",
+      "error": "",
+      "timestamp": "2025-09-25T21:08:37.475248"
+    },
+    {
+      "test_name": "菜单集成测试",
+      "success": true,
+      "details": "菜单项存在: True, 处理方法存在: True",
+      "error": "",
+      "timestamp": "2025-09-25T21:08:37.502061"
+    },
+    {
+      "test_name": "系统集成测试",
+      "success": true,
+      "details": "演示窗口创建: True, 启动按钮存在: True",
+      "error": "",
+      "timestamp": "2025-09-25T21:08:37.506142"
+    }
+  ],
+  "recommendations": [
+    "所有测试通过，系统集成成功"
+  ]
+}

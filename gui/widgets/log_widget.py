@@ -15,7 +15,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from PyQt5.QtCore import QMetaObject, Qt, Q_ARG
 
-
 class DragHandle(QWidget):
     """顶部可拖动分隔条"""
 
@@ -53,7 +52,6 @@ class DragHandle(QWidget):
         self._drag_start_pos = None
         self._orig_height = None
         event.accept()
-
 
 class LogWidget(QWidget):
     """日志控件类"""
@@ -840,7 +838,6 @@ class LogWidget(QWidget):
         dialog.resize(900, 700)
         dialog.exec_()
 
-
 def _get_popup_filtered_logs_html(self, level_combo, search_box):
     """获取弹窗中经过筛选的日志HTML内容"""
     # 获取筛选条件
@@ -880,7 +877,6 @@ def _get_popup_filtered_logs_html(self, level_combo, search_box):
         return '<div style="color:#888;text-align:center;margin-top:40px;">暂无符合条件的日志</div>'
     return "".join(filtered_logs)
 
-
 def refresh_popup(self):
     """刷新弹窗内容 - 线程安全版本"""
     if not hasattr(self, 'popup_dialog') or not self.popup_dialog or not hasattr(self, '_popup_log_text') or not self._popup_log_text:
@@ -899,7 +895,6 @@ def refresh_popup(self):
 
     # 使用单次计时器在主线程中移动光标
     QTimer.singleShot(0, lambda: self._move_cursor_to_end(self._popup_log_text))
-
 
 def _move_cursor_to_end(self, text_edit):
     """在主线程中安全地将光标移动到文本末尾"""

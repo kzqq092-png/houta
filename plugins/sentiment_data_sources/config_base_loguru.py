@@ -12,7 +12,6 @@ import json
 import os
 from datetime import datetime
 
-
 @dataclass
 class PluginConfigField:
     """插件配置字段定义"""
@@ -28,7 +27,6 @@ class PluginConfigField:
     validation_regex: Optional[str] = None  # 验证正则表达式
     placeholder: str = ""               # 输入框占位符
     group: str = "基本设置"             # 配置分组
-
 
 class ConfigurablePlugin(ABC):
     """可配置插件基类 - 纯Loguru版本"""
@@ -203,12 +201,10 @@ class ConfigurablePlugin(ABC):
         plugin_name = getattr(self, '__class__').__name__
         safe_log(level, message, plugin_name=plugin_name)
 
-
 def create_config_file_path(plugin_name: str) -> str:
     """创建配置文件路径"""
     config_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'sentiment_plugins')
     return os.path.join(config_dir, f"{plugin_name}.json")
-
 
 def validate_api_key(api_key: str, required_format: str = None) -> tuple[bool, str]:
     """验证API Key格式"""
@@ -224,7 +220,6 @@ def validate_api_key(api_key: str, required_format: str = None) -> tuple[bool, s
             return False, f"API Key格式不符合要求: {required_format}"
 
     return True, "API Key格式正确"
-
 
 def validate_number_range(value: Union[int, float], min_val: float = None, max_val: float = None) -> tuple[bool, str]:
     """验证数值范围"""

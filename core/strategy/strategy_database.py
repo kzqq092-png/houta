@@ -20,7 +20,6 @@ from contextlib import contextmanager
 from core.adapters import get_config, get_data_validator
 from .base_strategy import BaseStrategy, StrategySignal, StrategyParameter
 
-
 class StrategyDatabaseManager:
     """策略数据库管理器"""
 
@@ -764,11 +763,9 @@ class StrategyDatabaseManager:
             self.logger.error(f"获取数据库统计失败: {e}")
             return {}
 
-
 # 全局单例实例
 _strategy_db_manager = None
 _db_lock = threading.Lock()
-
 
 def get_strategy_database_manager() -> StrategyDatabaseManager:
     """获取策略数据库管理器单例"""
@@ -780,7 +777,6 @@ def get_strategy_database_manager() -> StrategyDatabaseManager:
                 _strategy_db_manager = StrategyDatabaseManager()
 
     return _strategy_db_manager
-
 
 def initialize_strategy_database(db_path: Optional[str] = None) -> StrategyDatabaseManager:
     """初始化策略数据库管理器"""

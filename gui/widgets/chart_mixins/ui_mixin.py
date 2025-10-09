@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import QVBoxLayout, QLabel
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-
 class UIMixin:
     """UI功能Mixin
 

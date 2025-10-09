@@ -9,18 +9,15 @@ from loguru import logger
 
 SIGNAL_CONFIG_FILE = os.path.expanduser("~/.hikyuu_signal_config.json")
 
-
 def load_signal_config():
     if os.path.exists(SIGNAL_CONFIG_FILE):
         with open(SIGNAL_CONFIG_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     return {"MACD金叉": {"fast": 12, "slow": 26, "signal": 9}, "RSI超卖": {"period": 14, "threshold": 30}, "KDJ金叉": {"n": 9, "m1": 3, "m2": 3}}
 
-
 def save_signal_config(cfg):
     with open(SIGNAL_CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
-
 
 class SentimentStockSelectorDialog(QDialog):
     def __init__(self, data_manager, parent=None):

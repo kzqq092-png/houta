@@ -2,7 +2,6 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-
 @dataclass(frozen=True)
 class SystemResourceUpdated:
     """当系统资源指标被采集时发布的事件。"""
@@ -10,7 +9,6 @@ class SystemResourceUpdated:
     cpu_percent: float
     memory_percent: float
     disk_percent: float
-
 
 @dataclass(frozen=True)
 class ApplicationMetricRecorded:

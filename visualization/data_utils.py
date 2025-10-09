@@ -17,7 +17,7 @@ class DataUtils:
             # 创建简单的日志记录器
             class SimpleLogger:
                 def info(self, msg): logger.info(f"[INFO] {msg}")
-                def warning(self, msg): logger.info(f"[WARNING] {msg}")
+                def warning(self, msg): logger.info(f" {msg}")
                 def error(self, msg): logger.info(f"[ERROR] {msg}")
             # log_manager已迁移到Loguru
 

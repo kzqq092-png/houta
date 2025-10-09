@@ -13,16 +13,13 @@ from .base_service import CacheableService, ConfigurableService
 from ..events import ChartUpdateEvent, StockSelectedEvent, EventBus
 from .unified_data_manager import UnifiedDataManager
 
-
 logger = logger
-
 
 # 错误类型枚举
 class ErrorType:
     DATA_LOAD_ERROR = "data_load_error"
     RENDER_ERROR = "render_error"
     UNKNOWN_ERROR = "unknown_error"
-
 
 # 错误处理器
 class ErrorHandler:
@@ -72,7 +69,6 @@ class ErrorHandler:
         """获取错误历史"""
         return self.error_history
 
-
 # 重试管理器
 class RetryManager:
     """重试管理器"""
@@ -106,7 +102,6 @@ class RetryManager:
         if last_error:
             raise last_error
         return None
-
 
 class ChartService(CacheableService, ConfigurableService):
     """

@@ -16,7 +16,7 @@ sys.path.insert(0, str(project_root))
 
 def demo_smart_signals():
     """演示智能信号聚合"""
-    logger.info(" 智能信号聚合系统演示")
+    logger.info("智能信号聚合系统演示")
     logger.info("=" * 60)
 
     try:
@@ -66,7 +66,7 @@ def demo_smart_signals():
                 self.timer.timeout.connect(self.generate_demo_signals)
                 self.timer.start(5000)  # 每5秒生成一次信号
 
-                logger.info(" 演示窗口已创建")
+                logger.info("演示窗口已创建")
 
                 # 初始化一些模拟数据
                 self.generate_initial_data()
@@ -219,21 +219,21 @@ def demo_smart_signals():
         demo_window.show()
 
         logger.info("\n 智能信号聚合系统演示功能:")
-        logger.info("    情绪数据实时更新和可视化")
-        logger.info("    技术指标信号检测")
-        logger.info("    情绪信号检测")
-        logger.info("    基本面信号检测")
-        logger.info("    成交量信号检测")
-        logger.info("    多源信号智能聚合")
-        logger.info("    实时智能提醒和警报")
-        logger.info("    信号组合分析 (如: 技术超买 + 情绪贪婪)")
+        logger.info("  情绪数据实时更新和可视化")
+        logger.info("  技术指标信号检测")
+        logger.info("  情绪信号检测")
+        logger.info("  基本面信号检测")
+        logger.info("  成交量信号检测")
+        logger.info("  多源信号智能聚合")
+        logger.info("  实时智能提醒和警报")
+        logger.info("  信号组合分析 (如: 技术超买 + 情绪贪婪)")
         logger.info("\n 特色功能:")
-        logger.info("    当RSI>80且恐贪指数>85时，生成强烈卖出信号")
-        logger.info("    当价格突破且情绪恐惧时，生成谨慎买入信号")
-        logger.info("    基本面PE/PB估值分析")
-        logger.info("    成交量异常和价量背离检测")
+        logger.info("  当RSI>80且恐贪指数>85时，生成强烈卖出信号")
+        logger.info("  当价格突破且情绪恐惧时，生成谨慎买入信号")
+        logger.info("  基本面PE/PB估值分析")
+        logger.info("  成交量异常和价量背离检测")
         logger.info("\n⏰ 每5秒自动生成新的模拟信号，观察聚合效果")
-        logger.info(" 点击警报卡片可查看详细信号分析")
+        logger.info("点击警报卡片可查看详细信号分析")
 
         # 运行应用
         return app.exec_()

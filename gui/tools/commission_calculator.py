@@ -157,7 +157,7 @@ class CommissionCalculator(QDialog):
         self.stock_price = QDoubleSpinBox()
         self.stock_price.setRange(0.01, 9999.99)
         self.stock_price.setDecimals(2)
-        self.stock_price.setSuffix(" 元")
+        self.stock_price.setSuffix("元")
         trade_layout.addWidget(self.stock_price, 1, 1)
 
         # 交易数量
@@ -165,7 +165,7 @@ class CommissionCalculator(QDialog):
         self.quantity = QDoubleSpinBox()
         self.quantity.setRange(100, 999999900)
         self.quantity.setDecimals(0)
-        self.quantity.setSuffix(" 股")
+        self.quantity.setSuffix("股")
         self.quantity.setSingleStep(100)
         trade_layout.addWidget(self.quantity, 2, 1)
 
@@ -186,7 +186,7 @@ class CommissionCalculator(QDialog):
         self.commission_rate = QDoubleSpinBox()
         self.commission_rate.setRange(0.0001, 0.01)
         self.commission_rate.setDecimals(4)
-        self.commission_rate.setSuffix(" %")
+        self.commission_rate.setSuffix("%")
         self.commission_rate.setSingleStep(0.0001)
         rate_layout.addWidget(self.commission_rate, 0, 1)
 
@@ -195,7 +195,7 @@ class CommissionCalculator(QDialog):
         self.min_commission = QDoubleSpinBox()
         self.min_commission.setRange(0.01, 100.0)
         self.min_commission.setDecimals(2)
-        self.min_commission.setSuffix(" 元")
+        self.min_commission.setSuffix("元")
         rate_layout.addWidget(self.min_commission, 1, 1)
 
         # 印花税费率（仅卖出）
@@ -203,7 +203,7 @@ class CommissionCalculator(QDialog):
         self.stamp_tax_rate = QDoubleSpinBox()
         self.stamp_tax_rate.setRange(0.0, 0.01)
         self.stamp_tax_rate.setDecimals(4)
-        self.stamp_tax_rate.setSuffix(" %")
+        self.stamp_tax_rate.setSuffix("%")
         rate_layout.addWidget(self.stamp_tax_rate, 2, 1)
 
         # 过户费费率
@@ -211,7 +211,7 @@ class CommissionCalculator(QDialog):
         self.transfer_fee_rate = QDoubleSpinBox()
         self.transfer_fee_rate.setRange(0.0, 0.01)
         self.transfer_fee_rate.setDecimals(4)
-        self.transfer_fee_rate.setSuffix(" %")
+        self.transfer_fee_rate.setSuffix("%")
         rate_layout.addWidget(self.transfer_fee_rate, 3, 1)
 
         stock_layout.addWidget(rate_group)

@@ -13,7 +13,6 @@ from decimal import Decimal
 from enum import Enum
 import json
 
-
 class DataQuality(Enum):
     """
     数据质量等级枚举
@@ -80,7 +79,6 @@ class DataQuality(Enum):
         }
         return descriptions.get(self, "未知质量等级")
 
-
 class QualityDimension(Enum):
     """质量维度枚举"""
     COMPLETENESS = "completeness"       # 完整性
@@ -92,7 +90,6 @@ class QualityDimension(Enum):
     INTEGRITY = "integrity"           # 完整性（引用完整性）
     CONFORMITY = "conformity"         # 符合性
 
-
 class QualityCheckStatus(Enum):
     """质量检查状态"""
     PENDING = "pending"               # 待检查
@@ -100,7 +97,6 @@ class QualityCheckStatus(Enum):
     COMPLETED = "completed"           # 已完成
     FAILED = "failed"                # 检查失败
     SKIPPED = "skipped"              # 已跳过
-
 
 class QualityIssueLevel(Enum):
     """质量问题级别"""
@@ -120,7 +116,6 @@ class QualityIssueLevel(Enum):
             self.INFO: 1
         }
         return scores.get(self, 0)
-
 
 @dataclass
 class QualityDimensionScore:
@@ -150,7 +145,6 @@ class QualityDimensionScore:
             'check_time': self.check_time.isoformat(),
             'weighted_score': self.weighted_score
         }
-
 
 @dataclass
 class QualityIssue:
@@ -209,7 +203,6 @@ class QualityIssue:
             resolved_at=datetime.fromisoformat(data['resolved_at']) if data.get('resolved_at') else None,
             is_resolved=data.get('is_resolved', False)
         )
-
 
 @dataclass
 class UnifiedDataQualityMetrics:
@@ -483,7 +476,6 @@ class UnifiedDataQualityMetrics:
         data = json.loads(json_str)
         return cls.from_dict(data)
 
-
 @dataclass
 class QualityBenchmark:
     """质量基准"""
@@ -503,7 +495,6 @@ class QualityBenchmark:
     def is_acceptable(self, score: float) -> bool:
         """检查是否可接受"""
         return score >= self.minimum_score
-
 
 @dataclass
 class QualityProfile:
@@ -529,7 +520,6 @@ class QualityProfile:
     def get_benchmarks_by_dimension(self, dimension: QualityDimension) -> List[QualityBenchmark]:
         """根据维度获取基准"""
         return [b for b in self.benchmarks if b.dimension == dimension]
-
 
 # 预定义质量配置文件
 def get_default_quality_profiles() -> Dict[str, QualityProfile]:
@@ -605,7 +595,6 @@ def get_default_quality_profiles() -> Dict[str, QualityProfile]:
     profiles["realtime"] = realtime_profile
 
     return profiles
-
 
 # 兼容性别名（保持向后兼容）
 DataQualityMetrics = UnifiedDataQualityMetrics

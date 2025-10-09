@@ -8,7 +8,6 @@ from loguru import logger
 
 # 重构后的交易控制器 - 使用服务架构
 
-
 class TradingController(QObject):
     """
     交易控制器 - 重构版本
@@ -298,7 +297,6 @@ class TradingController(QObject):
         except Exception as e:
             self.log_updated.emit(f"获取交易统计失败: {str(e)}")
             return {}
-
 
 def validate_backtest_params(params):
     """验证回测参数"""

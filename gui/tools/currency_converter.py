@@ -18,7 +18,6 @@ from decimal import Decimal, ROUND_HALF_UP
 
 logger = logger
 
-
 class CurrencyConverter(QDialog):
     """汇率转换器对话框"""
 
@@ -422,7 +421,6 @@ class CurrencyConverter(QDialog):
         """显示汇率转换器对话框"""
         converter = CurrencyConverter(parent)
         converter.exec_()
-
 
 if __name__ == "__main__":
     import sys

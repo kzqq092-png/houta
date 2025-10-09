@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-
 class EnhancedMoneyManager(MoneyManagerBase):
     """
     增强的资金管理策略

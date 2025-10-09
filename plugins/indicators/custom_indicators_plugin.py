@@ -425,7 +425,7 @@ def indicator_{indicator_name.lower()}(kline_data: StandardKlineData, params: di
 # 指标元数据定义
 indicator_{indicator_name.lower()}.metadata = IndicatorMetadata(
     name='{indicator_name.upper()}',
-    display_name='{indicator_name.replace("_", " ").title()}',
+    display_name='{indicator_name.replace("_", "").title()}',
     description='{indicator_name} 自定义指标',
     category=IndicatorCategory.{category.name},
     parameters=[

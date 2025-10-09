@@ -83,7 +83,7 @@ class ModernRiskControlCenterTab(QWidget):
         # AI智能分析（新增）
         if ENHANCED_RISK_AVAILABLE:
             self.ai_analysis_tab = self._create_ai_analysis_tab()
-            self.tab_widget.addTab(self.ai_analysis_tab, "🤖 AI分析")
+            self.tab_widget.addTab(self.ai_analysis_tab, "AI分析")
 
         layout.addWidget(self.tab_widget)
 
@@ -1022,7 +1022,7 @@ class ModernRiskControlCenterTab(QWidget):
         layout.addWidget(prediction_group)
 
         # 异常检测区域
-        anomaly_group = QGroupBox("⚠️ 智能异常检测")
+        anomaly_group = QGroupBox("智能异常检测")
         anomaly_layout = QVBoxLayout()
 
         # 异常检测结果表格
@@ -1039,7 +1039,7 @@ class ModernRiskControlCenterTab(QWidget):
         layout.addWidget(anomaly_group)
 
         # 智能建议区域
-        suggestions_group = QGroupBox("💡 智能风险建议")
+        suggestions_group = QGroupBox("[INFO] 智能风险建议")
         suggestions_layout = QVBoxLayout()
 
         self.ai_suggestions_text = QTextEdit()
@@ -1052,7 +1052,7 @@ class ModernRiskControlCenterTab(QWidget):
         layout.addWidget(suggestions_group)
 
         # 风险情景分析
-        scenarios_group = QGroupBox("📊 风险情景分析")
+        scenarios_group = QGroupBox("风险情景分析")
         scenarios_layout = QVBoxLayout()
 
         self.scenarios_table = QTableWidget()
@@ -1070,11 +1070,11 @@ class ModernRiskControlCenterTab(QWidget):
         # 控制按钮
         button_layout = QHBoxLayout()
 
-        refresh_ai_btn = QPushButton("🔄 刷新AI分析")
+        refresh_ai_btn = QPushButton("刷新AI分析")
         refresh_ai_btn.clicked.connect(self._refresh_ai_analysis)
         button_layout.addWidget(refresh_ai_btn)
 
-        export_ai_btn = QPushButton("📊 导出AI报告")
+        export_ai_btn = QPushButton("导出AI报告")
         export_ai_btn.clicked.connect(self._export_ai_report)
         button_layout.addWidget(export_ai_btn)
 

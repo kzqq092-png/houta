@@ -285,7 +285,7 @@ class TradingInterfaceConfigWidget(QWidget):
 
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(5, 300)
-        self.timeout_spin.setSuffix(" 秒")
+        self.timeout_spin.setSuffix("秒")
 
         self.retry_count_spin = QSpinBox()
         self.retry_count_spin.setRange(1, 10)
@@ -544,7 +544,7 @@ class SystemConfigWidget(QWidget):
 
         self.save_interval_spin = QSpinBox()
         self.save_interval_spin.setRange(60, 3600)
-        self.save_interval_spin.setSuffix(" 秒")
+        self.save_interval_spin.setSuffix("秒")
 
         self.log_level_combo = QComboBox()
         self.log_level_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR"])
@@ -595,11 +595,11 @@ class SystemConfigWidget(QWidget):
 
         self.data_update_interval_spin = QSpinBox()
         self.data_update_interval_spin.setRange(500, 10000)
-        self.data_update_interval_spin.setSuffix(" 毫秒")
+        self.data_update_interval_spin.setSuffix("毫秒")
 
         self.chart_update_interval_spin = QSpinBox()
         self.chart_update_interval_spin.setRange(1000, 30000)
-        self.chart_update_interval_spin.setSuffix(" 毫秒")
+        self.chart_update_interval_spin.setSuffix("毫秒")
 
         self.max_backtests_spin = QSpinBox()
         self.max_backtests_spin.setRange(1, 10)

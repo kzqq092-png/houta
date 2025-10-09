@@ -26,7 +26,7 @@ try:
     from plugins.sentiment_data_sources import AVAILABLE_PLUGINS
     from plugins.sentiment_data_source_interface import SentimentResponse, SentimentData
     SENTIMENT_SERVICE_AVAILABLE = True
-    logger.info(" 情绪数据服务可用")
+    logger.info("情绪数据服务可用")
 except ImportError as e:
     logger.error(f" 情绪数据服务导入失败: {e}")
     SENTIMENT_SERVICE_AVAILABLE = False
@@ -452,7 +452,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         except Exception:
             self.db_service = None
 
-        logger.info(" 专业情绪分析标签页初始化完成")
+        logger.info("专业情绪分析标签页初始化完成")
 
     def _initialize_sentiment_service(self):
         """初始化情绪数据服务"""
@@ -462,15 +462,15 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 if hasattr(self, 'coordinator') and hasattr(self.coordinator, 'service_container'):
                     try:
                         self.sentiment_service = self.coordinator.service_container.resolve(SentimentDataService)
-                        logger.info(" 从服务容器获取情绪数据服务")
+                        logger.info("从服务容器获取情绪数据服务")
                     except:
                         # 如果服务容器中没有，创建新实例
                         self.sentiment_service = SentimentDataService()
-                        logger.info(" 创建新的情绪数据服务实例")
+                        logger.info("创建新的情绪数据服务实例")
                 else:
                     # 直接创建
                     self.sentiment_service = SentimentDataService()
-                    logger.info(" 直接创建情绪数据服务")
+                    logger.info("直接创建情绪数据服务")
 
                 # 初始化服务
                 if self.sentiment_service:
@@ -508,7 +508,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         # 延迟加载插件，避免阻塞UI创建
         QTimer.singleShot(100, self.load_available_plugins_async)
 
-        logger.info(" UI创建完成，所有组件已设置为可见")
+        logger.info("UI创建完成，所有组件已设置为可见")
 
     def create_analysis_ui(self, layout):
         """创建实时情绪分析UI"""
@@ -535,7 +535,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def create_report_ui(self, layout):
         """创建情绪报告的UI界面"""
         # 报告配置组
-        config_group = QGroupBox(" 报告配置")
+        config_group = QGroupBox("报告配置")
         config_layout = QGridLayout(config_group)
 
         # 报告类型
@@ -564,18 +564,18 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         layout.addWidget(config_group)
 
         # 报告控制组
-        control_group = QGroupBox(" 报告控制")
+        control_group = QGroupBox("报告控制")
         control_layout = QHBoxLayout(control_group)
 
-        self.generate_report_btn = QPushButton(" 生成报告")
+        self.generate_report_btn = QPushButton("生成报告")
         self.generate_report_btn.clicked.connect(self.generate_sentiment_report)
         control_layout.addWidget(self.generate_report_btn)
 
-        self.schedule_report_btn = QPushButton("⏰ 定时报告")
+        self.schedule_report_btn = QPushButton("[TIME] 定时报告")
         self.schedule_report_btn.clicked.connect(self.schedule_sentiment_report)
         control_layout.addWidget(self.schedule_report_btn)
 
-        self.export_report_btn = QPushButton(" 导出报告")
+        self.export_report_btn = QPushButton("导出报告")
         self.export_report_btn.clicked.connect(self.export_sentiment_report)
         control_layout.addWidget(self.export_report_btn)
 
@@ -583,7 +583,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         layout.addWidget(control_group)
 
         # 报告预览区域
-        preview_group = QGroupBox(" 报告预览")
+        preview_group = QGroupBox("报告预览")
         preview_layout = QVBoxLayout(preview_group)
 
         self.report_preview = QTextEdit()
@@ -594,7 +594,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         layout.addWidget(preview_group)
 
         # 历史报告列表
-        history_group = QGroupBox(" 历史报告")
+        history_group = QGroupBox("历史报告")
         history_layout = QVBoxLayout(history_group)
 
         self.report_history_table = QTableWidget()
@@ -610,7 +610,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_plugins_section(self):
         """创建插件选择区域"""
-        plugins_group = QGroupBox(" 情绪数据源插件")
+        plugins_group = QGroupBox("情绪数据源插件")
         layout = QVBoxLayout(plugins_group)
 
         # 插件选择说明
@@ -639,7 +639,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         self.deselect_all_btn.clicked.connect(self.deselect_all_plugins)
         button_layout.addWidget(self.deselect_all_btn)
 
-        self.refresh_plugins_btn = QPushButton(" 刷新插件")
+        self.refresh_plugins_btn = QPushButton("刷新插件")
         self.refresh_plugins_btn.clicked.connect(self.load_available_plugins_async)
         button_layout.addWidget(self.refresh_plugins_btn)
 
@@ -650,7 +650,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_params_section(self):
         """创建参数配置区域"""
-        params_group = QGroupBox(" 分析参数")
+        params_group = QGroupBox("分析参数")
         layout = QGridLayout(params_group)
 
         # 数据源权重
@@ -683,14 +683,14 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_control_section(self):
         """创建分析控制区域"""
-        control_group = QGroupBox(" 分析控制")
+        control_group = QGroupBox("分析控制")
         main_layout = QVBoxLayout(control_group)
 
         # 按钮和控制区域
         buttons_layout = QHBoxLayout()
 
         # 开始分析按钮
-        self.analyze_btn = QPushButton(" 开始分析")
+        self.analyze_btn = QPushButton("开始分析")
         self.analyze_btn.setStyleSheet("""
             QPushButton {
                 background-color: #0078d4;
@@ -711,13 +711,13 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         buttons_layout.addWidget(self.analyze_btn)
 
         # 停止分析按钮
-        self.stop_btn = QPushButton(" 停止分析")
+        self.stop_btn = QPushButton("停止分析")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.stop_analysis)
         buttons_layout.addWidget(self.stop_btn)
 
         # 自动刷新开关
-        self.auto_refresh_cb = QCheckBox(" 自动刷新")
+        self.auto_refresh_cb = QCheckBox("自动刷新")
         self.auto_refresh_cb.toggled.connect(self.toggle_auto_refresh)
         buttons_layout.addWidget(self.auto_refresh_cb)
 
@@ -731,12 +731,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         buttons_layout.addStretch()
 
         # 保存结果按钮
-        self.save_btn = QPushButton(" 保存结果")
+        self.save_btn = QPushButton("保存结果")
         self.save_btn.clicked.connect(self.save_results)
         buttons_layout.addWidget(self.save_btn)
 
         # 清空结果按钮
-        self.clear_btn = QPushButton(" 清空结果")
+        self.clear_btn = QPushButton("清空结果")
         self.clear_btn.clicked.connect(self.clear_results)
         buttons_layout.addWidget(self.clear_btn)
 
@@ -776,7 +776,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_status_section(self):
         """创建状态显示区域"""
-        status_group = QGroupBox(" 服务状态")
+        status_group = QGroupBox("服务状态")
         layout = QHBoxLayout(status_group)
 
         # 服务状态
@@ -794,7 +794,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         layout.addStretch()
 
         # 状态刷新按钮
-        refresh_status_btn = QPushButton(" 刷新状态")
+        refresh_status_btn = QPushButton("刷新状态")
         refresh_status_btn.clicked.connect(self.refresh_status)
         layout.addWidget(refresh_status_btn)
 
@@ -802,14 +802,14 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_results_section(self):
         """创建结果显示区域"""
-        results_group = QGroupBox(" 分析结果")
+        results_group = QGroupBox("分析结果")
         layout = QVBoxLayout(results_group)
 
         # 创建分割器
         splitter = QSplitter(Qt.Vertical)
 
         # 情绪概览
-        overview_group = QGroupBox(" 情绪概览")
+        overview_group = QGroupBox("情绪概览")
         overview_layout = QVBoxLayout(overview_group)
 
         # 主要指数区域
@@ -884,7 +884,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         splitter.addWidget(overview_group)
 
         # 详细结果表格
-        details_group = QGroupBox(" 详细分析结果")
+        details_group = QGroupBox("详细分析结果")
         details_layout = QVBoxLayout(details_group)
 
         self.sentiment_table = QTableWidget()
@@ -949,7 +949,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def load_available_plugins_async(self):
         """异步加载可用的情绪数据源插件"""
         try:
-            logger.info(" 开始异步加载情绪数据源插件...")
+            logger.info("开始异步加载情绪数据源插件...")
             self.plugin_loader = AsyncPluginLoader(self.db_service)
             self.plugin_loader.plugin_loaded.connect(self.on_plugin_loaded)
             self.plugin_loader.loading_progress.connect(self.update_loading_progress)
@@ -983,7 +983,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         """更新插件UI显示 - 优化版本，避免阻塞主线程"""
         try:
             if not hasattr(self, 'plugins_layout') or self.plugins_layout is None:
-                logger.error(" plugins_layout未初始化，无法更新插件UI")
+                logger.error("plugins_layout未初始化，无法更新插件UI")
                 return
 
             # 清空现有插件选择
@@ -1093,8 +1093,8 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         try:
             # 检查是否已有线程在运行
             if self.analysis_thread and self.analysis_thread.isRunning():
-                self.update_status_label(" 分析正在进行中，请等待完成")
-                logger.info(" 分析正在进行中，请等待完成")
+                self.update_status_label("分析正在进行中，请等待完成")
+                logger.info("分析正在进行中，请等待完成")
                 return
 
             # 获取选中的插件
@@ -1102,12 +1102,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             if not selected_plugins:
                 # 使用非阻塞的状态提示替换阻塞性弹框
-                self.update_status_label(" 请至少选择一个情绪数据源插件")
-                logger.info(" 请至少选择一个情绪数据源插件")
+                self.update_status_label("请至少选择一个情绪数据源插件")
+                logger.info("请至少选择一个情绪数据源插件")
 
                 # 尝试自动加载可用插件
                 if not self.available_plugins:
-                    self.update_status_label(" 尝试自动加载情绪插件...")
+                    self.update_status_label("尝试自动加载情绪插件...")
                     self.load_available_plugins_async()
                     return
 
@@ -1118,7 +1118,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             # 更新UI状态
             self.analyze_btn.setEnabled(False)
-            self.analyze_btn.setText(" 分析中...")
+            self.analyze_btn.setText("分析中...")
             self.stop_btn.setEnabled(True)
             if self.progress_bar:
                 self.progress_bar.setVisible(True)
@@ -1160,7 +1160,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def reset_ui_state(self):
         """重置UI状态"""
         self.analyze_btn.setEnabled(True)
-        self.analyze_btn.setText(" 开始分析")
+        self.analyze_btn.setText("开始分析")
         self.stop_btn.setEnabled(False)
         if self.progress_bar:
             self.progress_bar.setVisible(False)
@@ -1209,7 +1209,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 'selected_plugins': self.get_selected_plugins()
             })
 
-            logger.info(" 情绪分析UI更新完成")
+            logger.info("情绪分析UI更新完成")
 
         except Exception as e:
             logger.error(f" 处理分析结果失败: {e}")
@@ -1255,11 +1255,11 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             logger.info(f" 更新情绪显示，数据量: {len(self.sentiment_results)}")
 
             if not hasattr(self, 'sentiment_table') or self.sentiment_table is None:
-                logger.error(" sentiment_table未初始化")
+                logger.error("sentiment_table未初始化")
                 return
 
             if not self.sentiment_results:
-                logger.error(" 没有情绪数据可显示")
+                logger.error("没有情绪数据可显示")
                 self.sentiment_table.setRowCount(0)
                 return
 
@@ -1326,7 +1326,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             # 强制更新表格显示
             self.sentiment_table.update()
-            logger.info(" 情绪表格更新完成")
+            logger.info("情绪表格更新完成")
 
         except Exception as e:
             logger.error(f" 更新情绪显示失败: {e}")
@@ -1383,11 +1383,11 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             logger.info(f" 计算综合情绪指数，数据量: {len(self.sentiment_results)}")
 
             if not hasattr(self, 'composite_score_label') or self.composite_score_label is None:
-                logger.error(" composite_score_label未初始化")
+                logger.error("composite_score_label未初始化")
                 return
 
             if not self.sentiment_results:
-                logger.error(" 没有数据计算综合指数")
+                logger.error("没有数据计算综合指数")
                 self.composite_score_label.setText("综合情绪指数: --")
                 return
 
@@ -1450,7 +1450,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 更新其他专业指数
             self._update_professional_indices()
 
-            logger.info(" 综合情绪指数更新完成")
+            logger.info("综合情绪指数更新完成")
 
         except Exception as e:
             logger.error(f" 计算综合情绪指数失败: {e}")
@@ -1948,12 +1948,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             logger.info(f" 启动自动刷新，间隔 {self.refresh_interval_spin.value()} 分钟")
         else:
             self.auto_refresh_timer.stop()
-            logger.info(" 停止自动刷新")
+            logger.info("停止自动刷新")
 
     def auto_refresh_data(self):
         """自动刷新数据"""
         if self.get_selected_plugins():
-            logger.info("⏰ 自动刷新情绪数据...")
+            logger.info("[TIME] 自动刷新情绪数据...")
             self.analyze_sentiment()
 
     def stop_analysis(self):
@@ -1961,7 +1961,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         try:
             # 停止异步分析线程
             if self.analysis_thread and self.analysis_thread.isRunning():
-                logger.info(" 正在停止异步分析线程...")
+                logger.info("正在停止异步分析线程...")
                 self.analysis_thread.stop()
                 # 使用非阻塞方式等待线程结束
                 QTimer.singleShot(100, self._check_thread_stopped)
@@ -1970,7 +1970,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             # 停止插件加载线程
             if self.plugin_loader and self.plugin_loader.isRunning():
-                logger.info(" 正在停止插件加载线程...")
+                logger.info("正在停止插件加载线程...")
                 self.plugin_loader.stop()
 
             # 停止自动刷新
@@ -1993,7 +1993,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def _force_stop_thread(self):
         """强制停止线程"""
         if self.analysis_thread and self.analysis_thread.isRunning():
-            logger.info(" 强制终止分析线程...")
+            logger.info("强制终止分析线程...")
             self.analysis_thread.terminate()
             self.analysis_thread.wait(1000)
         self._finalize_stop()
@@ -2004,12 +2004,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         self.reset_ui_state()
         if self.status_label:
             self.status_label.setText("分析已停止")
-        logger.info(" 情绪分析已停止")
+        logger.info("情绪分析已停止")
 
     def save_results(self):
         """保存分析结果"""
         if not self.sentiment_results:
-            self.update_status_label(" 没有可保存的结果")
+            self.update_status_label("没有可保存的结果")
             return
 
         file_path, _ = QFileDialog.getSaveFileName(
@@ -2050,13 +2050,13 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.total_indicators_label.setText("指标数量: --")
         if hasattr(self, 'data_quality_label'):
             self.data_quality_label.setText("数据质量: --")
-        logger.info(" 已清空分析结果")
+        logger.info("已清空分析结果")
 
     # 报告功能方法
     def generate_sentiment_report(self):
         """生成情绪报告"""
         try:
-            logger.info(" 开始生成情绪报告...")
+            logger.info("开始生成情绪报告...")
 
             # 获取报告参数
             report_type = self.report_type_combo.currentText()
@@ -2090,7 +2090,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             })
 
             QMessageBox.information(self, "成功", f"情绪报告生成完成\n类型: {report_type}\n周期: {period}天")
-            logger.info(" 情绪报告生成完成")
+            logger.info("情绪报告生成完成")
 
         except Exception as e:
             logger.error(f" 生成报告失败: {e}")
@@ -2322,7 +2322,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 except Exception as e:
                     logger.error(f" 清理情绪数据服务失败: {e}")
 
-            logger.info(" 专业情绪分析标签页资源清理完成")
+            logger.info("专业情绪分析标签页资源清理完成")
 
         except Exception as e:
             logger.error(f" 关闭事件处理失败: {e}")
@@ -2347,7 +2347,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     if self.available_plugins:
                         QTimer.singleShot(500, self._delayed_analyze_sentiment)
                     else:
-                        logger.info(" 插件尚未加载完成，跳过自动情绪分析")
+                        logger.info("插件尚未加载完成，跳过自动情绪分析")
 
         except Exception as e:
             logger.error(f" [ProfessionalSentimentTab] 设置K线数据失败: {e}")
@@ -2359,7 +2359,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             if (hasattr(self, 'analyze_sentiment') and
                 self.available_plugins and
                     not (self.analysis_thread and self.analysis_thread.isRunning())):
-                logger.info(" 执行延迟的情绪分析...")
+                logger.info("执行延迟的情绪分析...")
                 self.analyze_sentiment()
         except Exception as e:
             logger.error(f" [ProfessionalSentimentTab] 延迟情绪分析失败: {e}")
@@ -2367,7 +2367,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def on_plugins_db_updated(self):
         """数据库插件状态更新回调 -> 异步刷新情绪插件列表"""
         try:
-            logger.info(" 检测到数据库更新，异步刷新情绪插件列表...")
+            logger.info("检测到数据库更新，异步刷新情绪插件列表...")
             # 使用异步方式刷新，避免阻塞主线程
             QTimer.singleShot(200, self.load_available_plugins_async)
         except Exception as e:

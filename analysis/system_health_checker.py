@@ -41,7 +41,7 @@ class SystemHealthChecker:
 
     def run_comprehensive_check(self) -> Dict[str, Any]:
         """运行全面的系统健康检查"""
-        logger.info(" 开始FactorWeave-Quant 量化交易系统健康检查...")
+        logger.info("开始FactorWeave-Quant 量化交易系统健康检查...")
 
         health_report = {
             'timestamp': datetime.now().isoformat(),
@@ -111,7 +111,7 @@ class SystemHealthChecker:
         """检查形态识别功能"""
         try:
             #  修复：添加更安全的形态识别检查
-            logger.info(" 检查形态识别功能...")
+            logger.info("检查形态识别功能...")
 
             try:
                 # 创建测试数据
@@ -120,7 +120,7 @@ class SystemHealthChecker:
 
                 # 测试识别器创建
                 recognizer = EnhancedPatternRecognizer(debug_mode=False)
-                logger.info(" 形态识别器创建成功")
+                logger.info("形态识别器创建成功")
 
                 # 测试形态识别
                 start_time = time.time()
@@ -460,14 +460,14 @@ class SystemHealthChecker:
 
         # 系统信息
         sys_info = report.get('system_info', {})
-        lines.append(" 系统信息:")
+        lines.append("系统信息:")
         lines.append(f"  版本: {sys_info.get('version', 'unknown')}")
         lines.append(f"  支持形态: {sys_info.get('supported_patterns', 0)}种")
         lines.append("")
 
         # 性能指标
         perf = report.get('performance_metrics', {})
-        lines.append(" 性能指标:")
+        lines.append("性能指标:")
         lines.append(f"  实时监控操作: {perf.get('live_monitored_operations', 0)}")
         lines.append(f"  实时总调用次数: {perf.get('live_total_calls', 0)}")
         lines.append(f"  实时成功率: {perf.get('live_success_rate', 0):.2%}")
@@ -477,7 +477,7 @@ class SystemHealthChecker:
 
         # 内存使用
         memory = report.get('memory_usage', {})
-        lines.append(" 内存使用:")
+        lines.append("内存使用:")
         lines.append(f"  CPU使用率: {memory.get('cpu_percent', 0):.1f}%")
         lines.append(f"  内存使用率: {memory.get('memory_percent', 0):.1f}%")
         lines.append(f"  磁盘使用率: {memory.get('disk_percent', 0):.1f}%")
@@ -486,7 +486,7 @@ class SystemHealthChecker:
 
         # 建议
         recommendations = report.get('recommendations', [])
-        lines.append(" 优化建议:")
+        lines.append("优化建议:")
         for i, rec in enumerate(recommendations, 1):
             lines.append(f"  {i}. {rec}")
 

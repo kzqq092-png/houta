@@ -280,7 +280,7 @@ class VersionManager:
             return False
 
         if version.is_active:
-            logger.info(" 不能删除激活的版本")
+            logger.info("不能删除激活的版本")
             return False
 
         conn = sqlite3.connect(self.db_manager.db_path)

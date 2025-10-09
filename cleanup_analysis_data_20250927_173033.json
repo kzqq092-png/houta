@@ -1,0 +1,630 @@
+{
+  "timestamp": "20250927_173033",
+  "summary": {
+    "total_files": 89,
+    "total_size_mb": 1.7612171173095703,
+    "backup_files": 21,
+    "temp_files": 64,
+    "duplicate_files": 4
+  },
+  "backup_files": {
+    "files": [
+      {
+        "path": "gui\\menu_bar.py.backup",
+        "size_bytes": 28922,
+        "size_mb": 0.027582168579101562,
+        "modified": "2025-08-02 20:13:00"
+      },
+      {
+        "path": "core\\coordinators\\main_window_coordinator.py.backup",
+        "size_bytes": 69203,
+        "size_mb": 0.06599712371826172,
+        "modified": "2025-08-28 21:54:32"
+      },
+      {
+        "path": "core\\services\\notification_service.py.backup",
+        "size_bytes": 23627,
+        "size_mb": 0.02253246307373047,
+        "modified": "2025-09-05 00:24:31"
+      },
+      {
+        "path": "core\\services\\service_bootstrap.py.backup",
+        "size_bytes": 46159,
+        "size_mb": 0.044020652770996094,
+        "modified": "2025-09-25 21:39:23"
+      },
+      {
+        "path": "core\\services\\unified_data_manager.py.backup",
+        "size_bytes": 134472,
+        "size_mb": 0.12824249267578125,
+        "modified": "2025-09-25 21:39:23"
+      },
+      {
+        "path": "core\\services\\uni_plugin_data_manager.py.backup",
+        "size_bytes": 37428,
+        "size_mb": 0.035694122314453125,
+        "modified": "2025-09-25 21:39:23"
+      },
+      {
+        "path": "gui\\dialogs\\database_admin_dialog.py.backup",
+        "size_bytes": 65668,
+        "size_mb": 0.06262588500976562,
+        "modified": "2025-08-30 18:10:20"
+      },
+      {
+        "path": "gui\\dialogs\\unified_duckdb_import_dialog.py.backup",
+        "size_bytes": 70906,
+        "size_mb": 0.06762123107910156,
+        "modified": "2025-09-25 00:45:05"
+      },
+      {
+        "path": "gui\\widgets\\data_import_dashboard.py.backup",
+        "size_bytes": 28942,
+        "size_mb": 0.027601242065429688,
+        "modified": "2025-09-25 00:45:05"
+      },
+      {
+        "path": "gui\\widgets\\analysis_tabs\\professional_sentiment_tab.py.backup",
+        "size_bytes": 103470,
+        "size_mb": 0.09867668151855469,
+        "modified": "2025-08-16 20:23:32"
+      },
+      {
+        "path": "gui\\dialogs\\database_admin_dialog.py.backup2",
+        "size_bytes": 70490,
+        "size_mb": 0.06722450256347656,
+        "modified": "2025-08-30 18:20:34"
+      },
+      {
+        "path": "gui\\dialogs\\database_admin_dialog.py.backup3",
+        "size_bytes": 74908,
+        "size_mb": 0.07143783569335938,
+        "modified": "2025-08-30 18:36:44"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758899317",
+        "size_bytes": 1211,
+        "size_mb": 0.0011548995971679688,
+        "modified": "2025-08-10 13:13:29"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758899318",
+        "size_bytes": 2015,
+        "size_mb": 0.0019216537475585938,
+        "modified": "2025-09-26 23:08:37"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758900246",
+        "size_bytes": 2053,
+        "size_mb": 0.0019578933715820312,
+        "modified": "2025-09-26 23:08:38"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758900249",
+        "size_bytes": 2085,
+        "size_mb": 0.0019884109497070312,
+        "modified": "2025-09-26 23:24:06"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758900503",
+        "size_bytes": 2172,
+        "size_mb": 0.002071380615234375,
+        "modified": "2025-09-26 23:24:09"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758900733",
+        "size_bytes": 2172,
+        "size_mb": 0.002071380615234375,
+        "modified": "2025-09-26 23:28:23"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758900872",
+        "size_bytes": 2172,
+        "size_mb": 0.002071380615234375,
+        "modified": "2025-09-26 23:32:13"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758900918",
+        "size_bytes": 2172,
+        "size_mb": 0.002071380615234375,
+        "modified": "2025-09-26 23:34:32"
+      },
+      {
+        "path": "config\\app_config.json.backup.1758901151",
+        "size_bytes": 2172,
+        "size_mb": 0.002071380615234375,
+        "modified": "2025-09-26 23:35:18"
+      }
+    ],
+    "count": 21,
+    "total_size_mb": 0.7366361618041992
+  },
+  "temp_files": {
+    "files": [
+      {
+        "path": "architecture_diagnosis_report_20250925_213303.md",
+        "size_bytes": 2504,
+        "size_mb": 0.00238800048828125,
+        "modified": "2025-09-25 21:33:03",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213844.md",
+        "size_bytes": 2504,
+        "size_mb": 0.00238800048828125,
+        "modified": "2025-09-25 21:38:44",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213902.md",
+        "size_bytes": 2504,
+        "size_mb": 0.00238800048828125,
+        "modified": "2025-09-25 21:39:02",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213915.md",
+        "size_bytes": 2504,
+        "size_mb": 0.00238800048828125,
+        "modified": "2025-09-25 21:39:15",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213928.md",
+        "size_bytes": 2505,
+        "size_mb": 0.0023889541625976562,
+        "modified": "2025-09-25 21:39:28",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_214510.md",
+        "size_bytes": 2489,
+        "size_mb": 0.0023736953735351562,
+        "modified": "2025-09-25 21:45:10",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_215154.md",
+        "size_bytes": 2489,
+        "size_mb": 0.0023736953735351562,
+        "modified": "2025-09-25 21:51:54",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_215314.md",
+        "size_bytes": 2489,
+        "size_mb": 0.0023736953735351562,
+        "modified": "2025-09-25 21:53:14",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_215508.md",
+        "size_bytes": 2497,
+        "size_mb": 0.0023813247680664062,
+        "modified": "2025-09-25 21:55:08",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_222435.md",
+        "size_bytes": 2497,
+        "size_mb": 0.0023813247680664062,
+        "modified": "2025-09-25 22:24:35",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_223003.md",
+        "size_bytes": 2497,
+        "size_mb": 0.0023813247680664062,
+        "modified": "2025-09-25 22:30:03",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_223408.md",
+        "size_bytes": 2511,
+        "size_mb": 0.0023946762084960938,
+        "modified": "2025-09-25 22:34:08",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_223751.md",
+        "size_bytes": 2499,
+        "size_mb": 0.0023832321166992188,
+        "modified": "2025-09-25 22:37:51",
+        "category": "report"
+      },
+      {
+        "path": "startup_log.txt",
+        "size_bytes": 305058,
+        "size_mb": 0.2909259796142578,
+        "modified": "2025-09-27 17:29:17",
+        "category": "log"
+      },
+      {
+        "path": "startup_error.txt",
+        "size_bytes": 25431,
+        "size_mb": 0.024252891540527344,
+        "modified": "2025-09-27 17:29:23",
+        "category": "log"
+      },
+      {
+        "path": "tests\\compatibility\\results\\compatibility_report_20250927_020743.txt",
+        "size_bytes": 503,
+        "size_mb": 0.00047969818115234375,
+        "modified": "2025-09-27 02:07:43",
+        "category": "report"
+      },
+      {
+        "path": "tests\\evaluation\\results\\architecture_evaluation_report_20250927_020940.txt",
+        "size_bytes": 692,
+        "size_mb": 0.000659942626953125,
+        "modified": "2025-09-27 02:09:40",
+        "category": "report"
+      },
+      {
+        "path": "tests\\performance\\results\\performance_report_20250927_020401.txt",
+        "size_bytes": 1213,
+        "size_mb": 0.0011568069458007812,
+        "modified": "2025-09-27 02:04:01",
+        "category": "report"
+      },
+      {
+        "path": "tests\\performance\\results\\performance_report_20250927_020527.txt",
+        "size_bytes": 1212,
+        "size_mb": 0.001155853271484375,
+        "modified": "2025-09-27 02:05:27",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213303.md",
+        "size_bytes": 2504,
+        "size_mb": 0.00238800048828125,
+        "modified": "2025-09-25 21:33:03",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213844.md",
+        "size_bytes": 2504,
+        "size_mb": 0.00238800048828125,
+        "modified": "2025-09-25 21:38:44",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213902.md",
+        "size_bytes": 2504,
+        "size_mb": 0.00238800048828125,
+        "modified": "2025-09-25 21:39:02",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213915.md",
+        "size_bytes": 2504,
+        "size_mb": 0.00238800048828125,
+        "modified": "2025-09-25 21:39:15",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_213928.md",
+        "size_bytes": 2505,
+        "size_mb": 0.0023889541625976562,
+        "modified": "2025-09-25 21:39:28",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_214510.md",
+        "size_bytes": 2489,
+        "size_mb": 0.0023736953735351562,
+        "modified": "2025-09-25 21:45:10",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_215154.md",
+        "size_bytes": 2489,
+        "size_mb": 0.0023736953735351562,
+        "modified": "2025-09-25 21:51:54",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_215314.md",
+        "size_bytes": 2489,
+        "size_mb": 0.0023736953735351562,
+        "modified": "2025-09-25 21:53:14",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_215508.md",
+        "size_bytes": 2497,
+        "size_mb": 0.0023813247680664062,
+        "modified": "2025-09-25 21:55:08",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_222435.md",
+        "size_bytes": 2497,
+        "size_mb": 0.0023813247680664062,
+        "modified": "2025-09-25 22:24:35",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_223003.md",
+        "size_bytes": 2497,
+        "size_mb": 0.0023813247680664062,
+        "modified": "2025-09-25 22:30:03",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_223408.md",
+        "size_bytes": 2511,
+        "size_mb": 0.0023946762084960938,
+        "modified": "2025-09-25 22:34:08",
+        "category": "report"
+      },
+      {
+        "path": "architecture_diagnosis_report_20250925_223751.md",
+        "size_bytes": 2499,
+        "size_mb": 0.0023832321166992188,
+        "modified": "2025-09-25 22:37:51",
+        "category": "report"
+      },
+      {
+        "path": "comprehensive_functionality_test.py",
+        "size_bytes": 12152,
+        "size_mb": 0.01158905029296875,
+        "modified": "2025-09-27 14:35:21",
+        "category": "other"
+      },
+      {
+        "path": "comprehensive_kline_feature_audit.py",
+        "size_bytes": 26291,
+        "size_mb": 0.02507305145263672,
+        "modified": "2025-09-25 01:10:02",
+        "category": "other"
+      },
+      {
+        "path": "comprehensive_migration_validation.py",
+        "size_bytes": 26806,
+        "size_mb": 0.025564193725585938,
+        "modified": "2025-09-25 21:56:10",
+        "category": "other"
+      },
+      {
+        "path": "comprehensive_plugin_analysis.py",
+        "size_bytes": 15691,
+        "size_mb": 0.014964103698730469,
+        "modified": "2025-09-25 22:33:38",
+        "category": "other"
+      },
+      {
+        "path": "comprehensive_plugin_check.py",
+        "size_bytes": 13143,
+        "size_mb": 0.012534141540527344,
+        "modified": "2025-09-22 23:15:54",
+        "category": "verification"
+      },
+      {
+        "path": "comprehensive_ui_integration_check.py",
+        "size_bytes": 18494,
+        "size_mb": 0.017637252807617188,
+        "modified": "2025-09-25 01:10:01",
+        "category": "verification"
+      },
+      {
+        "path": "debug_plugin_loading.py",
+        "size_bytes": 2799,
+        "size_mb": 0.0026693344116210938,
+        "modified": "2025-09-20 18:05:01",
+        "category": "debug"
+      },
+      {
+        "path": "debug_table_structure.py",
+        "size_bytes": 5342,
+        "size_mb": 0.0050945281982421875,
+        "modified": "2025-09-23 23:08:46",
+        "category": "debug"
+      },
+      {
+        "path": "scripts\\debug_deep_analysis.py",
+        "size_bytes": 8935,
+        "size_mb": 0.008521080017089844,
+        "modified": "2025-09-05 23:43:45",
+        "category": "debug"
+      },
+      {
+        "path": "fix_final_dialog_issues.py",
+        "size_bytes": 12359,
+        "size_mb": 0.011786460876464844,
+        "modified": "2025-09-25 19:51:57",
+        "category": "fix"
+      },
+      {
+        "path": "fix_indentation_error.py",
+        "size_bytes": 6995,
+        "size_mb": 0.006670951843261719,
+        "modified": "2025-09-25 19:51:56",
+        "category": "fix"
+      },
+      {
+        "path": "fix_performance_chart.py",
+        "size_bytes": 11203,
+        "size_mb": 0.010684013366699219,
+        "modified": "2025-09-25 19:51:56",
+        "category": "fix"
+      },
+      {
+        "path": "fix_plugin_availability_issue.py",
+        "size_bytes": 17275,
+        "size_mb": 0.01647472381591797,
+        "modified": "2025-09-25 00:18:26",
+        "category": "fix"
+      },
+      {
+        "path": "fix_plugin_connection_and_quality.py",
+        "size_bytes": 11014,
+        "size_mb": 0.010503768920898438,
+        "modified": "2025-09-25 01:10:00",
+        "category": "fix"
+      },
+      {
+        "path": "fix_remaining_issues.py",
+        "size_bytes": 11129,
+        "size_mb": 0.010613441467285156,
+        "modified": "2025-09-25 19:51:57",
+        "category": "fix"
+      },
+      {
+        "path": "fix_ui_integration_issues.py",
+        "size_bytes": 25912,
+        "size_mb": 0.02471160888671875,
+        "modified": "2025-09-25 19:51:55",
+        "category": "fix"
+      },
+      {
+        "path": "fix_unified_data_manager.py",
+        "size_bytes": 16403,
+        "size_mb": 0.01564311981201172,
+        "modified": "2025-09-25 21:21:05",
+        "category": "fix"
+      },
+      {
+        "path": "check_all_plugins.py",
+        "size_bytes": 5867,
+        "size_mb": 0.005595207214355469,
+        "modified": "2025-09-05 00:24:30",
+        "category": "verification"
+      },
+      {
+        "path": "check_all_plugins_config.py",
+        "size_bytes": 12201,
+        "size_mb": 0.011635780334472656,
+        "modified": "2025-09-05 00:24:30",
+        "category": "verification"
+      },
+      {
+        "path": "check_plugin_capabilities.py",
+        "size_bytes": 4313,
+        "size_mb": 0.004113197326660156,
+        "modified": "2025-09-25 00:18:26",
+        "category": "verification"
+      },
+      {
+        "path": "check_plugin_database.py",
+        "size_bytes": 2342,
+        "size_mb": 0.0022335052490234375,
+        "modified": "2025-09-20 18:05:01",
+        "category": "verification"
+      },
+      {
+        "path": "check_ui_functionality_completeness.py",
+        "size_bytes": 14884,
+        "size_mb": 0.014194488525390625,
+        "modified": "2025-09-25 01:10:01",
+        "category": "verification"
+      },
+      {
+        "path": "verify_system_integration.py",
+        "size_bytes": 15918,
+        "size_mb": 0.015180587768554688,
+        "modified": "2025-09-25 19:51:56",
+        "category": "verification"
+      },
+      {
+        "path": "scripts\\verify_deep_analysis.py",
+        "size_bytes": 6176,
+        "size_mb": 0.005889892578125,
+        "modified": "2025-09-05 23:56:02",
+        "category": "verification"
+      },
+      {
+        "path": "scripts\\verify_system_integration.py",
+        "size_bytes": 21040,
+        "size_mb": 0.0200653076171875,
+        "modified": "2025-09-21 18:49:20",
+        "category": "verification"
+      },
+      {
+        "path": "tools\\verify_complete_table_schemas.py",
+        "size_bytes": 8928,
+        "size_mb": 0.008514404296875,
+        "modified": "2025-09-08 23:47:13",
+        "category": "verification"
+      },
+      {
+        "path": "diagnose_architecture_issues.py",
+        "size_bytes": 19116,
+        "size_mb": 0.018230438232421875,
+        "modified": "2025-09-25 21:21:05",
+        "category": "diagnosis"
+      },
+      {
+        "path": "diagnose_plugin_connection_issue.py",
+        "size_bytes": 8613,
+        "size_mb": 0.008213996887207031,
+        "modified": "2025-09-25 01:09:59",
+        "category": "diagnosis"
+      },
+      {
+        "path": "diagnose_plugin_data_sources.py",
+        "size_bytes": 7083,
+        "size_mb": 0.006754875183105469,
+        "modified": "2025-09-20 16:25:05",
+        "category": "diagnosis"
+      },
+      {
+        "path": "enhance_plugin_capabilities.py",
+        "size_bytes": 13139,
+        "size_mb": 0.012530326843261719,
+        "modified": "2025-09-25 00:32:29",
+        "category": "other"
+      },
+      {
+        "path": "optimize_kline_ui_performance.py",
+        "size_bytes": 14412,
+        "size_mb": 0.013744354248046875,
+        "modified": "2025-09-25 01:10:00",
+        "category": "other"
+      },
+      {
+        "path": "immediate_ui_performance_fix.py",
+        "size_bytes": 7644,
+        "size_mb": 0.007289886474609375,
+        "modified": "2025-09-25 01:10:00",
+        "category": "fix"
+      }
+    ],
+    "count": 64,
+    "total_size_mb": 0.7655200958251953
+  },
+  "duplicate_files": {
+    "files": [
+      {
+        "path": "backups_professional",
+        "type": "directory",
+        "size_bytes": 196631,
+        "size_mb": 0.18752193450927734,
+        "modified": "2025-09-25 22:45:20"
+      },
+      {
+        "path": "core\\services\\uni_plugin_data_manager_clean.py",
+        "type": "file",
+        "size_bytes": 15214,
+        "size_mb": 0.014509201049804688,
+        "modified": "2025-09-20 12:54:06"
+      },
+      {
+        "path": "core\\services\\uni_plugin_data_manager_backup.py",
+        "type": "file",
+        "size_bytes": 38346,
+        "size_mb": 0.03656959533691406,
+        "modified": "2025-09-19 23:16:12"
+      },
+      {
+        "path": "scripts\\migration\\create_system_backup.py",
+        "type": "file",
+        "size_bytes": 21454,
+        "size_mb": 0.020460128784179688,
+        "modified": "2025-09-20 15:40:44"
+      }
+    ],
+    "count": 4,
+    "total_size_mb": 0.2590608596801758
+  }
+}

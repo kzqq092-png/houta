@@ -4,7 +4,6 @@ from typing import Dict, List, Tuple
 from datetime import datetime
 from loguru import logger
 
-
 class RiskMetricsCalculator:
     def __init__(self):
         self.cache = {}  # 用于缓存计算结果
