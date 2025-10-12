@@ -48,6 +48,7 @@ try:
     from core.ai.data_anomaly_detector import DataAnomalyDetector
     from core.ui_integration.ui_business_logic_adapter import get_ui_adapter
     from loguru import logger
+    from gui.widgets.enhanced_ui.data_quality_monitor_tab_real_data import get_real_data_provider
     CORE_AVAILABLE = True
 except ImportError as e:
     logger = logging.getLogger(__name__)
@@ -862,15 +863,31 @@ class DataQualityControlCenter(QWidget):
         self.quality_timer.start(10000)  # 每10秒更新一次
 
     def load_sample_data(self):
-        """加载示例数据"""
-        # 生成示例质量指标
-        self.generate_sample_metrics()
+        """加载数据（使用真实数据质量监控）"""
+        # 初始化真实数据提供者
+        try:
+            if CORE_AVAILABLE:
+                self.real_data_provider = get_real_data_provider()
+                logger.info("数据质量控制中心: 真实数据提供者已初始化")
 
-        # 生成示例质量规则
-        self.generate_sample_rules()
+                # 加载真实数据
+                self.load_real_metrics()
+                self.load_real_rules()
+                self.load_real_issues()
 
-        # 生成示例质量问题
-        self.generate_sample_issues()
+                logger.info("真实数据质量数据加载完成")
+            else:
+                # 降级到示例数据
+                logger.warning("核心服务不可用，使用示例数据")
+                self.generate_sample_metrics()
+                self.generate_sample_rules()
+                self.generate_sample_issues()
+        except Exception as e:
+            logger.error(f"加载真实数据失败: {e}")
+            # 降级到示例数据
+            self.generate_sample_metrics()
+            self.generate_sample_rules()
+            self.generate_sample_issues()
 
     def generate_sample_metrics(self):
         """生成示例质量指标"""
@@ -961,15 +978,37 @@ class DataQualityControlCenter(QWidget):
         self.filter_issues()
 
     def update_quality_metrics(self):
-        """更新质量指标"""
-        import random
+        """更新质量指标（使用真实数据）"""
+        try:
+            if hasattr(self, 'real_data_provider') and self.real_data_provider:
+                # 获取真实指标
+                metrics_data = self.real_data_provider.get_quality_metrics()
 
-        # 模拟指标变化
-        for metric_type, metric in self.quality_metrics.items():
-            # 小幅随机变化
-            change = random.uniform(-0.02, 0.02)
-            metric.value = max(0.5, min(1.0, metric.value + change))
-            metric.timestamp = datetime.now()
+                # 更新现有指标
+                metric_type_map = {
+                    'completeness': QualityMetricType.COMPLETENESS,
+                    'accuracy': QualityMetricType.ACCURACY,
+                    'timeliness': QualityMetricType.TIMELINESS,
+                    'consistency': QualityMetricType.CONSISTENCY,
+                    'validity': QualityMetricType.VALIDITY,
+                    'uniqueness': QualityMetricType.UNIQUENESS
+                }
+
+                for metric_name, value in metrics_data.items():
+                    if metric_name in metric_type_map:
+                        metric_type = metric_type_map[metric_name]
+                        if metric_type in self.quality_metrics:
+                            self.quality_metrics[metric_type].value = value
+                            self.quality_metrics[metric_type].timestamp = datetime.now()
+            else:
+                # 降级到模拟数据
+                import random
+                for metric_type, metric in self.quality_metrics.items():
+                    change = random.uniform(-0.02, 0.02)
+                    metric.value = max(0.5, min(1.0, metric.value + change))
+                    metric.timestamp = datetime.now()
+        except Exception as e:
+            logger.error(f"更新质量指标失败: {e}")
 
         self.update_quality_gauges()
         self.update_overview_stats()
@@ -995,9 +1034,21 @@ class DataQualityControlCenter(QWidget):
                 gauge.set_score(self.quality_metrics[metric_type].value)
 
     def update_overview_stats(self):
-        """更新概览统计"""
-        # 总记录数（模拟）
-        self.total_records_label.setText("1,234,567")
+        """更新概览统计（使用真实数据）"""
+        try:
+            if hasattr(self, 'real_data_provider') and self.real_data_provider:
+                # 获取真实统计
+                datatypes = self.real_data_provider.get_datatypes_quality()
+
+                # 总记录数
+                total_records = sum(dt.get('count', 0) for dt in datatypes)
+                self.total_records_label.setText(f"{total_records:,}")
+            else:
+                # 降级到模拟数据
+                self.total_records_label.setText("1,234,567")
+        except Exception as e:
+            logger.error(f"更新概览统计失败: {e}")
+            self.total_records_label.setText("N/A")
 
         # 质量问题数
         unresolved_issues = len([issue for issue in self.quality_issues if not issue.resolved])
@@ -1715,6 +1766,81 @@ class DataQualityControlCenter(QWidget):
 
         except Exception as e:
             logger.error(f"清洗后更新问题状态失败: {e}")
+
+    # ==================== 真实数据加载方法 ====================
+
+    def load_real_metrics(self):
+        """加载真实质量指标"""
+        try:
+            metrics_data = self.real_data_provider.get_quality_metrics()
+
+            metric_type_map = {
+                'completeness': QualityMetricType.COMPLETENESS,
+                'accuracy': QualityMetricType.ACCURACY,
+                'timeliness': QualityMetricType.TIMELINESS,
+                'consistency': QualityMetricType.CONSISTENCY,
+                'validity': QualityMetricType.VALIDITY,
+                'uniqueness': QualityMetricType.UNIQUENESS
+            }
+
+            for metric_name, value in metrics_data.items():
+                if metric_name in metric_type_map:
+                    metric_type = metric_type_map[metric_name]
+                    metric = QualityMetric(
+                        metric_type=metric_type,
+                        value=value,
+                        threshold=0.85,
+                        timestamp=datetime.now()
+                    )
+                    self.quality_metrics[metric_type] = metric
+
+            self.update_quality_gauges()
+            logger.info("真实质量指标加载完成")
+
+        except Exception as e:
+            logger.error(f"加载真实质量指标失败: {e}")
+
+    def load_real_rules(self):
+        """加载真实质量规则"""
+        # 使用系统配置的规则（暂时保持示例规则）
+        self.generate_sample_rules()
+        logger.info("质量规则加载完成")
+
+    def load_real_issues(self):
+        """加载真实质量问题"""
+        try:
+            anomalies = self.real_data_provider.get_anomaly_records()
+
+            issues = []
+            severity_map = {
+                '严重': QualitySeverity.CRITICAL,
+                '警告': QualitySeverity.HIGH,
+                '一般': QualitySeverity.MEDIUM,
+                '轻微': QualitySeverity.LOW,
+                '正常': QualitySeverity.LOW
+            }
+
+            for idx, anomaly in enumerate(anomalies):
+                if anomaly.get('severity') not in ['正常', 'INFO']:
+                    issue = QualityIssue(
+                        issue_id=f"issue_{idx:03d}",
+                        rule_id="auto_detected",
+                        rule_name=anomaly.get('type', 'Unknown'),
+                        severity=severity_map.get(anomaly.get('severity'), QualitySeverity.MEDIUM),
+                        description=anomaly.get('description', ''),
+                        affected_rows=1,
+                        column=anomaly.get('datatype', ''),
+                        sample_values=[anomaly.get('source', '')]
+                    )
+                    issue.detected_at = anomaly.get('time', datetime.now())
+                    issues.append(issue)
+
+            self.quality_issues = issues if issues else []
+            self.filter_issues()
+            logger.info(f"真实质量问题加载完成: {len(issues)} 个问题")
+
+        except Exception as e:
+            logger.error(f"加载真实质量问题失败: {e}")
 
 
 if __name__ == "__main__":

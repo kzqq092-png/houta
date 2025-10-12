@@ -511,27 +511,40 @@ class FieldMappingEngine:
 
     def _validate_column_data(self, column_data: pd.Series, column_name: str) -> bool:
         """验证列数据"""
-        # 检查空值比例
-        null_ratio = column_data.isnull().sum() / len(column_data)
-        if null_ratio > 0.8:  # 如果空值超过80%，认为数据质量有问题
-            return False
-
-        # 检查数据类型一致性
-        non_null_data = column_data.dropna()
-        if len(non_null_data) == 0:
-            return False
-
-        # 对于数值字段，检查是否包含有效数值
-        if column_name in ['open', 'high', 'low', 'close', 'volume', 'value']:
-            try:
-                numeric_data = pd.to_numeric(non_null_data.head(10), errors='coerce')
-                # 检查转换后是否有有效的数值
-                valid_count = int(numeric_data.notna().sum())  # 确保是标量
-                return valid_count > 0
-            except Exception:
+        try:
+            # 检查数据长度
+            if len(column_data) == 0:
                 return False
 
-        return True
+            # 检查空值比例（确保结果是标量）
+            null_count = int(column_data.isnull().sum())
+            total_count = len(column_data)
+            null_ratio = null_count / total_count if total_count > 0 else 1.0
+
+            if null_ratio > 0.8:  # 如果空值超过80%，认为数据质量有问题
+                return False
+
+            # 检查数据类型一致性
+            non_null_data = column_data.dropna()
+            if len(non_null_data) == 0:
+                return False
+
+            # 对于数值字段，检查是否包含有效数值
+            if column_name in ['open', 'high', 'low', 'close', 'volume', 'value',
+                               'main_net_inflow', 'change_percent', 'market_value']:
+                try:
+                    numeric_data = pd.to_numeric(non_null_data.head(10), errors='coerce')
+                    # 检查转换后是否有有效的数值（确保结果是标量）
+                    valid_count = int(numeric_data.notna().sum())
+                    return valid_count > 0
+                except Exception:
+                    return False
+
+            return True
+
+        except Exception as e:
+            self.logger.debug(f"列数据验证异常: {column_name}, {e}")
+            return True  # 验证异常时认为数据有效，避免过于严格
 
     def _update_stats(self, mapping_results: List[MappingResult]):
         """更新统计信息"""

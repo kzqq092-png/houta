@@ -175,6 +175,9 @@ class AIPredictionService(BaseService):
         self._last_warning_time = {}  # 记录每种预测类型的最后警告时间
         self._warning_interval = 60  # 警告间隔（秒）
 
+        # 缓存ML库导入状态
+        self._ml_libs_cache = None
+
         # 初始化模型
         self._initialize_models()
 
@@ -188,9 +191,6 @@ class AIPredictionService(BaseService):
             self._last_warning_time[prediction_type] = current_time
             return True
         return False
-
-        # 缓存ML库导入状态
-        self._ml_libs_cache = None
 
     def _import_ml_libraries(self) -> Optional[Dict[str, Any]]:
         """统一的机器学习库导入方法"""

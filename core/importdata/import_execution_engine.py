@@ -70,11 +70,16 @@ class TaskExecutionResult:
     execution_time: float = 0.0
 
     @property
-    def progress_percentage(self) -> float:
-        """进度百分比"""
+    def progress(self) -> float:
+        """进度百分比（0-100）- UI兼容性"""
         if self.total_records == 0:
             return 0.0
         return (self.processed_records / self.total_records) * 100
+
+    @property
+    def progress_percentage(self) -> float:
+        """进度百分比（向后兼容）"""
+        return self.progress
 
 
 class DataImportExecutionEngine(QObject):
@@ -298,28 +303,23 @@ class DataImportExecutionEngine(QObject):
         """获取AI优化统计信息"""
         return self._ai_optimization_stats.copy()
 
-    def _init_cache_manager(self) -> MultiLevelCacheManager:
+    def _init_cache_manager(self) -> Optional[MultiLevelCacheManager]:
         """初始化多级缓存管理器"""
         try:
-            cache_config = {
-                'levels': [CacheLevel.MEMORY, CacheLevel.DISK],
-                'memory': {
-                    'max_size': 1000,
-                    'max_memory_mb': 200
-                },
-                'disk': {
-                    'cache_dir': 'cache/import_cache',
-                    'max_size_mb': 1000
-                },
-                'default_ttl_minutes': 60
-            }
+            # MultiLevelCacheManager实际只支持简单的内存缓存
+            # 参数：max_size (缓存条目数), ttl (生存时间秒数)
+            cache_manager = MultiLevelCacheManager(
+                max_size=1000,
+                ttl=3600  # 60分钟 = 3600秒
+            )
 
-            cache_manager = None
             logger.info("多级缓存管理器初始化成功")
             return cache_manager
 
         except Exception as e:
             logger.error(f"缓存管理器初始化失败: {e}")
+            import traceback
+            logger.error(f"详细错误: {traceback.format_exc()}")
             return None
 
     def _cache_task_data(self, task_id: str, data_type: str, data: Any) -> bool:
@@ -929,6 +929,15 @@ class DataImportExecutionEngine(QObject):
     def _init_auto_tuner(self) -> Optional[AutoTuner]:
         """初始化自动调优器"""
         try:
+            # 确保PerformanceEvaluator可用
+            try:
+                from optimization.algorithm_optimizer import PerformanceEvaluator
+                evaluator = PerformanceEvaluator(debug_mode=False)
+                logger.debug("PerformanceEvaluator初始化成功")
+            except Exception as eval_error:
+                logger.warning(f"PerformanceEvaluator初始化失败: {eval_error}")
+                # 继续初始化AutoTuner，它可能有内置的评估器
+
             # 配置自动调优器
             max_workers = min(4, self.executor._max_workers)  # 使用较少的工作线程
             auto_tuner = AutoTuner(max_workers=max_workers, debug_mode=False)
@@ -938,6 +947,8 @@ class DataImportExecutionEngine(QObject):
 
         except Exception as e:
             logger.error(f"自动调优器初始化失败: {e}")
+            import traceback
+            logger.error(f"详细错误: {traceback.format_exc()}")
             return None
 
     def _auto_tune_task_parameters(self, task_config: ImportTaskConfig) -> ImportTaskConfig:
@@ -951,9 +962,9 @@ class DataImportExecutionEngine(QObject):
             # 创建调优配置
             tuning_config = OptimizationConfig(
                 target_metric='execution_time',
-                optimization_method='bayesian',
-                max_iterations=10,
-                early_stopping=True
+                method='bayesian',  # 参数名是'method'不是'optimization_method'
+                max_iterations=10
+                # OptimizationConfig不支持early_stopping参数
             )
 
             # 创建调优任务
@@ -1016,6 +1027,7 @@ class DataImportExecutionEngine(QObject):
                         symbols=base_config.symbols[:min(10, len(base_config.symbols))],  # 使用少量股票测试
                         data_source=base_config.data_source,
                         asset_type=base_config.asset_type,
+                        data_type=base_config.data_type,  # 添加必需的data_type参数
                         frequency=base_config.frequency,
                         mode=base_config.mode,
                         batch_size=params.get('batch_size', base_config.batch_size),
@@ -1847,11 +1859,14 @@ class DataImportExecutionEngine(QObject):
     def _save_kdata_to_database(self, symbol: str, kdata: 'pd.DataFrame', task_config: ImportTaskConfig):
         """保存K线数据到数据库（使用新的增强资产数据库管理器）"""
         try:
-            # 使用新的增强资产数据库管理器
-            from ..enhanced_asset_database_manager import EnhancedAssetDatabaseManager
+            # 使用资产分数据库管理器
+            from ..asset_database_manager import AssetSeparatedDatabaseManager
             from ..plugin_types import AssetType, DataType
 
-            asset_manager = EnhancedAssetDatabaseManager()
+            asset_manager = AssetSeparatedDatabaseManager()
+
+            # 标准化数据字段，确保与表结构匹配
+            kdata = self._standardize_kline_data_fields(kdata)
 
             # 根据股票代码确定资产类型
             asset_type = AssetType.STOCK_A if symbol.endswith(('.SZ', '.SH')) else AssetType.STOCK
@@ -1897,7 +1912,6 @@ class DataImportExecutionEngine(QObject):
             # 添加symbol列
             data_with_symbol = data.copy()
             data_with_symbol['symbol'] = symbol
-            data_with_symbol['import_time'] = pd.Timestamp.now()
 
             # 插入数据
             result = duckdb_ops.insert_dataframe(
@@ -1942,7 +1956,6 @@ class DataImportExecutionEngine(QObject):
             # 添加symbol列
             data_with_symbol = data.copy()
             data_with_symbol['symbol'] = symbol
-            data_with_symbol['import_time'] = pd.Timestamp.now()
 
             # 插入数据（实时数据通常不需要upsert，直接插入）
             result = duckdb_ops.insert_dataframe(
@@ -2028,11 +2041,16 @@ class DataImportExecutionEngine(QObject):
                     )
 
                     if not kdata.empty:
-                        # 添加symbol列和时间戳
+                        # 添加symbol列
                         kdata_with_meta = kdata.copy()
                         kdata_with_meta['symbol'] = symbol
-                        kdata_with_meta['import_time'] = pd.Timestamp.now()
-
+                        
+                        # 调试：检查datetime列
+                        if 'datetime' not in kdata_with_meta.columns:
+                            logger.warning(f"{symbol}: 数据中缺少datetime列，可用列: {kdata_with_meta.columns.tolist()}")
+                        elif kdata_with_meta['datetime'].isna().all():
+                            logger.warning(f"{symbol}: datetime列全部为None")
+                        
                         # 线程安全地添加到列表
                         with download_lock:
                             all_kdata_list.append(kdata_with_meta)
@@ -2130,12 +2148,12 @@ class DataImportExecutionEngine(QObject):
                 logger.warning("没有数据需要保存")
                 return
 
-            # 使用新的增强资产数据库管理器
-            from ..enhanced_asset_database_manager import EnhancedAssetDatabaseManager
+            # 使用资产分数据库管理器
+            from ..asset_database_manager import AssetSeparatedDatabaseManager
             from ..plugin_types import AssetType, DataType
             import pandas as pd
 
-            asset_manager = EnhancedAssetDatabaseManager()
+            asset_manager = AssetSeparatedDatabaseManager()
 
             # 合并所有数据
             combined_data = pd.concat(all_kdata_list, ignore_index=True)
@@ -2172,15 +2190,27 @@ class DataImportExecutionEngine(QObject):
         try:
             if df.empty:
                 return df
+            
+            # 如果datetime是index，将其重置为列
+            if isinstance(df.index, pd.DatetimeIndex):
+                df = df.reset_index()
+                # 如果reset后的列名为'index'，重命名为datetime
+                if 'index' in df.columns and 'datetime' not in df.columns:
+                    df = df.rename(columns={'index': 'datetime'})
 
             # 处理字段名称映射（code -> symbol）
             if 'code' in df.columns and 'symbol' not in df.columns:
                 df['symbol'] = df['code']
+
+            # 删除code列（如果存在，避免与symbol冲突）
+            if 'code' in df.columns:
                 df = df.drop('code', axis=1)
 
             # 基础字段映射和默认值
+            # 标准量化表字段（20字段 - 方案B）
+            # 包括基础OHLCV、复权数据、扩展交易数据、元数据
             field_defaults = {
-                # 基础OHLCV字段（必需）
+                # 基础OHLCV字段（8个）
                 'symbol': '',
                 'datetime': None,
                 'open': 0.0,
@@ -2189,40 +2219,27 @@ class DataImportExecutionEngine(QObject):
                 'close': 0.0,
                 'volume': 0,
                 'amount': 0.0,
+                'turnover': 0.0,
 
-                # 复权数据
-                'adj_close': None,
-                'adj_factor': None,
-                'vwap': None,
-                'bid_price': None,
-                'ask_price': None,
-                'bid_volume': None,
-                'ask_volume': None,
+                # 复权数据（2个）- 量化回测必需
+                'adj_close': None,      # 复权收盘价
+                'adj_factor': 1.0,      # 复权因子（默认1.0=不复权）
 
-                # 技术指标
-                'rsi_14': None,
-                'macd_dif': None,
-                'macd_dea': None,
-                'macd_histogram': None,
-                'kdj_k': None,
-                'kdj_d': None,
-                'kdj_j': None,
-                'bollinger_upper': None,
-                'bollinger_middle': None,
-                'bollinger_lower': None,
-                'turnover_rate': None,
-                'net_inflow_large': None,
-                'net_inflow_medium': None,
-                'net_inflow_small': None,
+                # 扩展交易数据（2个）
+                'turnover_rate': None,  # 换手率（行业标准）
+                'vwap': None,           # 成交量加权均价（机构常用）
 
-                # 元数据
-                'plugin_specific_data': None,
-                'data_source': 'import_engine',
+                # 元数据（6个）
+                'name': None,
+                'market': None,
+                'frequency': '1d',
+                'period': None,
+                'data_source': 'unknown',  # 数据来源追溯
                 'created_at': None,
-                'data_quality_score': None
+                'updated_at': None,
             }
 
-            # 添加缺失的字段
+            # 添加缺失的必需字段
             for field, default_value in field_defaults.items():
                 if field not in df.columns:
                     df[field] = default_value
@@ -2236,17 +2253,61 @@ class DataImportExecutionEngine(QObject):
                 if field in df.columns:
                     df[field] = pd.to_numeric(df[field], errors='coerce').fillna(0)
 
-            # 确保datetime字段格式正确
+            # 确保datetime字段格式正确且不为空
             if 'datetime' in df.columns:
                 df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+                # 删除datetime为空的行（数据库NOT NULL约束）
+                null_datetime_count = df['datetime'].isna().sum()
+                if null_datetime_count > 0:
+                    logger.warning(f"发现 {null_datetime_count} 条datetime为空的记录，将被过滤")
+                    df = df[df['datetime'].notna()]
+            else:
+                # 如果没有datetime列，尝试使用其他时间列
+                time_columns = [col for col in df.columns if 'time' in col.lower() or 'date' in col.lower()]
+                if time_columns:
+                    logger.warning(f"未找到datetime列，尝试使用 {time_columns[0]}")
+                    df['datetime'] = pd.to_datetime(df[time_columns[0]], errors='coerce')
+                    df = df[df['datetime'].notna()]
+                else:
+                    # 最后尝试：检查是否有DatetimeIndex但还没有被重置
+                    if isinstance(df.index, pd.DatetimeIndex):
+                        logger.warning("发现DatetimeIndex但未被重置为datetime列，正在修复")
+                        df = df.reset_index()
+                        if 'index' in df.columns:
+                            df = df.rename(columns={'index': 'datetime'})
+                    else:
+                        logger.error(f"未找到时间相关列，无法标准化数据。可用列: {df.columns.tolist()}")
+                        return pd.DataFrame()
 
             # 确保symbol字段不为空
             if 'symbol' in df.columns:
                 df['symbol'] = df['symbol'].fillna('').astype(str)
 
+            # 删除code列（如果存在），避免与symbol混淆
+            if 'code' in df.columns:
+                logger.debug("删除code列（已有symbol列）")
+                df = df.drop(columns=['code'])
+
             # 设置默认时间戳
             if 'created_at' in df.columns and df['created_at'].isna().all():
                 df['created_at'] = pd.Timestamp.now()
+
+            # 智能计算复权价格（如果数据源没有提供）
+            if 'adj_close' in df.columns:
+                # 如果adj_close为空但有adj_factor，则计算
+                mask = df['adj_close'].isna() & df['adj_factor'].notna()
+                if mask.any():
+                    df.loc[mask, 'adj_close'] = df.loc[mask, 'close'] * df.loc[mask, 'adj_factor']
+
+                # 如果adj_close和adj_factor都为空，设置adj_close=close（不复权）
+                mask = df['adj_close'].isna()
+                if mask.any():
+                    df.loc[mask, 'adj_close'] = df.loc[mask, 'close']
+
+            # 智能计算VWAP（如果数据源没有提供）
+            if 'vwap' in df.columns and df['vwap'].isna().all():
+                # vwap = amount / volume
+                df['vwap'] = df['amount'] / df['volume'].replace(0, pd.NA)
 
             logger.debug(f"数据字段标准化完成，字段数: {len(df.columns)}")
             return df

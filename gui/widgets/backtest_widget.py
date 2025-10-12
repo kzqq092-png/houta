@@ -1259,7 +1259,7 @@ class ProfessionalBacktestWidget(QWidget):
                 # 尝试导入并创建UltraPerformanceOptimizer
                 from backtest.ultra_performance_optimizer import UltraPerformanceOptimizer
                 self.performance_optimizer = UltraPerformanceOptimizer()
-                logger.info("UltraPerformanceOptimizer初始化成功")
+                logger.info("UltraPerformanceOptimizer初始化成功,使用GPU加速回测")
             except ImportError:
                 logger.warning("📦 UltraPerformanceOptimizer模块不可用，使用基础优化器")
                 self._create_fallback_optimizer()

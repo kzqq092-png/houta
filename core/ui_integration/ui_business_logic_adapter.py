@@ -27,8 +27,14 @@ from PyQt5.QtWidgets import QApplication
 
 # 导入核心服务
 try:
+    from loguru import logger
     from core.containers.service_container import ServiceContainer
-    from core.containers import get_service_container
+    try:
+        from core.containers import get_service_container
+    except ImportError:
+        # 如果__init__.py没有导出，直接导入
+        from core.containers.service_container import get_service_container
+
     from core.services.service_bootstrap import ServiceBootstrap
     from core.importdata.unified_data_import_engine import UnifiedDataImportEngine
     from core.importdata.task_status_manager import TaskStatusManager
@@ -44,20 +50,25 @@ try:
     # EnhancedDistributedService 不存在，使用 DistributedService
     from core.services.distributed_service import DistributedService as EnhancedDistributedService
     from core.ai.data_anomaly_detector import DataAnomalyDetector
-    from loguru import logger
+
     CORE_SERVICES_AVAILABLE = True
     # 标记编排服务不可用
     ImportOrchestrationService = None
+    logger.info("UI适配器核心服务导入成功")
+
 except ImportError as e:
     import logging
     logger = logging.getLogger(__name__)
     CORE_SERVICES_AVAILABLE = False
     ImportOrchestrationService = None
     logger.warning(f"核心服务导入失败: {e}")
+    import traceback
+    logger.warning(f"详细导入错误: {traceback.format_exc()}")
     # 尝试使用loguru记录详细错误
     try:
         from loguru import logger as loguru_logger
         loguru_logger.warning(f"UI适配器核心服务导入失败，具体错误: {e}")
+        loguru_logger.warning(f"错误堆栈: {traceback.format_exc()}")
     except ImportError:
         pass
 
@@ -202,6 +213,15 @@ class UIBusinessLogicAdapter(QObject):
                 'anomaly_detector': DataAnomalyDetector
             }
 
+            # 标记可选服务（未注册时不警告，不影响核心功能）
+            self._optional_services = {
+                'unified_import_engine', 'task_status_manager',
+                'performance_coordinator', 'quality_monitor',
+                'behavior_learner', 'config_recommendation',
+                'config_impact_analyzer', 'cache_coordinator',
+                'distributed_service', 'anomaly_detector'
+            }
+
             # 初始化服务信息
             for name, service_type in service_definitions.items():
                 self.services[name] = ServiceInfo(
@@ -239,7 +259,11 @@ class UIBusinessLogicAdapter(QObject):
                     else:
                         service_info.status = ServiceStatus.UNAVAILABLE
                         service_info.error_message = "服务未注册"
-                        logger.warning(f"服务 {name} 未注册")
+                        # 只对非可选服务输出警告
+                        if not hasattr(self, '_optional_services') or name not in self._optional_services:
+                            logger.warning(f"服务 {name} 未注册")
+                        else:
+                            logger.debug(f"可选服务 {name} 未注册（不影响核心功能）")
                         self.service_status_changed.emit(name, "unavailable")
 
                 except Exception as e:

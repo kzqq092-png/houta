@@ -6,6 +6,7 @@
 """
 
 import asyncio
+import traceback
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 from PyQt5.QtWidgets import (
@@ -841,130 +842,317 @@ class SmartRecommendationPanel(QWidget):
         """)
 
     def _load_initial_recommendations(self):
-        """加载初始推荐"""
+        """加载初始推荐（使用真实推荐引擎）"""
         try:
-            # 生成模拟推荐数据
-            recommendations = self._generate_mock_recommendations()
+            # 初始化推荐引擎（如果尚未初始化）
+            if self.recommendation_engine is None:
+                logger.info("初始化智能推荐引擎...")
+                self.recommendation_engine = SmartRecommendationEngine()
+
+                # 初始化引擎数据
+                self._initialize_recommendation_engine()
+
+            # 异步获取真实推荐
+            logger.info("正在获取个性化推荐...")
+            user_id = self._get_current_user_id()
+
+            # 使用asyncio运行异步推荐
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            recommendations = loop.run_until_complete(
+                self.recommendation_engine.get_recommendations(
+                    user_id=user_id,
+                    count=self.max_recommendations * 2  # 获取更多以便分类
+                )
+            )
+
+            # 转换为显示格式
+            formatted_recommendations = self._format_engine_recommendations(recommendations)
 
             # 按类型分组显示
-            self._display_recommendations_by_type(recommendations)
+            self._display_recommendations_by_type(formatted_recommendations)
 
-            # 更新用户行为图表
-            behavior_data = self._generate_mock_behavior_data()
-            self.behavior_chart.update_behavior_data(behavior_data)
+            # 更新用户行为图表（使用真实统计数据）
+            behavior_data = self._get_real_behavior_data()
+            if behavior_data:
+                self.behavior_chart.update_behavior_data(behavior_data)
 
             # 更新反馈统计
             self._update_feedback_stats()
 
-            logger.info("初始推荐数据加载完成")
+            logger.info(f"加载了 {len(recommendations)} 个真实推荐")
 
         except Exception as e:
-            logger.error(f"加载初始推荐失败: {e}")
+            logger.error(f"加载推荐失败: {e}")
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            # 显示空状态而不是Mock数据
+            self._show_empty_state(str(e))
 
-    def _generate_mock_recommendations(self) -> List[Dict[str, Any]]:
-        """生成模拟推荐数据"""
-        recommendations = []
+    # ==================== 真实数据处理方法 ====================
 
-        # 股票推荐
-        stock_recommendations = [
-            {
-                "id": "stock_001",
-                "type": "stock",
-                "title": "贵州茅台 (600519)",
-                "description": "基于基本面分析，该股票具有良好的投资价值，建议关注",
-                "score": 8.5,
-                "reason": "ROE持续增长，品牌价值稳定",
-                "target_price": 1800.0,
-                "risk_level": "中等"
-            },
-            {
-                "id": "stock_002",
-                "type": "stock",
-                "title": "宁德时代 (300750)",
-                "description": "新能源板块龙头，技术指标显示上涨趋势",
-                "score": 7.8,
-                "reason": "技术突破，行业景气度高",
-                "target_price": 420.0,
-                "risk_level": "较高"
+    def _initialize_recommendation_engine(self):
+        """初始化推荐引擎数据（使用真实系统数据）"""
+        try:
+            logger.info("开始初始化推荐引擎数据...")
+
+            # 1. 从系统获取真实股票数据
+            stock_items_added = self._load_stock_content_items()
+            logger.info(f"添加了 {stock_items_added} 个股票内容项")
+
+            # 2. 添加策略内容（如果有）
+            strategy_items_added = self._load_strategy_content_items()
+            logger.info(f"添加了 {strategy_items_added} 个策略内容项")
+
+            # 3. 添加指标内容
+            indicator_items_added = self._load_indicator_content_items()
+            logger.info(f"添加了 {indicator_items_added} 个指标内容项")
+
+            # 4. 创建或更新用户画像
+            self._create_user_profile()
+
+            logger.info("推荐引擎数据初始化完成")
+
+        except Exception as e:
+            logger.error(f"初始化推荐引擎失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    def _load_stock_content_items(self) -> int:
+        """从UnifiedDataManager加载股票数据"""
+        try:
+            from core.services.service_container import ServiceContainer
+            from core.services.smart_recommendation_engine import ContentItem, RecommendationType
+
+            # 获取数据管理器
+            container = ServiceContainer()
+            data_manager = container.get('UnifiedDataManager')
+
+            if not data_manager:
+                logger.warning("UnifiedDataManager不可用，尝试直接实例化")
+                from core.services.unified_data_manager import UnifiedDataManager
+                data_manager = UnifiedDataManager()
+
+            # 获取股票列表
+            stock_list = data_manager.get_asset_list('stock')
+
+            if stock_list.empty:
+                logger.warning("股票列表为空")
+                return 0
+
+            # 添加股票内容项
+            count = 0
+            for idx, stock in stock_list.iterrows():
+                stock_code = stock.get('code', stock.get('symbol', ''))
+                stock_name = stock.get('name', '')
+
+                if not stock_code:
+                    continue
+
+                item = ContentItem(
+                    item_id=f"stock_{stock_code}",
+                    item_type=RecommendationType.STOCK,
+                    title=f"{stock_name} ({stock_code})",
+                    description=f"行业: {stock.get('industry', '未知')} | 板块: {stock.get('sector', '未知')}",
+                    tags=[stock.get('sector', ''), stock.get('industry', ''), stock.get('market', '')],
+                    categories=[stock.get('market', ''), stock.get('sector', '')],
+                    keywords=[stock_name, stock_code, stock.get('industry', '')],
+                    metadata={
+                        'code': stock_code,
+                        'name': stock_name,
+                        'market': stock.get('market', ''),
+                        'sector': stock.get('sector', ''),
+                        'industry': stock.get('industry', '')
+                    }
+                )
+
+                self.recommendation_engine.add_content_item(item)
+                count += 1
+
+                # 限制数量避免过多
+                if count >= 1000:
+                    break
+
+            return count
+
+        except Exception as e:
+            logger.error(f"加载股票内容项失败: {e}")
+            return 0
+
+    def _load_strategy_content_items(self) -> int:
+        """加载策略内容项"""
+        try:
+            from core.services.smart_recommendation_engine import ContentItem, RecommendationType
+
+            # 常见策略列表
+            strategies = [
+                {"id": "ma_crossover", "name": "均线交叉策略", "desc": "基于移动平均线交叉的趋势跟踪策略", "tags": ["趋势", "移动平均"]},
+                {"id": "rsi_reversal", "name": "RSI反转策略", "desc": "利用RSI超买超卖信号的反转策略", "tags": ["震荡", "RSI"]},
+                {"id": "macd_signal", "name": "MACD信号策略", "desc": "基于MACD指标的交易信号策略", "tags": ["趋势", "MACD"]},
+                {"id": "bollinger_breakout", "name": "布林带突破策略", "desc": "基于布林带的突破交易策略", "tags": ["突破", "波动"]},
+                {"id": "volume_price", "name": "量价配合策略", "desc": "结合成交量和价格的确认策略", "tags": ["量价", "确认"]},
+            ]
+
+            count = 0
+            for strategy in strategies:
+                item = ContentItem(
+                    item_id=f"strategy_{strategy['id']}",
+                    item_type=RecommendationType.STRATEGY,
+                    title=strategy['name'],
+                    description=strategy['desc'],
+                    tags=strategy['tags'],
+                    categories=["交易策略"],
+                    keywords=[strategy['name']] + strategy['tags']
+                )
+                self.recommendation_engine.add_content_item(item)
+                count += 1
+
+            return count
+
+        except Exception as e:
+            logger.error(f"加载策略内容项失败: {e}")
+            return 0
+
+    def _load_indicator_content_items(self) -> int:
+        """加载指标内容项"""
+        try:
+            from core.services.smart_recommendation_engine import ContentItem, RecommendationType
+
+            # 常用技术指标
+            indicators = [
+                {"id": "macd", "name": "MACD", "desc": "趋势指标，识别趋势方向和强度", "tags": ["趋势"]},
+                {"id": "rsi", "name": "RSI", "desc": "相对强弱指标，识别超买超卖", "tags": ["震荡"]},
+                {"id": "kdj", "name": "KDJ", "desc": "随机指标，短期交易信号", "tags": ["震荡"]},
+                {"id": "boll", "name": "布林带", "desc": "波动率指标，识别突破机会", "tags": ["波动"]},
+                {"id": "ma", "name": "移动平均线", "desc": "趋势指标，平滑价格波动", "tags": ["趋势"]},
+            ]
+
+            count = 0
+            for indicator in indicators:
+                item = ContentItem(
+                    item_id=f"indicator_{indicator['id']}",
+                    item_type=RecommendationType.INDICATOR,
+                    title=indicator['name'],
+                    description=indicator['desc'],
+                    tags=indicator['tags'],
+                    categories=["技术指标"],
+                    keywords=[indicator['name']] + indicator['tags']
+                )
+                self.recommendation_engine.add_content_item(item)
+                count += 1
+
+            return count
+
+        except Exception as e:
+            logger.error(f"加载指标内容项失败: {e}")
+            return 0
+
+    def _create_user_profile(self):
+        """创建用户画像"""
+        try:
+            from core.services.smart_recommendation_engine import UserProfile
+
+            user_id = self._get_current_user_id()
+
+            if user_id not in self.recommendation_engine.user_profiles:
+                profile = UserProfile(
+                    user_id=user_id,
+                    registration_date=datetime.now(),
+                    last_active=datetime.now(),
+                    activity_level="medium",
+                    risk_tolerance="medium",
+                    investment_horizon="medium"
+                )
+                self.recommendation_engine.user_profiles[user_id] = profile
+                logger.info(f"创建用户画像: {user_id}")
+
+        except Exception as e:
+            logger.error(f"创建用户画像失败: {e}")
+
+    def _get_current_user_id(self) -> str:
+        """获取当前用户ID"""
+        # 简化实现 - 使用系统默认用户
+        # 后续可以集成真实的用户系统
+        return "default_user"
+
+    def _format_engine_recommendations(self, recommendations: List) -> List[Dict[str, Any]]:
+        """将引擎推荐转换为显示格式"""
+        formatted = []
+
+        for rec in recommendations:
+            # 映射推荐类型
+            type_map = {
+                'stock': 'stock',
+                'strategy': 'strategy',
+                'indicator': 'indicator',
+                'news': 'news',
+                'research': 'research',
+                'portfolio': 'portfolio'
             }
-        ]
 
-        # 策略推荐
-        strategy_recommendations = [
-            {
-                "id": "strategy_001",
-                "type": "strategy",
-                "title": "均线多头排列策略",
-                "description": "基于移动平均线的趋势跟踪策略，适合当前市场环境",
-                "score": 7.2,
-                "reason": "历史回测表现良好",
-                "success_rate": 0.68,
-                "max_drawdown": 0.15
-            },
-            {
-                "id": "strategy_002",
-                "type": "strategy",
-                "title": "RSI超卖反弹策略",
-                "description": "利用RSI指标识别超卖机会的短期交易策略",
-                "score": 6.9,
-                "reason": "适合震荡市场",
-                "success_rate": 0.72,
-                "max_drawdown": 0.08
+            rec_type = type_map.get(rec.item_type.value, 'unknown')
+
+            formatted_rec = {
+                "id": rec.item_id,
+                "type": rec_type,
+                "title": rec.title,
+                "description": rec.description or rec.explanation,
+                "score": rec.score * 10,  # 转换为0-10分
+                "reason": rec.explanation,
+                "confidence": rec.confidence,
+                "metadata": rec.metadata
             }
-        ]
 
-        # 指标推荐
-        indicator_recommendations = [
-            {
-                "id": "indicator_001",
-                "type": "indicator",
-                "title": "MACD金叉信号",
-                "description": "MACD指标出现金叉，建议关注买入机会",
-                "score": 7.5,
-                "reason": "技术指标确认趋势",
-                "reliability": 0.75
-            },
-            {
-                "id": "indicator_002",
-                "type": "indicator",
-                "title": "布林带突破",
-                "description": "价格突破布林带上轨，关注突破有效性",
-                "score": 6.8,
-                "reason": "突破信号明确",
-                "reliability": 0.68
+            formatted.append(formatted_rec)
+
+        return formatted
+
+    def _get_real_behavior_data(self) -> Optional[Dict[str, Any]]:
+        """获取真实用户行为数据"""
+        try:
+            if not self.recommendation_engine:
+                return None
+
+            stats = self.recommendation_engine.get_recommendation_stats()
+
+            # 构建行为数据
+            behavior_data = {
+                'usage_frequency': {
+                    '推荐总数': stats.get('total_recommendations', 0),
+                    '缓存命中': stats.get('cache_hits', 0),
+                    '缓存未命中': stats.get('cache_misses', 0),
+                },
+                'preferences': {
+                    '用户总数': stats.get('total_users', 0),
+                    '内容项总数': stats.get('total_items', 0),
+                    '交互总数': stats.get('total_interactions', 0),
+                },
+                'recommendation_effectiveness': {
+                    '缓存命中率': stats.get('cache_hit_rate', 0.0),
+                    '模型已训练': 1.0 if stats.get('model_trained') else 0.0,
+                }
             }
-        ]
 
-        # 新闻推荐
-        news_recommendations = [
-            {
-                "id": "news_001",
-                "type": "news",
-                "title": "央行降准释放流动性",
-                "description": "央行宣布降准0.25个百分点，市场流动性将得到改善",
-                "score": 8.0,
-                "reason": "政策利好",
-                "impact": "正面",
-                "relevance": 0.85
-            },
-            {
-                "id": "news_002",
-                "type": "news",
-                "title": "科技板块业绩超预期",
-                "description": "多家科技公司发布超预期业绩，板块情绪向好",
-                "score": 7.3,
-                "reason": "基本面改善",
-                "impact": "正面",
-                "relevance": 0.78
-            }
-        ]
+            return behavior_data
 
-        recommendations.extend(stock_recommendations)
-        recommendations.extend(strategy_recommendations)
-        recommendations.extend(indicator_recommendations)
-        recommendations.extend(news_recommendations)
+        except Exception as e:
+            logger.error(f"获取行为数据失败: {e}")
+            return None
 
-        return recommendations
+    def _show_empty_state(self, message: str = ""):
+        """显示空状态"""
+        logger.info(f"显示空状态: {message}")
+        # 清空所有推荐卡片
+        for layout in [self.stock_cards_layout, self.strategy_cards_layout,
+                       self.indicator_cards_layout, self.news_cards_layout]:
+            while layout.count():
+                child = layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
     def _display_recommendations_by_type(self, recommendations: List[Dict[str, Any]]):
         """按类型显示推荐"""
@@ -1022,30 +1210,7 @@ class SmartRecommendationPanel(QWidget):
         # 添加弹性空间
         layout.addStretch()
 
-    def _generate_mock_behavior_data(self) -> Dict[str, Any]:
-        """生成模拟用户行为数据"""
-        return {
-            'usage_frequency': {
-                '图表分析': 45,
-                '技术指标': 38,
-                '形态识别': 25,
-                '基本面分析': 20,
-                '数据导入': 15
-            },
-            'preferences': {
-                '技术分析': 40,
-                '基本面分析': 25,
-                '量化策略': 20,
-                '风险管理': 15
-            },
-            'time_distribution': list(range(24)),
-            'recommendation_effectiveness': {
-                '点击率': 0.75,
-                '转化率': 0.45,
-                '满意度': 0.85,
-                '准确率': 0.68
-            }
-        }
+    # Mock函数已删除 - 使用 _get_real_behavior_data() 获取真实数据
 
     def _update_feedback_stats(self):
         """更新反馈统计"""

@@ -174,6 +174,15 @@ class StrategyService(BaseService):
             except ImportError:
                 logger.warning("Backtrader策略插件不可用")
 
+            # 20字段标准策略插件 (New)
+            try:
+                from strategies.adj_vwap_strategies import AdjMomentumPlugin, VWAPReversionPlugin
+                self._plugin_factories['adj_momentum_v2'] = lambda: AdjMomentumPlugin()
+                self._plugin_factories['vwap_reversion_v2'] = lambda: VWAPReversionPlugin()
+                logger.info(">> 已注册20字段标准策略: adj_momentum_v2, vwap_reversion_v2")
+            except ImportError as e:
+                logger.warning(f"20字段标准策略插件不可用: {e}")
+
             # 自定义策略插件
             try:
                 from plugins.strategies.custom_strategy_plugin import CustomStrategyPlugin

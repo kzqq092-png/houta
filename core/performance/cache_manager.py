@@ -7,6 +7,7 @@ import threading
 from typing import Any, Optional, Dict
 from collections import OrderedDict
 from enum import Enum
+from loguru import logger
 
 
 class CacheLevel(Enum):
@@ -57,7 +58,14 @@ class MultiLevelCacheManager:
 
             # 添加新项
             self._cache[key] = value
-            self._timestamps[key] = time.time() + (ttl or self.ttl)
+
+            # 计算过期时间，确保ttl是有效的数值
+            ttl_value = ttl if ttl is not None else self.ttl
+            if not isinstance(ttl_value, (int, float)):
+                logger.warning(f"Invalid TTL type: {type(ttl_value)}, using default")
+                ttl_value = self.ttl
+
+            self._timestamps[key] = time.time() + ttl_value
 
     def delete(self, key: str) -> bool:
         """删除缓存项"""
@@ -77,7 +85,14 @@ class MultiLevelCacheManager:
         """检查是否过期"""
         if key not in self._timestamps:
             return True
-        return time.time() > self._timestamps[key]
+        try:
+            expiry_time = self._timestamps[key]
+            # 确保expiry_time是数值类型
+            if not isinstance(expiry_time, (int, float)):
+                return True
+            return time.time() > expiry_time
+        except (TypeError, ValueError):
+            return True
 
     def _remove(self, key: str) -> None:
         """移除缓存项"""
@@ -100,6 +115,24 @@ class MultiLevelCacheManager:
                 self._remove(key)
 
             return len(expired_keys)
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """获取缓存统计信息"""
+        with self._lock:
+            total_items = len(self._cache)
+            current_time = time.time()
+
+            # 统计过期项
+            expired_count = sum(1 for key in self._cache.keys() if self._is_expired(key))
+
+            return {
+                'total_items': total_items,
+                'active_items': total_items - expired_count,
+                'expired_items': expired_count,
+                'max_size': self.max_size,
+                'ttl': self.ttl,
+                'utilization': total_items / self.max_size if self.max_size > 0 else 0.0
+            }
 
 
 # 全局实例

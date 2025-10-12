@@ -1347,6 +1347,20 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
     def _process_datetime_column(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
         """处理时间列"""
         try:
+            # 检查是否存在datetime列
+            if 'datetime' not in df.columns:
+                logger.warning(f"数据中不存在datetime列: {symbol}, 列名: {df.columns.tolist()}")
+                return pd.DataFrame()
+
+            # 检查是否有数据
+            if df.empty or df['datetime'].isna().all():
+                logger.warning(f"datetime列数据为空: {symbol}")
+                return pd.DataFrame()
+
+            # 记录原始数据样本用于调试
+            sample_data = df['datetime'].head(3).tolist()
+            logger.debug(f"原始datetime数据样本 {symbol}: {sample_data}")
+
             # 过滤明显无效的时间数据
             invalid_patterns = ['0-00-00', '1900-01-01', '2099-12-31']
             for pattern in invalid_patterns:
@@ -1363,28 +1377,36 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             ]
 
             converted = False
+            best_success_rate = 0
             for fmt in datetime_formats:
                 try:
                     if fmt is None:
-                        df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+                        df_temp = df.copy()
+                        df_temp['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
                     else:
-                        df['datetime'] = pd.to_datetime(df['datetime'], format=fmt, errors='coerce')
+                        df_temp = df.copy()
+                        df_temp['datetime'] = pd.to_datetime(df['datetime'], format=fmt, errors='coerce')
 
                     # 检查转换成功率
-                    valid_count = df['datetime'].notna().sum()
-                    total_count = len(df)
+                    valid_count = df_temp['datetime'].notna().sum()
+                    total_count = len(df_temp)
                     success_rate = valid_count / total_count if total_count > 0 else 0
 
-                    if success_rate > 0.8:  # 80%以上转换成功
+                    if success_rate > best_success_rate:
+                        best_success_rate = success_rate
+
+                    if success_rate > 0.5:  # 降低阈值到50%以提高兼容性
+                        df = df_temp
                         converted = True
                         logger.debug(f"时间格式转换成功: {symbol}, 格式: {fmt}, 成功率: {success_rate:.2%}")
                         break
 
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"尝试格式 {fmt} 失败: {e}")
                     continue
 
             if not converted:
-                logger.error(f"时间格式转换失败: {symbol}")
+                logger.error(f"时间格式转换失败: {symbol}, 最佳成功率: {best_success_rate:.2%}, 样本数据: {sample_data[:2]}")
                 return pd.DataFrame()
 
             # 删除时间转换失败的行

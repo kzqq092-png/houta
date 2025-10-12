@@ -7,13 +7,6 @@ from loguru import logger
 
 import numpy as np
 import pandas as pd
-import numba
-from numba import cuda, jit, njit, prange
-import cupy as cp  # GPU加速
-import dask.dataframe as dd  # 分布式计算
-import dask.array as da
-from dask.distributed import Client, as_completed
-import ray  # 分布式计算框架
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import mmap
@@ -26,10 +19,69 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-import h5py  # 高性能数据存储
-import zarr  # 云原生数组存储
 import hashlib  # 哈希计算
 # 纯Loguru架构，移除旧的日志导入
+
+# 可选依赖 - GPU和分布式计算
+try:
+    import numba
+    from numba import cuda, jit, njit, prange
+    NUMBA_AVAILABLE = True
+except ImportError:
+    logger.warning("Numba未安装，GPU加速功能不可用")
+    NUMBA_AVAILABLE = False
+    # 创建dummy装饰器
+
+    def jit(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator if not args else decorator(args[0])
+    njit = jit
+    prange = range
+
+try:
+    import cupy as cp
+    CUPY_AVAILABLE = True
+except ImportError:
+    logger.debug("CuPy未安装，GPU数组计算不可用")
+    CUPY_AVAILABLE = False
+    cp = None
+
+try:
+    import dask.dataframe as dd
+    import dask.array as da
+    from dask.distributed import Client, as_completed
+    DASK_AVAILABLE = True
+except ImportError:
+    logger.debug("Dask未安装，分布式计算不可用")
+    DASK_AVAILABLE = False
+    dd = None
+    da = None
+    Client = None
+
+try:
+    import ray
+    RAY_AVAILABLE = True
+except ImportError:
+    logger.debug("Ray未安装，分布式框架不可用")
+    RAY_AVAILABLE = False
+    ray = None
+
+try:
+    import h5py
+    H5PY_AVAILABLE = True
+except ImportError:
+    logger.debug("h5py未安装，HDF5存储不可用")
+    H5PY_AVAILABLE = False
+    h5py = None
+
+try:
+    import zarr
+    ZARR_AVAILABLE = True
+except ImportError:
+    logger.debug("Zarr未安装，云原生存储不可用")
+    ZARR_AVAILABLE = False
+    zarr = None
 
 
 class PerformanceLevel(Enum):
@@ -104,15 +156,15 @@ class UltraPerformanceOptimizer:
 
     def _check_gpu_availability(self) -> bool:
         """检查GPU可用性"""
+        if not CUPY_AVAILABLE:
+            logger.debug("CuPy未安装，GPU加速不可用")
+            return False
+
         try:
-            # 优先检查CuPy
-            import cupy
-            cupy.cuda.Device(0).compute_capability
+            # 检查GPU设备
+            cp.cuda.Device(0).compute_capability
             logger.info("✅ CuPy GPU可用")
             return True
-        except ImportError:
-            logger.info("⚠️ CuPy未安装，GPU加速不可用")
-            return False
         except Exception as e:
             logger.debug(f"GPU检测失败: {e}")
             return False

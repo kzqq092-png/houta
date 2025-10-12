@@ -343,9 +343,9 @@ class DatabaseAdminDialog(QDialog):
         self.table_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.table_list.setWordWrap(True)
         self.table_list.itemClicked.connect(self.load_table)
-        self.table_list.setMinimumWidth(140)
-        self.table_list.setMaximumWidth(320)
-        self.table_list.setFixedWidth(180)
+        # self.table_list.setMinimumWidth(140)
+        # self.table_list.setMaximumWidth(320)
+        # self.table_list.setFixedWidth(180)
 
         # 表描述面板
         description_panel = self._create_table_description_panel()
@@ -2125,8 +2125,9 @@ class DatabaseAdminDialog(QDialog):
         try:
             # 首先清理所有使用数据库连接的对象
             if hasattr(self, 'model') and self.model:
-                # 清理 QSqlTableModel
-                self.model.clear()
+                # 清理模型 - DuckDBTableModel没有clear()方法
+                if hasattr(self.model, 'clear'):
+                    self.model.clear()
                 self.table_view.setModel(None)
                 self.model.deleteLater()
                 self.model = None

@@ -34,6 +34,7 @@ from ..performance.factorweave_performance_integration import FactorWeavePerform
 from ..performance.unified_monitor import get_performance_monitor
 from ..events import EventBus, get_event_bus
 
+
 class PerformanceAnomalyType(Enum):
     """性能异常类型"""
     SPIKE = "spike"                    # 性能尖峰
@@ -42,12 +43,14 @@ class PerformanceAnomalyType(Enum):
     STAGNATION = "stagnation"         # 性能停滞
     RESOURCE_EXHAUSTION = "resource_exhaustion"  # 资源耗尽
 
+
 class PerformanceTrendType(Enum):
     """性能趋势类型"""
     IMPROVING = "improving"            # 改善中
     STABLE = "stable"                 # 稳定
     DEGRADING = "degrading"           # 恶化中
     VOLATILE = "volatile"             # 波动
+
 
 @dataclass
 class PerformanceAnomaly:
@@ -65,6 +68,7 @@ class PerformanceAnomaly:
     auto_resolvable: bool = False
     suggested_actions: List[str] = field(default_factory=list)
 
+
 @dataclass
 class PerformanceTrend:
     """性能趋势"""
@@ -76,6 +80,7 @@ class PerformanceTrend:
     prediction_confidence: float  # 预测置信度
     time_window: timedelta
     data_points: int
+
 
 @dataclass
 class PerformanceOptimizationSuggestion:
@@ -90,6 +95,7 @@ class PerformanceOptimizationSuggestion:
     implementation_difficulty: str  # easy, medium, hard
     priority: str  # low, medium, high, critical
     created_at: datetime = field(default_factory=datetime.now)
+
 
 class EnhancedPerformanceBridge:
     """增强版性能数据桥接器"""
@@ -781,7 +787,9 @@ class EnhancedPerformanceBridge:
                 if len(history) < 50:  # 数据不足
                     continue
 
-                recent_values = [point['value'] for point in history[-50:]]
+                # deque不支持切片，需要先转换为列表
+                history_list = list(history)
+                recent_values = [point['value'] for point in history_list[-50:]]
 
                 # 计算统计指标
                 mean_val = statistics.mean(recent_values)
@@ -1024,8 +1032,10 @@ class EnhancedPerformanceBridge:
             logger.error(f"应用优化建议失败: {e}")
             return False
 
+
 # 全局实例
 _enhanced_performance_bridge = None
+
 
 def get_enhanced_performance_bridge() -> EnhancedPerformanceBridge:
     """获取增强版性能数据桥接器实例"""
@@ -1033,6 +1043,7 @@ def get_enhanced_performance_bridge() -> EnhancedPerformanceBridge:
     if _enhanced_performance_bridge is None:
         _enhanced_performance_bridge = EnhancedPerformanceBridge()
     return _enhanced_performance_bridge
+
 
 def initialize_enhanced_performance_bridge(auto_start: bool = True) -> EnhancedPerformanceBridge:
     """初始化增强版性能数据桥接器"""
@@ -1043,6 +1054,7 @@ def initialize_enhanced_performance_bridge(auto_start: bool = True) -> EnhancedP
 
     logger.info("增强版性能数据桥接器初始化完成")
     return bridge
+
 
 if __name__ == "__main__":
     # 测试代码

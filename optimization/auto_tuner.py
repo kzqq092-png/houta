@@ -9,7 +9,7 @@ from loguru import logger
 from analysis.pattern_manager import PatternManager
 from optimization.database_schema import OptimizationDatabaseManager
 from optimization.version_manager import VersionManager
-from optimization.algorithm_optimizer import AlgorithmOptimizer, OptimizationConfig
+from optimization.algorithm_optimizer import AlgorithmOptimizer, OptimizationConfig, PerformanceEvaluator
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed

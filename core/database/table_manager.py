@@ -28,6 +28,7 @@ from ..plugin_types import AssetType
 
 logger = logger
 
+
 class TableType(Enum):
     """表类型枚举"""
     # 基础数据类型
@@ -57,6 +58,7 @@ class TableType(Enum):
     SECTOR_FUND_FLOW_DAILY = "sector_fund_flow_daily"
     SECTOR_FUND_FLOW_INTRADAY = "sector_fund_flow_intraday"
 
+
 @dataclass
 class TableSchema:
     """表结构定义"""
@@ -67,6 +69,7 @@ class TableSchema:
     partitions: Optional[Dict[str, Any]] = None  # 分区定义
     constraints: Optional[List[str]] = None  # 约束条件
     version: str = "1.0"
+
 
 class TableSchemaRegistry:
     """表结构注册表"""
@@ -812,6 +815,7 @@ class TableSchemaRegistry:
         """获取所有表结构"""
         return self._schemas.copy()
 
+
 class DynamicTableManager:
     """动态表管理器"""
 
@@ -925,8 +929,9 @@ class DynamicTableManager:
 
         try:
             with self.connection_manager.get_connection(database_path) as conn:
+                # 使用duckdb_tables()内置函数，比information_schema更高效
                 result = conn.execute(
-                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+                    "SELECT COUNT(*) FROM duckdb_tables() WHERE table_name = ?",
                     [table_name]
                 ).fetchone()
 
@@ -1177,14 +1182,15 @@ CREATE TABLE {table_name} (
                     clean_plugin_name = re.sub(r'[^a-zA-Z0-9_]', '_', plugin_name.lower())
                     pattern = f"%_{clean_plugin_name}%"
 
+                    # 使用duckdb_tables()更高效
                     result = conn.execute(
-                        "SELECT table_name FROM information_schema.tables WHERE table_name LIKE ?",
+                        "SELECT table_name FROM duckdb_tables() WHERE table_name LIKE ?",
                         [pattern]
                     ).fetchall()
                 else:
                     # 获取所有表
                     result = conn.execute(
-                        "SELECT table_name FROM information_schema.tables"
+                        "SELECT table_name FROM duckdb_tables()"
                     ).fetchall()
 
                 return [row[0] for row in result]
@@ -1261,9 +1267,9 @@ CREATE TABLE {table_name} (
         """
         try:
             with self.connection_manager.get_connection(database_path) as conn:
-                # 获取表数量
+                # 获取表数量 - 使用duckdb_tables()更高效
                 table_count = conn.execute(
-                    "SELECT COUNT(*) FROM information_schema.tables"
+                    "SELECT COUNT(*) FROM duckdb_tables()"
                 ).fetchone()[0]
 
                 # 获取各类型表的数量
@@ -1271,7 +1277,7 @@ CREATE TABLE {table_name} (
                 for table_type in TableType:
                     pattern = f"{table_type.value}_%"
                     count = conn.execute(
-                        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE ?",
+                        "SELECT COUNT(*) FROM duckdb_tables() WHERE table_name LIKE ?",
                         [pattern]
                     ).fetchone()[0]
                     type_counts[table_type.value] = count
@@ -1294,8 +1300,10 @@ CREATE TABLE {table_name} (
                 'error': str(e)
             }
 
+
 # 全局表管理器实例
 _table_manager: Optional[DynamicTableManager] = None
+
 
 def get_table_manager() -> DynamicTableManager:
     """获取全局表管理器实例"""

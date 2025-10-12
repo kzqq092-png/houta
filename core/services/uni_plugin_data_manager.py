@@ -433,9 +433,43 @@ class UniPluginDataManager:
             # 2. 获取可用插件
             logger.info(f"[TET] TET框架开始数据请求处理 - 方法: {method_name}, 资产类型: {context.asset_type.value}, 数据类型: {context.data_type.value}")
 
+            # 检查是否指定了数据源
+            specified_data_source = params.get('data_source', None)
+            if specified_data_source:
+                logger.info(f"[DATA_SOURCE] 指定数据源: {specified_data_source}")
+
             available_plugins = self.plugin_center.get_available_plugins(
                 context.data_type, context.asset_type, context.market
             )
+
+            # 如果指定了数据源，过滤插件列表
+            if specified_data_source and available_plugins:
+                # 尝试匹配插件名称（支持中文名称和英文名称）
+                filtered_plugins = []
+                data_source_lower = specified_data_source.lower()
+                for plugin_id in available_plugins:
+                    plugin = self.plugin_center.get_plugin(plugin_id)
+                    if plugin:
+                        # 获取插件信息
+                        plugin_info = getattr(plugin, 'plugin_info', None)
+                        if plugin_info:
+                            plugin_name = getattr(plugin_info, 'name', '').lower()
+                            plugin_chinese_name = getattr(plugin_info, 'chinese_name', '').lower()
+
+                            # 检查是否匹配
+                            if (data_source_lower in plugin_name or
+                                data_source_lower in plugin_chinese_name or
+                                data_source_lower in plugin_id.lower() or
+                                specified_data_source in plugin_name or
+                                    specified_data_source in plugin_chinese_name):
+                                filtered_plugins.append(plugin_id)
+                                logger.info(f"[DATA_SOURCE] 匹配到插件: {plugin_id} (名称: {plugin_name}/{plugin_chinese_name})")
+
+                if filtered_plugins:
+                    available_plugins = filtered_plugins
+                    logger.info(f"[DATA_SOURCE] 根据数据源 {specified_data_source} 过滤后的插件: {available_plugins}")
+                else:
+                    logger.warning(f"[DATA_SOURCE] 未找到匹配数据源 {specified_data_source} 的插件，将使用所有可用插件")
 
             if not available_plugins:
                 raise RuntimeError(f"没有可用的插件支持数据类型: {context.data_type.value}/{context.asset_type.value}")
@@ -815,6 +849,16 @@ class UniPluginDataManager:
                     method_params['asset_type'] = context.asset_type
                 if 'market' not in method_params and context.market:
                     method_params['market'] = context.market
+
+                # 参数名称映射（不同插件可能使用不同的参数名）
+                # frequency -> period (部分插件如通达信使用period而不是frequency)
+                if 'frequency' in method_params and method_name == 'get_kline_data':
+                    method_params['period'] = method_params.pop('frequency')
+
+                # 移除插件不支持的参数
+                # data_source参数用于插件选择，不应传递给插件方法本身
+                if 'data_source' in method_params:
+                    method_params.pop('data_source')
 
                 # 执行并监控
                 result, validation_result = self.risk_manager.execute_with_monitoring(

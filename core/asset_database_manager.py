@@ -28,6 +28,7 @@ from core.plugin_types import AssetType, DataType
 
 logger = logger.bind(module=__name__)
 
+
 @dataclass
 class AssetDatabaseConfig:
     """资产数据库配置"""
@@ -55,6 +56,7 @@ class AssetDatabaseConfig:
             'threads': self.threads
         }
 
+
 @dataclass
 class AssetDatabaseInfo:
     """资产数据库信息"""
@@ -81,6 +83,7 @@ class AssetDatabaseInfo:
             'health_status': self.health_status,
             'supported_data_sources': self.supported_data_sources
         }
+
 
 class AssetSeparatedDatabaseManager:
     """
@@ -279,11 +282,11 @@ class AssetSeparatedDatabaseManager:
 
             # 获取数据库内部信息
             with self.duckdb_manager.get_connection(db_path) as conn:
-                # 获取表数量
+                # 获取表数量 - 使用duckdb_tables()更高效
                 tables_result = conn.execute("""
                     SELECT COUNT(*) as table_count 
-                    FROM information_schema.tables 
-                    WHERE table_schema = 'main'
+                    FROM duckdb_tables() 
+                    WHERE schema_name = 'main'
                 """).fetchone()
                 table_count = tables_result[0] if tables_result else 0
 
@@ -684,10 +687,10 @@ class AssetSeparatedDatabaseManager:
     def _ensure_table_exists(self, conn, table_name: str, data: pd.DataFrame, data_type: DataType):
         """确保表存在，如果不存在则创建"""
         try:
-            # 检查表是否存在
+            # 检查表是否存在 - 使用duckdb_tables()更高效
             table_exists = conn.execute(f"""
                 SELECT COUNT(*) 
-                FROM information_schema.tables 
+                FROM duckdb_tables() 
                 WHERE table_name = '{table_name}'
             """).fetchone()[0] > 0
 
@@ -722,7 +725,12 @@ class AssetSeparatedDatabaseManager:
                     volume DOUBLE,
                     amount DOUBLE,
                     turnover DOUBLE,
+                    adj_close DOUBLE,
+                    adj_factor DOUBLE DEFAULT 1.0,
+                    turnover_rate DOUBLE,
+                    vwap DOUBLE,
                     period VARCHAR,
+                    data_source VARCHAR DEFAULT 'unknown',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (symbol, datetime, frequency)
@@ -838,22 +846,63 @@ class AssetSeparatedDatabaseManager:
         except Exception as e:
             logger.warning(f"创建索引失败: {e}")
 
+    def _get_table_columns(self, conn, table_name: str) -> list:
+        """获取表的列名"""
+        try:
+            result = conn.execute(f"""
+                SELECT column_name 
+                FROM duckdb_columns() 
+                WHERE table_name = '{table_name}'
+            """).fetchall()
+            return [row[0] for row in result]
+        except Exception as e:
+            logger.warning(f"获取表列名失败 {table_name}: {e}")
+            return []
+
+    def _filter_dataframe_columns(self, data: pd.DataFrame, table_columns: list) -> pd.DataFrame:
+        """过滤DataFrame，只保留表中存在的列"""
+        # 找出data中存在但表中不存在的列
+        extra_columns = [col for col in data.columns if col not in table_columns]
+
+        if extra_columns:
+            logger.debug(f"过滤掉不在表中的列: {extra_columns}")
+            # 只保留表中存在的列
+            valid_columns = [col for col in data.columns if col in table_columns]
+            return data[valid_columns].copy()
+
+        return data
+
     def _upsert_data(self, conn, table_name: str, data: pd.DataFrame, data_type: DataType) -> int:
         """插入或更新数据"""
         try:
+            # 获取表的实际列名
+            table_columns = self._get_table_columns(conn, table_name)
+            if not table_columns:
+                logger.error(f"无法获取表 {table_name} 的列信息")
+                return 0
+
+            # 过滤数据，只保留表中存在的列
+            filtered_data = self._filter_dataframe_columns(data, table_columns)
+
+            if filtered_data.empty or len(filtered_data.columns) == 0:
+                logger.warning(f"过滤后没有有效数据可插入")
+                return 0
+
             # 使用DuckDB的INSERT ... ON CONFLICT语法
-            placeholders = ', '.join(['?' for _ in data.columns])
-            columns = ', '.join(data.columns)
+            placeholders = ', '.join(['?' for _ in filtered_data.columns])
+            columns = ', '.join(filtered_data.columns)
 
             if data_type == DataType.HISTORICAL_KLINE:
                 # K线数据使用symbol、datetime和frequency作为唯一键
                 update_fields = []
-                for col in ['open', 'high', 'low', 'close', 'volume', 'amount', 'turnover']:
-                    if col in data.columns:
+                # 基础OHLCV + 扩展字段（包括新增的复权数据等）
+                for col in ['open', 'high', 'low', 'close', 'volume', 'amount', 'turnover',
+                            'adj_close', 'adj_factor', 'turnover_rate', 'vwap']:
+                    if col in filtered_data.columns:
                         update_fields.append(f"{col} = EXCLUDED.{col}")
-                
+
                 update_clause = ', '.join(update_fields) if update_fields else "open = EXCLUDED.open"
-                
+
                 sql = f"""
                     INSERT INTO {table_name} ({columns}) 
                     VALUES ({placeholders})
@@ -878,10 +927,10 @@ class AssetSeparatedDatabaseManager:
                 """
 
             # 批量插入数据
-            data_tuples = [tuple(row) for row in data.values]
+            data_tuples = [tuple(row) for row in filtered_data.values]
             conn.executemany(sql, data_tuples)
 
-            return len(data)
+            return len(filtered_data)
 
         except Exception as e:
             logger.error(f"插入数据失败: {e}")
@@ -906,11 +955,11 @@ class AssetSeparatedDatabaseManager:
                     # 执行简单查询测试连接
                     result = conn.execute("SELECT 1").fetchone()
                     if result and result[0] == 1:
-                        # 获取表数量
+                        # 获取表数量 - 使用duckdb_tables()更高效
                         table_count = conn.execute("""
                             SELECT COUNT(*) as table_count 
-                            FROM information_schema.tables 
-                            WHERE table_schema = 'main'
+                            FROM duckdb_tables() 
+                            WHERE schema_name = 'main'
                         """).fetchone()[0]
 
                         return {
@@ -950,9 +999,11 @@ class AssetSeparatedDatabaseManager:
         except Exception as e:
             logger.error(f"关闭数据库连接失败: {e}")
 
+
 # 全局实例
 _asset_db_manager: Optional[AssetSeparatedDatabaseManager] = None
 _manager_lock = threading.Lock()
+
 
 def get_asset_database_manager(config: Optional[AssetDatabaseConfig] = None) -> AssetSeparatedDatabaseManager:
     """获取全局资产数据库管理器实例"""
@@ -963,6 +1014,7 @@ def get_asset_database_manager(config: Optional[AssetDatabaseConfig] = None) -> 
             _asset_db_manager = AssetSeparatedDatabaseManager(config)
 
         return _asset_db_manager
+
 
 def initialize_asset_database_manager(config: Optional[AssetDatabaseConfig] = None) -> AssetSeparatedDatabaseManager:
     """初始化资产数据库管理器"""
@@ -977,6 +1029,7 @@ def initialize_asset_database_manager(config: Optional[AssetDatabaseConfig] = No
 
         return _asset_db_manager
 
+
 def cleanup_asset_database_manager():
     """清理资产数据库管理器"""
     global _asset_db_manager
@@ -986,6 +1039,7 @@ def cleanup_asset_database_manager():
             _asset_db_manager.close_all_connections()
             _asset_db_manager = None
             logger.info("AssetSeparatedDatabaseManager 已清理")
+
 
 def get_asset_separated_database_manager() -> AssetSeparatedDatabaseManager:
     """获取资产分数据库管理器实例（便捷函数）"""

@@ -19,12 +19,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 logger = logger
 
+
 class ImportMode(Enum):
     """导入模式"""
     REAL_TIME = "real_time"      # 实时导入
     BATCH = "batch"              # 批量导入
     SCHEDULED = "scheduled"      # 定时导入
     MANUAL = "manual"            # 手动导入
+
 
 class DataFrequency(Enum):
     """数据频率"""
@@ -38,6 +40,7 @@ class DataFrequency(Enum):
     WEEKLY = "weekly"           # 周线
     MONTHLY = "monthly"         # 月线
 
+
 class ImportStatus(Enum):
     """导入状态"""
     PENDING = "pending"         # 等待中
@@ -46,6 +49,7 @@ class ImportStatus(Enum):
     FAILED = "failed"           # 失败
     PAUSED = "paused"          # 暂停
     CANCELLED = "cancelled"     # 已取消
+
 
 @dataclass
 class DataSourceConfig:
@@ -72,6 +76,7 @@ class DataSourceConfig:
         """从字典创建"""
         return cls(**data)
 
+
 @dataclass
 class ImportTaskConfig:
     """导入任务配置"""
@@ -89,6 +94,12 @@ class ImportTaskConfig:
     enabled: bool = True               # 是否启用
     max_workers: int = 4               # 最大工作线程数
     batch_size: int = 1000             # 批处理大小
+    retry_count: int = 3               # 失败重试次数
+    error_strategy: str = "跳过"        # 错误处理策略
+    memory_limit: int = 2048           # 内存限制(MB)
+    timeout: int = 300                 # 超时时间(秒)
+    progress_interval: int = 5         # 进度更新间隔(秒)
+    validate_data: bool = True         # 是否验证数据
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -105,6 +116,7 @@ class ImportTaskConfig:
         data['frequency'] = DataFrequency(data['frequency'])
         data['mode'] = ImportMode(data['mode'])
         return cls(**data)
+
 
 @dataclass
 class ImportProgress:
@@ -149,6 +161,7 @@ class ImportProgress:
         """从字典创建"""
         data['status'] = ImportStatus(data['status'])
         return cls(**data)
+
 
 class ImportConfigManager:
     """
@@ -652,6 +665,7 @@ class ImportConfigManager:
             logger.error(f"配置导入失败: {e}")
             return False
 
+
 def main():
     """测试函数"""
     # 创建配置管理器
@@ -697,6 +711,7 @@ def main():
     # 获取统计信息
     stats = manager.get_statistics()
     logger.info(f"统计信息: {json.dumps(stats, ensure_ascii=False, indent=2)}")
+
 
 if __name__ == "__main__":
     main()

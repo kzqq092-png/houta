@@ -21,6 +21,7 @@ except ImportError:
     redis = None
     aioredis = None
 
+
 class Cache:
     """
     统一缓存类，支持本地/分布式/异步
@@ -33,6 +34,11 @@ class Cache:
     def __init__(self, cache_dir: str = ".cache", size_limit: int = 1024*1024*1024,
                  default_ttl: int = 1800, backend: str = "diskcache",
                  redis_url: str = "redis://localhost:6379/0", async_mode: bool = False):
+        # 确保default_ttl是有效的数值
+        if not isinstance(default_ttl, (int, float)):
+            logger.warning(f"Invalid default_ttl type: {type(default_ttl)}, using 1800")
+            default_ttl = 1800
+
         self._default_ttl = default_ttl
         self._backend = backend
         self._async_mode = async_mode
@@ -79,6 +85,12 @@ class Cache:
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None):
         expire = ttl if ttl is not None else self._default_ttl
+
+        # 确保expire是有效的数值类型
+        if not isinstance(expire, (int, float)):
+            logger.warning(f"Invalid expire type: {type(expire)}, using default {self._default_ttl}")
+            expire = self._default_ttl
+
         if self._backend == "diskcache":
             if self._memory_cache:
                 self.cache[key] = value  # 简单内存缓存，忽略TTL
@@ -165,6 +177,10 @@ class Cache:
         return False
 
     def set_default_ttl(self, ttl: int):
+        """设置默认TTL，带类型检查"""
+        if not isinstance(ttl, (int, float)):
+            logger.warning(f"Invalid default_ttl type: {type(ttl)}, ignored")
+            return
         self._default_ttl = ttl
 
     def set_size_limit(self, size_limit: int):

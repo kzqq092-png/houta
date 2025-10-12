@@ -123,8 +123,53 @@ class DuckDBConnectionPool:
     def _create_connection(self) -> Optional[duckdb.DuckDBPyConnection]:
         """创建新的数据库连接"""
         try:
-            # 创建连接
-            conn = duckdb.connect(self.database_path)
+            # 确保路径使用正确的编码
+            db_path = str(Path(self.database_path).resolve())
+
+            # 检查数据库文件是否存在
+            db_file = Path(db_path)
+            db_exists = db_file.exists()
+
+            if db_exists:
+                logger.debug(f"数据库文件已存在: {db_path}, 大小: {db_file.stat().st_size} bytes")
+            else:
+                logger.info(f"创建新数据库文件: {db_path}")
+
+            # 创建连接 - 使用显式的UTF-8编码处理
+            try:
+                # DuckDB可能在读取现有数据库时遇到编码问题
+                # 尝试使用read_only=False确保可以修复可能的编码问题
+                conn = duckdb.connect(db_path, read_only=False)
+
+            except UnicodeDecodeError as ude:
+                # UTF-8解码错误 - 可能是数据库文件损坏或包含无效字符
+                logger.error(f"UTF-8解码错误: {ude}")
+                logger.error(f"数据库路径: {db_path}")
+
+                # 如果是现有数据库文件损坏，尝试备份并重建
+                if db_exists:
+                    import shutil
+                    backup_path = db_path + f".corrupted_backup_{int(time.time())}"
+                    logger.warning(f"检测到数据库文件可能损坏，创建备份: {backup_path}")
+                    try:
+                        shutil.copy2(db_path, backup_path)
+                        logger.info(f"备份完成，尝试删除损坏的数据库文件")
+                        db_file.unlink()
+                        # 尝试创建新的数据库
+                        conn = duckdb.connect(db_path, read_only=False)
+                        logger.info("成功创建新数据库文件")
+                    except Exception as backup_error:
+                        logger.error(f"备份和重建失败: {backup_error}")
+                        raise ude
+                else:
+                    # 新建数据库时出现编码错误，可能是路径问题
+                    logger.error("创建新数据库时出现UTF-8编码错误")
+                    logger.error("可能原因: 1) 路径包含特殊字符 2) 磁盘权限问题 3) 文件系统编码问题")
+                    raise
+
+            except Exception as conn_error:
+                logger.error(f"创建DuckDB连接时出错: {type(conn_error).__name__}: {conn_error}")
+                raise
 
             # 生成连接ID
             conn_id = f"conn_{self._total_connections}_{int(time.time())}"
@@ -155,6 +200,8 @@ class DuckDBConnectionPool:
 
         except Exception as e:
             logger.error(f"创建DuckDB连接失败: {e}")
+            import traceback
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
             return None
 
     def _apply_config(self, conn: duckdb.DuckDBPyConnection):

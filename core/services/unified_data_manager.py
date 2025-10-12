@@ -350,19 +350,8 @@ class UnifiedDataManager:
 
             # 多级缓存管理器（增强现有缓存）
             from ..performance.cache_manager import CacheLevel
-            cache_config = {
-                'levels': [CacheLevel.L1_MEMORY, CacheLevel.L3_DISK],
-                'default_ttl_minutes': 30,
-                'memory': {
-                    'max_size': 1000,
-                    'max_memory_mb': 100
-                },
-                'disk': {
-                    'cache_dir': 'cache/duckdb',
-                    'max_size_mb': 500
-                }
-            }
-            self.multi_cache = MultiLevelCacheManager(cache_config)
+            # 使用正确的构造函数参数：max_size和ttl（秒）
+            self.multi_cache = MultiLevelCacheManager(max_size=1000, ttl=1800)  # 30分钟 = 1800秒
 
             # DuckDB可用标志
             self.duckdb_available = True
@@ -605,6 +594,93 @@ class UnifiedDataManager:
 
         except Exception as e:
             logger.error(f"获取K线数据失败: {stock_code} - {e}")
+            return pd.DataFrame()
+
+    def get_kdata_from_source(self, stock_code: str, period: str = 'D', count: int = 365, data_source: str = None) -> pd.DataFrame:
+        """
+        从指定数据源获取K线数据
+
+        Args:
+            stock_code: 股票代码
+            period: 周期 (D/W/M/1/5/15/30/60/daily/weekly/monthly等)
+            count: 数据条数
+            data_source: 数据源名称 (如: '通达信', 'akshare', 'eastmoney'等)
+
+        Returns:
+            K线数据DataFrame
+        """
+        try:
+            # 标准化周期格式
+            period_map = {
+                'D': 'daily', 'daily': 'daily',
+                'W': 'weekly', 'weekly': 'weekly',
+                'M': 'monthly', 'monthly': 'monthly',
+                '1': '1min', '5': '5min', '15': '15min',
+                '30': '30min', '60': '60min'
+            }
+            frequency = period_map.get(period, period)
+
+            cache_key = f"kdata_{stock_code}_{period}_{count}_{data_source}"
+
+            # 1. 检查缓存
+            cached_data = self._get_cached_data(cache_key)
+            if cached_data is not None and not cached_data.empty:
+                logger.debug(f"从缓存获取K线数据: {stock_code} (数据源: {data_source})")
+                return cached_data
+
+            # 2. 使用UniPluginDataManager获取数据
+            if self._uni_plugin_manager:
+                try:
+                    from ..plugin_types import AssetType
+                    from datetime import datetime, timedelta
+
+                    # 计算日期范围
+                    end_date = datetime.now()
+                    # 根据周期计算开始日期
+                    if frequency == 'daily':
+                        start_date = end_date - timedelta(days=count * 2)  # 预留空间排除非交易日
+                    elif frequency == 'weekly':
+                        start_date = end_date - timedelta(weeks=count)
+                    elif frequency == 'monthly':
+                        start_date = end_date - timedelta(days=count * 31)
+                    else:
+                        start_date = end_date - timedelta(days=count)
+
+                    # 调用插件管理器获取数据，传递data_source参数
+                    df = self._uni_plugin_manager.get_kline_data(
+                        symbol=stock_code,
+                        asset_type=AssetType.STOCK,
+                        start_date=start_date,
+                        end_date=end_date,
+                        frequency=frequency,
+                        data_source=data_source  # 传递指定的数据源
+                    )
+
+                    if not df.empty:
+                        # 限制数据条数
+                        if len(df) > count:
+                            df = df.tail(count)
+
+                        # 数据标准化
+                        df = self._standardize_kdata_format(df, stock_code)
+
+                        # 缓存数据
+                        self._cache_data(cache_key, df)
+
+                        logger.info(f"从数据源 {data_source} 获取K线数据成功: {stock_code}, 数据量: {len(df)}")
+                        return df
+                    else:
+                        logger.warning(f"从数据源 {data_source} 获取K线数据为空: {stock_code}")
+
+                except Exception as e:
+                    logger.error(f"使用UniPluginDataManager从数据源 {data_source} 获取K线数据失败: {e}")
+
+            # 3. 降级到默认get_kdata方法
+            logger.warning(f"从指定数据源 {data_source} 获取失败，降级到默认方法")
+            return self.get_kdata(stock_code, period, count)
+
+        except Exception as e:
+            logger.error(f"从数据源 {data_source} 获取K线数据失败: {stock_code} - {e}")
             return pd.DataFrame()
 
     def _get_cached_data(self, cache_key: str) -> Optional[pd.DataFrame]:

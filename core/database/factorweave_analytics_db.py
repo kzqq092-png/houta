@@ -127,6 +127,22 @@ class FactorWeaveAnalyticsDB:
             return False
         return True
 
+    def reconnect(self):
+        """重新连接数据库"""
+        try:
+            if self.conn:
+                try:
+                    self.conn.close()
+                except Exception as e:
+                    logger.debug(f"关闭旧连接时出错: {e}")
+
+            self.conn = None
+            self._connect()
+            logger.info("数据库重新连接成功")
+        except Exception as e:
+            logger.error(f"数据库重新连接失败: {e}")
+            self.conn = None
+
     def _connect(self):
         """连接到DuckDB数据库"""
         if not DUCKDB_AVAILABLE:
@@ -463,14 +479,30 @@ class FactorWeaveAnalyticsDB:
             return pd.DataFrame()  # 返回空DataFrame
 
         try:
+            # 尝试执行查询，如果遇到"result closed"错误则重新连接
             if params:
                 result = self.conn.execute(sql, params).fetchdf()
             else:
                 result = self.conn.execute(sql).fetchdf()
             return result
         except Exception as e:
-            logger.error(f"查询执行失败: {e}")
-            raise
+            error_msg = str(e).lower()
+            # 如果是连接相关错误，尝试重新连接后重试一次
+            if 'result closed' in error_msg or 'connection closed' in error_msg:
+                logger.warning(f"检测到连接关闭，尝试重新连接...")
+                self.reconnect()
+                try:
+                    if params:
+                        result = self.conn.execute(sql, params).fetchdf()
+                    else:
+                        result = self.conn.execute(sql).fetchdf()
+                    return result
+                except Exception as retry_error:
+                    logger.error(f"重试后查询仍然失败: {retry_error}")
+                    return pd.DataFrame()
+            else:
+                logger.error(f"查询执行失败: {e}")
+                return pd.DataFrame()  # 返回空DataFrame而不是抛出异常
 
     def execute_command(self, sql: str, params: List = None) -> bool:
         """执行INSERT/UPDATE/DELETE等命令，返回成功状态"""

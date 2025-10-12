@@ -670,20 +670,6 @@ class EnhancedDataImportWidget(QWidget):
         # 应用性能优化
         self.apply_performance_optimization()
 
-    def apply_unified_theme(self):
-        """应用统一主题"""
-        try:
-            if self.theme_manager and self.design_system:
-                theme = self.theme_manager.get_current_theme()
-                if theme:
-                    # 应用主题到组件
-                    self.setStyleSheet(theme.get_widget_style())
-                    logger.debug("统一主题应用成功") if logger else None
-            else:
-                logger.debug("主题管理器不可用，跳过主题应用") if logger else None
-        except Exception as e:
-            logger.warning(f"应用统一主题失败: {e}") if logger else None
-
     def apply_performance_optimization(self):
         """应用性能优化"""
         try:
@@ -805,14 +791,10 @@ class EnhancedDataImportWidget(QWidget):
 
         layout.addWidget(main_splitter)
 
-        # 底部状态栏
-        self.status_bar = QStatusBar()
-        self.status_bar.showMessage("增强版数据导入系统就化")
-        layout.addWidget(self.status_bar)
-
     def create_title_frame(self) -> QFrame:
         """创建标题框架"""
         frame = QFrame()
+        frame.setFixedHeight(60)
         frame.setFrameStyle(QFrame.StyledPanel)
         frame.setStyleSheet("""
             QFrame {
@@ -831,7 +813,7 @@ class EnhancedDataImportWidget(QWidget):
 
         # 标题
         title_label = QLabel("K线专业数据导入系统")
-        title_label.setFont(QFont("Arial", 16, QFont.Bold))
+        title_label.setFont(QFont("Arial", 15, QFont.Bold))
         layout.addWidget(title_label)
 
         layout.addStretch()
@@ -848,13 +830,9 @@ class EnhancedDataImportWidget(QWidget):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        # 任务配置区域
+        # 任务配置区域（已包含智能化功能，无需重复添加）
         config_group = self.create_task_config_group()
         layout.addWidget(config_group)
-
-        # 智能化功能控制区化
-        ai_group = self.create_ai_features_group()
-        layout.addWidget(ai_group)
 
         # 任务操作区域
         task_ops_group = self.create_task_operations_group()
@@ -864,37 +842,244 @@ class EnhancedDataImportWidget(QWidget):
         return widget
 
     def create_task_config_group(self) -> QGroupBox:
-        """创建扩展任务配置组"""
+        """创建扩展任务配置组（合并所有配置，无Tab标签）"""
         group = QGroupBox("任务配置")
         group.setFont(QFont("Arial", 10, QFont.Bold))
         main_layout = QVBoxLayout(group)
 
-        # 创建折叠式选项化
-        self.config_tabs = QTabWidget()
-        # 基本信息选项化
-        basic_tab = self._create_integrated_basic_tab()
-        self.config_tabs.addTab(basic_tab, "基本信息")
+        # 创建滚动区域以容纳所有配置
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setMinimumHeight(700)  # 设置合理的最小高度
+        scroll.setMinimumWidth(450)
+        scroll.setAlignment(Qt.AlignCenter)
+        # 内容widget
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(5)
 
-        # 合并的数据源和高级配置tab
-        integrated_config_tab = self._create_integrated_config_tab()
-        self.config_tabs.addTab(integrated_config_tab, "数据源与高级配置")
+        # ==================== 第一部分：基本信息 ====================
+        basic_info_group = QGroupBox("📋 基本信息")
+        basic_layout = QFormLayout(basic_info_group)
 
-        main_layout.addWidget(self.config_tabs)
+        # 任务名称
+        self.task_name_edit = QLineEdit()
+        self.task_name_edit.setText(f"导入任务_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        basic_layout.addRow("任务名称:", self.task_name_edit)
 
-        # 添加验证和创建按化
+        # 任务描述
+        self.task_desc_edit = QTextEdit()
+        self.task_desc_edit.setMaximumHeight(60)  # 恢复为60，更灵活
+        self.task_desc_edit.setPlaceholderText("输入任务描述（可选）...")
+        basic_layout.addRow("任务描述:", self.task_desc_edit)
+
+        # 资产类型
+        self.asset_type_combo = QComboBox()
+        self.asset_type_combo.addItems(["股票", "期货", "基金", "债券", "指数"])
+        self.asset_type_combo.currentTextChanged.connect(self.on_asset_type_changed)
+        basic_layout.addRow("📊 资产类型:", self.asset_type_combo)
+
+        # 数据类型
+        self.data_type_combo = QComboBox()
+        self.data_type_combo.addItems(["K线数据", "分笔数据", "财务数据", "基本面数据"])
+        basic_layout.addRow("📈 数据类型:", self.data_type_combo)
+
+        # 数据频率
+        self.frequency_combo = QComboBox()
+        self.frequency_combo.addItems(["日线", "周线", "月线", "5分钟", "15分钟", "30分钟", "60分钟"])
+        basic_layout.addRow("⏱️ 数据频率:", self.frequency_combo)
+
+        content_layout.addWidget(basic_info_group)
+
+        # ==================== 第二部分：代码选择 ====================
+        symbols_group = QGroupBox("🏷️ 股票选择")
+        symbols_layout = QVBoxLayout(symbols_group)
+
+        # 批量选择按钮区域
+        batch_buttons_layout = QHBoxLayout()
+
+        self.batch_select_btn = QPushButton("📦 批量选择")
+        self.batch_select_btn.clicked.connect(self.show_batch_selection_dialog)
+        batch_buttons_layout.addWidget(self.batch_select_btn)
+
+        # 快速选择按钮
+        self.quick_select_btn = QPushButton("快速选择")
+        self.quick_select_btn.clicked.connect(self.show_quick_selection_dialog)
+        batch_buttons_layout.addWidget(self.quick_select_btn)
+
+        self.clear_symbols_btn = QPushButton("🗑️ 清空")
+        self.clear_symbols_btn.clicked.connect(lambda: self.symbols_edit.clear())
+        batch_buttons_layout.addWidget(self.clear_symbols_btn)
+
+        batch_buttons_layout.addStretch()
+        symbols_layout.addLayout(batch_buttons_layout)
+
+        # 代码输入框
+        self.symbols_edit = QTextEdit()
+        self.symbols_edit.setMaximumHeight(80)  # 恢复为80，批量输入更方便
+        self.symbols_edit.setPlaceholderText("输入代码，多个代码用逗号或换行分隔，如：000001,600000")
+        symbols_layout.addWidget(self.symbols_edit)
+
+        content_layout.addWidget(symbols_group)
+
+        # ==================== 第三部分：数据源配置 ====================
+        datasource_group = QGroupBox("🔌 数据源配置")
+        datasource_layout = QFormLayout(datasource_group)
+
+        # 数据源选择
+        self.data_source_combo = QComboBox()
+        self.data_source_combo.addItems(["通达信", "东方财富", "新浪财经", "腾讯财经"])
+        datasource_layout.addRow("数据源:", self.data_source_combo)
+
+        # 数据时间范围
+        date_range_layout = QHBoxLayout()
+
+        date_range_layout.addWidget(QLabel("开始日期:"))
+        self.start_date = QDateEdit()
+        self.start_date.setDate(QDate.currentDate().addMonths(-12))
+        self.start_date.setCalendarPopup(True)
+        date_range_layout.addWidget(self.start_date)
+
+        date_range_layout.addWidget(QLabel("结束日期:"))
+        self.end_date = QDateEdit()
+        self.end_date.setDate(QDate.currentDate())
+        self.end_date.setCalendarPopup(True)
+        date_range_layout.addWidget(self.end_date)
+
+        datasource_layout.addRow("📅 时间范围:", date_range_layout)
+
+        content_layout.addWidget(datasource_group)
+
+        # ==================== 第四部分：执行配置 ====================
+        execution_group = QGroupBox("")
+        execution_layout = QHBoxLayout(execution_group)
+
+        # 左侧：资源配置
+        resource_config = QGroupBox("💻 资源配置")
+        resource_layout = QFormLayout(resource_config)
+
+        self.batch_size_spin = QSpinBox()
+        self.batch_size_spin.setRange(1, 10000)
+        self.batch_size_spin.setValue(1000)
+        self.batch_size_spin.setToolTip("每批处理的记录数")
+        resource_layout.addRow("批量大小:", self.batch_size_spin)
+
+        self.workers_spin = QSpinBox()
+        self.workers_spin.setRange(1, 32)
+        self.workers_spin.setValue(4)
+        self.workers_spin.setToolTip("并行处理的线程数")
+        resource_layout.addRow("工作线程数:", self.workers_spin)
+
+        self.memory_limit_spin = QSpinBox()
+        self.memory_limit_spin.setRange(512, 16384)
+        self.memory_limit_spin.setValue(2048)
+        self.memory_limit_spin.setSuffix("MB")
+        self.memory_limit_spin.setToolTip("内存使用限制")
+        resource_layout.addRow("内存限制:", self.memory_limit_spin)
+
+        self.timeout_spin = QSpinBox()
+        self.timeout_spin.setRange(60, 3600)
+        self.timeout_spin.setValue(300)
+        self.timeout_spin.setSuffix("秒")
+        self.timeout_spin.setToolTip("单个请求超时时间")
+        resource_layout.addRow("超时设置:", self.timeout_spin)
+
+        execution_layout.addWidget(resource_config)
+
+        # 右侧：错误处理配置
+        error_config = QGroupBox("⚠️ 错误处理")
+        error_layout = QFormLayout(error_config)
+
+        self.retry_count_spin = QSpinBox()
+        self.retry_count_spin.setRange(0, 10)
+        self.retry_count_spin.setValue(3)
+        self.retry_count_spin.setToolTip("失败重试次数")
+        error_layout.addRow("重试次数:", self.retry_count_spin)
+
+        self.error_strategy_combo = QComboBox()
+        self.error_strategy_combo.addItems(["停止", "跳过", "重试"])
+        self.error_strategy_combo.setCurrentText("跳过")
+        self.error_strategy_combo.setToolTip("遇到错误时的处理策略")
+        error_layout.addRow("错误处理:", self.error_strategy_combo)
+
+        self.progress_interval_spin = QSpinBox()
+        self.progress_interval_spin.setRange(1, 60)
+        self.progress_interval_spin.setValue(5)
+        self.progress_interval_spin.setSuffix("秒")
+        self.progress_interval_spin.setToolTip("进度更新间隔")
+        error_layout.addRow("进度间隔:", self.progress_interval_spin)
+
+        execution_layout.addWidget(error_config)
+
+        content_layout.addWidget(execution_group)
+
+        # ==================== 第五部分：智能化功能 ====================
+        ai_features_group = QGroupBox("🤖 智能化功能")
+        ai_layout = QVBoxLayout(ai_features_group)
+
+        # 创建两列布局
+        ai_row1 = QHBoxLayout()
+        ai_row2 = QHBoxLayout()
+        ai_row3 = QHBoxLayout()
+
+        self.ai_optimization_cb = QCheckBox("启用AI参数优化")
+        self.ai_optimization_cb.setChecked(True)
+        self.ai_optimization_cb.setToolTip("使用机器学习算法优化执行参数")
+        ai_row1.addWidget(self.ai_optimization_cb)
+
+        self.auto_tuning_cb = QCheckBox("启用AutoTuner自动调优")
+        self.auto_tuning_cb.setChecked(True)
+        self.auto_tuning_cb.setToolTip("使用AutoTuner进行参数自动调优")
+        ai_row1.addWidget(self.auto_tuning_cb)
+
+        self.distributed_cb = QCheckBox("启用分布式执行")
+        self.distributed_cb.setChecked(True)
+        self.distributed_cb.setToolTip("大任务自动分布式执行")
+        ai_row2.addWidget(self.distributed_cb)
+
+        self.caching_cb = QCheckBox("启用智能缓存")
+        self.caching_cb.setChecked(True)
+        self.caching_cb.setToolTip("启用多级缓存加速")
+        ai_row2.addWidget(self.caching_cb)
+
+        self.quality_monitoring_cb = QCheckBox("启用数据质量监控")
+        self.quality_monitoring_cb.setChecked(True)
+        self.quality_monitoring_cb.setToolTip("实时监控数据质量")
+        ai_row3.addWidget(self.quality_monitoring_cb)
+
+        # 数据验证
+        self.validate_data_cb = QCheckBox("启用数据验证")
+        self.validate_data_cb.setChecked(True)
+        self.validate_data_cb.setToolTip("导入前验证数据格式")
+        ai_row3.addWidget(self.validate_data_cb)
+
+        ai_layout.addLayout(ai_row1)
+        ai_layout.addLayout(ai_row2)
+        ai_layout.addLayout(ai_row3)
+
+        content_layout.addWidget(ai_features_group)
+
+        # 设置内容widget到滚动区域
+        scroll.setWidget(content_widget)
+        main_layout.addWidget(scroll)
+
+        # 添加验证和重置按钮
         button_layout = QHBoxLayout()
 
-        # 验证配置按钮
-        self.validate_config_btn = QPushButton("验证配置")
+        self.validate_config_btn = QPushButton("✅ 验证配置")
         self.validate_config_btn.clicked.connect(self.validate_current_configuration)
         button_layout.addWidget(self.validate_config_btn)
 
-        # 重置配置按钮
-        self.reset_config_btn = QPushButton("重置")
+        self.reset_config_btn = QPushButton("🔄 重置")
         self.reset_config_btn.clicked.connect(self.reset_configuration)
         button_layout.addWidget(self.reset_config_btn)
 
         main_layout.addLayout(button_layout)
+
+        # 初始化批量按钮状态
+        self._initialize_batch_buttons()
 
         return group
 
@@ -973,12 +1158,6 @@ class EnhancedDataImportWidget(QWidget):
         widget = QWidget()
         main_layout = QVBoxLayout(widget)
 
-        # 创建滚动区域以容纳所有配置
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-
         # 内容widget
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
@@ -997,7 +1176,7 @@ class EnhancedDataImportWidget(QWidget):
         date_layout = QFormLayout(date_group)
 
         self.start_date = QDateEdit()
-        self.start_date.setDate(QDate.currentDate().addMonths(-6))
+        self.start_date.setDate(QDate.currentDate().addMonths(-12))
         self.start_date.setCalendarPopup(True)
         date_layout.addRow("开始日期:", self.start_date)
 
@@ -1010,7 +1189,7 @@ class EnhancedDataImportWidget(QWidget):
         content_layout.addWidget(datasource_group)
 
         # 第二部分：执行配置
-        execution_group = QGroupBox("执行配置")
+        execution_group = QGroupBox("⚙️ 执行配置")
         execution_layout = QHBoxLayout(execution_group)
 
         # 左侧：资源配置
@@ -1075,12 +1254,6 @@ class EnhancedDataImportWidget(QWidget):
         self.progress_interval_spin.setToolTip("进度更新间隔")
         error_layout.addRow("进度间隔:", self.progress_interval_spin)
 
-        # 数据验证
-        self.validate_data_cb = QCheckBox("启用数据验证")
-        self.validate_data_cb.setChecked(True)
-        self.validate_data_cb.setToolTip("导入前验证数据格式")
-        error_layout.addRow("", self.validate_data_cb)
-
         execution_layout.addWidget(error_config)
         content_layout.addWidget(execution_group)
 
@@ -1091,6 +1264,7 @@ class EnhancedDataImportWidget(QWidget):
         # 创建两列布局
         ai_row1 = QHBoxLayout()
         ai_row2 = QHBoxLayout()
+        ai_row3 = QHBoxLayout()
 
         # AI优化开关
         self.ai_optimization_cb = QCheckBox("启用AI参数优化")
@@ -1120,16 +1294,21 @@ class EnhancedDataImportWidget(QWidget):
         self.quality_monitoring_cb = QCheckBox("启用数据质量监控")
         self.quality_monitoring_cb.setChecked(True)
         self.quality_monitoring_cb.setToolTip("实时监控数据质量")
+        ai_row3.addWidget(self.quality_monitoring_cb)
+
+        # 数据验证开关
+        self.validate_data_cb = QCheckBox("启用数据验证")
+        self.validate_data_cb.setChecked(True)
+        self.validate_data_cb.setToolTip("导入前验证数据格式")
+        ai_row3.addWidget(self.validate_data_cb)
 
         ai_layout.addLayout(ai_row1)
         ai_layout.addLayout(ai_row2)
-        ai_layout.addWidget(self.quality_monitoring_cb)
+        ai_layout.addLayout(ai_row3)
 
         content_layout.addWidget(ai_features_group)
 
-        # 设置内容widget到滚动区域
-        scroll.setWidget(content_widget)
-        main_layout.addWidget(scroll)
+        main_layout.addWidget(content_widget)
 
         return widget
 
@@ -1175,44 +1354,6 @@ class EnhancedDataImportWidget(QWidget):
         main_layout.addWidget(right_panel, 1)
 
         return widget
-
-    def create_ai_features_group(self) -> QGroupBox:
-        """创建AI功能控制化"""
-        group = QGroupBox("智能化功化")
-        group.setFont(QFont("Arial", 10, QFont.Bold))
-        layout = QVBoxLayout(group)
-
-        # AI优化开化
-        self.ai_optimization_cb = QCheckBox("启用AI参数优化")
-        self.ai_optimization_cb.setChecked(True)
-        self.ai_optimization_cb.setToolTip("使用机器学习算法优化执行参数")
-        layout.addWidget(self.ai_optimization_cb)
-
-        # 自动调优开化
-        self.auto_tuning_cb = QCheckBox("启用AutoTuner自动调优")
-        self.auto_tuning_cb.setChecked(True)
-        self.auto_tuning_cb.setToolTip("使用AutoTuner进行参数自动调优")
-        layout.addWidget(self.auto_tuning_cb)
-
-        # 分布式执行开化
-        self.distributed_cb = QCheckBox("启用分布式执化")
-        self.distributed_cb.setChecked(True)
-        self.distributed_cb.setToolTip("大任务自动分布式执行")
-        layout.addWidget(self.distributed_cb)
-
-        # 智能缓存开化
-        self.caching_cb = QCheckBox("启用智能缓存")
-        self.caching_cb.setChecked(True)
-        self.caching_cb.setToolTip("启用多级缓存加化")
-        layout.addWidget(self.caching_cb)
-
-        # 数据质量监控开化
-        self.quality_monitoring_cb = QCheckBox("启用数据质量监控")
-        self.quality_monitoring_cb.setChecked(True)
-        self.quality_monitoring_cb.setToolTip("实时监控数据质量")
-        layout.addWidget(self.quality_monitoring_cb)
-
-        return group
 
     def create_task_operations_group(self) -> QGroupBox:
         """创建任务操作组"""
@@ -1869,11 +2010,19 @@ class EnhancedDataImportWidget(QWidget):
                 symbols=symbols,
                 data_source=self.data_source_combo.currentText(),
                 asset_type=self.asset_type_combo.currentText(),
-                data_type="K线数据",  # 默认数据类型
+                data_type=self.data_type_combo.currentText() if hasattr(self, 'data_type_combo') else "K线数据",  # 从UI读取数据类型
                 frequency=freq_map.get(self.frequency_combo.currentText(), DataFrequency.DAILY),
                 mode=ImportMode.MANUAL,  # 默认手动模式
                 batch_size=self.batch_size_spin.value(),
-                max_workers=self.workers_spin.value()
+                max_workers=self.workers_spin.value(),
+                start_date=self.start_date.date().toString("yyyy-MM-dd"),
+                end_date=self.end_date.date().toString("yyyy-MM-dd"),
+                retry_count=self.retry_count_spin.value() if hasattr(self, 'retry_count_spin') else 3,
+                error_strategy=self.error_strategy_combo.currentText() if hasattr(self, 'error_strategy_combo') else "跳过",
+                memory_limit=self.memory_limit_spin.value() if hasattr(self, 'memory_limit_spin') else 2048,
+                timeout=self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 300,
+                progress_interval=self.progress_interval_spin.value() if hasattr(self, 'progress_interval_spin') else 5,
+                validate_data=self.validate_data_cb.isChecked() if hasattr(self, 'validate_data_cb') else True
             )
 
             # 更新引擎配置
@@ -2135,7 +2284,7 @@ class EnhancedDataImportWidget(QWidget):
         # 设置表格
         columns = [
             "任务名称", "状态", "进度", "数据源", "资产类型", "数据类型",
-            "频率", "符号数量", "开始时间", "结束时间", "运行时间", "成功数", "失败数"
+            "频率", "下载数量", "开始时间", "结束时间", "运行时间", "成功数", "失败数"
         ]
         self.task_table.setColumnCount(len(columns))
         self.task_table.setHorizontalHeaderLabels(columns)
@@ -2308,7 +2457,15 @@ class EnhancedDataImportWidget(QWidget):
                 frequency=frequency_enum,
                 mode=ImportMode.MANUAL,
                 batch_size=task_config_dict.get('batch_size', 100),
-                max_workers=task_config_dict.get('max_workers', 4)
+                max_workers=task_config_dict.get('max_workers', 4),
+                start_date=task_config_dict.get('start_date', None),
+                end_date=task_config_dict.get('end_date', None),
+                retry_count=task_config_dict.get('retry_count', 3),
+                error_strategy=task_config_dict.get('error_strategy', '跳过'),
+                memory_limit=task_config_dict.get('memory_limit', 2048),
+                timeout=task_config_dict.get('timeout', 300),
+                progress_interval=task_config_dict.get('progress_interval', 5),
+                validate_data=task_config_dict.get('validate_data', True)
             )
 
             # 添加任务到配置管理器
@@ -2745,9 +2902,6 @@ class EnhancedDataImportWidget(QWidget):
             # 获取当前主题
             current_theme = self.theme_manager.get_current_theme()
 
-            # 应用主题到主窗口
-            self._apply_theme_to_widget(self, current_theme)
-
             # 应用设计系统样式
             self._apply_design_system_styles()
 
@@ -2759,183 +2913,6 @@ class EnhancedDataImportWidget(QWidget):
 
         except Exception as e:
             logger.error(f"应用统一主题失败: {e}") if logger else None
-
-    def _apply_theme_to_widget(self, widget, theme):
-        """应用主题到指定组件"""
-        try:
-            if not theme or not hasattr(theme, 'colors'):
-                return
-
-            # 获取主题颜色
-            colors = theme.colors
-
-            # 安全获取颜色值的辅助函数
-            def safe_color(attr_name, default_color):
-                """安全获取颜色值，确保不返回None"""
-                color = getattr(colors, attr_name, None)
-                return color if color is not None else default_color
-
-            # 构建统一的样式表
-            style_sheet = f"""
-            QWidget {{
-                background-color: {safe_color('background_primary', '#FFFFFF')};
-                color: {safe_color('text_primary', '#000000')};
-                font-family: {getattr(self.design_system, 'typography', None) and getattr(self.design_system.typography, 'primary_font', None) or 'Arial'};
-            }}
-
-            QGroupBox {{
-                font-weight: bold;
-                border: 2px solid {safe_color('border_primary', '#DDDDDD')};
-                border-radius: 5px;
-                margin-top: 1ex;
-                background-color: {safe_color('surface_primary', '#FFFFFF')};
-            }}
-
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 5px 5px;
-                color: {safe_color('primary', '#2196F3')};
-            }}
-
-            QPushButton {{
-                background-color: {safe_color('primary', '#2196F3')};
-                color: {safe_color('background_primary', '#FFFFFF')};
-                border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-weight: bold;
-                min-width: 80px;
-            }}
-
-            QPushButton:hover {{
-                background-color: {safe_color('primary_light', '#64B5F6')};
-            }}
-
-            QPushButton:pressed {{
-                background-color: {safe_color('primary_dark', '#1976D2')};
-            }}
-
-            QPushButton:disabled {{
-                background-color: {safe_color('text_disabled', '#BDBDBD')};
-                color: {safe_color('text_hint', '#9E9E9E')};
-            }}
-
-            QTabWidget::pane {{
-                border: 1px solid {safe_color('border_primary', '#E0E0E0')};
-                border-radius: 5px;
-                background-color: {safe_color('surface_primary', '#FFFFFF')};
-            }}
-
-            QTabBar::tab {{
-                background: {safe_color('surface_secondary', '#FAFAFA')};
-                border: 1px solid {safe_color('border_primary', '#E0E0E0')};
-                padding: 8px 16px;
-                margin-right: 2px;
-                border-radius: 4px 4px 0px 0px;
-            }}
-
-            QTabBar::tab:selected {{
-                background: {safe_color('primary', '#2196F3')};
-                color: {safe_color('background_primary', '#FFFFFF')};
-            }}
-
-            QTabBar::tab:hover {{
-                background: {safe_color('primary_light', '#64B5F6')};
-            }}
-
-            QTableWidget {{
-                gridline-color: {safe_color('border_primary', '#E0E0E0')};
-                background-color: {safe_color('surface_primary', '#FFFFFF')};
-                alternate-background-color: {safe_color('surface_secondary', '#FAFAFA')};
-                selection-background-color: {safe_color('primary', '#2196F3')};
-                selection-color: {safe_color('background_primary', '#FFFFFF')};
-            }}
-
-            QHeaderView::section {{
-                background-color: {safe_color('primary', '#2196F3')};
-                color: {safe_color('background_primary', '#FFFFFF')};
-                padding: 6px;
-                border: 1px solid {safe_color('border_primary', '#E0E0E0')};
-                font-weight: bold;
-            }}
-
-            QLineEdit, QTextEdit, QComboBox {{
-                border: 1px solid {safe_color('border_primary', '#E0E0E0')};
-                border-radius: 4px;
-                padding: 4px 8px;
-                background-color: {safe_color('surface_primary', '#FFFFFF')};
-                selection-background-color: {safe_color('primary', '#2196F3')};
-                selection-color: {safe_color('background_primary', '#FFFFFF')};
-            }}
-
-            QLineEdit:focus, QTextEdit:focus, QComboBox:focus {{
-                border: 2px solid {safe_color('primary', '#2196F3')};
-            }}
-
-            QProgressBar {{
-                border: 1px solid {safe_color('border_primary', '#E0E0E0')};
-                border-radius: 4px;
-                text-align: center;
-                background-color: {safe_color('surface_secondary', '#FAFAFA')};
-            }}
-
-            QProgressBar::chunk {{
-                background-color: {safe_color('primary', '#2196F3')};
-                border-radius: 3px;
-            }}
-
-            QScrollBar:vertical {{
-                background: {safe_color('surface_secondary', '#FAFAFA')};
-                width: 12px;
-                border-radius: 6px;
-            }}
-
-            QScrollBar::handle:vertical {{
-                background: {safe_color('primary', '#2196F3')};
-                min-height: 20px;
-                border-radius: 6px;
-            }}
-
-            QScrollBar::handle:vertical:hover {{
-                background: {safe_color('primary_light', '#64B5F6')};
-            }}
-
-            QLabel {{
-                color: {safe_color('text_primary', '#212121')};
-            }}
-
-            QCheckBox {{
-                spacing: 5px;
-            }}
-
-            QCheckBox::indicator {{
-                width: 18px;
-                height: 18px;
-                border: 2px solid {safe_color('border_primary', '#E0E0E0')};
-                border-radius: 3px;
-                background-color: {safe_color('surface_primary', '#FFFFFF')};
-            }}
-
-            QCheckBox::indicator:checked {{
-                background-color: {safe_color('primary', '#2196F3')};
-                border-color: {safe_color('primary', '#2196F3')};
-            }}
-
-            QToolTip {{
-                background-color: {safe_color('surface_primary', '#FFFFFF')};
-                color: {safe_color('text_primary', '#212121')};
-                border: 1px solid {safe_color('border_primary', '#E0E0E0')};
-                border-radius: 4px;
-                padding: 4px;
-            }}
-            """
-
-            # 应用样式表到widget
-            widget.setStyleSheet(style_sheet)
-
-        except Exception as e:
-            logger.error(f"应用主题到组件失败: {e}") if logger else None
 
     def _apply_design_system_styles(self):
         """应用设计系统样式"""
@@ -2972,9 +2949,6 @@ class EnhancedDataImportWidget(QWidget):
     def _on_theme_changed(self, new_theme):
         """主题改变时的处理"""
         try:
-            # 重新应用主题到所有组件
-            self._apply_theme_to_widget(self, new_theme)
-
             # 通知所有子组件更新主题
             self._update_child_themes(new_theme)
 
@@ -3562,12 +3536,6 @@ class EnhancedDataImportWidget(QWidget):
         self.progress_interval_spin.setSuffix("秒")
         self.progress_interval_spin.setToolTip("进度更新间隔")
         layout.addRow("进度间隔:", self.progress_interval_spin)
-
-        # 数据验证
-        self.validate_data_cb = QCheckBox("启用数据验证")
-        self.validate_data_cb.setChecked(True)
-        self.validate_data_cb.setToolTip("导入前验证数据格式")
-        layout.addRow("", self.validate_data_cb)
 
         return widget
 

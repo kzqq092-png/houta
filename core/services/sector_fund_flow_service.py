@@ -279,6 +279,15 @@ class SectorFundFlowService(QObject):
     def _standardize_sector_flow_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """标准化板块资金流数据格式"""
         try:
+            # 验证输入数据
+            if df is None or not isinstance(df, pd.DataFrame):
+                logger.warning(f"无效的输入数据类型: {type(df)}")
+                return pd.DataFrame()
+            
+            if df.empty:
+                logger.warning("输入数据为空")
+                return df
+            
             # 标准化列名
             column_mapping = {
                 '板块': 'sector_name',
@@ -300,12 +309,22 @@ class SectorFundFlowService(QObject):
 
             for col in numeric_columns:
                 if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    # 确保列是Series而不是DataFrame
+                    col_data = df[col]
+                    if isinstance(col_data, pd.DataFrame):
+                        logger.warning(f"列 {col} 是DataFrame而不是Series，跳过转换")
+                        continue
+                    
+                    # 安全的类型转换
+                    try:
+                        df[col] = pd.to_numeric(col_data, errors='coerce')
+                    except Exception as conv_err:
+                        logger.warning(f"列 {col} 转换失败: {conv_err}")
 
             return df
 
         except Exception as e:
-            logger.warning(f" 数据标准化失败: {e}")
+            logger.warning(f"数据标准化失败: {e}")
             return df
 
     def _is_cache_valid(self, cache_key: str) -> bool:
