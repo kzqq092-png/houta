@@ -20,6 +20,13 @@ from .base_service import BaseService
 try:
     from PyQt5.QtCore import QObject, pyqtSignal, QMutex, QMutexLocker
     PYQT5_AVAILABLE = True
+
+    # 创建信号持有者类
+    class ConfigSignals(QObject):
+        """配置服务的信号类"""
+        config_changed = pyqtSignal(str, object)
+        theme_changed = pyqtSignal(str)
+
 except ImportError:
     PYQT5_AVAILABLE = False
     # 创建模拟的QObject和pyqtSignal
@@ -30,6 +37,10 @@ except ImportError:
 
     def pyqtSignal(*args, **kwargs):
         return lambda: None
+
+    # 模拟的信号类
+    class ConfigSignals(QObject):
+        pass
 
 # 导入配置类型
 try:
@@ -54,6 +65,7 @@ logger = logger
 
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'factorweave_system.sqlite')
+
 
 class ConfigService(BaseService):
     """
@@ -80,13 +92,10 @@ class ConfigService(BaseService):
         # 先初始化BaseService
         super().__init__(**kwargs)
 
-        # 如果PyQt5可用，创建QObject实例用于信号
+        # 如果PyQt5可用，创建ConfigSignals实例用于信号
         self._qt_object = None
         if PYQT5_AVAILABLE:
-            self._qt_object = QObject()
-            # 动态添加信号
-            self._qt_object.config_changed = pyqtSignal(str, object)
-            self._qt_object.theme_changed = pyqtSignal(str)
+            self._qt_object = ConfigSignals()
 
         self._config_file = config_file or 'config/app_config.json'
         self._use_sqlite = use_sqlite

@@ -13,7 +13,7 @@ from optimization.version_manager import VersionManager
 from optimization.auto_tuner import AutoTuner
 from optimization.main_controller import OptimizationController
 from core.services import (
-    ConfigService, ThemeService, StockService,
+    ConfigService, StockService,
     ChartService, AnalysisService
 )
 from core.events import EventBus, get_event_bus

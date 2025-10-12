@@ -51,8 +51,7 @@ from PyQt5.QtGui import (
 
 # 导入核心组件
 try:
-    from gui.themes.unified_theme_manager import UnifiedThemeManager, ThemeType
-    from gui.styles.unified_design_system import UnifiedDesignSystem, ColorScheme
+    from utils.theme import get_theme_manager
     THEME_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"主题系统不可用: {e}") if logger else None
@@ -616,13 +615,13 @@ class EnhancedDataImportWidget(QWidget):
         self.ui_adapter = None
         self.ui_synchronizer = None
 
-        # 初始化主题系化
+        # 初始化主题系统
         self.theme_manager = None
-        self.design_system = None
         if THEME_AVAILABLE:
             try:
-                self.theme_manager = UnifiedThemeManager()
-                self.design_system = UnifiedDesignSystem()
+                from utils.config_manager import ConfigManager
+                config_manager = ConfigManager()
+                self.theme_manager = get_theme_manager(config_manager)
                 logger.info("主题系统初始化成功") if logger else None
             except Exception as e:
                 logger.error(f"主题系统初始化失败: {e}") if logger else None
@@ -2987,12 +2986,14 @@ class EnhancedDataImportWidget(QWidget):
         """设置主题类型"""
         try:
             if self.theme_manager:
+                # ThemeManager使用主题名称字符串，不是枚举
                 if theme_type.lower() == 'dark':
-                    self.theme_manager.set_theme(ThemeType.DARK)
+                    self.theme_manager.set_theme('Dark')
                 elif theme_type.lower() == 'light':
-                    self.theme_manager.set_theme(ThemeType.LIGHT)
+                    self.theme_manager.set_theme('Light')
                 elif theme_type.lower() == 'auto':
-                    self.theme_manager.set_theme(ThemeType.AUTO)
+                    # ThemeManager暂不支持auto，使用Light作为默认
+                    self.theme_manager.set_theme('Light')
                 else:
                     logger.warning(f"未知主题类型: {theme_type}") if logger else None
 

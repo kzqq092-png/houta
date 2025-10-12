@@ -318,7 +318,7 @@ class SmartRecommendationPanel(QWidget):
         layout.addWidget(control_panel)
 
         # 主要内容标签页
-        main_tabs = QTabWidget()
+        main_tabs = QTabWidget(self)
 
         # 推荐内容标签页
         recommendations_tab = self._create_recommendations_tab()
@@ -343,8 +343,7 @@ class SmartRecommendationPanel(QWidget):
 
     def _create_control_panel(self) -> QWidget:
         """创建控制面板"""
-        panel = QFrame()
-        panel.setFrameStyle(QFrame.StyledPanel)
+        panel = QFrame(self)
         panel.setMaximumHeight(60)
 
         layout = QHBoxLayout(panel)
@@ -925,7 +924,7 @@ class SmartRecommendationPanel(QWidget):
     def _load_stock_content_items(self) -> int:
         """从UnifiedDataManager加载股票数据"""
         try:
-            from core.services.service_container import ServiceContainer
+            from core.containers import ServiceContainer
             from core.services.smart_recommendation_engine import ContentItem, RecommendationType
 
             # 获取数据管理器

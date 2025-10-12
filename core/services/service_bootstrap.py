@@ -19,7 +19,6 @@ from core.events import EventBus, get_event_bus
 # 然后导入服务类型
 from core.services.config_service import ConfigService
 from core.services.extension_service import ExtensionService
-from core.services.theme_service import ThemeService
 from core.services.stock_service import StockService
 from core.services.chart_service import ChartService
 from core.services.analysis_service import AnalysisService
@@ -285,15 +284,6 @@ class ServiceBootstrap:
             # 提供回退机制
 
             self._initialize_fallback_data_manager()
-
-        # 主题服务
-
-        if not self._is_service_registered(ThemeService):
-            self.service_container.register(
-                ThemeService, scope=ServiceScope.SINGLETON)
-        theme_service = self.service_container.resolve(ThemeService)
-        theme_service.initialize()
-        logger.info("主题服务注册完成")
 
         #  股票服务 - 使用工厂方法传递服务容器（延迟初始化）
         self.service_container.register_factory(

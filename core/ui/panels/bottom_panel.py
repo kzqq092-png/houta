@@ -16,6 +16,7 @@ import re
 import sys
 from datetime import datetime
 
+
 class LogHandler:
     """自定义日志处理器，将Loguru日志输出到UI（已迁移到Loguru）"""
 
@@ -57,11 +58,12 @@ class LogHandler:
                 logger.remove(self.handler_id)
             except:
                 pass
-            
+
             # 添加新的handler with new level
             self.current_level = level
             self.handler_id = logger.add(self._loguru_sink, level=level)
             logger.debug(f"UI日志处理器级别已更新为: {level}")
+
 
 class LogWidget(QTextEdit):
     """日志显示组件"""
@@ -118,6 +120,7 @@ class LogWidget(QTextEdit):
         """为LogHandler兼容性提供的方法"""
         formatted_message = f"[{timestamp}] {message}"
         self.append_log(formatted_message, level)
+
 
 class BottomPanel(BasePanel):
     """底部面板 - 日志显示和系统状态"""
@@ -293,7 +296,7 @@ class BottomPanel(BasePanel):
         # 查找文本
         found = self.log_widget.find(search_text)
         if not found:
-    
+
             logger.warning(f"未找到包含 '{search_text}' 的日志")
 
     def _restore_all_logs(self):
@@ -353,7 +356,7 @@ class BottomPanel(BasePanel):
                 logger.info(f"日志已导出到: {filename}")
 
         except Exception as e:
-    
+
             logger.error(f"导出日志失败: {e}")
 
     def add_log(self, message: str, level: str = 'INFO'):
@@ -400,7 +403,7 @@ class BottomPanel(BasePanel):
 
             # 发送隐藏信号
             self.panel_hidden.emit()
-    
+
             logger.debug("日志面板已隐藏")
 
     def _show_panel(self) -> None:

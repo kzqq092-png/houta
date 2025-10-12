@@ -165,77 +165,12 @@ class MainMenuBar(QMenuBar):
 
             self.view_menu.addSeparator()
 
-            # 专业回测面板 - 已合并到分析菜单的专业回测中
-            # self.backtest_panel_action = QAction("专业回测面板", self)
-            # self.backtest_panel_action.setCheckable(True)
-            # self.backtest_panel_action.setChecked(False)
-            # self.backtest_panel_action.setStatusTip("显示/隐藏专业回测面板")
-            # self.view_menu.addAction(self.backtest_panel_action)
-
-            self.view_menu.addSeparator()
-
             # 刷新
             self.refresh_action = QAction("刷新", self)
             self.refresh_action.setStatusTip("刷新当前数据")
             self.view_menu.addAction(self.refresh_action)
 
             self.view_menu.addSeparator()
-
-            # 增强功能子菜单
-            self.enhanced_menu = self.view_menu.addMenu("[INFO] 增强功能")
-
-            # Level-2数据面板
-            self.level2_panel_action = QAction("Level-2 数据面板", self)
-            self.level2_panel_action.setCheckable(True)
-            self.level2_panel_action.setStatusTip("显示/隐藏Level-2行情数据面板")
-            self.enhanced_menu.addAction(self.level2_panel_action)
-
-            # 订单簿深度
-            self.orderbook_action = QAction("订单簿深度", self)
-            self.orderbook_action.setCheckable(True)
-            self.orderbook_action.setStatusTip("显示/隐藏订单簿深度分析")
-            self.enhanced_menu.addAction(self.orderbook_action)
-
-            # 基本面分析
-            self.fundamental_action = QAction("基本面分析", self)
-            self.fundamental_action.setCheckable(True)
-            self.fundamental_action.setStatusTip("显示/隐藏基本面分析标签页")
-            self.enhanced_menu.addAction(self.fundamental_action)
-
-            # 数据质量监控
-            self.quality_monitor_action = QAction("数据质量监控", self)
-            self.quality_monitor_action.setCheckable(True)
-            self.quality_monitor_action.setStatusTip("显示/隐藏数据质量监控面板")
-            self.enhanced_menu.addAction(self.quality_monitor_action)
-
-            # 智能推荐
-            self.smart_recommendation_action = QAction("智能推荐", self)
-            self.smart_recommendation_action.setCheckable(True)
-            self.smart_recommendation_action.setStatusTip("显示/隐藏智能推荐面板")
-            self.enhanced_menu.addAction(self.smart_recommendation_action)
-
-            self.view_menu.addSeparator()
-
-            # 主题切换子菜单
-            self.theme_menu = self.view_menu.addMenu("主题")
-            self.default_theme_action = QAction("默认主题", self)
-            self.light_theme_action = QAction("浅色主题", self)
-            self.dark_theme_action = QAction("深色主题", self)
-            self.theme_menu.addAction(self.default_theme_action)
-            self.theme_menu.addAction(self.light_theme_action)
-            self.theme_menu.addAction(self.dark_theme_action)
-
-            # 性能仪表板已移至顶级性能监控菜单
-            # 保留注释以记录移除原因
-
-            # 连接信号到coordinator
-            if self.coordinator:
-                # 视图菜单和刷新功能的信号连接已移至统一的信号连接处理中，避免重复连接
-
-                # 主题切换信号连接已移至统一的信号连接处理中，避免重复连接
-
-                # 性能仪表板信号连接已移至性能监控菜单
-                pass
 
         except Exception as e:
             if True:  # 使用Loguru日志
@@ -544,7 +479,6 @@ class MainMenuBar(QMenuBar):
     def init_advanced_menu(self):
         """初始化高级功能菜单"""
         try:
-            # 注意：插件管理已迁移到工具菜单，避免重复
 
             # 分布式/云API/指标市场/批量分析
             self.node_manager_action = QAction("分布式节点管理", self)
@@ -592,17 +526,47 @@ class MainMenuBar(QMenuBar):
             # 性能评估
             self.performance_evaluation_action = QAction("性能评估", self)
             self.performance_evaluation_action.setStatusTip("评估形态识别算法性能")
-            self.optimization_menu.addAction(
-                self.performance_evaluation_action)
+            self.optimization_menu.addAction(self.performance_evaluation_action)
 
             # 系统状态
             self.optimization_status_action = QAction("系统状态", self)
             self.optimization_status_action.setStatusTip("查看优化系统状态")
             self.optimization_menu.addAction(self.optimization_status_action)
 
-            # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
+            # 高级数据面板子菜单
+            self.enhanced_menu = self.optimization_menu.addMenu("高级数据面板")
 
-            # 注意：优化系统菜单的信号连接已在connect_signals方法中统一处理
+            # Level-2数据面板
+            self.level2_panel_action = QAction("Level-2 数据面板", self)
+            self.level2_panel_action.setCheckable(True)
+            self.level2_panel_action.setStatusTip("显示/隐藏Level-2行情数据面板")
+            self.enhanced_menu.addAction(self.level2_panel_action)
+
+            # 订单簿深度
+            self.orderbook_action = QAction("订单簿深度", self)
+            self.orderbook_action.setCheckable(True)
+            self.orderbook_action.setStatusTip("显示/隐藏订单簿深度分析")
+            self.enhanced_menu.addAction(self.orderbook_action)
+
+            # 基本面分析
+            self.fundamental_action = QAction("基本面分析", self)
+            self.fundamental_action.setCheckable(True)
+            self.fundamental_action.setStatusTip("显示/隐藏基本面分析标签页")
+            self.enhanced_menu.addAction(self.fundamental_action)
+
+            # 数据质量监控
+            self.quality_monitor_action = QAction("数据质量监控", self)
+            self.quality_monitor_action.setCheckable(True)
+            self.quality_monitor_action.setStatusTip("显示/隐藏数据质量监控面板")
+            self.enhanced_menu.addAction(self.quality_monitor_action)
+
+            # 智能推荐
+            self.smart_recommendation_action = QAction("智能推荐", self)
+            self.smart_recommendation_action.setCheckable(True)
+            self.smart_recommendation_action.setStatusTip("显示/隐藏智能推荐面板")
+            self.enhanced_menu.addAction(self.smart_recommendation_action)
+
+            self.optimization_menu.addAction(self.enhanced_menu)
 
         except Exception as e:
             if True:  # 使用Loguru日志

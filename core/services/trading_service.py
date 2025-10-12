@@ -21,6 +21,10 @@ from loguru import logger
 from .base_service import BaseService
 from ..events import EventBus, get_event_bus
 from ..containers import ServiceContainer, get_service_container
+from ..strategy_extensions import StrategyLifecycle
+
+# 为了向后兼容，将 StrategyLifecycle 重命名为 StrategyState
+StrategyState = StrategyLifecycle
 
 
 class OrderType(Enum):
@@ -160,14 +164,20 @@ class Portfolio:
 
     def _recalculate(self):
         """重新计算组合指标"""
-        self.total_cost = sum(pos.cost_price * pos.quantity for pos in self.positions.values())
-        self.total_market_value = self.cash + sum(
+        # 确保所有计算都使用Decimal类型
+        self.total_cost = Decimal(sum(pos.cost_price * pos.quantity for pos in self.positions.values()))
+
+        # 计算持仓市值，确保使用Decimal
+        positions_value = Decimal(sum(
             pos.market_value or (pos.current_price or pos.cost_price) * pos.quantity
             for pos in self.positions.values()
-        )
+        ))
+        self.total_market_value = Decimal(self.cash) + positions_value
+
+        # 盈亏计算，确保都是Decimal
         self.total_profit_loss = self.total_market_value - self.total_cost
 
-        if self.total_cost > 0:
+        if self.total_cost > Decimal('0'):
             self.total_profit_loss_ratio = float(self.total_profit_loss / self.total_cost) * 100
         else:
             self.total_profit_loss_ratio = 0.0
@@ -421,6 +431,55 @@ class TradingService(BaseService):
         with self._service_lock:
             self._trading_metrics.last_update = datetime.now()
             return self._trading_metrics
+
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """
+        获取性能统计信息
+
+        Returns:
+            包含性能统计的字典
+        """
+        try:
+            with self._service_lock:
+                # 获取投资组合
+                portfolio = self.get_portfolio()
+
+                # 获取交易指标
+                metrics = self.get_trading_metrics()
+
+                # 统计活跃策略数量（基于活跃订单和持仓）
+                active_strategies = len(self._active_orders) + len([p for p in self._positions.values() if p.quantity > 0])
+                total_strategies = len(self._orders)
+
+                return {
+                    'active_strategies': active_strategies,
+                    'total_strategies': max(total_strategies, 1),  # 至少为1避免除零
+                    'total_orders': metrics.total_orders,
+                    'filled_orders': metrics.filled_orders,
+                    'cancelled_orders': metrics.cancelled_orders,
+                    'success_rate': metrics.success_rate,
+                    'total_profit_loss': float(portfolio.total_profit_loss) if portfolio else 0.0,
+                    'total_profit_loss_pct': portfolio.total_profit_loss_pct if portfolio else 0.0,
+                    'win_rate': 0.0,  # 需要基于历史交易记录计算
+                    'max_drawdown': 0.0,  # 需要基于历史净值计算
+                    'sharpe_ratio': 0.0,  # 需要基于历史收益计算
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to get performance stats: {e}")
+            return {
+                'active_strategies': 0,
+                'total_strategies': 1,
+                'total_orders': 0,
+                'filled_orders': 0,
+                'cancelled_orders': 0,
+                'success_rate': 0.0,
+                'total_profit_loss': 0.0,
+                'total_profit_loss_pct': 0.0,
+                'win_rate': 0.0,
+                'max_drawdown': 0.0,
+                'sharpe_ratio': 0.0,
+            }
 
     def _do_health_check(self) -> Dict[str, Any]:
         """执行健康检查"""

@@ -868,18 +868,34 @@ class AssetSeparatedDatabaseManager:
             logger.debug(f"过滤掉不在表中的列: {extra_columns}")
             # 只保留表中存在的列
             valid_columns = [col for col in data.columns if col in table_columns]
-            return data[valid_columns].copy()
+            filtered_data = data[valid_columns].copy()
+
+            # 检查关键字段是否存在
+            logger.debug(f"过滤后的列: {filtered_data.columns.tolist()}")
+            if 'datetime' not in filtered_data.columns:
+                logger.warning(f"过滤后缺少datetime字段！原始列: {data.columns.tolist()}, 表列: {table_columns}")
+
+            return filtered_data
 
         return data
 
     def _upsert_data(self, conn, table_name: str, data: pd.DataFrame, data_type: DataType) -> int:
         """插入或更新数据"""
         try:
+            # 调试：检查输入数据
+            logger.debug(f"准备插入数据到 {table_name}，输入列: {data.columns.tolist()}")
+            if 'datetime' in data.columns:
+                logger.debug(f"datetime字段存在，非空记录数: {data['datetime'].notna().sum()}/{len(data)}")
+            else:
+                logger.warning(f"输入数据缺少datetime字段！")
+
             # 获取表的实际列名
             table_columns = self._get_table_columns(conn, table_name)
             if not table_columns:
                 logger.error(f"无法获取表 {table_name} 的列信息")
                 return 0
+
+            logger.debug(f"表 {table_name} 的列: {table_columns}")
 
             # 过滤数据，只保留表中存在的列
             filtered_data = self._filter_dataframe_columns(data, table_columns)

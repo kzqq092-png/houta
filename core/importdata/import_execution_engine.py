@@ -2044,13 +2044,26 @@ class DataImportExecutionEngine(QObject):
                         # 添加symbol列
                         kdata_with_meta = kdata.copy()
                         kdata_with_meta['symbol'] = symbol
-                        
+
+                        # ✅ 关键修复：如果datetime是索引，将其转换为列
+                        import pandas as pd
+                        if isinstance(kdata_with_meta.index, pd.DatetimeIndex):
+                            logger.debug(f"{symbol}: 检测到DatetimeIndex，转换为datetime列")
+                            kdata_with_meta = kdata_with_meta.reset_index()
+                            # 如果reset后的列名为'index'或'date'，重命名为datetime
+                            if 'index' in kdata_with_meta.columns and 'datetime' not in kdata_with_meta.columns:
+                                kdata_with_meta = kdata_with_meta.rename(columns={'index': 'datetime'})
+                            elif 'date' in kdata_with_meta.columns and 'datetime' not in kdata_with_meta.columns:
+                                kdata_with_meta = kdata_with_meta.rename(columns={'date': 'datetime'})
+
                         # 调试：检查datetime列
                         if 'datetime' not in kdata_with_meta.columns:
                             logger.warning(f"{symbol}: 数据中缺少datetime列，可用列: {kdata_with_meta.columns.tolist()}")
                         elif kdata_with_meta['datetime'].isna().all():
                             logger.warning(f"{symbol}: datetime列全部为None")
-                        
+                        else:
+                            logger.debug(f"{symbol}: datetime列正常，非空记录数: {kdata_with_meta['datetime'].notna().sum()}/{len(kdata_with_meta)}")
+
                         # 线程安全地添加到列表
                         with download_lock:
                             all_kdata_list.append(kdata_with_meta)
@@ -2187,16 +2200,28 @@ class DataImportExecutionEngine(QObject):
 
     def _standardize_kline_data_fields(self, df) -> 'pd.DataFrame':
         """标准化K线数据字段，确保与表结构匹配"""
+        import pandas as pd  # 在函数开头导入，避免后续引用错误
+
         try:
             if df.empty:
                 return df
-            
-            # 如果datetime是index，将其重置为列
+
+            # ✅ 步骤1: 如果datetime是index，将其重置为列
             if isinstance(df.index, pd.DatetimeIndex):
+                logger.debug("检测到DatetimeIndex，转换为datetime列")
                 df = df.reset_index()
-                # 如果reset后的列名为'index'，重命名为datetime
+                # 如果reset后的列名为'index'或'date'，重命名为datetime
                 if 'index' in df.columns and 'datetime' not in df.columns:
                     df = df.rename(columns={'index': 'datetime'})
+                    logger.debug("已将'index'列重命名为'datetime'")
+                elif 'date' in df.columns and 'datetime' not in df.columns:
+                    df = df.rename(columns={'date': 'datetime'})
+                    logger.debug("已将'date'列重命名为'datetime'")
+
+            # ✅ 步骤2: 如果有'date'列但没有'datetime'列，重命名
+            if 'date' in df.columns and 'datetime' not in df.columns:
+                df = df.rename(columns={'date': 'datetime'})
+                logger.debug("已将'date'列重命名为'datetime'")
 
             # 处理字段名称映射（code -> symbol）
             if 'code' in df.columns and 'symbol' not in df.columns:
@@ -2243,9 +2268,6 @@ class DataImportExecutionEngine(QObject):
             for field, default_value in field_defaults.items():
                 if field not in df.columns:
                     df[field] = default_value
-
-            # 导入pandas
-            import pandas as pd
 
             # 确保数据类型正确
             numeric_fields = ['open', 'high', 'low', 'close', 'volume', 'amount']
@@ -2309,11 +2331,23 @@ class DataImportExecutionEngine(QObject):
                 # vwap = amount / volume
                 df['vwap'] = df['amount'] / df['volume'].replace(0, pd.NA)
 
-            logger.debug(f"数据字段标准化完成，字段数: {len(df.columns)}")
+            # 最终检查：确保datetime字段存在且有效
+            if 'datetime' not in df.columns:
+                logger.error(f"标准化完成但缺少datetime字段！可用列: {df.columns.tolist()}")
+                return pd.DataFrame()  # 返回空DataFrame，避免插入失败
+
+            if df['datetime'].isna().all():
+                logger.error(f"标准化完成但datetime字段全为空！")
+                return pd.DataFrame()
+
+            logger.debug(f"数据字段标准化完成，字段数: {len(df.columns)}, 记录数: {len(df)}")
+            logger.debug(f"标准化后的列: {df.columns.tolist()}")
             return df
 
         except Exception as e:
             logger.error(f"标准化K线数据字段失败: {e}")
+            import traceback
+            logger.error(f"详细错误: {traceback.format_exc()}")
             return df
 
     def _import_realtime_data(self, task_config: ImportTaskConfig, result: TaskExecutionResult):

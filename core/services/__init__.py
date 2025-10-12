@@ -8,7 +8,6 @@ from .base_service import BaseService, AsyncBaseService, ConfigurableService, Ca
 from .stock_service import StockService
 from .chart_service import ChartService
 from .analysis_service import AnalysisService
-from .theme_service import ThemeService
 from .config_service import ConfigService
 from .industry_service import IndustryService
 from .unified_data_manager import UnifiedDataManager
@@ -23,7 +22,6 @@ __all__ = [
     'StockService',
     'ChartService',
     'AnalysisService',
-    'ThemeService',
     'ConfigService',
     'IndustryService',
     'UnifiedDataManager',

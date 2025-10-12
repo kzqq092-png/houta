@@ -39,7 +39,7 @@ from ..plugin_types import AssetType
 from ..containers import ServiceContainer
 from ..services import (
     StockService, ChartService, AnalysisService,
-    ThemeService, ConfigService, UnifiedDataManager
+    ConfigService, UnifiedDataManager
 )
 from optimization.optimization_dashboard import create_optimization_dashboard
 from gui.widgets.modern_performance_widget import ModernUnifiedPerformanceWidget
@@ -134,7 +134,9 @@ class MainWindowCoordinator(BaseCoordinator):
             self._chart_service = self.service_container.resolve(ChartService)
             self._analysis_service = self.service_container.resolve(
                 AnalysisService)
-            self._theme_service = self.service_container.resolve(ThemeService)
+            # 使用ThemeManager替代ThemeService
+            from utils.theme import get_theme_manager
+            self._theme_manager = get_theme_manager(self._config_service if hasattr(self, '_config_service') else None)
             self._config_service = self.service_container.resolve(
                 ConfigService)
             self._data_manager = self.service_container.resolve(
@@ -327,8 +329,6 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 设置分割器的初始大小
             vertical_splitter.setSizes([700, 200])  # 主区域和底部面板的比例
-
-            # 性能仪表板停靠窗口已删除 - 根据用户要求移除
 
             # 创建专业回测组件（作为停靠窗口）
             self._create_professional_backtest_widget()
@@ -550,19 +550,47 @@ class MainWindowCoordinator(BaseCoordinator):
     def _apply_theme(self) -> None:
         """应用主题"""
         try:
-            # 获取当前主题
-            current_theme = self._theme_service.get_current_theme()
-            theme_config = self._theme_service.get_theme_config(current_theme)
+            # 使用ThemeManager获取当前主题
+            if hasattr(self, '_theme_manager') and self._theme_manager:
+                current_theme = self._theme_manager.current_theme
+                is_qss = self._theme_manager.is_qss_theme()
 
-            # 应用主题到主窗口
-            if theme_config:
-                # 这里可以根据主题配置设置窗口样式
-                pass
+                logger.info(f"Theme applied: {current_theme}, Type: {'QSS' if is_qss else 'JSON'}")
 
-            logger.info(f"Theme applied: {current_theme}")
+                # 如果是JSON主题，需要手动通知各个面板更新
+                if not is_qss:
+                    self._notify_panels_theme_change()
+            else:
+                logger.warning("ThemeManager not available")
 
         except Exception as e:
             logger.error(f"Failed to apply theme: {e}")
+
+    def _notify_panels_theme_change(self) -> None:
+        """通知所有面板主题变化（用于JSON主题）"""
+        try:
+            # 遍历所有面板，调用它们的主题更新方法
+            for panel_name, panel in self._panels.items():
+                try:
+                    # 如果面板有_on_theme_changed方法，调用它
+                    if hasattr(panel, '_on_theme_changed'):
+                        panel._on_theme_changed(self._theme_manager.current_theme)
+
+                    # 如果面板有update_theme方法，调用它
+                    elif hasattr(panel, 'update_theme'):
+                        panel.update_theme()
+
+                    # 强制重绘
+                    if hasattr(panel, 'update'):
+                        panel.update()
+
+                except Exception as e:
+                    logger.warning(f"Panel {panel_name} theme update failed: {e}")
+
+            logger.info("Notified all panels of theme change")
+
+        except Exception as e:
+            logger.error(f"Failed to notify panels: {e}")
 
     def _load_window_config(self) -> None:
         """加载窗口配置"""
@@ -1032,10 +1060,9 @@ class MainWindowCoordinator(BaseCoordinator):
                 theme_name = theme_data
                 logger.info(f"Theme changed via menu: {theme_name}")
 
-                # 使用主题服务
-                theme_service = self.service_container.get_service(ThemeService)
-                if theme_service:
-                    theme_service.set_theme(theme_name)
+                # 使用ThemeManager
+                if hasattr(self, '_theme_manager') and self._theme_manager:
+                    self._theme_manager.set_theme(theme_name)
                     self.show_message(f"主题已切换为: {theme_name}")
                 else:
                     # 降级到应用主题
@@ -1218,7 +1245,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
             dialog = SettingsDialog(
                 parent=self._main_window,
-                theme_service=self._theme_service,
+                theme_manager=self._theme_manager if hasattr(self, '_theme_manager') else None,
                 config_service=self._config_service
             )
 

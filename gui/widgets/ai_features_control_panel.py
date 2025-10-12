@@ -812,7 +812,7 @@ class AIFeaturesControlPanel(QWidget):
 
         # 配置推荐选项卡
         recommendation_tab = self.create_recommendation_tab()
-        self.tab_widget.addTab(recommendation_tab, "[INFO] 智能推荐")
+        self.tab_widget.addTab(recommendation_tab, "智能推荐")
 
         layout.addWidget(self.tab_widget)
 

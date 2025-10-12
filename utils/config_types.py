@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 from .theme_types import Theme
 from PyQt5.QtCore import QObject, pyqtSignal
 
+
 @dataclass
 class ThemeConfig:
     """Theme configuration settings"""
@@ -16,6 +17,7 @@ class ThemeConfig:
     name: str = "light"
     font_family: str = "Arial"
     font_size: int = 12
+    theme_name: str = "default"  # 当前选中的主题名称（用于持久化）
 
     def __hash__(self):
         """Make ThemeConfig hashable by using theme name as hash"""
@@ -37,7 +39,8 @@ class ThemeConfig:
             "theme": self.theme.name.lower(),
             "name": self.name,
             "font_family": self.font_family,
-            "font_size": self.font_size
+            "font_size": self.font_size,
+            "theme_name": self.theme_name
         }
 
     @classmethod
@@ -54,8 +57,10 @@ class ThemeConfig:
             theme=Theme.from_str(data.get("theme", "light")),
             name=data.get("name", "light"),
             font_family=data.get("font_family", "Arial"),
-            font_size=data.get("font_size", 12)
+            font_size=data.get("font_size", 12),
+            theme_name=data.get("theme_name", "default")
         )
+
 
 @dataclass
 class ChartConfig:
@@ -124,6 +129,7 @@ class ChartConfig:
             font_size=data.get("font_size", 12)
         )
 
+
 @dataclass
 class TradingConfig:
     """Trading parameters configuration"""
@@ -186,6 +192,7 @@ class TradingConfig:
             time_stop=data.get("time_stop", 5)
         )
 
+
 @dataclass
 class AppConfig:
     """Application configuration container"""
@@ -224,6 +231,7 @@ class AppConfig:
             chart=ChartConfig.from_dict(chart_data),
             trading=TradingConfig.from_dict(trading_data)
         )
+
 
 @dataclass
 class DataConfig:
@@ -268,6 +276,7 @@ class DataConfig:
             data_source=data.get("data_source", 'local'),
             backup_enabled=data.get("backup_enabled", True)
         )
+
 
 @dataclass
 class UIConfig:
@@ -316,6 +325,7 @@ class UIConfig:
             layout=data.get("layout", 'default'),
             window_size=data.get("window_size", {'width': 1200, 'height': 800})
         )
+
 
 @dataclass
 class LoggingConfig(QObject):
@@ -393,6 +403,7 @@ class LoggingConfig(QObject):
     def emit_config_changed(self):
         """发射配置变更信号"""
         self.config_changed.emit(self)
+
 
 class UIStyleConfig:
     """UI样式配置"""
