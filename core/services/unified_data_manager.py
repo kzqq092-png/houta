@@ -339,11 +339,17 @@ class UnifiedDataManager:
             from ..database.table_manager import get_table_manager
             from ..integration.data_router import DataRouter
             from ..performance.cache_manager import MultiLevelCacheManager
+            from ..asset_database_manager import AssetSeparatedDatabaseManager
+            from ..asset_type_identifier import get_asset_type_identifier
 
             # 初始化DuckDB组件
             self.duckdb_operations = get_duckdb_operations()
             self.duckdb_manager = get_connection_manager()
             self.table_manager = get_table_manager()
+
+            # 初始化资产数据库管理器和资产类型识别器
+            self.asset_manager = AssetSeparatedDatabaseManager()
+            self.asset_identifier = get_asset_type_identifier()
 
             # 智能数据路由器
             self.data_router = DataRouter()
@@ -356,13 +362,15 @@ class UnifiedDataManager:
             # DuckDB可用标志
             self.duckdb_available = True
 
-            logger.info("DuckDB功能集成成功")
+            logger.info("DuckDB功能集成成功（包含资产数据库管理器）")
 
         except ImportError as e:
             logger.warning(f" DuckDB模块导入失败，将使用传统模式: {e}")
             self.duckdb_operations = None
             self.duckdb_manager = None
             self.table_manager = None
+            self.asset_manager = None
+            self.asset_identifier = None
             self.data_router = None
             self.multi_cache = None
             self.duckdb_available = False
@@ -371,6 +379,8 @@ class UnifiedDataManager:
             self.duckdb_operations = None
             self.duckdb_manager = None
             self.table_manager = None
+            self.asset_manager = None
+            self.asset_identifier = None
             self.data_router = None
             self.multi_cache = None
             self.duckdb_available = False
@@ -768,6 +778,18 @@ class UnifiedDataManager:
                 logger.warning("DuckDB操作器不可用")
                 return pd.DataFrame()
 
+            # 将字符串转换为AssetType枚举
+            from ..plugin_types import AssetType
+            asset_type_enum_mapping = {
+                'stock': AssetType.STOCK_US,  # 默认使用STOCK_US
+                'crypto': AssetType.CRYPTO,
+                'fund': AssetType.FUND,
+                'bond': AssetType.BOND,
+                'index': AssetType.INDEX,
+                'sector': AssetType.SECTOR
+            }
+            asset_type_enum = asset_type_enum_mapping.get(asset_type, AssetType.STOCK_US)
+
             # 根据资产类型选择对应的表和查询
             table_mapping = {
                 'stock': 'stock_basic',
@@ -815,7 +837,7 @@ class UnifiedDataManager:
 
             # 执行查询 - 使用query_data方法
             result = self.duckdb_operations.query_data(
-                database_path="db/kline_stock.duckdb",
+                database_path=self.asset_manager.get_database_path(asset_type_enum),
                 table_name=table_name,
                 custom_sql=query
             )
@@ -840,7 +862,7 @@ class UnifiedDataManager:
 
             # 使用现有的DuckDB操作器进行查询
             # 构建查询SQL - 使用标准的kline_stock数据库
-            database_path = "db/kline_stock.duckdb"
+            database_path = self.asset_manager.get_database_path(asset_type)
 
             # 根据周期确定表名
             table_name = f"kline_{period.lower()}" if period != 'D' else "kline_daily"
@@ -883,20 +905,24 @@ class UnifiedDataManager:
             if not self.duckdb_operations or data.empty:
                 return
 
+            # 识别资产类型
+            asset_type = self.asset_identifier.identify_asset_type(stock_code)
+            db_path = self.asset_manager.get_database_path(asset_type)
+
             table_name = f"kline_data_{period.lower()}"
 
             # 确保表存在
             if self.table_manager:
                 from ..database.table_manager import TableType
                 actual_table_name = self.table_manager.ensure_table_exists(
-                    "db/kline_stock.duckdb", TableType.KLINE_DATA, "unified_data_manager", period
+                    db_path, TableType.KLINE_DATA, "unified_data_manager", period
                 )
                 if actual_table_name:
                     table_name = actual_table_name
 
             # 插入数据（使用upsert避免重复）
             result = self.duckdb_operations.insert_dataframe(
-                database_path="db/kline_stock.duckdb",
+                database_path=db_path,
                 table_name=table_name,
                 data=data,
                 upsert=True
@@ -1745,7 +1771,7 @@ class UnifiedDataManager:
             """
 
             result = self.duckdb_operations.execute_query(
-                database_path="db/kline_stock.duckdb",
+                database_path=self.asset_manager.get_database_path(asset_type),
                 query=query,
                 params=[stock_code]
             )
@@ -1765,11 +1791,15 @@ class UnifiedDataManager:
             if not data:
                 return
 
+            # 识别资产类型
+            asset_type = self.asset_identifier.identify_asset_type(stock_code)
+            db_path = self.asset_manager.get_database_path(asset_type)
+
             # 确保财务数据表存在
             if self.table_manager:
                 from ..database.table_manager import TableType
                 if not self.table_manager.ensure_table_exists(
-                    "db/kline_stock.duckdb", TableType.FINANCIAL_STATEMENT, "unified_data_manager"
+                    db_path, TableType.FINANCIAL_STATEMENT, "unified_data_manager"
                 ):
                     logger.error("创建财务数据表失败")
                     return
@@ -1777,7 +1807,7 @@ class UnifiedDataManager:
             # 转换为DataFrame并存储
             df = pd.DataFrame([data])
             result = self.duckdb_operations.insert_dataframe(
-                database_path="db/kline_stock.duckdb",
+                database_path=db_path,
                 table_name="financial_statements",
                 data=df,
                 upsert=True
@@ -1860,7 +1890,7 @@ class UnifiedDataManager:
             """
 
             result = self.duckdb_operations.execute_query(
-                database_path="db/kline_stock.duckdb",
+                database_path=self.asset_manager.get_database_path(asset_type),
                 query=query,
                 params=[indicator, period, count]
             )
@@ -1882,18 +1912,23 @@ class UnifiedDataManager:
             if not self.duckdb_operations or data.empty:
                 return
 
+            # 宏观数据使用MACRO资产类型
+            from ..plugin_types import AssetType
+            asset_type = AssetType.MACRO
+            db_path = self.asset_manager.get_database_path(asset_type)
+
             # 确保宏观数据表存在
             if self.table_manager:
                 from ..database.table_manager import TableType
                 if not self.table_manager.ensure_table_exists(
-                    "db/kline_stock.duckdb", TableType.MACRO_ECONOMIC, "unified_data_manager"
+                    db_path, TableType.MACRO_ECONOMIC, "unified_data_manager"
                 ):
                     logger.error("创建宏观数据表失败")
                     return
 
             # 插入数据
             result = self.duckdb_operations.insert_dataframe(
-                database_path="db/kline_stock.duckdb",
+                database_path=db_path,
                 table_name="macro_economic_data",
                 data=data,
                 upsert=True

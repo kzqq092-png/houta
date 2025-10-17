@@ -1903,7 +1903,7 @@ class DataImportExecutionEngine(QObject):
             table_name = f"fundamental_{data_type.lower().replace(' ', '_')}"
 
             # 确保表存在 - 使用统一的DuckDB数据库
-            db_path = "db/kline_stock.duckdb"
+            db_path = self.asset_manager.get_database_path(asset_type)
             # 确保表存在
             if not table_manager.ensure_table_exists(db_path, TableType.FINANCIAL_STATEMENT, "import_engine"):
                 logger.error("创建财务数据表失败")
@@ -1947,7 +1947,7 @@ class DataImportExecutionEngine(QObject):
             table_name = "realtime_data"
 
             # 确保表存在 - 使用统一的DuckDB数据库
-            db_path = "db/kline_stock.duckdb"
+            db_path = self.asset_manager.get_database_path(asset_type)
             # 确保表存在
             if not table_manager.ensure_table_exists(db_path, TableType.REAL_TIME_QUOTE, "import_engine"):
                 logger.error("创建实时行情表失败")

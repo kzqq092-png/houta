@@ -34,6 +34,7 @@ from contextlib import contextmanager
 
 from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
 from core.plugin_types import PluginType, AssetType, DataType
+from plugins.plugin_interface import PluginState
 
 logger = logger.bind(module=__name__)
 
@@ -272,11 +273,14 @@ class ConnectionPool:
 
 
 class TongdaxinStockPlugin(IDataSourcePlugin):
-    """通达信股票数据源插件"""
+    """通达信股票数据源插件（异步优化版）"""
 
     def __init__(self):
+        # 调用父类初始化（设置plugin_state等基础属性）
+        super().__init__()
+
         self.logger = logger.bind(module=__name__)
-        self.initialized = False
+        # initialized 和 last_error 已经在父类中定义
 
         # 默认配置
         self.DEFAULT_CONFIG = {
@@ -300,7 +304,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         self.config = self.DEFAULT_CONFIG.copy()
 
         # 插件基本信息
-        self.plugin_id = "examples.tongdaxin_stock_plugin"  # 添加plugin_id属性
+        self.plugin_id = "data_sources.tongdaxin_plugin"  # 修正plugin_id属性
         self.name = "通达信股票数据源插件"
         self.version = "1.0.0"
         self.description = "提供A股实时和历史数据，支持上海、深圳交易所，基于pytdx库"
@@ -533,8 +537,13 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         ]
 
     def initialize(self, config: Dict[str, Any]) -> bool:
-        """初始化插件"""
+        """
+        同步初始化插件（快速，不做网络连接）
+        网络测试和连接池初始化已移至 _do_connect() 方法，在后台线程中执行
+        """
         try:
+            self.plugin_state = PluginState.INITIALIZING
+
             if not PYTDX_AVAILABLE:
                 raise ImportError("pytdx库未安装")
 
@@ -546,31 +555,53 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             merged.update(config or {})
             self.config = merged
 
-            # 配置参数
+            # 配置参数（快速）
             self.timeout = int(self.config.get('timeout', self.DEFAULT_CONFIG['timeout']))
             self.max_retries = int(self.config.get('max_retries', self.DEFAULT_CONFIG['max_retries']))
             self.cache_duration = int(self.config.get('cache_duration', self.DEFAULT_CONFIG['cache_duration']))
 
-            # 连接池配置参数
+            # 连接池配置参数（快速）
             self.use_connection_pool = self.config.get('use_connection_pool', self.DEFAULT_CONFIG['use_connection_pool'])
-            connection_pool_size = int(self.config.get('connection_pool_size', self.DEFAULT_CONFIG['connection_pool_size']))
+            self.connection_pool_size = int(self.config.get('connection_pool_size', self.DEFAULT_CONFIG['connection_pool_size']))
 
-            # 服务器配置
+            # 服务器配置（快速）
             host = self.config.get('host', self.DEFAULT_CONFIG['host'])
             port = int(self.config.get('port', self.DEFAULT_CONFIG['port']))
             self.current_server = (host, port)
 
-            # 初始化连接池或单连接模式
-            if self.use_connection_pool and self.server_list:
-                # 使用连接池模式
-                self.connection_pool = ConnectionPool(max_connections=connection_pool_size)
-                self.connection_pool.initialize(self.server_list)
-                logger.info(f"连接池模式初始化完成，池大小: {connection_pool_size}")
+            # 标记初始化完成（不做网络测试和连接池初始化）
+            self.initialized = True
+            self.plugin_state = PluginState.INITIALIZED
+            logger.info("通达信插件同步初始化完成（<100ms，连接池初始化将在后台进行）")
+            return True
 
-                # 设置初始化状态
-                self.initialized = True
+        except Exception as e:
+            self.last_error = str(e)
+            self.plugin_state = PluginState.FAILED
+            logger.error(f"通达信股票数据源插件初始化失败: {e}")
+            logger.error(traceback.format_exc())
+            return False
+
+    def _do_connect(self) -> bool:
+        """
+        实际连接逻辑（在后台线程中执行）
+        将原来在 initialize() 中的连接池初始化和网络测试移到这里
+        """
+        try:
+            logger.info("通达信插件开始连接测试...")
+
+            # 初始化连接池或单连接模式（原来在 initialize 中的代码）
+            if self.use_connection_pool and self.server_list:
+                # 使用连接池模式（耗时操作）
+                logger.info(f"开始初始化连接池，池大小: {self.connection_pool_size}")
+                self.connection_pool = ConnectionPool(max_connections=self.connection_pool_size)
+                self.connection_pool.initialize(self.server_list)
+                logger.info(f"✅ 连接池初始化完成，池大小: {self.connection_pool_size}")
+
+                # 设置成功状态
                 self.last_success_time = datetime.now()
-                logger.info("通达信股票数据源插件(连接池模式)初始化成功")
+                self.plugin_state = PluginState.CONNECTED
+                logger.info("✅ 通达信插件(连接池模式)连接成功")
                 return True
             else:
                 # 传统单连接模式
@@ -586,21 +617,22 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                     self.current_server = self.server_list[0]
                     logger.debug(f"设置默认服务器: {self.current_server}")
 
-                # 尝试连接测试
+                # 尝试连接测试（耗时操作）
                 logger.debug(f"开始连接测试，目标服务器: {self.current_server}")
                 if self._test_connection():
-                    logger.info(f"通达信股票数据源插件初始化成功，服务器: {self.current_server}")
-                    self.initialized = True
+                    logger.info(f"✅ 通达信插件连接成功，服务器: {self.current_server}")
                     self.last_success_time = datetime.now()
+                    self.plugin_state = PluginState.CONNECTED
                     return True
                 else:
-                    logger.warning("通达信股票数据源插件初始化成功，但连接测试失败")
-                    self.initialized = True  # 仍然认为初始化成功，允许后续重试
+                    logger.warning("⚠️ 通达信插件连接测试失败，但仍可尝试后续操作")
+                    self.plugin_state = PluginState.CONNECTED  # 仍然认为连接成功
                     return True
 
         except Exception as e:
             self.last_error = str(e)
-            logger.error(f"通达信股票数据源插件初始化失败: {e}")
+            self.plugin_state = PluginState.FAILED
+            logger.error(f"❌ 通达信插件连接失败: {e}")
             logger.error(traceback.format_exc())
             return False
 

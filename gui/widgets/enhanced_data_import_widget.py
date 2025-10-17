@@ -617,11 +617,15 @@ class EnhancedDataImportWidget(QWidget):
 
         # 初始化主题系统
         self.theme_manager = None
+        self.design_system = None  # 初始化设计系统属性
         if THEME_AVAILABLE:
             try:
                 from utils.config_manager import ConfigManager
                 config_manager = ConfigManager()
                 self.theme_manager = get_theme_manager(config_manager)
+                # 尝试获取设计系统
+                if hasattr(self.theme_manager, 'design_system'):
+                    self.design_system = self.theme_manager.design_system
                 logger.info("主题系统初始化成功") if logger else None
             except Exception as e:
                 logger.error(f"主题系统初始化失败: {e}") if logger else None
@@ -875,8 +879,9 @@ class EnhancedDataImportWidget(QWidget):
         basic_layout.addRow("任务描述:", self.task_desc_edit)
 
         # 资产类型
+        from core.ui_asset_type_utils import get_asset_type_combo_items
         self.asset_type_combo = QComboBox()
-        self.asset_type_combo.addItems(["股票", "期货", "基金", "债券", "指数"])
+        self.asset_type_combo.addItems(get_asset_type_combo_items())
         self.asset_type_combo.currentTextChanged.connect(self.on_asset_type_changed)
         basic_layout.addRow("📊 资产类型:", self.asset_type_combo)
 
@@ -1099,8 +1104,9 @@ class EnhancedDataImportWidget(QWidget):
         layout.addRow("任务描述:", self.task_desc_edit)
 
         # 资产类型
+        from core.ui_asset_type_utils import get_asset_type_combo_items
         self.asset_type_combo = QComboBox()
-        self.asset_type_combo.addItems(["股票", "期货", "基金", "债券", "指数"])
+        self.asset_type_combo.addItems(get_asset_type_combo_items())
         self.asset_type_combo.currentTextChanged.connect(self.on_asset_type_changed)
         layout.addRow("资产类型:", self.asset_type_combo)
 

@@ -52,6 +52,7 @@ class SystemHealthChecker:
             'memory_usage': self._check_memory_usage(),
             'dependencies': self._check_dependencies(),
             'database_connectivity': self._check_database_connectivity(),
+            'connection_pool_health': self._check_connection_pool_health(),  # ✅ 新增
             'ui_components': self._check_ui_components(),
             'overall_health': 'unknown'
         }
@@ -352,6 +353,68 @@ class SystemHealthChecker:
                 'status': 'error',
                 'error': str(e),
                 'details': traceback.format_exc()
+            }
+
+    def _check_connection_pool_health(self) -> Dict[str, Any]:
+        """✅ 检查DuckDB连接池健康状态"""
+        try:
+            logger.info("检查DuckDB连接池健康状态...")
+
+            # 导入分析数据库管理器
+            from core.database.factorweave_analytics_db import FactorWeaveAnalyticsDB
+
+            # 获取数据库实例
+            db = FactorWeaveAnalyticsDB()
+
+            # 执行健康检查
+            health = db.health_check()
+
+            # 转换状态
+            if health['healthy']:
+                if not health['warnings']:
+                    status = 'healthy'
+                else:
+                    status = 'warning'
+            else:
+                status = 'critical'
+
+            return {
+                'status': status,
+                'healthy': health['healthy'],
+                'pool_size': health['metrics'].get('pool_size', 'N/A'),
+                'checked_out': health['metrics'].get('checked_out', 0),
+                'checked_in': health['metrics'].get('checked_in', 0),
+                'overflow': health['metrics'].get('overflow', 0),
+                'warnings': health['warnings'],
+                'recommendations': health['recommendations']
+            }
+
+        except ImportError as e:
+            logger.warning(f"无法导入连接池模块: {e}")
+            return {
+                'status': 'unknown',
+                'error': f'模块不可用: {e}',
+                'healthy': None,
+                'pool_size': 'N/A',
+                'checked_out': 0,
+                'checked_in': 0,
+                'overflow': 0,
+                'warnings': ['连接池模块未安装或不可用'],
+                'recommendations': ['安装并配置DuckDB连接池']
+            }
+        except Exception as e:
+            logger.error(f"连接池健康检查失败: {e}")
+            return {
+                'status': 'error',
+                'error': str(e),
+                'details': traceback.format_exc(),
+                'healthy': False,
+                'pool_size': 'N/A',
+                'checked_out': 0,
+                'checked_in': 0,
+                'overflow': 0,
+                'warnings': [f'健康检查失败: {e}'],
+                'recommendations': ['检查连接池配置和数据库连接']
             }
 
     def _generate_test_kdata(self) -> pd.DataFrame:

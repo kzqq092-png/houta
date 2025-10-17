@@ -2635,13 +2635,19 @@ class EnhancedPluginManagerDialog(QDialog):
 
             logger.info(f" 已加载资产类型选项: {list(self.asset_type_display_map.keys())}")
         except ImportError:
-            # 回退到静态列表
-            fallback_items = ["股票", "期货", "数字货币", "外汇", "债券"]
+            # 回退到静态列表 - 使用统一的资产类型工具
+            from core.ui_asset_type_utils import get_asset_type_combo_items
+            fallback_items = get_asset_type_combo_items()
             self.asset_type_combo.addItems(fallback_items)
             self.asset_type_display_map = {
-                "股票": "stock",
+                "A股": "stock_a",
+                "美股": "stock_us",
+                "港股": "stock_hk",
                 "期货": "futures",
-                "数字货币": "crypto",
+                "基金": "fund",
+                "债券": "bond",
+                "指数": "index",
+                "加密货币": "crypto",
                 "外汇": "forex",
                 "债券": "bond"
             }

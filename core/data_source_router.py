@@ -571,6 +571,23 @@ class DataSourceRouter:
                     logger.warning(f"所有支持 {request.asset_type.value} 的数据源都不可用")
                     return None
 
+                # 进一步过滤：只选择已就绪的数据源（支持异步插件）
+                ready_sources = []
+                for source_id in healthy_sources:
+                    try:
+                        adapter = self.data_sources.get(source_id)
+                        if adapter and adapter.is_connected():
+                            ready_sources.append(source_id)
+                        else:
+                            logger.debug(f"数据源 {source_id} 尚未就绪，跳过")
+                    except Exception as e:
+                        logger.warning(f"检查数据源 {source_id} 就绪状态失败: {e}")
+
+                # 如果没有就绪的数据源，使用健康的数据源（兼容旧插件）
+                if not ready_sources:
+                    logger.debug(f"没有已就绪的数据源，使用健康数据源（可能需要等待连接）")
+                    ready_sources = healthy_sources
+
                 # 选择路由策略
                 routing_strategy = strategy or self.default_strategy
                 strategy_impl = self.routing_strategies.get(routing_strategy)
@@ -580,11 +597,11 @@ class DataSourceRouter:
                     strategy_impl = self.routing_strategies.get(RoutingStrategy.PRIORITY)
                     if not strategy_impl:
                         # 简单选择第一个可用的
-                        return healthy_sources[0]
+                        return ready_sources[0]
 
-                # 执行路由选择
+                # 执行路由选择（使用就绪的数据源）
                 selected_source = strategy_impl.select_data_source(
-                    healthy_sources, request, self.metrics
+                    ready_sources, request, self.metrics
                 )
 
                 if selected_source:

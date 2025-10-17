@@ -18,6 +18,7 @@ from enum import Enum
 from dataclasses import dataclass, asdict, field
 from PyQt5.QtCore import QObject, pyqtSignal
 import traceback
+import datetime
 
 # 添加项目根目录到Python路径，确保可以导入plugins包
 current_dir = Path(__file__).parent
@@ -634,12 +635,19 @@ class PluginManager(QObject):
         try:
             plugin_files = []
 
+            # 排除的目录列表
+            excluded_dirs = {'examples', 'templates', '__pycache__', 'test', 'tests', '.git'}
+
             # 扫描插件目录
             for plugin_path in self.plugin_dir.rglob("*.py"):
+                # 检查是否在排除目录中
+                if any(excluded in plugin_path.parts for excluded in excluded_dirs):
+                    continue
+
                 if plugin_path.name != "__init__.py" and not plugin_path.name.startswith("_"):
                     plugin_files.append(plugin_path)
 
-            logger.info(f"发现 {len(plugin_files)} 个潜在插件文件")
+            logger.info(f"发现 {len(plugin_files)} 个潜在插件文件（已排除 examples/templates 等目录）")
 
         except Exception as e:
             logger.error(f"扫描插件目录失败: {e}")
@@ -857,16 +865,9 @@ class PluginManager(QObject):
                             # 创建适配器
                             adapter = DataSourcePluginAdapter(plugin_info.instance, plugin_info.id)
 
-                            # 关键修复：连接适配器
-                            try:
-                                if adapter.connect():
-                                    logger.info(f" 数据源插件适配器连接成功: {plugin_info.id}")
-                                else:
-                                    logger.warning(f" 数据源插件适配器连接失败: {plugin_info.id}")
-                                    # 即使连接失败也继续注册，让路由器处理
-                            except Exception as e:
-                                logger.error(f" 数据源插件适配器连接异常 {plugin_info.id}: {e}")
-                                # 即使连接异常也继续注册，让路由器处理
+                            # 优化：跳过同步连接，避免阻塞主线程
+                            # 连接将在后台线程或首次使用时自动建立
+                            logger.info(f" 数据源插件适配器已创建（延迟连接）: {plugin_info.id}")
 
                             # 使用正确的注册方法：register_data_source_plugin
                             success = unified_manager.register_data_source_plugin(
@@ -1348,11 +1349,15 @@ class PluginManager(QObject):
                 # 更新插件状态
                 plugin_info.enabled = True
 
-                # 如果数据管理器中已注册，确保其健康状态
+                # 如果数据管理器中已注册，确保其健康状态（使用异步连接）
                 if self.data_manager and plugin_id in self.data_manager._plugin_data_sources:
                     adapter = self.data_manager._plugin_data_sources[plugin_id]
                     if not adapter.is_connected():
-                        adapter.connect()
+                        # 异步连接，不阻塞主线程
+                        plugin = adapter.plugin
+                        if hasattr(plugin, 'connect_async'):
+                            plugin.connect_async()
+                            logger.info(f"数据源插件 {plugin_id} 已启动异步连接")
 
                 # 发送启用信号
                 self.plugin_enabled.emit(plugin_id)
@@ -1466,24 +1471,25 @@ class PluginManager(QObject):
                 if self.load_plugin(plugin_name, plugin_path):
                     loaded_count += 1
 
-            # 加载examples目录中的示例插件
-            examples_dir = self.plugin_dir / "examples"
-            if examples_dir.exists():
-                # 确保examples目录是一个包
-                init_file = examples_dir / "__init__.py"
-                if not init_file.exists():
-                    with open(init_file, 'w') as f:
-                        f.write('"""插件示例包"""')
-                    logger.info(f"创建examples包的__init__.py文件")
-
-                for plugin_path in examples_dir.glob("*.py"):
-                    if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
-                        logger.info(f"跳过非插件文件: {plugin_path.name}")
-                        continue
-
-                    plugin_name = f"examples.{plugin_path.stem}"
-                    if self.load_plugin(plugin_name, plugin_path):
-                        loaded_count += 1
+            # 加载examples目录中的示例插件（默认禁用，避免与正式插件重复）
+            # examples_dir = self.plugin_dir / "examples"
+            # if examples_dir.exists():
+            #     # 确保examples目录是一个包
+            #     init_file = examples_dir / "__init__.py"
+            #     if not init_file.exists():
+            #         with open(init_file, 'w') as f:
+            #             f.write('"""插件示例包"""')
+            #         logger.info(f"创建examples包的__init__.py文件")
+            #
+            #     for plugin_path in examples_dir.glob("*.py"):
+            #         if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
+            #             logger.info(f"跳过非插件文件: {plugin_path.name}")
+            #             continue
+            #
+            #         plugin_name = f"examples.{plugin_path.stem}"
+            #         if self.load_plugin(plugin_name, plugin_path):
+            #             loaded_count += 1
+            logger.info("跳过 examples 目录（示例插件已禁用，避免与正式插件重复）")
 
             # 加载sentiment_data_sources目录中的情绪数据源插件
             sentiment_dir = self.plugin_dir / "sentiment_data_sources"
@@ -1841,16 +1847,13 @@ class PluginManager(QObject):
                                     # 创建适配器
                                     adapter = DataSourcePluginAdapter(plugin_instance, plugin_name)
 
-                                    # 关键修复：连接适配器
-                                    try:
-                                        if adapter.connect():
-                                            logger.info(f" 数据源插件适配器连接成功: {plugin_name}")
-                                        else:
-                                            logger.warning(f" 数据源插件适配器连接失败: {plugin_name}")
-                                            # 即使连接失败也继续注册，让路由器处理
-                                    except Exception as e:
-                                        logger.error(f" 数据源插件适配器连接异常 {plugin_name}: {e}")
-                                        # 即使连接异常也继续注册，让路由器处理
+                                    # 优化：启动异步连接，避免阻塞主线程
+                                    # 连接在后台线程中进行
+                                    if hasattr(plugin_instance, 'connect_async'):
+                                        plugin_instance.connect_async()
+                                        logger.info(f" 数据源插件适配器已创建，异步连接已启动: {plugin_name}")
+                                    else:
+                                        logger.info(f" 数据源插件适配器已创建（延迟连接）: {plugin_name}")
 
                                     # 使用正确的注册方法：register_data_source_plugin
                                     success = unified_manager.register_data_source_plugin(

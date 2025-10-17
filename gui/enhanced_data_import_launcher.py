@@ -40,11 +40,10 @@ class EnhancedDataImportMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setup_ui()
-        self.setup_menu()
 
     def setup_ui(self):
         """设置UI"""
-        self.setWindowTitle("HIkyuu-UI 增强版数据导入系统")
+        self.setWindowTitle("K线专业数据导入系统")
         self.setGeometry(100, 100, 1400, 900)
 
         # 设置窗口图标
@@ -57,134 +56,10 @@ class EnhancedDataImportMainWindow(QMainWindow):
         else:
             # 如果UI不可用，显示错误信息
             from PyQt5.QtWidgets import QLabel
-            error_label = QLabel("增强版数据导入UI组件加载失败\n请检查依赖项是否正确安装")
+            error_label = QLabel("K线数据导入UI组件加载失败\n请检查依赖项是否正确安装")
             error_label.setAlignment(Qt.AlignCenter)
             error_label.setStyleSheet("color: red; font-size: 16px;")
             self.setCentralWidget(error_label)
-
-    def setup_menu(self):
-        """设置菜单栏"""
-        menubar = self.menuBar()
-
-        # 文件菜单
-        file_menu = menubar.addMenu('文件')
-
-        # 导入配置
-        import_config_action = QAction('导入配置', self)
-        import_config_action.triggered.connect(self.import_config)
-        file_menu.addAction(import_config_action)
-
-        # 导出配置
-        export_config_action = QAction('导出配置', self)
-        export_config_action.triggered.connect(self.export_config)
-        file_menu.addAction(export_config_action)
-
-        file_menu.addSeparator()
-
-        # 退出
-        exit_action = QAction('退出', self)
-        exit_action.setShortcut('Ctrl+Q')
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-
-        # 工具菜单
-        tools_menu = menubar.addMenu('工具')
-
-        # 系统状态
-        status_action = QAction('系统状态', self)
-        status_action.triggered.connect(self.show_system_status)
-        tools_menu.addAction(status_action)
-
-        # 性能监控
-        performance_action = QAction('性能监控', self)
-        performance_action.triggered.connect(self.show_performance_monitor)
-        tools_menu.addAction(performance_action)
-
-        # 帮助菜单
-        help_menu = menubar.addMenu('帮助')
-
-        # 关于
-        about_action = QAction('关于', self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
-
-    def import_config(self):
-        """导入配置"""
-        from PyQt5.QtWidgets import QFileDialog, QMessageBox
-
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "导入配置文件",
-            "",
-            "JSON Files (*.json);;All Files (*)"
-        )
-
-        if file_path:
-            QMessageBox.information(self, "信息", f"配置文件导入功能开发中\n选择的文件: {file_path}")
-
-    def export_config(self):
-        """导出配置"""
-        from PyQt5.QtWidgets import QFileDialog, QMessageBox
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "导出配置文件",
-            "import_config.json",
-            "JSON Files (*.json);;All Files (*)"
-        )
-
-        if file_path:
-            QMessageBox.information(self, "信息", f"配置文件导出功能开发中\n保存路径: {file_path}")
-
-    def show_system_status(self):
-        """显示系统状态"""
-        from PyQt5.QtWidgets import QMessageBox
-
-        status_info = """
-        HIkyuu-UI 增强版数据导入系统状态
-        
-       AI预测服务: 已启用
-       性能监控: 已启用  
-       多级缓存: 已启用
-       分布式执行: 已启用
-       自动调优: 已启用
-       数据质量监控: 已启用
-        
-        系统运行正常！
-        """
-
-        QMessageBox.information(self, "系统状态", status_info)
-
-    def show_performance_monitor(self):
-        """显示性能监控"""
-        from PyQt5.QtWidgets import QMessageBox
-
-        QMessageBox.information(self, "性能监控", "独立性能监控窗口功能开发中...")
-
-    def show_about(self):
-        """显示关于信息"""
-        from PyQt5.QtWidgets import QMessageBox
-
-        about_info = """
-        <h2>HIkyuu-UI 增强版数据导入系统</h2>
-        <p><b>版本:</b> 2.0 - AI增强版</p>
-        <p><b>作者:</b> FactorWeave-Quant团队</p>
-        
-        <h3>核心特性:</h3>
-        <ul>
-        <li>AI智能参数优化</li>
-        <li> 实时性能监控和异常检测</li>
-        <li>多级智能缓存系统</li>
-        <li>分布式任务执行</li>
-        <li>AutoTuner自动调优</li>
-        <li>专业数据质量监控</li>
-        </ul>
-        
-        <p><b>技术栈:</b> Python, PyQt5, DuckDB, scikit-learn</p>
-        <p><b>许可证:</b> MIT License</p>
-        """
-
-        QMessageBox.about(self, "关于", about_info)
 
 
 def main():
@@ -192,7 +67,7 @@ def main():
     app = QApplication(sys.argv)
 
     # 设置应用程序信息
-    app.setApplicationName("HIkyuu-UI 增强版数据导入系统")
+    app.setApplicationName("数据导入系统")
     app.setApplicationVersion("2.0")
     app.setOrganizationName("FactorWeave-Quant")
 
@@ -236,12 +111,6 @@ def main():
     # 创建主窗口
     window = EnhancedDataImportMainWindow()
     window.show()
-
-    # 显示启动信息
-    if logger:
-        logger.info("HIkyuu-UI 增强版数据导入系统启动完成")
-    else:
-        print("HIkyuu-UI 增强版数据导入系统启动完成")
 
     # 运行应用程序
     sys.exit(app.exec_())

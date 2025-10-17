@@ -29,6 +29,7 @@ from ..database.factorweave_analytics_db import get_analytics_db
 
 logger = logger
 
+
 @dataclass
 class PerformanceBenchmark:
     """性能基准数据类"""
@@ -38,6 +39,14 @@ class PerformanceBenchmark:
     current_value: float
     improvement_percentage: float
     status: str  # 'excellent', 'good', 'needs_improvement', 'critical'
+    threshold: float = 0.0  # 阈值（默认0）
+    history: list = None  # 历史数据（默认None）
+
+    def __post_init__(self):
+        """初始化后处理"""
+        if self.history is None:
+            self.history = []
+
 
 class FactorWeavePerformanceIntegrator:
     """FactorWeave性能监控集成器"""
@@ -124,37 +133,39 @@ class FactorWeavePerformanceIntegrator:
                 unique_id = base_timestamp + i * 1000 + random.randint(1, 999)
 
                 try:
-                    self.analytics_db.conn.execute("""
-                        INSERT OR REPLACE INTO performance_metrics 
-                        (id, version_id, pattern_name, test_time, precision, recall, f1_score, 
-                         accuracy, execution_time, memory_usage, cpu_usage, signal_quality, 
-                         confidence_avg, patterns_found, robustness_score, parameter_sensitivity, 
-                         overall_score, test_conditions)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, [
-                        unique_id,  # 唯一ID
-                        1,  # version_id
-                        metric.get('name', 'unknown'),
-                        datetime.now(),
-                        metric.get('precision', 0.0),
-                        metric.get('recall', 0.0),
-                        metric.get('f1_score', 0.0),
-                        metric.get('accuracy', 0.0),
-                        metric.get('execution_time', 0.0),
-                        metric.get('memory_usage', 0.0),
-                        metric.get('cpu_usage', 0.0),
-                        metric.get('signal_quality', 0.0),
-                        metric.get('confidence_avg', 0.0),
-                        metric.get('patterns_found', 0),
-                        metric.get('robustness_score', 0.0),
-                        metric.get('parameter_sensitivity', 0.0),
-                        metric.get('overall_score', 0.0),
-                        json.dumps(metric.get('conditions', {}))
-                    ])
+                    with self.analytics_db.pool.get_connection() as conn:
+                        # performance_metrics表结构: id, metric_type, metric_name, value, timestamp, tags, created_at
+                        # 将所有指标打包到tags JSON中
+                        tags_data = {
+                            'precision': metric.get('precision', 0.0),
+                            'recall': metric.get('recall', 0.0),
+                            'f1_score': metric.get('f1_score', 0.0),
+                            'accuracy': metric.get('accuracy', 0.0),
+                            'execution_time': metric.get('execution_time', 0.0),
+                            'memory_usage': metric.get('memory_usage', 0.0),
+                            'cpu_usage': metric.get('cpu_usage', 0.0),
+                            'signal_quality': metric.get('signal_quality', 0.0),
+                            'confidence_avg': metric.get('confidence_avg', 0.0),
+                            'patterns_found': metric.get('patterns_found', 0),
+                            'robustness_score': metric.get('robustness_score', 0.0),
+                            'parameter_sensitivity': metric.get('parameter_sensitivity', 0.0),
+                            'conditions': metric.get('conditions', {})
+                        }
+
+                        conn.execute("""
+                            INSERT INTO performance_metrics 
+                            (metric_type, metric_name, value, timestamp, tags)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, [
+                            'pattern_recognition',  # metric_type
+                            metric.get('name', 'unknown'),  # metric_name
+                            metric.get('overall_score', 0.0),  # value
+                            datetime.now(),  # timestamp
+                            json.dumps(tags_data)  # tags
+                        ])
+                        # DuckDB autocommit模式，不需要显式commit
                 except Exception as insert_error:
                     logger.debug(f"插入性能指标失败，跳过: {insert_error}")
-
-            self.analytics_db.conn.commit()
             logger.debug(f"同步了 {len(recent_metrics)} 条性能数据到DuckDB")
 
         except Exception as e:
@@ -344,22 +355,31 @@ class FactorWeavePerformanceIntegrator:
                 unique_id = base_timestamp + i * 1000 + random.randint(1, 999) + 50000
 
                 try:
-                    self.analytics_db.conn.execute("""
-                        INSERT OR REPLACE INTO analysis_cache 
-                        (id, cache_key, cache_type, data, expires_at, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, [
-                        unique_id,  # 唯一ID
-                        f"benchmark_{benchmark.metric_name}_{unique_id}",  # 唯一缓存键
-                        'performance_benchmark',
-                        json.dumps(asdict(benchmark)),
-                        datetime.now() + timedelta(hours=1),
-                        datetime.now()
-                    ])
+                    with self.analytics_db.pool.get_connection() as conn:
+                        # 使用optimization_logs表存储性能基准
+                        benchmark_data = {
+                            'metric_name': benchmark.metric_name,
+                            'threshold': benchmark.threshold,
+                            'current_value': benchmark.current_value,
+                            'status': benchmark.status,
+                            'history': benchmark.history
+                        }
+
+                        conn.execute("""
+                            INSERT INTO optimization_logs 
+                            (optimization_type, parameters, result, improvement, timestamp, metadata)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, [
+                            'performance_benchmark',
+                            json.dumps({'metric_name': benchmark.metric_name}),
+                            benchmark.current_value,
+                            0.0,  # improvement placeholder
+                            datetime.now(),
+                            json.dumps(benchmark_data)
+                        ])
+                        # DuckDB autocommit模式，不需要显式commit
                 except Exception as insert_error:
                     logger.debug(f"插入性能基准失败，跳过: {insert_error}")
-
-            self.analytics_db.conn.commit()
 
         except Exception as e:
             logger.error(f"存储性能基准失败: {e}")
@@ -549,8 +569,10 @@ class FactorWeavePerformanceIntegrator:
             logger.error(f"检测异常失败: {e}")
             return []
 
+
 # 全局实例和工厂函数
 _performance_integrator = None
+
 
 def get_performance_integrator() -> FactorWeavePerformanceIntegrator:
     """获取性能监控集成器的全局实例"""
@@ -560,6 +582,8 @@ def get_performance_integrator() -> FactorWeavePerformanceIntegrator:
     return _performance_integrator
 
 # 便捷装饰器
+
+
 def measure_factorweave_performance(operation_name: str, category: str = 'custom'):
     """FactorWeave性能测量装饰器"""
     def decorator(func):

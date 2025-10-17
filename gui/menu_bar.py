@@ -81,19 +81,19 @@ class MainMenuBar(QMenuBar):
         """初始化文件菜单"""
         try:
             # 新建
-            self.new_action = QAction(QIcon("icons/new.png"), "新建(&N)", self)
+            self.new_action = QAction("新建(&N)", self)
             self.new_action.setShortcut("Ctrl+N")
             self.new_action.setStatusTip("创建新的策略")
             self.file_menu.addAction(self.new_action)
 
             # 打开
-            self.open_action = QAction(QIcon("icons/open.png"), "打开(&O)", self)
+            self.open_action = QAction("打开(&O)", self)
             self.open_action.setShortcut("Ctrl+O")
             self.open_action.setStatusTip("打开策略文件")
             self.file_menu.addAction(self.open_action)
 
             # 保存
-            self.save_action = QAction(QIcon("icons/save.png"), "保存(&S)", self)
+            self.save_action = QAction("保存(&S)", self)
             self.save_action.setShortcut("Ctrl+S")
             self.save_action.setStatusTip("保存当前策略")
             self.file_menu.addAction(self.save_action)
@@ -121,12 +121,12 @@ class MainMenuBar(QMenuBar):
         """初始化编辑菜单"""
         try:
             # 撤销
-            self.undo_action = QAction(QIcon("icons/undo.png"), "撤销(&U)", self)
+            self.undo_action = QAction("撤销(&U)", self)
             self.undo_action.setShortcut("Ctrl+Z")
             self.edit_menu.addAction(self.undo_action)
 
             # 重做
-            self.redo_action = QAction(QIcon("icons/redo.png"), "重做(&R)", self)
+            self.redo_action = QAction("重做(&R)", self)
             self.redo_action.setShortcut("Ctrl+Y")
             self.edit_menu.addAction(self.redo_action)
 
@@ -180,35 +180,30 @@ class MainMenuBar(QMenuBar):
         """初始化分析菜单"""
         try:
             # 分析
-            self.analyze_action = QAction(
-                QIcon("icons/analyze.png"), "分析", self)
+            self.analyze_action = QAction("分析", self)
             self.analyze_action.setStatusTip("分析当前股票")
             self.analysis_menu.addAction(self.analyze_action)
 
             # 回测
-            self.backtest_action = QAction(
-                QIcon("icons/backtest.png"), "回测", self)
+            self.backtest_action = QAction("回测", self)
             self.backtest_action.setStatusTip("回测当前策略")
             self.analysis_menu.addAction(self.backtest_action)
 
             # 专业回测（合并了专业回测系统和专业回测面板）
-            self.professional_backtest_action = QAction(
-                QIcon("icons/backtest.png"), "专业回测", self)
+            self.professional_backtest_action = QAction("专业回测", self)
             self.professional_backtest_action.setStatusTip("打开专业回测功能（支持面板和窗口模式）")
             self.professional_backtest_action.setShortcut("Ctrl+Shift+B")
             self.analysis_menu.addAction(self.professional_backtest_action)
 
             # 优化
-            self.optimize_action = QAction(
-                QIcon("icons/optimize.png"), "优化", self)
+            self.optimize_action = QAction("优化", self)
             self.optimize_action.setStatusTip("优化策略参数")
             self.analysis_menu.addAction(self.optimize_action)
 
             self.analysis_menu.addSeparator()
 
             # 批量/分布式分析
-            self.batch_analysis_action = QAction(
-                QIcon("icons/batch.png"), "批量/分布式分析", self)
+            self.batch_analysis_action = QAction("批量/分布式分析", self)
             self.batch_analysis_action.setStatusTip("批量/分布式回测与分析")
             self.analysis_menu.addAction(self.batch_analysis_action)
         except Exception as e:
@@ -219,8 +214,7 @@ class MainMenuBar(QMenuBar):
         """初始化策略菜单"""
         try:
             # 策略管理
-            self.strategy_manager_action = QAction(
-                QIcon("icons/strategy.png"), "策略管理器", self)
+            self.strategy_manager_action = QAction("策略管理器", self)
             self.strategy_manager_action.setStatusTip("打开策略管理器")
             self.strategy_menu.addAction(self.strategy_manager_action)
 
@@ -243,11 +237,6 @@ class MainMenuBar(QMenuBar):
 
             self.strategy_menu.addSeparator()
 
-            # 策略回测 - 已整合到分析菜单的智能回测中
-            # self.strategy_backtest_action = QAction("策略回测", self)
-            # self.strategy_backtest_action.setStatusTip("对策略进行历史回测")
-            # self.strategy_menu.addAction(self.strategy_backtest_action)
-
             # 策略优化
             self.strategy_optimize_action = QAction("策略优化", self)
             self.strategy_optimize_action.setStatusTip("优化策略参数")
@@ -256,8 +245,7 @@ class MainMenuBar(QMenuBar):
             self.strategy_menu.addSeparator()
 
             # 交易监控
-            self.trading_monitor_action = QAction(
-                QIcon("icons/monitor.png"), "交易监控", self)
+            self.trading_monitor_action = QAction("交易监控", self)
             self.trading_monitor_action.setStatusTip("打开交易监控窗口")
             self.strategy_menu.addAction(self.trading_monitor_action)
 
@@ -427,7 +415,7 @@ class MainMenuBar(QMenuBar):
         """初始化性能监控菜单"""
         try:
             # 性能监控中心
-            self.performance_center_action = QAction(QIcon("icons/performance.png"), "性能监控中心(&C)", self)
+            self.performance_center_action = QAction("性能监控中心(&C)", self)
             self.performance_center_action.setShortcut("Ctrl+Shift+M")
             self.performance_center_action.setStatusTip("打开统一性能监控中心")
             self.performance_menu.addAction(self.performance_center_action)
@@ -566,7 +554,8 @@ class MainMenuBar(QMenuBar):
             self.smart_recommendation_action.setStatusTip("显示/隐藏智能推荐面板")
             self.enhanced_menu.addAction(self.smart_recommendation_action)
 
-            self.optimization_menu.addAction(self.enhanced_menu)
+            # 修复：使用 addMenu 而不是 addAction
+            self.optimization_menu.addMenu(self.enhanced_menu)
 
         except Exception as e:
             if True:  # 使用Loguru日志

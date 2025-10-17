@@ -431,13 +431,12 @@ class SettingsDialog(QDialog):
             else:
                 workload = WorkloadType.MIXED
 
-            # 应用配置
-            config = optimizer.create_optimized_config(workload)
-            config.memory_limit = f"{memory_gb}GB"
-            config.threads = threads
+            # 应用优化配置
+            optimizer.optimize_for_workload(workload)
+            logger.info(f"已应用DuckDB优化配置: {workload.value}")
 
             # 更新状态
-            self.duckdb_status_label.setText(f"状态: 已应用 {mode} (内存: {memory_gb}GB, 线程: {threads})")
+            self.duckdb_status_label.setText(f"状态: 已应用 {mode} (工作负载: {workload.value})")
             self.duckdb_status_label.setStyleSheet("""
                 QLabel {
                     background-color: #d1ecf1;
@@ -485,13 +484,17 @@ class SettingsDialog(QDialog):
     def _update_duckdb_status(self) -> None:
         """更新DuckDB状态显示"""
         try:
-            # 检查DuckDB连接状态
+            # 检查DuckDB连接状态（连接池版本）
             from core.database.factorweave_analytics_db import FactorWeaveAnalyticsDB
 
             # 尝试连接数据库
             db = FactorWeaveAnalyticsDB()
-            if hasattr(db, 'conn') and db.conn:
-                self.duckdb_status_label.setText("状态: DuckDB连接正常，配置已生效")
+            # 检查连接池状态
+            if hasattr(db, 'pool') and db._check_connection():
+                pool_status = db.get_pool_status()
+                self.duckdb_status_label.setText(
+                    f"状态: DuckDB连接池正常 (活跃: {pool_status.get('checked_out', 0)}/{pool_status.get('pool_size', 0)})"
+                )
                 self.duckdb_status_label.setStyleSheet("""
                     QLabel {
                         background-color: #d4edda;
@@ -503,7 +506,7 @@ class SettingsDialog(QDialog):
                     }
                 """)
             else:
-                self.duckdb_status_label.setText("状态: DuckDB连接异常")
+                self.duckdb_status_label.setText("状态: DuckDB连接池异常")
                 self.duckdb_status_label.setStyleSheet("""
                     QLabel {
                         background-color: #f8d7da;

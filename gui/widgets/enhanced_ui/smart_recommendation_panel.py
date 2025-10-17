@@ -187,15 +187,15 @@ class UserBehaviorChart(FigureCanvas):
 
         # 使用频率
         self.ax1.set_title('功能使用频率', fontsize=10, fontweight='bold')
-        self.ax1.set_ylabel('使用次数')
+        self.ax1.set_ylabel('使用次数', fontsize=10, fontweight='bold')
 
         # 偏好分析
         self.ax2.set_title('用户偏好分析', fontsize=10, fontweight='bold')
 
         # 时间分布
         self.ax3.set_title('使用时间分布', fontsize=10, fontweight='bold')
-        self.ax3.set_xlabel('小时')
-        self.ax3.set_ylabel('活跃度')
+        self.ax3.set_xlabel('小时', fontsize=10, fontweight='bold')
+        self.ax3.set_ylabel('活跃度', fontsize=10, fontweight='bold')
 
         # 推荐效果
         self.ax4.set_title('推荐效果统计', fontsize=10, fontweight='bold')
@@ -216,13 +216,13 @@ class UserBehaviorChart(FigureCanvas):
             usage_counts = [45, 38, 25, 20, 15]
 
             bars1 = self.ax1.bar(functions, usage_counts, color='#3498DB', alpha=0.8)
-            self.ax1.tick_params(axis='x', rotation=45)
+            self.ax1.tick_params(axis='both', rotation=45, labelsize=8)
 
             # 在柱子上显示数值
             for bar, count in zip(bars1, usage_counts):
                 height = bar.get_height()
                 self.ax1.text(bar.get_x() + bar.get_width()/2., height + 0.5,
-                              str(count), ha='center', va='bottom', fontweight='bold')
+                              str(count), ha='center', va='bottom', fontweight='bold', fontsize=8)
 
             # 用户偏好分析（饼图）
             preferences = ['技术分析', '基本面分析', '量化策略', '风险管理']
@@ -236,12 +236,12 @@ class UserBehaviorChart(FigureCanvas):
             for autotext in autotexts:
                 autotext.set_color('white')
                 autotext.set_fontweight('bold')
-
+                autotext.set_fontsize(8)
             # 使用时间分布
             hours = list(range(24))
             activity = [2, 1, 0, 0, 0, 0, 1, 3, 5, 8, 12, 15, 18, 20, 22, 25, 28, 30, 25, 20, 15, 10, 6, 3]
 
-            self.ax3.plot(hours, activity, 'b-o', linewidth=2, markersize=4)
+            self.ax3.plot(hours, activity, 'b-o', linewidth=1, markersize=4)
             self.ax3.fill_between(hours, activity, alpha=0.3, color='#3498DB')
             self.ax3.set_xlim(0, 23)
             self.ax3.set_xticks(range(0, 24, 4))
@@ -256,7 +256,7 @@ class UserBehaviorChart(FigureCanvas):
             for bar, value in zip(bars4, values):
                 width = bar.get_width()
                 self.ax4.text(width + 0.01, bar.get_y() + bar.get_height()/2.,
-                              f'{value:.1%}', ha='left', va='center', fontweight='bold')
+                              f'{value:.1%}', ha='left', va='center', fontweight='bold', fontsize=8)
 
             self.ax4.set_xlim(0, 1)
 

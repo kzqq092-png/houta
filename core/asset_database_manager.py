@@ -32,7 +32,7 @@ logger = logger.bind(module=__name__)
 @dataclass
 class AssetDatabaseConfig:
     """资产数据库配置"""
-    base_path: str = "data/databases"
+    base_path: str = "db/databases"
     pool_size: int = 10
     auto_create: bool = True
     enable_wal: bool = True
@@ -264,6 +264,10 @@ class AssetSeparatedDatabaseManager:
 
     def _get_database_path(self, asset_type: AssetType) -> str:
         """获取资产类型对应的数据库路径"""
+        # 别名映射：STOCK → STOCK_US（通用股票默认为美股）
+        if asset_type == AssetType.STOCK:
+            asset_type = AssetType.STOCK_US
+
         base_path = Path(self.config.base_path)
         asset_dir = base_path / asset_type.value.lower()
         db_file = asset_dir / f"{asset_type.value.lower()}_data.duckdb"
@@ -411,8 +415,15 @@ class AssetSeparatedDatabaseManager:
                 # 创建视图（在表创建完成后）
                 if 'unified_best_quality_kline' in self._table_schemas:
                     try:
-                        conn.execute(self._table_schemas['unified_best_quality_kline'])
-                        logger.debug("创建视图 unified_best_quality_kline 成功")
+                        # 获取实际的K线表名
+                        actual_kline_table = f"{asset_type.value.lower()}_kline"
+
+                        # 替换视图SQL中的表名引用
+                        view_sql = self._table_schemas['unified_best_quality_kline']
+                        view_sql = view_sql.replace('historical_kline_data', actual_kline_table)
+
+                        conn.execute(view_sql)
+                        logger.debug(f"创建视图 unified_best_quality_kline 成功（引用表: {actual_kline_table}）")
                     except Exception as e:
                         logger.warning(f"创建视图失败: {e}")
 
@@ -714,7 +725,6 @@ class AssetSeparatedDatabaseManager:
             return f"""
                 CREATE TABLE {table_name} (
                     symbol VARCHAR,
-                    name VARCHAR,
                     market VARCHAR,
                     datetime TIMESTAMP,
                     frequency VARCHAR NOT NULL DEFAULT '1d',
@@ -729,9 +739,7 @@ class AssetSeparatedDatabaseManager:
                     adj_factor DOUBLE DEFAULT 1.0,
                     turnover_rate DOUBLE,
                     vwap DOUBLE,
-                    period VARCHAR,
                     data_source VARCHAR DEFAULT 'unknown',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (symbol, datetime, frequency)
                 )

@@ -305,6 +305,8 @@ class DatabaseAdminDialog(QDialog):
         self.current_table = None
         self.page_size = 50
         self.current_page = 0
+        self.total_rows = 0  # 总行数
+        self.total_pages = 0  # 总页数
         self.log = []
 
         # 慢SQL记录功能
@@ -768,59 +770,28 @@ class DatabaseAdminDialog(QDialog):
                 # 更新分页信息
                 total_rows = self.model.rowCount()
 
+            # 保存总行数和总页数到实例变量
+            self.total_rows = total_rows
+            self.total_pages = (total_rows + self.page_size - 1) // self.page_size
+
             # 更新页面信息
-            total_pages = (total_rows + self.page_size - 1) // self.page_size
-            self.page_label.setText(f"第 {self.current_page + 1} 页，共 {total_pages} 页，总计 {total_rows} 行")
+            self.page_label.setText(f"第 {self.current_page + 1} 页，共 {self.total_pages} 页，总计 {self.total_rows} 行")
 
             # 更新按钮状态
             self.prev_btn.setEnabled(self.current_page > 0)
-            self.next_btn.setEnabled(self.current_page < total_pages - 1)
+            self.next_btn.setEnabled(self.current_page < self.total_pages - 1)
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载表 {table_name} 失败: {str(e)}")
 
     def refresh_table(self):
+        """刷新当前表（保持当前页码）"""
         table_name = self.current_table
         if not table_name:
             return
-        self.model = QSqlTableModel(self, self.db)
-        self.model.setTable(table_name)
-        self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
-        self.model.select()
-        # 字段类型与主键信息
-        self.field_types = {}
-        self.pk_fields = set()
-        query = self.db.exec(f"PRAGMA table_info({table_name})")
-        while query.next():
-            name = query.value(1)
-            ftype = query.value(2)
-            pk = query.value(5)
-            self.field_types[name] = ftype
-            if pk:
-                self.pk_fields.add(name)
-        # 字段级权限适配
-        perms = self.field_permissions.get(table_name, {})
-        for col in range(self.model.columnCount()):
-            name = self.model.headerData(col, Qt.Horizontal)
-            if perms.get(name) == 'hidden':
-                self.table_view.setColumnHidden(col, True)
-            else:
-                self.table_view.setColumnHidden(col, False)
-        self.table_view.setModel(self.model)
-        self.table_view.setItemDelegate(TypeDelegate(
-            self.field_types, self.table_view, self.field_permissions, table_name))
-        for col in range(self.model.columnCount()):
-            name = self.model.headerData(col, Qt.Horizontal)
-            if name in self.pk_fields:
-                self.table_view.setColumnWidth(col, 120)
-        self.apply_search()
-        self.update_page_label()
-        # 空数据提示
-        if self.model.rowCount() == 0:
-            label = QLabel("暂无数据", self.table_view)
-            label.setAlignment(Qt.AlignCenter)
-            label.setStyleSheet("color: #90A4AE; font-size: 16px;")
-            self.table_view.setIndexWidget(self.model.index(0, 0), label)
+
+        # 使用 load_table_data 来支持分页
+        self.load_table_data(table_name)
 
     def add_row(self):
         if hasattr(self, 'model'):
@@ -894,18 +865,28 @@ class DatabaseAdminDialog(QDialog):
         self.update_page_label()
 
     def prev_page(self):
+        """上一页"""
         if self.current_page > 0:
             self.current_page -= 1
-            self.refresh_table()
+            self.load_table_data(self.current_table)
 
     def next_page(self):
-        self.current_page += 1
-        self.refresh_table()
+        """下一页"""
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            self.load_table_data(self.current_table)
 
     def update_page_label(self):
-        total = self.model.rowCount()
-        self.page_label.setText(
-            f"第{self.current_page+1}页 / 共{(total-1)//self.page_size+1}页  共{total}行")
+        """更新分页标签（使用实例变量）"""
+        if self.total_rows > 0:
+            self.page_label.setText(
+                f"第{self.current_page+1}页 / 共{self.total_pages}页  共{self.total_rows}行")
+        else:
+            # 兼容旧逻辑（SQLite模式）
+            total = self.model.rowCount() if hasattr(self, 'model') else 0
+            total_pages = max(1, (total - 1) // self.page_size + 1) if total > 0 else 1
+            self.page_label.setText(
+                f"第{self.current_page+1}页 / 共{total_pages}页  共{total}行")
 
     def show_log(self):
         if self.log_window is None:

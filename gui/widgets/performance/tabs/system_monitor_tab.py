@@ -26,6 +26,7 @@ except ImportError:
 
 logger = logger
 
+
 class ModernSystemMonitorTab(QWidget):
     """现代化系统监控标签页"""
 

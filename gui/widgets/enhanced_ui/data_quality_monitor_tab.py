@@ -54,18 +54,18 @@ class QualityTrendChart(FigureCanvas):
 
         # 质量评分趋势
         self.ax1.set_title('数据质量评分趋势', fontsize=8, fontweight='bold')
-        self.ax1.set_ylabel('质量评分')
+        self.ax1.set_ylabel('质量评分', fontsize=8)
         self.ax1.set_ylim(0, 1)
         self.ax1.grid(True, alpha=0.3)
 
         # 异常数量统计
         self.ax2.set_title('异常数量统计', fontsize=8, fontweight='bold')
-        self.ax2.set_ylabel('异常数量')
+        self.ax2.set_ylabel('异常数量', fontsize=8)
         self.ax2.grid(True, alpha=0.3)
 
         # 数据源健康度
         self.ax3.set_title('数据源健康度', fontsize=8, fontweight='bold')
-        self.ax3.set_ylabel('健康度评分')
+        self.ax3.set_ylabel('健康度评分', fontsize=8)
         self.ax3.set_ylim(0, 1)
         self.ax3.grid(True, alpha=0.3)
 
@@ -93,11 +93,11 @@ class QualityTrendChart(FigureCanvas):
                 # 降级：使用默认值
                 quality_scores = np.full(24, 0.85)
 
-            self.ax1.plot(timestamps, quality_scores, 'b-o', linewidth=0.8, markersize=4)
-            self.ax1.axhline(y=0.8, color='orange', linestyle='--', alpha=0.7, label='警告线')
-            self.ax1.axhline(y=0.6, color='red', linestyle='--', alpha=0.7, label='危险线')
-            self.ax1.legend()
-            self.ax1.tick_params(axis='x', rotation=45)
+            self.ax1.plot(timestamps, quality_scores, 'b-o', linewidth=0.7, markersize=4)
+            self.ax1.axhline(y=0.8, color='orange', linestyle='--', alpha=0.7, label='警告线', linewidth=0.8)
+            self.ax1.axhline(y=0.6, color='red', linestyle='--', alpha=0.7, label='危险线', linewidth=0.8)
+            self.ax1.legend(prop={'size': 8})  # 设置标签字体大小为8
+            self.ax1.tick_params(axis='both', rotation=0, labelsize=8)
 
             # 获取真实异常数量统计（24小时）
             if self.monitor_tab and hasattr(self.monitor_tab, '_get_anomaly_history_counts'):
@@ -106,7 +106,7 @@ class QualityTrendChart(FigureCanvas):
                 # 降级：使用默认值
                 anomaly_counts = np.zeros(24, dtype=int)
             self.ax2.bar(timestamps, anomaly_counts, alpha=0.7, color='#E74C3C', width=0.02)
-            self.ax2.tick_params(axis='x', rotation=45)
+            self.ax2.tick_params(axis='both', rotation=0, labelsize=8)
 
             # 数据源健康度（从真实数据源获取）
             if self.monitor_tab and hasattr(self.monitor_tab, '_get_real_data_sources_quality'):
@@ -114,18 +114,19 @@ class QualityTrendChart(FigureCanvas):
             else:
                 # 降级：使用默认值
                 sources_data = [{'name': 'System', 'score': 0.85}]
-            sources = [s['name'] for s in sources_data[:5]]  # 前5个数据源
+            sources = [s['name'].rsplit('.', 1)[-1] if '.' in s['name'] else s['name'] for s in sources_data[:5]]  # 前5个数据源
             health_scores = [s['score'] for s in sources_data[:5]]
             colors = ['#27AE60' if s >= 0.9 else '#F39C12' if s >= 0.8 else '#E74C3C' for s in health_scores]
 
             bars = self.ax3.bar(sources, health_scores, color=colors, alpha=0.8)
             self.ax3.set_ylim(0, 1)
+            self.ax3.tick_params(axis='both', rotation=0, labelsize=9)
 
             # 在柱子上显示数值
             for bar, score in zip(bars, health_scores):
                 height = bar.get_height()
                 self.ax3.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                              f'{score:.2f}', ha='center', va='bottom', fontweight='bold')
+                              f'{score:.2f}', ha='center', va='center', fontweight='bold', fontsize=10)
 
             # 质量分布（饼图 - 从真实数据计算）
             if self.monitor_tab and hasattr(self.monitor_tab, '_calculate_quality_distribution'):
@@ -145,6 +146,7 @@ class QualityTrendChart(FigureCanvas):
             for autotext in autotexts:
                 autotext.set_color('white')
                 autotext.set_fontweight('bold')
+                autotext.set_fontsize(8)
 
             self.fig.tight_layout()
             self.draw()

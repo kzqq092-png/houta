@@ -24,3 +24,6 @@ logs/*
 .cursor
 .cursorignore
 .cursorignore
+.spec-workflow
+.spec-workflow/*
+*.duckdb

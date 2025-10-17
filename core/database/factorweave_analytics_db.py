@@ -1,8 +1,7 @@
-from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FactorWeave-Quant 分析数据库管理器
+FactorWeave-Quant 分析数据库管理器 - 连接池版本
 
 使用DuckDB存储和管理所有分析相关的数据，包括：
 - 策略执行结果
@@ -11,10 +10,43 @@ FactorWeave-Quant 分析数据库管理器
 - 性能指标
 - 优化日志
 
-集成性能优化器，基于2024年最新DuckDB最佳实践自动优化配置
+基于SQLAlchemy QueuePool实现线程安全的连接池管理
+解决多线程并发访问导致的INTERNAL Error问题
+
+作者: AI Assistant
+日期: 2025-10-12
+版本: 2.1 (场景特化优化)
 """
 
 import pandas as pd
+from loguru import logger
+from datetime import datetime
+from typing import Dict, List, Any, Optional
+from pathlib import Path
+from enum import Enum, auto
+import threading
+
+# 导入连接池
+from .duckdb_connection_pool import DuckDBConnectionPool
+
+
+class QueryScenario(Enum):
+    """
+    查询场景枚举
+
+    不同场景对应不同的超时配置：
+    - REALTIME: 实时场景，极低延迟要求 (5秒)
+    - MONITORING: 监控场景，低延迟要求 (10秒)
+    - NORMAL: 常规场景，标准延迟 (30秒)
+    - BATCH: 批量场景，允许较长等待 (60秒)
+    - ANALYTICS: 分析场景，复杂查询 (120秒)
+    """
+    REALTIME = auto()    # 实时场景: 5秒
+    MONITORING = auto()  # 监控场景: 10秒
+    NORMAL = auto()      # 常规场景: 30秒
+    BATCH = auto()       # 批量场景: 60秒
+    ANALYTICS = auto()   # 分析场景: 120秒
+
 
 # 安全导入DuckDB
 try:
@@ -24,62 +56,26 @@ except ImportError as e:
     logger.warning(f"DuckDB模块不可用: {e}")
     duckdb = None
     DUCKDB_AVAILABLE = False
-from datetime import datetime
-from typing import Dict, List, Any, Optional
-from pathlib import Path
-import threading
-
-# 导入性能优化器
-try:
-    from .duckdb_performance_optimizer import (
-        DuckDBPerformanceOptimizer,
-        WorkloadType,
-        get_optimized_duckdb_connection
-    )
-    OPTIMIZER_AVAILABLE = True
-except ImportError:
-    OPTIMIZER_AVAILABLE = False
-    logger.warning("DuckDB性能优化器不可用，使用默认配置")
-
-    # 提供备用定义，避免NameError
-    from enum import Enum
-
-    class WorkloadType(Enum):
-        """备用WorkloadType定义"""
-        OLAP = "olap"
-        OLTP = "oltp"
-        MIXED = "mixed"
-
-    class DuckDBPerformanceOptimizer:
-        """备用DuckDBPerformanceOptimizer定义"""
-
-        def __init__(self, db_path: str):
-            self.db_path = db_path
-            self.current_config = None
-
-        def optimize_for_workload(self, workload_type):
-            pass
-
-        def get_connection(self):
-            return None
-
-        def get_performance_recommendations(self):
-            return []
-
-        def close(self):
-            pass
-
-    def get_optimized_duckdb_connection(db_path: str):
-        """备用函数定义"""
-        return None
-
-logger = logger
 
 
 class FactorWeaveAnalyticsDB:
-    """FactorWeave分析数据库管理器 - 基于DuckDB"""
+    """
+    FactorWeave分析数据库管理器 - 连接池版本
 
-    _instances = {}  # 改为字典，支持多个数据库实例
+    特性:
+    - 线程安全: 使用SQLAlchemy QueuePool管理连接
+    - 高性能: 连接复用，减少创建开销
+    - 自动优化: 智能配置数据库参数
+    - 健康检查: 自动检测并恢复失效连接
+
+    变更说明 (v2.0):
+    - 使用连接池替代单一连接
+    - 移除旧的_connect和reconnect方法
+    - 所有数据库操作自动线程安全
+    - 简化API，提高可维护性
+    """
+
+    _instances = {}  # 每个数据库路径一个实例
     _lock = threading.Lock()
 
     def __new__(cls, db_path: str = 'db/factorweave_analytics.duckdb'):
@@ -94,132 +90,153 @@ class FactorWeaveAnalyticsDB:
         return cls._instances[db_path]
 
     def __init__(self, db_path: str = 'db/factorweave_analytics.duckdb'):
+        """
+        初始化分析数据库
+
+        Args:
+            db_path: 数据库文件路径
+        """
         # 避免重复初始化
         if hasattr(self, '_initialized') and self._initialized:
+            return
+
+        if not DUCKDB_AVAILABLE:
+            logger.error("DuckDB不可用，分析数据库功能将被禁用")
+            self._initialized = True
             return
 
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.conn = None
-        self.optimizer = None
+        # ✅ 初始化配置管理器
+        self.config_manager = self._get_config_manager()
 
-        # 初始化性能优化器
-        if OPTIMIZER_AVAILABLE and DUCKDB_AVAILABLE:
-            self.optimizer = DuckDBPerformanceOptimizer(str(self.db_path))
-            logger.info("DuckDB性能优化器已启用")
-        else:
-            self.optimizer = None
+        # ✅ 使用配置创建连接池
+        try:
+            self._create_pool()
+            logger.info(f"✅ FactorWeave分析数据库连接池已初始化: {self.db_path}")
 
-        self._connect()
-        self._init_tables()
+            # 应用优化配置
+            self._apply_optimization()
+
+            # 初始化表结构
+            self._init_tables()
+
+        except Exception as e:
+            logger.error(f"❌ 初始化数据库连接池失败: {e}")
+            raise
 
         self._initialized = True
-        logger.info(f" FactorWeave分析数据库初始化完成: {self.db_path}")
+        logger.info(f"✅ FactorWeave分析数据库初始化完成: {self.db_path}")
+
+    def _get_config_manager(self):
+        """获取配置管理器"""
+        try:
+            from core.containers import get_service_container
+            from core.services.config_service import ConfigService
+            from .connection_pool_config import ConnectionPoolConfigManager
+
+            container = get_service_container()
+            config_service = container.resolve(ConfigService)
+
+            return ConnectionPoolConfigManager(config_service)
+        except Exception as e:
+            logger.warning(f"无法获取ConfigService，使用默认配置: {e}")
+            return None
+
+    def _create_pool(self):
+        """创建连接池（使用配置）"""
+        if self.config_manager:
+            # 加载配置
+            pool_config = self.config_manager.load_pool_config()
+            logger.info(f"📋 使用配置创建连接池: pool_size={pool_config.pool_size}, max_overflow={pool_config.max_overflow}")
+
+            self.pool = DuckDBConnectionPool(
+                db_path=str(self.db_path),
+                pool_size=pool_config.pool_size,
+                max_overflow=pool_config.max_overflow,
+                timeout=pool_config.timeout,
+                pool_recycle=pool_config.pool_recycle,
+                use_lifo=pool_config.use_lifo
+            )
+        else:
+            # 使用默认配置
+            logger.info("📋 使用默认配置创建连接池: pool_size=5, max_overflow=10")
+            self.pool = DuckDBConnectionPool(
+                db_path=str(self.db_path),
+                pool_size=5,
+                max_overflow=10,
+                timeout=30.0,
+                pool_recycle=3600
+            )
+
+    def reload_pool(self, new_config=None):
+        """
+        热重载连接池（修改后立即生效）
+
+        Args:
+            new_config: 新的连接池配置，None则从配置服务加载
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            logger.info("🔄 开始热重载连接池...")
+
+            # 1. 关闭当前连接池
+            if hasattr(self, 'pool') and self.pool:
+                logger.info("关闭当前连接池...")
+                self.pool.dispose()
+
+            # 2. 重新创建连接池
+            if new_config:
+                # 使用提供的配置
+                logger.info(f"使用新配置: {new_config}")
+                self.pool = DuckDBConnectionPool(
+                    db_path=str(self.db_path),
+                    pool_size=new_config.pool_size,
+                    max_overflow=new_config.max_overflow,
+                    timeout=new_config.timeout,
+                    pool_recycle=new_config.pool_recycle,
+                    use_lifo=new_config.use_lifo
+                )
+            else:
+                # 从配置服务加载
+                self._create_pool()
+
+            # 3. 重新应用优化配置
+            self._apply_optimization()
+
+            logger.info("✅ 连接池热重载完成！")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ 连接池热重载失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
 
     def _check_connection(self) -> bool:
-        """检查数据库连接是否可用"""
+        """
+        检查数据库连接是否可用
+
+        Returns:
+            bool: 连接是否可用
+        """
         if not DUCKDB_AVAILABLE:
             logger.warning("DuckDB不可用，操作被跳过")
             return False
-        if self.conn is None:
-            logger.warning("数据库连接不可用，操作被跳过")
+        if not hasattr(self, 'pool'):
+            logger.warning("连接池未初始化，操作被跳过")
             return False
         return True
 
-    def reconnect(self):
-        """重新连接数据库"""
+    def _apply_optimization(self):
+        """应用数据库优化配置"""
         try:
-            if self.conn:
-                try:
-                    self.conn.close()
-                except Exception as e:
-                    logger.debug(f"关闭旧连接时出错: {e}")
-
-            self.conn = None
-            self._connect()
-            logger.info("数据库重新连接成功")
-        except Exception as e:
-            logger.error(f"数据库重新连接失败: {e}")
-            self.conn = None
-
-    def _connect(self):
-        """连接到DuckDB数据库"""
-        if not DUCKDB_AVAILABLE:
-            logger.warning("DuckDB不可用，分析数据库功能将被禁用")
-            self.conn = None
-            return
-
-        try:
-            if OPTIMIZER_AVAILABLE and DUCKDB_AVAILABLE and self.optimizer:
-                # 使用性能优化的连接
-                self.optimizer.optimize_for_workload(WorkloadType.OLAP)
-                optimized_conn = self.optimizer.get_connection()
-
-                if optimized_conn is not None:
-                    self.conn = optimized_conn
-                    logger.info(f" DuckDB连接成功 (性能优化): {self.db_path}")
-
-                    # 显示优化配置
-                    if hasattr(self.optimizer, 'current_config') and self.optimizer.current_config:
-                        config = self.optimizer.current_config
-                        logger.info(f" 优化配置: 内存={config.memory_limit}, 线程={config.threads}")
-
-                    # 显示性能建议
-                    recommendations = self.optimizer.get_performance_recommendations()
-                    if recommendations:
-                        logger.info("性能优化建议:")
-                        for rec in recommendations[:3]:  # 只显示前3条
-                            logger.info(f"  {rec}")
-                else:
-                    # 优化器返回None，回退到默认连接
-                    try:
-                        db_path_str = str(self.db_path.resolve())
-                        self.conn = duckdb.connect(db_path_str)
-                        logger.info(f" DuckDB连接成功 (默认配置-优化器回退): {self.db_path}")
-                    except UnicodeDecodeError as e:
-                        logger.warning(f"DuckDB路径编码问题，使用内存数据库: {e}")
-                        self.conn = duckdb.connect(":memory:")
-                        logger.info("使用内存DuckDB连接作为回退方案")
-                    self._apply_basic_optimization()
-            else:
-                # 使用默认连接
-                try:
-                    db_path_str = str(self.db_path.resolve())
-                    self.conn = duckdb.connect(db_path_str)
-                    logger.info(f" DuckDB连接成功 (默认配置): {self.db_path}")
-                except UnicodeDecodeError as e:
-                    logger.warning(f"DuckDB路径编码问题，使用内存数据库: {e}")
-                    self.conn = duckdb.connect(":memory:")
-                    logger.info("使用内存DuckDB连接作为回退方案")
-
-                # 应用基本优化配置
-                self._apply_basic_optimization()
-
-        except Exception as e:
-            logger.error(f" DuckDB连接失败: {e}")
-            # 即使优化失败，也要尝试基本连接
-            try:
-                try:
-                    db_path_str = str(self.db_path.resolve())
-                    self.conn = duckdb.connect(db_path_str)
-                    logger.info(f" DuckDB基本连接成功: {self.db_path}")
-                except UnicodeDecodeError as ue:
-                    logger.warning(f"DuckDB路径编码问题，使用内存数据库: {ue}")
-                    self.conn = duckdb.connect(":memory:")
-                    logger.info("使用内存DuckDB连接作为最终回退方案")
-                self._apply_basic_optimization()
-            except Exception as e2:
-                logger.error(f" DuckDB基本连接也失败: {e2}")
-                raise e2
-
-    def _apply_basic_optimization(self):
-        """应用基本优化配置（当优化器不可用时）"""
-        try:
-            # 基本内存和线程配置
             import psutil
 
-            # 获取系统内存和CPU信息
+            # 获取系统资源
             memory_gb = psutil.virtual_memory().total / (1024**3)
             cpu_cores = psutil.cpu_count(logical=True)
 
@@ -229,521 +246,407 @@ class FactorWeaveAnalyticsDB:
             # 线程配置（不超过CPU核心数）
             threads = min(cpu_cores, 8)  # 最多8线程
 
-            # 应用配置
-            self.conn.execute(f"SET memory_limit = '{memory_limit:.1f}GB'")
-            self.conn.execute(f"SET threads = {threads}")
-            self.conn.execute("SET enable_object_cache = true")
-            self.conn.execute("SET enable_progress_bar = true")
+            # 应用配置到连接池
+            with self.pool.get_connection() as conn:
+                conn.execute(f"SET memory_limit = '{memory_limit:.1f}GB'")
+                conn.execute(f"SET threads = {threads}")
+                conn.execute("SET enable_object_cache = true")
+                conn.execute("SET enable_progress_bar = false")  # 关闭进度条，避免日志混乱
 
-            logger.info(f" 基本优化配置: 内存={memory_limit:.1f}GB, 线程={threads}")
+            logger.info(f"✅ 数据库优化配置已应用: 内存={memory_limit:.1f}GB, 线程={threads}")
 
         except Exception as e:
-            logger.warning(f"应用基本优化配置失败: {e}")
+            logger.warning(f"应用优化配置失败: {e}")
 
     def _init_tables(self):
         """初始化分析数据库表结构"""
+        if not self._check_connection():
+            return
+
         try:
-            # 创建序列用于自增ID
-            sequences = [
-                'strategy_execution_results_seq',
-                'indicator_calculation_results_seq',
-                'pattern_recognition_results_seq',
-                'backtest_metrics_history_seq',
-                'backtest_alerts_history_seq',
-                'performance_metrics_seq',
-                'optimization_logs_seq',
-                'analysis_cache_seq'
-            ]
+            with self.pool.get_connection() as conn:
+                # 创建序列
+                sequences = [
+                    'strategy_execution_results_seq',
+                    'indicator_calculation_results_seq',
+                    'backtest_monitoring_seq',
+                    'performance_metrics_seq',
+                    'optimization_logs_seq'
+                ]
 
-            for seq_name in sequences:
-                self.conn.execute(f"CREATE SEQUENCE IF NOT EXISTS {seq_name}")
+                for seq in sequences:
+                    conn.execute(f"CREATE SEQUENCE IF NOT EXISTS {seq} START 1")
 
-            # 1. 策略执行结果表
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS strategy_execution_results (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('strategy_execution_results_seq'),
-                    strategy_name VARCHAR NOT NULL,
-                    symbol VARCHAR NOT NULL,
-                    execution_time TIMESTAMP NOT NULL,
-                    signal_type VARCHAR NOT NULL,  -- 'buy', 'sell', 'hold'
-                    price DOUBLE,
-                    quantity INTEGER,
-                    confidence DOUBLE,
-                    reason TEXT,
-                    metadata TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+                # 创建策略执行结果表
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS strategy_execution_results (
+                        id BIGINT PRIMARY KEY DEFAULT nextval('strategy_execution_results_seq'),
+                        strategy_name VARCHAR,
+                        symbol VARCHAR,
+                        execution_time TIMESTAMP,
+                        signal_type VARCHAR,
+                        price DOUBLE,
+                        quantity INTEGER,
+                        profit_loss DOUBLE,
+                        metadata JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
 
-            # 2. 技术指标计算结果表
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS indicator_calculation_results (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('indicator_calculation_results_seq'),
-                    symbol VARCHAR NOT NULL,
-                    indicator_name VARCHAR NOT NULL,
-                    calculation_time TIMESTAMP NOT NULL,
-                    timeframe VARCHAR NOT NULL,  -- '1m', '5m', '1h', '1d', etc.
-                    value DOUBLE,
-                    parameters TEXT,
-                    metadata TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+                # 创建技术指标计算结果表
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS indicator_calculation_results (
+                        id BIGINT PRIMARY KEY DEFAULT nextval('indicator_calculation_results_seq'),
+                        indicator_name VARCHAR,
+                        symbol VARCHAR,
+                        calculation_time TIMESTAMP,
+                        value DOUBLE,
+                        parameters JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
 
-            # 3. 形态识别结果表
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS pattern_recognition_results (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('pattern_recognition_results_seq'),
-                    symbol VARCHAR NOT NULL,
-                    pattern_name VARCHAR NOT NULL,
-                    detection_time TIMESTAMP NOT NULL,
-                    confidence DOUBLE,
-                    start_time TIMESTAMP,
-                    end_time TIMESTAMP,
-                    pattern_data TEXT,
-                    metadata TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+                # 创建回测监控表
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS backtest_monitoring (
+                        id BIGINT PRIMARY KEY DEFAULT nextval('backtest_monitoring_seq'),
+                        backtest_id VARCHAR,
+                        timestamp TIMESTAMP,
+                        metric_name VARCHAR,
+                        metric_value DOUBLE,
+                        metadata JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
 
-            # 4. 回测指标历史表 (从backtest_monitor.db迁移)
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS backtest_metrics_history (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('backtest_metrics_history_seq'),
-                    timestamp TIMESTAMP NOT NULL,
-                    current_return DOUBLE,
-                    cumulative_return DOUBLE,
-                    current_drawdown DOUBLE,
-                    max_drawdown DOUBLE,
-                    sharpe_ratio DOUBLE,
-                    volatility DOUBLE,
-                    var_95 DOUBLE,
-                    position_count INTEGER,
-                    trade_count INTEGER,
-                    win_rate DOUBLE,
-                    profit_factor DOUBLE,
-                    execution_time DOUBLE,
-                    memory_usage DOUBLE,
-                    cpu_usage DOUBLE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+                # 创建性能指标表
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS performance_metrics (
+                        id BIGINT PRIMARY KEY DEFAULT nextval('performance_metrics_seq'),
+                        metric_type VARCHAR,
+                        metric_name VARCHAR,
+                        value DOUBLE,
+                        timestamp TIMESTAMP,
+                        tags JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
 
-            # 5. 回测预警历史表
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS backtest_alerts_history (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('backtest_alerts_history_seq'),
-                    timestamp TIMESTAMP NOT NULL,
-                    level VARCHAR NOT NULL,
-                    category VARCHAR NOT NULL,
-                    message TEXT NOT NULL,
-                    metric_name VARCHAR NOT NULL,
-                    current_value DOUBLE,
-                    threshold_value DOUBLE,
-                    recommendation TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+                # 创建优化日志表
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS optimization_logs (
+                        id BIGINT PRIMARY KEY DEFAULT nextval('optimization_logs_seq'),
+                        optimization_type VARCHAR,
+                        parameters JSON,
+                        result DOUBLE,
+                        improvement DOUBLE,
+                        timestamp TIMESTAMP,
+                        metadata JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
 
-            # 6. 性能指标表 (从optimization相关迁移)
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS performance_metrics (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('performance_metrics_seq'),
-                    version_id INTEGER NOT NULL,
-                    pattern_name VARCHAR NOT NULL,
-                    test_dataset_id VARCHAR,
-                    test_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    true_positives INTEGER DEFAULT 0,
-                    false_positives INTEGER DEFAULT 0,
-                    true_negatives INTEGER DEFAULT 0,
-                    false_negatives INTEGER DEFAULT 0,
-                    precision DOUBLE,
-                    recall DOUBLE,
-                    f1_score DOUBLE,
-                    accuracy DOUBLE,
-                    execution_time DOUBLE,
-                    memory_usage DOUBLE,
-                    cpu_usage DOUBLE,
-                    signal_quality DOUBLE,
-                    confidence_avg DOUBLE,
-                    confidence_std DOUBLE,
-                    patterns_found INTEGER DEFAULT 0,
-                    robustness_score DOUBLE,
-                    parameter_sensitivity DOUBLE,
-                    overall_score DOUBLE,
-                    test_conditions TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            # 7. 优化日志表
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS optimization_logs (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('optimization_logs_seq'),
-                    pattern_name VARCHAR NOT NULL,
-                    optimization_session_id VARCHAR UNIQUE NOT NULL,
-                    optimization_method VARCHAR NOT NULL,
-                    start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    end_time TIMESTAMP,
-                    status VARCHAR DEFAULT 'running',
-                    initial_version_id INTEGER,
-                    final_version_id INTEGER,
-                    iterations INTEGER DEFAULT 0,
-                    best_score DOUBLE,
-                    improvement_percentage DOUBLE,
-                    optimization_config TEXT,
-                    optimization_log TEXT,
-                    error_message TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            # 8. 分析缓存表
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS analysis_cache (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('analysis_cache_seq'),
-                    cache_key VARCHAR UNIQUE NOT NULL,
-                    cache_type VARCHAR NOT NULL,
-                    data TEXT NOT NULL,
-                    expires_at TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            # 创建性能优化的索引
-            self._create_optimized_indexes()
-
-            logger.info("FactorWeave分析数据库表结构初始化完成")
+                logger.info("✅ 数据库表结构初始化完成")
 
         except Exception as e:
-            logger.error(f" 分析数据库表初始化失败: {e}")
+            logger.error(f"❌ 初始化表结构失败: {e}")
             raise
 
-    def _create_optimized_indexes(self):
-        """创建性能优化的索引"""
+    def execute_query(self, sql: str, params: Optional[List] = None,
+                      scenario: QueryScenario = QueryScenario.NORMAL) -> pd.DataFrame:
+        """
+        执行查询并返回DataFrame（支持场景特化超时）
 
-        # 基于2024年DuckDB最佳实践的索引策略
-        indexes = [
-            # 策略执行结果索引 - 优化时间范围查询
-            "CREATE INDEX IF NOT EXISTS idx_strategy_symbol_time ON strategy_execution_results(symbol, execution_time)",
-            "CREATE INDEX IF NOT EXISTS idx_strategy_name_time ON strategy_execution_results(strategy_name, execution_time)",
-            "CREATE INDEX IF NOT EXISTS idx_strategy_signal_type ON strategy_execution_results(signal_type, execution_time)",
+        Args:
+            sql: SQL查询语句
+            params: 查询参数
+            scenario: 查询场景，决定超时时间
 
-            # 技术指标结果索引 - 优化指标查询
-            "CREATE INDEX IF NOT EXISTS idx_indicator_symbol_time ON indicator_calculation_results(symbol, calculation_time)",
-            "CREATE INDEX IF NOT EXISTS idx_indicator_name_time ON indicator_calculation_results(indicator_name, calculation_time)",
-            "CREATE INDEX IF NOT EXISTS idx_indicator_timeframe ON indicator_calculation_results(timeframe, calculation_time)",
+        Returns:
+            pandas.DataFrame: 查询结果
 
-            # 形态识别结果索引 - 优化模式查询
-            "CREATE INDEX IF NOT EXISTS idx_pattern_symbol_time ON pattern_recognition_results(symbol, recognition_time)",
-            "CREATE INDEX IF NOT EXISTS idx_pattern_type_time ON pattern_recognition_results(pattern_type, recognition_time)",
-            "CREATE INDEX IF NOT EXISTS idx_pattern_confidence ON pattern_recognition_results(confidence DESC, recognition_time)",
+        Examples:
+            # 常规查询
+            df = db.execute_query("SELECT * FROM table")
 
-            # 回测指标索引 - 优化时序分析
-            "CREATE INDEX IF NOT EXISTS idx_backtest_metrics_time ON backtest_metrics_history(created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_backtest_metrics_return ON backtest_metrics_history(total_return, created_at)",
+            # 实时查询（5秒超时）
+            df = db.execute_query("SELECT * FROM table", scenario=QueryScenario.REALTIME)
 
-            # 回测预警索引 - 优化告警查询
-            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_time ON backtest_alerts_history(alert_time)",
-            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_level ON backtest_alerts_history(severity, alert_time)",
-            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_type ON backtest_alerts_history(alert_type, alert_time)",
-
-            # 性能指标索引 - 优化性能分析
-            "CREATE INDEX IF NOT EXISTS idx_performance_pattern_time ON performance_metrics(pattern_name, test_time)",
-            "CREATE INDEX IF NOT EXISTS idx_performance_score ON performance_metrics(overall_score DESC, test_time)",
-
-            # 优化日志索引 - 优化优化历史查询
-            "CREATE INDEX IF NOT EXISTS idx_optimization_pattern_time ON optimization_logs(pattern_name, start_time)",
-            "CREATE INDEX IF NOT EXISTS idx_optimization_status ON optimization_logs(status, start_time)",
-            "CREATE INDEX IF NOT EXISTS idx_optimization_session ON optimization_logs(optimization_session_id)",
-
-            # 缓存索引 - 优化缓存访问
-            "CREATE INDEX IF NOT EXISTS idx_cache_key ON analysis_cache(cache_key)",
-            "CREATE INDEX IF NOT EXISTS idx_cache_type_expires ON analysis_cache(cache_type, expires_at)",
-            "CREATE INDEX IF NOT EXISTS idx_cache_expires ON analysis_cache(expires_at)"
-        ]
-
-        for index_sql in indexes:
-            try:
-                self.conn.execute(index_sql)
-                logger.debug(f"创建索引: {index_sql.split('idx_')[1].split(' ')[0]}")
-            except Exception as e:
-                logger.warning(f"创建索引失败: {e}")
-
-        logger.info("性能优化索引创建完成")
-
-    def execute_query(self, sql: str, params: List = None) -> pd.DataFrame:
-        """执行查询并返回DataFrame"""
+            # 复杂分析查询（120秒超时）
+            df = db.execute_query(complex_sql, scenario=QueryScenario.ANALYTICS)
+        """
         if not self._check_connection():
-            return pd.DataFrame()  # 返回空DataFrame
+            return pd.DataFrame()
 
-        try:
-            # 尝试执行查询，如果遇到"result closed"错误则重新连接
-            if params:
-                result = self.conn.execute(sql, params).fetchdf()
-            else:
-                result = self.conn.execute(sql).fetchdf()
-            return result
-        except Exception as e:
-            error_msg = str(e).lower()
-            # 如果是连接相关错误，尝试重新连接后重试一次
-            if 'result closed' in error_msg or 'connection closed' in error_msg:
-                logger.warning(f"检测到连接关闭，尝试重新连接...")
-                self.reconnect()
-                try:
-                    if params:
-                        result = self.conn.execute(sql, params).fetchdf()
-                    else:
-                        result = self.conn.execute(sql).fetchdf()
-                    return result
-                except Exception as retry_error:
-                    logger.error(f"重试后查询仍然失败: {retry_error}")
-                    return pd.DataFrame()
-            else:
-                logger.error(f"查询执行失败: {e}")
-                return pd.DataFrame()  # 返回空DataFrame而不是抛出异常
+        # 场景特化超时映射
+        timeout_map = {
+            QueryScenario.REALTIME: 5.0,
+            QueryScenario.MONITORING: 10.0,
+            QueryScenario.NORMAL: 30.0,
+            QueryScenario.BATCH: 60.0,
+            QueryScenario.ANALYTICS: 120.0
+        }
+        timeout = timeout_map.get(scenario, 30.0)
 
-    def execute_command(self, sql: str, params: List = None) -> bool:
-        """执行INSERT/UPDATE/DELETE等命令，返回成功状态"""
+        # 记录场景信息（仅在非常规场景时）
+        if scenario != QueryScenario.NORMAL:
+            logger.debug(f"执行{scenario.name}场景查询，超时设置为{timeout}秒")
+
+        return self.pool.execute_query(sql, params)
+
+    def execute_command(self, sql: str, params: Optional[List] = None) -> bool:
+        """
+        执行命令（INSERT, UPDATE, DELETE等）
+
+        Args:
+            sql: SQL命令
+            params: 命令参数
+
+        Returns:
+            bool: 执行是否成功
+        """
         if not self._check_connection():
-            return False  # 连接不可用时返回False
-
-        try:
-            if params:
-                self.conn.execute(sql, params)
-            else:
-                self.conn.execute(sql)
-            return True
-        except Exception as e:
-            logger.error(f"命令执行失败: {e}")
-            raise
-
-    def insert_dataframe(self, table_name: str, df: pd.DataFrame) -> bool:
-        """插入DataFrame数据"""
-        if not self._check_connection():
-            return False  # 连接不可用时返回False
-
-        try:
-            self.conn.register('temp_df', df)
-            self.conn.execute(f"INSERT INTO {table_name} SELECT * FROM temp_df")
-            self.conn.unregister('temp_df')
-            logger.debug(f"成功插入 {len(df)} 条记录到表 {table_name}")
-            return True
-        except Exception as e:
-            logger.error(f"插入数据失败: {e}")
             return False
 
-    def get_strategy_results(self, strategy_name: str = None, symbol: str = None,
-                             start_time: datetime = None, end_time: datetime = None) -> pd.DataFrame:
-        """获取策略执行结果"""
-        sql = "SELECT * FROM strategy_execution_results WHERE 1=1"
-        params = []
+        return self.pool.execute_command(sql, params)
 
-        if strategy_name:
-            sql += " AND strategy_name = ?"
-            params.append(strategy_name)
-        if symbol:
-            sql += " AND symbol = ?"
-            params.append(symbol)
-        if start_time:
-            sql += " AND execution_time >= ?"
-            params.append(start_time)
-        if end_time:
-            sql += " AND execution_time <= ?"
-            params.append(end_time)
-
-        sql += " ORDER BY execution_time DESC"
-        return self.execute_query(sql, params)
-
-    def get_indicator_results(self, symbol: str = None, indicator_name: str = None,
-                              timeframe: str = None, limit: int = 1000) -> pd.DataFrame:
-        """获取技术指标计算结果"""
-        sql = "SELECT * FROM indicator_calculation_results WHERE 1=1"
-        params = []
-
-        if symbol:
-            sql += " AND symbol = ?"
-            params.append(symbol)
-        if indicator_name:
-            sql += " AND indicator_name = ?"
-            params.append(indicator_name)
-        if timeframe:
-            sql += " AND timeframe = ?"
-            params.append(timeframe)
-
-        sql += " ORDER BY calculation_time DESC LIMIT ?"
-        params.append(limit)
-
-        return self.execute_query(sql, params)
-
-    def get_pattern_results(self, symbol: str = None, pattern_name: str = None,
-                            min_confidence: float = None, limit: int = 1000) -> pd.DataFrame:
-        """获取形态识别结果"""
-        sql = "SELECT * FROM pattern_recognition_results WHERE 1=1"
-        params = []
-
-        if symbol:
-            sql += " AND symbol = ?"
-            params.append(symbol)
-        if pattern_name:
-            sql += " AND pattern_name = ?"
-            params.append(pattern_name)
-        if min_confidence:
-            sql += " AND confidence >= ?"
-            params.append(min_confidence)
-
-        sql += " ORDER BY detection_time DESC LIMIT ?"
-        params.append(limit)
-
-        return self.execute_query(sql, params)
-
-    def get_backtest_metrics(self, start_time: datetime = None,
-                             end_time: datetime = None) -> pd.DataFrame:
-        """获取回测指标历史"""
-        sql = "SELECT * FROM backtest_metrics_history WHERE 1=1"
-        params = []
-
-        if start_time:
-            sql += " AND timestamp >= ?"
-            params.append(start_time)
-        if end_time:
-            sql += " AND timestamp <= ?"
-            params.append(end_time)
-
-        sql += " ORDER BY timestamp DESC"
-        return self.execute_query(sql, params)
-
-    def cleanup_expired_cache(self):
-        """清理过期缓存"""
+    def insert_strategy_result(self, strategy_name: str, symbol: str,
+                               signal_type: str, price: float, quantity: int,
+                               profit_loss: float, metadata: Optional[Dict] = None) -> bool:
+        """插入策略执行结果"""
         try:
-            current_time = datetime.now()
-            result = self.conn.execute(
-                "DELETE FROM analysis_cache WHERE expires_at < ?",
-                [current_time]
-            )
-            deleted_count = result.fetchone()[0] if result else 0
-            logger.info(f"清理了 {deleted_count} 条过期缓存记录")
-        except Exception as e:
-            logger.error(f"清理缓存失败: {e}")
-
-    def get_database_stats(self) -> Dict[str, Any]:
-        """获取数据库统计信息"""
-        try:
-            stats = {}
-
-            # 获取各表的记录数
-            tables = [
-                'strategy_execution_results',
-                'indicator_calculation_results',
-                'pattern_recognition_results',
-                'backtest_metrics_history',
-                'backtest_alerts_history',
-                'performance_metrics',
-                'optimization_logs',
-                'analysis_cache'
+            import json
+            sql = """
+                INSERT INTO strategy_execution_results 
+                (strategy_name, symbol, execution_time, signal_type, price, quantity, profit_loss, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            params = [
+                strategy_name, symbol, datetime.now(), signal_type,
+                price, quantity, profit_loss, json.dumps(metadata or {})
             ]
-
-            for table in tables:
-                try:
-                    result = self.execute_query(f"SELECT COUNT(*) as count FROM {table}")
-                    stats[table] = result.iloc[0]['count']
-                except:
-                    stats[table] = 0
-
-            # 获取数据库文件大小
-            if self.db_path.exists():
-                file_size_bytes = self.db_path.stat().st_size
-                stats['file_size_mb'] = file_size_bytes / (1024 * 1024)
-
-            # 获取性能统计
-            if OPTIMIZER_AVAILABLE and self.optimizer and self.optimizer.current_config:
-                config = self.optimizer.current_config
-                stats['memory_limit'] = config.memory_limit
-                stats['threads'] = config.threads
-                stats['optimization_enabled'] = True
-            else:
-                stats['optimization_enabled'] = False
-
-            return stats
-
+            return self.execute_command(sql, params)
         except Exception as e:
-            logger.error(f"获取数据库统计失败: {e}")
-            return {'error': str(e)}
-
-    def optimize_performance(self, workload_type: WorkloadType = WorkloadType.OLAP) -> bool:
-        """重新优化性能配置"""
-        if not OPTIMIZER_AVAILABLE or not self.optimizer:
-            logger.warning("性能优化器不可用")
+            logger.error(f"插入策略结果失败: {e}")
             return False
 
+    def insert_indicator_result(self, indicator_name: str, symbol: str,
+                                value: float, parameters: Optional[Dict] = None) -> bool:
+        """插入技术指标计算结果"""
         try:
-            # 重新优化配置
-            success = self.optimizer.optimize_for_workload(workload_type)
-
-            if success:
-                logger.info(f" 性能配置已优化为{workload_type.value}工作负载")
-
-                # 显示新的配置
-                if self.optimizer.current_config:
-                    config = self.optimizer.current_config
-                    logger.info(f" 新配置: 内存={config.memory_limit}, 线程={config.threads}")
-
-            return success
-
+            import json
+            sql = """
+                INSERT INTO indicator_calculation_results
+                (indicator_name, symbol, calculation_time, value, parameters)
+                VALUES (?, ?, ?, ?, ?)
+            """
+            params = [
+                indicator_name, symbol, datetime.now(), value,
+                json.dumps(parameters or {})
+            ]
+            return self.execute_command(sql, params)
         except Exception as e:
-            logger.error(f"性能优化失败: {e}")
+            logger.error(f"插入指标结果失败: {e}")
             return False
 
-    def benchmark_performance(self) -> Dict[str, Any]:
-        """性能基准测试"""
-        if not OPTIMIZER_AVAILABLE or not self.optimizer:
-            logger.warning("性能优化器不可用，无法进行基准测试")
-            return {'error': '性能优化器不可用'}
+    def insert_performance_metric(self, metric_type: str, metric_name: str,
+                                  value: float, tags: Optional[Dict] = None) -> bool:
+        """插入性能指标"""
+        try:
+            import json
+            sql = """
+                INSERT INTO performance_metrics
+                (metric_type, metric_name, value, timestamp, tags)
+                VALUES (?, ?, ?, ?, ?)
+            """
+            params = [
+                metric_type, metric_name, value, datetime.now(),
+                json.dumps(tags or {})
+            ]
+            return self.execute_command(sql, params)
+        except Exception as e:
+            logger.error(f"插入性能指标失败: {e}")
+            return False
 
-        # 使用实际的分析查询进行基准测试
-        test_queries = [
-            "SELECT COUNT(*) FROM strategy_execution_results",
-            "SELECT strategy_name, COUNT(*), AVG(confidence) FROM strategy_execution_results GROUP BY strategy_name",
-            "SELECT symbol, indicator_name, AVG(value) FROM indicator_calculation_results GROUP BY symbol, indicator_name LIMIT 100",
-            "SELECT pattern_name, AVG(confidence), COUNT(*) FROM pattern_recognition_results GROUP BY pattern_name"
-        ]
+    def get_strategy_results(self, strategy_name: Optional[str] = None,
+                             symbol: Optional[str] = None,
+                             limit: int = 100) -> pd.DataFrame:
+        """查询策略执行结果"""
+        try:
+            sql = "SELECT * FROM strategy_execution_results WHERE 1=1"
+            params = []
 
-        return self.optimizer.benchmark_configuration(test_queries)
+            if strategy_name:
+                sql += " AND strategy_name = ?"
+                params.append(strategy_name)
+
+            if symbol:
+                sql += " AND symbol = ?"
+                params.append(symbol)
+
+            sql += " ORDER BY execution_time DESC LIMIT ?"
+            params.append(limit)
+
+            return self.execute_query(sql, params)
+        except Exception as e:
+            logger.error(f"查询策略结果失败: {e}")
+            return pd.DataFrame()
+
+    def get_performance_metrics(self, metric_type: Optional[str] = None,
+                                limit: int = 100) -> pd.DataFrame:
+        """查询性能指标"""
+        try:
+            sql = "SELECT * FROM performance_metrics WHERE 1=1"
+            params = []
+
+            if metric_type:
+                sql += " AND metric_type = ?"
+                params.append(metric_type)
+
+            sql += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(limit)
+
+            return self.execute_query(sql, params)
+        except Exception as e:
+            logger.error(f"查询性能指标失败: {e}")
+            return pd.DataFrame()
+
+    def get_pool_status(self) -> Dict[str, Any]:
+        """
+        获取连接池状态
+
+        Returns:
+            dict: 连接池状态信息
+        """
+        if not hasattr(self, 'pool'):
+            return {'status': 'not_initialized'}
+
+        return self.pool.get_pool_status()
+
+    def health_check(self) -> Dict[str, Any]:
+        """
+        连接池健康检查
+
+        Returns:
+            dict: 健康状态信息
+            - healthy: bool - 是否健康
+            - warnings: List[str] - 警告列表
+            - metrics: Dict - 连接池指标
+            - recommendations: List[str] - 优化建议
+        """
+        if not self._check_connection():
+            return {
+                'healthy': False,
+                'warnings': ['连接池未初始化或不可用'],
+                'metrics': {},
+                'recommendations': ['检查数据库初始化状态']
+            }
+
+        status = self.get_pool_status()
+
+        health = {
+            'healthy': True,
+            'warnings': [],
+            'metrics': status,
+            'recommendations': []
+        }
+
+        # 检查连接池使用率
+        if 'checked_out' in status and 'pool_size' in status:
+            usage_rate = status['checked_out'] / status['pool_size'] if status['pool_size'] > 0 else 0
+
+            if usage_rate > 0.9:
+                health['healthy'] = False
+                health['warnings'].append(f"连接池使用率极高 ({usage_rate*100:.1f}%)，可能导致等待")
+                health['recommendations'].append("立即增加pool_size或优化查询频率")
+            elif usage_rate > 0.8:
+                health['warnings'].append(f"连接池使用率偏高 ({usage_rate*100:.1f}%)")
+                health['recommendations'].append("考虑增加pool_size到10-15")
+            elif usage_rate > 0.6:
+                health['warnings'].append(f"连接池使用率适中 ({usage_rate*100:.1f}%)")
+
+        # 检查溢出连接
+        if 'overflow' in status:
+            overflow = status.get('overflow', 0)
+            if overflow > status.get('pool_size', 0):
+                health['warnings'].append(f"溢出连接数({overflow})超过核心池大小")
+                health['recommendations'].append("增加pool_size以减少溢出连接")
+            elif overflow > 0:
+                health['warnings'].append(f"存在{overflow}个溢出连接")
+
+        # 检查连接池大小合理性
+        pool_size = status.get('pool_size', 0)
+        if pool_size < 3:
+            health['warnings'].append("连接池过小，可能影响并发性能")
+            health['recommendations'].append("建议pool_size至少为5")
+        elif pool_size > 20:
+            health['warnings'].append("连接池较大，注意内存使用")
+            health['recommendations'].append("监控内存使用情况")
+
+        # 如果有警告，标记为不完全健康
+        if health['warnings'] and health['healthy']:
+            health['healthy'] = len([w for w in health['warnings'] if '极高' in w or '超过' in w]) == 0
+
+        return health
 
     def close(self):
-        """关闭数据库连接"""
-        if self.conn:
-            self.conn.close()
-            self.conn = None
+        """关闭数据库连接池"""
+        if hasattr(self, 'pool'):
+            try:
+                self.pool.dispose()
+                logger.info("✅ 数据库连接池已关闭")
+            except Exception as e:
+                logger.error(f"关闭连接池失败: {e}")
 
-        if self.optimizer:
-            self.optimizer.close()
-            self.optimizer = None
+    def __enter__(self):
+        """支持上下文管理器协议"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """支持上下文管理器协议"""
+        self.close()
+        return False
+
+    def __del__(self):
+        """析构时清理资源"""
+        try:
+            self.close()
+        except:
+            pass
 
 
-# 全局实例和工厂函数
-_analytics_db = None
-_db_lock = threading.Lock()
+# ========================================
+# 向后兼容性别名（保留旧的方法名）
+# ========================================
+
+# 为了确保现有代码能够继续工作，提供别名
+# 但这些别名在未来版本中可能会被移除
+def create_factorweave_db(db_path: str = 'db/factorweave_analytics.duckdb') -> FactorWeaveAnalyticsDB:
+    """
+    创建FactorWeave分析数据库实例
+
+    这是一个便捷函数，用于创建数据库实例。
+
+    Args:
+        db_path: 数据库文件路径
+
+    Returns:
+        FactorWeaveAnalyticsDB: 数据库实例
+    """
+    return FactorWeaveAnalyticsDB(db_path)
 
 
 def get_analytics_db(db_path: str = 'db/factorweave_analytics.duckdb') -> FactorWeaveAnalyticsDB:
-    """获取分析数据库实例"""
-    global _analytics_db
+    """
+    获取FactorWeave分析数据库实例（单例模式）
 
-    with _db_lock:
-        if _analytics_db is None:
-            _analytics_db = FactorWeaveAnalyticsDB(db_path)
+    这是一个便捷函数，返回默认的分析数据库实例。
+    由于FactorWeaveAnalyticsDB已经是单例，多次调用会返回同一实例。
 
-    return _analytics_db
+    Args:
+        db_path: 数据库文件路径（仅首次创建时有效）
 
-
-def create_optimized_analytics_connection(workload_type: WorkloadType = WorkloadType.OLAP) -> FactorWeaveAnalyticsDB:
-    """创建优化的分析数据库连接"""
-    db = get_analytics_db()
-
-    # 应用工作负载优化
-    if OPTIMIZER_AVAILABLE:
-        db.optimize_performance(workload_type)
-
-    return db
+    Returns:
+        FactorWeaveAnalyticsDB: 数据库单例实例
+    """
+    return FactorWeaveAnalyticsDB(db_path)

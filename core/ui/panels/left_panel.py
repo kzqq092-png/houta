@@ -130,7 +130,7 @@ class LeftPanel(BasePanel):
 
             # 创建资产类型下拉框
             self.asset_type_combo = QComboBox()
-            self.asset_type_combo.setMinimumHeight(30)
+            # self.asset_type_combo.setMinimumHeight(20)
 
             # 添加支持的资产类型
             asset_types = [

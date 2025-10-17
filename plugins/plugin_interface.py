@@ -11,6 +11,19 @@ from enum import Enum
 from dataclasses import dataclass
 from PyQt5.QtWidgets import QWidget, QMenu, QAction
 from PyQt5.QtCore import QObject, pyqtSignal
+from concurrent.futures import Future, ThreadPoolExecutor
+from datetime import datetime
+
+
+class PluginState(Enum):
+    """插件状态枚举"""
+    CREATED = "created"           # 插件对象已创建
+    INITIALIZING = "initializing"  # 正在同步初始化
+    INITIALIZED = "initialized"   # 同步初始化完成
+    CONNECTING = "connecting"     # 正在异步连接
+    CONNECTED = "connected"       # 连接成功，可用
+    FAILED = "failed"             # 连接失败
+
 
 class PluginType(Enum):
     """插件类型枚举"""
@@ -23,12 +36,14 @@ class PluginType(Enum):
     NOTIFICATION = "notification"    # 通知插件
     CHART_TOOL = "chart_tool"        # 图表工具插件
 
+
 class PluginCategory(Enum):
     """插件分类"""
     CORE = "core"                    # 核心插件
     COMMUNITY = "community"          # 社区插件
     COMMERCIAL = "commercial"        # 商业插件
     EXPERIMENTAL = "experimental"    # 实验性插件
+
 
 @dataclass
 class PluginMetadata:
@@ -50,6 +65,7 @@ class PluginMetadata:
     documentation_url: Optional[str] = None  # 文档地址
     support_url: Optional[str] = None        # 支持地址
     changelog_url: Optional[str] = None      # 更新日志地址
+
 
 class IPlugin(ABC):
     """插件接口基类"""
@@ -119,6 +135,7 @@ class IPlugin(ABC):
         """
         pass
 
+
 class IIndicatorPlugin(IPlugin):
     """技术指标插件接口"""
 
@@ -154,6 +171,7 @@ class IIndicatorPlugin(IPlugin):
             绘图配置
         """
         return {}
+
 
 class IStrategyPlugin(IPlugin):
     """策略插件接口"""
@@ -195,8 +213,18 @@ class IStrategyPlugin(IPlugin):
         """
         return {}
 
+
 class IDataSourcePlugin(IPlugin):
-    """数据源插件接口"""
+    """数据源插件接口（支持异步初始化）"""
+
+    def __init__(self):
+        """初始化插件基类属性"""
+        super().__init__() if hasattr(super(), '__init__') else None
+        self.plugin_state = PluginState.CREATED
+        self._connection_future = None
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix=f"Plugin-{self.__class__.__name__}")
+        self.last_error = None
+        self.initialized = False
 
     @abstractmethod
     def get_data_source_name(self) -> str:
@@ -232,6 +260,98 @@ class IDataSourcePlugin(IPlugin):
         """
         return True
 
+    # === 新增：异步初始化接口 ===
+
+    def connect_async(self) -> Future:
+        """
+        异步连接（在后台线程中建立连接）
+
+        子类如果需要耗时的网络连接操作，应该重写 _do_connect() 方法
+
+        Returns:
+            Future: 连接任务的Future对象，可以查询连接状态
+        """
+        if self.plugin_state == PluginState.CONNECTED:
+            # 已连接，直接返回成功的 Future
+            future = Future()
+            future.set_result(True)
+            return future
+
+        if self._connection_future and not self._connection_future.done():
+            # 连接中，返回现有的 Future
+            return self._connection_future
+
+        # 启动新的连接任务
+        self.plugin_state = PluginState.CONNECTING
+        logger.info(f"[{self.__class__.__name__}] 启动异步连接...")
+        self._connection_future = self._executor.submit(self._do_connect)
+        return self._connection_future
+
+    def _do_connect(self) -> bool:
+        """
+        实际的连接逻辑（在后台线程中执行）
+
+        子类应该重写此方法，实现真正的连接逻辑
+
+        Returns:
+            bool: 连接是否成功
+        """
+        try:
+            # 默认实现：调用test_connection
+            result = self.test_connection()
+            if result:
+                self.plugin_state = PluginState.CONNECTED
+                logger.info(f"[{self.__class__.__name__}] 连接成功")
+            else:
+                self.plugin_state = PluginState.FAILED
+                self.last_error = "Connection test failed"
+                logger.warning(f"[{self.__class__.__name__}] 连接失败")
+            return result
+        except Exception as e:
+            self.plugin_state = PluginState.FAILED
+            self.last_error = str(e)
+            logger.error(f"[{self.__class__.__name__}] 连接异常: {e}")
+            return False
+
+    def is_ready(self) -> bool:
+        """
+        检查插件是否已就绪（已连接）
+
+        Returns:
+            bool: 插件是否可用
+        """
+        return self.plugin_state == PluginState.CONNECTED
+
+    def wait_until_ready(self, timeout: float = 30.0) -> bool:
+        """
+        等待插件就绪（用于首次使用时确保连接已建立）
+
+        Args:
+            timeout: 超时时间（秒）
+
+        Returns:
+            bool: 插件是否就绪
+        """
+        if self.is_ready():
+            return True
+
+        if not self._connection_future:
+            # 还未开始连接，立即启动
+            logger.info(f"[{self.__class__.__name__}] 首次使用，启动连接...")
+            self.connect_async()
+
+        try:
+            # 等待连接完成
+            result = self._connection_future.result(timeout=timeout)
+            return result
+        except TimeoutError:
+            logger.warning(f"[{self.__class__.__name__}] 等待连接超时({timeout}s)")
+            return False
+        except Exception as e:
+            logger.error(f"[{self.__class__.__name__}] 等待连接异常: {e}")
+            return False
+
+
 class IAnalysisPlugin(IPlugin):
     """分析工具插件接口"""
 
@@ -257,6 +377,7 @@ class IAnalysisPlugin(IPlugin):
     def get_analysis_parameters(self) -> Dict[str, Any]:
         """获取分析参数定义"""
         return {}
+
 
 class IUIComponentPlugin(IPlugin):
     """UI组件插件接口"""
@@ -297,6 +418,7 @@ class IUIComponentPlugin(IPlugin):
         """
         return []
 
+
 class IExportPlugin(IPlugin):
     """导出插件接口"""
 
@@ -326,6 +448,7 @@ class IExportPlugin(IPlugin):
         """
         pass
 
+
 class INotificationPlugin(IPlugin):
     """通知插件接口"""
 
@@ -352,6 +475,7 @@ class INotificationPlugin(IPlugin):
     def get_notification_types(self) -> List[str]:
         """获取支持的通知类型"""
         return ["info", "warning", "error"]
+
 
 class IChartToolPlugin(IPlugin):
     """图表工具插件接口"""
@@ -380,6 +504,7 @@ class IChartToolPlugin(IPlugin):
     def deactivate_tool(self) -> None:
         """停用工具"""
         pass
+
 
 class PluginContext:
     """插件上下文"""
@@ -451,6 +576,8 @@ class PluginContext:
         self.config_manager.save_plugin_config(plugin_name, config)
 
 # 插件装饰器
+
+
 def plugin_metadata(**kwargs):
     """
     插件元数据装饰器
@@ -462,6 +589,7 @@ def plugin_metadata(**kwargs):
         cls._plugin_metadata = PluginMetadata(**kwargs)
         return cls
     return decorator
+
 
 def register_plugin(plugin_type: PluginType):
     """

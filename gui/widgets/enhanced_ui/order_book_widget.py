@@ -23,6 +23,7 @@ from loguru import logger
 
 from core.events.event_bus import EventBus, OrderBookEvent
 
+
 class OrderBookDepthChart(FigureCanvas):
     """订单簿深度图表"""
 
@@ -45,10 +46,11 @@ class OrderBookDepthChart(FigureCanvas):
 
     def setup_chart(self):
         """设置图表样式"""
-        self.ax.set_title('订单簿深度图', fontsize=12, fontweight='bold')
-        self.ax.set_xlabel('价格', fontsize=10)
-        self.ax.set_ylabel('累计数量', fontsize=10)
+        self.ax.set_title('订单簿深度图', fontsize=10, fontweight='bold')
+        self.ax.set_xlabel('价格', fontsize=8)
+        self.ax.set_ylabel('累计数量', fontsize=8)
         self.ax.grid(True, alpha=0.3)
+        self.ax.tick_params(axis='both', rotation=0, labelsize=8)
 
         # 设置中文字体
         plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
@@ -107,6 +109,7 @@ class OrderBookDepthChart(FigureCanvas):
 
         except Exception as e:
             logger.error(f"更新订单簿深度图失败: {e}")
+
 
 class OrderBookWidget(QWidget):
     """

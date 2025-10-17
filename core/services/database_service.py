@@ -263,15 +263,9 @@ class DatabaseService(BaseService):
 
         # 默认数据库配置
         self._default_db_configs = {
-            "main_duckdb": DatabaseConfig(
+                        "analytics_duckdb": DatabaseConfig(
                 db_type=DatabaseType.DUCKDB,
-                db_path="data/main.duckdb",
-                pool_size=20,      # 从10增加到20
-                max_pool_size=60   # 从30增加到60
-            ),
-            "analytics_duckdb": DatabaseConfig(
-                db_type=DatabaseType.DUCKDB,
-                db_path="data/analytics.duckdb",
+                db_path="db/factorweave_analytics.duckdb",
                 pool_size=15,      # 从5增加到15
                 max_pool_size=40   # 从20增加到40
             ),
@@ -562,9 +556,18 @@ class DatabaseService(BaseService):
             raise
 
     @contextmanager
-    def get_connection(self, pool_name: str = "main_duckdb") -> Generator[DatabaseConnection, None, None]:
+    def get_connection(self, pool_name: str = "analytics_duckdb") -> Generator[DatabaseConnection, None, None]:
         """
         获取数据库连接（上下文管理器）
+
+        Args:
+            pool_name: 连接池名称，可选值：
+                - "analytics_duckdb": 分析数据库（默认）
+                - "strategy_sqlite": 策略数据库
+
+        Note:
+            - 资产数据（K线等）请使用 AssetSeparatedDatabaseManager
+            - 配置数据请使用 ConfigService
 
         Args:
             pool_name: 连接池名称
@@ -588,7 +591,11 @@ class DatabaseService(BaseService):
     def _get_connection_from_pool(self, pool_name: str) -> DatabaseConnection:
         """从连接池获取连接"""
         if pool_name not in self._connection_pools:
-            raise ValueError(f"Connection pool {pool_name} does not exist")
+            available_pools = list(self._connection_pools.keys())
+            raise ValueError(
+                f"连接池 '{pool_name}' 不存在。"
+                f"可用的连接池: {available_pools}"
+            )
 
         pool_lock = self._pool_locks[pool_name]
 
@@ -637,9 +644,14 @@ class DatabaseService(BaseService):
             metrics.active_connections = max(0, metrics.active_connections - 1)
 
     def execute_query(self, sql: str, parameters: Optional[Dict[str, Any]] = None,
-                      pool_name: str = "main_duckdb") -> Any:
+                      pool_name: str = "analytics_duckdb") -> Any:
         """
         执行查询
+
+        Args:
+            sql: SQL查询语句
+            parameters: 查询参数
+            pool_name: 连接池名称（默认："analytics_duckdb"）
 
         Args:
             sql: SQL语句
@@ -716,8 +728,15 @@ class DatabaseService(BaseService):
             raise
 
     @contextmanager
-    def begin_transaction(self, pool_name: str = "main_duckdb",
+    def begin_transaction(self, pool_name: str = "analytics_duckdb",
                           isolation_level: TransactionIsolationLevel = TransactionIsolationLevel.READ_COMMITTED) -> Generator[str, None, None]:
+        """
+        开始数据库事务
+
+        Args:
+            pool_name: 连接池名称（默认："analytics_duckdb"）
+            isolation_level: 事务隔离级别
+
         """
         开始事务（上下文管理器）
 

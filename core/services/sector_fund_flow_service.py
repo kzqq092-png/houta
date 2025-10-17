@@ -283,11 +283,11 @@ class SectorFundFlowService(QObject):
             if df is None or not isinstance(df, pd.DataFrame):
                 logger.warning(f"无效的输入数据类型: {type(df)}")
                 return pd.DataFrame()
-            
+
             if df.empty:
                 logger.warning("输入数据为空")
                 return df
-            
+
             # 标准化列名
             column_mapping = {
                 '板块': 'sector_name',
@@ -303,6 +303,11 @@ class SectorFundFlowService(QObject):
                 if old_col in df.columns:
                     df = df.rename(columns={old_col: new_col})
 
+            # 处理重复列（如果存在）
+            if df.columns.duplicated().any():
+                logger.warning(f"检测到重复列，移除重复: {df.columns[df.columns.duplicated()].tolist()}")
+                df = df.loc[:, ~df.columns.duplicated(keep='first')]
+
             # 数据类型转换
             numeric_columns = ['main_net_inflow', 'main_net_inflow_ratio',
                                'retail_net_inflow', 'retail_net_inflow_ratio', 'change_pct']
@@ -312,9 +317,9 @@ class SectorFundFlowService(QObject):
                     # 确保列是Series而不是DataFrame
                     col_data = df[col]
                     if isinstance(col_data, pd.DataFrame):
-                        logger.warning(f"列 {col} 是DataFrame而不是Series，跳过转换")
-                        continue
-                    
+                        logger.warning(f"列 {col} 仍是DataFrame（不应该），取第一列")
+                        col_data = col_data.iloc[:, 0]
+
                     # 安全的类型转换
                     try:
                         df[col] = pd.to_numeric(col_data, errors='coerce')
@@ -442,6 +447,20 @@ class SectorFundFlowService(QObject):
                 # 检查每个注册的数据源
                 for source_id in router.get_available_sources(routing_request):
                     try:
+                        # ✅ 新增：确保数据源适配器已就绪
+                        source_instance = router.get_data_source(source_id)
+                        if hasattr(source_instance, 'ensure_ready'):
+                            logger.debug(f"等待数据源 {source_id} 就绪...")
+                            is_ready = source_instance.ensure_ready(timeout=5.0)
+                            if not is_ready:
+                                logger.debug(f"数据源 {source_id} 尚未就绪，跳过检测")
+                                continue
+                        elif hasattr(source_instance, 'is_connected'):
+                            # 检查连接状态
+                            if not source_instance.is_connected():
+                                logger.debug(f"数据源 {source_id} 未连接，跳过检测")
+                                continue
+
                         # 检查是否支持SECTOR_FUND_FLOW
                         supports_fund_flow = self._check_source_supports_fund_flow(source_id, router)
                         if supports_fund_flow:
@@ -452,11 +471,13 @@ class SectorFundFlowService(QObject):
                                 'supports_fund_flow': True,
                                 'router': router
                             }
-                            logger.info(f"发现TET数据源: {source_id} (健康度: {health_score:.2f})")
+                            logger.info(f"✅ 发现TET数据源: {source_id} (健康度: {health_score:.2f})")
                         else:
                             logger.debug(f"🔶 数据源 {source_id} 不支持板块资金流")
                     except Exception as e:
-                        logger.warning(f" 检测数据源 {source_id} 失败: {e}")
+                        logger.warning(f"检测数据源 {source_id} 失败: {e}")
+                        import traceback
+                        logger.debug(traceback.format_exc())
 
         except Exception as e:
             logger.error(f"[ERROR] TET数据源检测失败: {e}")
@@ -499,27 +520,67 @@ class SectorFundFlowService(QObject):
         try:
             from ..plugin_types import DataType, AssetType
 
-            # 获取数据源实例
+            # 获取数据源实例（可能是适配器或插件）
             source_instance = router.get_data_source(source_id)
             if not source_instance:
+                logger.debug(f"数据源 {source_id} 不存在")
                 return False
 
-            # 检查插件信息中的支持数据类型
-            if hasattr(source_instance, 'plugin_info'):
-                plugin_info = source_instance.plugin_info
-                if hasattr(plugin_info, 'supported_data_types'):
-                    return DataType.SECTOR_FUND_FLOW in plugin_info.supported_data_types
+            # ✅ 方法1：调用 get_plugin_info() 方法（适配器）
+            plugin_info = None
+            if hasattr(source_instance, 'get_plugin_info'):
+                try:
+                    plugin_info = source_instance.get_plugin_info()
+                    logger.debug(f"✅ 通过 get_plugin_info() 获取插件信息: {source_id}")
+                except Exception as e:
+                    logger.debug(f"调用 get_plugin_info() 失败: {e}")
 
-            # 检查是否有相关方法
+            # ✅ 方法2：访问 plugin_info 属性（直接插件）
+            elif hasattr(source_instance, 'plugin_info'):
+                try:
+                    plugin_info = source_instance.plugin_info
+                    logger.debug(f"✅ 通过 plugin_info 属性获取插件信息: {source_id}")
+                except Exception as e:
+                    logger.debug(f"访问 plugin_info 属性失败: {e}")
+
+            # ✅ 方法3：通过适配器的 plugin 属性获取（适配器包装）
+            elif hasattr(source_instance, 'plugin'):
+                plugin = source_instance.plugin
+                if hasattr(plugin, 'plugin_info'):
+                    try:
+                        plugin_info = plugin.plugin_info
+                        logger.debug(f"✅ 通过适配器 plugin 属性获取插件信息: {source_id}")
+                    except Exception as e:
+                        logger.debug(f"通过适配器获取插件信息失败: {e}")
+
+            # 检查插件信息中的支持数据类型
+            if plugin_info:
+                if hasattr(plugin_info, 'supported_data_types'):
+                    supports_fund_flow = DataType.SECTOR_FUND_FLOW in plugin_info.supported_data_types
+                    logger.debug(f"数据源 {source_id} 支持数据类型: {plugin_info.supported_data_types}")
+                    logger.debug(f"数据源 {source_id} 是否支持板块资金流: {supports_fund_flow}")
+                    if supports_fund_flow:
+                        return True
+
+            # ✅ 回退方案：检查插件实例是否有相关方法
+            # 首先获取真正的插件实例（处理适配器包装）
+            plugin = source_instance
+            if hasattr(source_instance, 'plugin'):
+                plugin = source_instance.plugin
+
             method_names = ['get_sector_fund_flow_data', 'get_fund_flow', 'get_sector_flow']
             for method_name in method_names:
-                if hasattr(source_instance, method_name):
+                if hasattr(plugin, method_name):
+                    logger.debug(f"数据源 {source_id} 有方法 {method_name}，认为支持板块资金流")
                     return True
 
+            logger.debug(f"🔶 数据源 {source_id} 不支持板块资金流")
             return False
 
         except Exception as e:
-            logger.debug(f"检查数据源 {source_id} 支持情况时出错: {e}")
+            logger.warning(f"检查数据源 {source_id} 支持情况时出错: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
             return False
 
     def _check_legacy_source_supports_fund_flow(self, source_id: str, source_instance) -> bool:

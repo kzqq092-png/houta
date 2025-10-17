@@ -30,6 +30,7 @@ from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthChe
 from core.data_source_data_models import QueryParams
 from core.plugin_types import PluginType, AssetType, DataType
 from core.network.universal_network_config import INetworkConfigurable, NetworkEndpoint, PluginNetworkConfig
+from plugins.plugin_interface import PluginState
 
 logger = logger.bind(module=__name__)
 
@@ -48,15 +49,17 @@ DEFAULT_CONFIG = {
 
 
 class EastMoneyStockPlugin(IDataSourcePlugin):
-    """东方财富股票数据源插件"""
+    """东方财富股票数据源插件（异步优化版）"""
 
     def __init__(self):
+        # 调用父类初始化（设置plugin_state等基础属性）
+        super().__init__()
+
         self.logger = logger  # 添加logger属性
-        self.initialized = False
+        # initialized 和 last_error 已经在父类中定义
         self.config = DEFAULT_CONFIG.copy()
         self.session = None
         self.request_count = 0
-        self.last_error = None
 
         # 插件基本信息
         self.plugin_id = "data_sources.eastmoney_plugin"  # 修正plugin_id属性
@@ -150,7 +153,7 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
 
     def is_connected(self) -> bool:
         """检查连接状态"""
-        return getattr(self, 'initialized', False) and self.session is not None
+        return self.initialized and self.session is not None
 
     def get_connection_info(self):
         """获取连接信息"""
@@ -247,13 +250,19 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
         ]
 
     def initialize(self, config: Dict[str, Any]) -> bool:
-        """初始化插件"""
+        """
+        同步初始化插件（快速，不做网络连接）
+        网络测试已移至 _do_connect() 方法，在后台线程中执行
+        """
         try:
+            self.plugin_state = PluginState.INITIALIZING
+
+            # 合并配置
             merged = DEFAULT_CONFIG.copy()
             merged.update(config or {})
             self.config = merged
 
-            # 创建会话
+            # 创建会话（快速）
             self.session = requests.Session()
             self.session.headers.update({
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -261,11 +270,31 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
                 'Accept': 'application/json, text/plain, */*'
             })
 
-            # 配置参数
+            # 配置参数（快速）
             self.timeout = int(self.config.get('timeout', DEFAULT_CONFIG['timeout']))
             self.max_retries = int(self.config.get('max_retries', DEFAULT_CONFIG['max_retries']))
 
-            # 测试连接
+            # 标记初始化完成（不做网络测试）
+            self.initialized = True
+            self.plugin_state = PluginState.INITIALIZED
+            logger.info("东方财富插件同步初始化完成（<100ms，网络连接将在后台进行）")
+            return True
+
+        except Exception as e:
+            self.last_error = str(e)
+            self.plugin_state = PluginState.FAILED
+            logger.error(f"东方财富股票数据源插件初始化失败: {e}")
+            return False
+
+    def _do_connect(self) -> bool:
+        """
+        实际连接逻辑（在后台线程中执行）
+        将原来在 initialize() 中的网络测试移到这里
+        """
+        try:
+            logger.info("东方财富插件开始连接测试...")
+
+            # 网络测试（原来在 initialize 中的代码）
             base_url = self.config.get('base_url', DEFAULT_CONFIG['base_url'])
             api = self.config.get('api_urls', DEFAULT_CONFIG['api_urls'])
             test_url = f"{base_url}{api['stock_list']}"
@@ -281,27 +310,25 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
                 'fields': 'f12,f14,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11'
             }
 
-            # 尝试测试连接（可选）
-            try:
-                response = self.session.get(test_url, params=params, timeout=self.timeout)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data and 'data' in data and data['data']:
-                        logger.info("东方财富股票数据源插件初始化成功，网络连接正常")
-                    else:
-                        logger.warning("东方财富股票数据源插件初始化成功，但测试数据异常")
-                else:
-                    logger.warning(f"东方财富股票数据源插件初始化成功，但API返回状态码: {response.status_code}")
-            except Exception as test_e:
-                logger.warning(f"东方财富股票数据源插件初始化成功，但网络测试失败: {test_e}")
+            response = self.session.get(test_url, params=params, timeout=self.timeout)
 
-            # 无论网络测试是否成功，都认为插件初始化成功
-            self.initialized = True
-            return True
+            if response.status_code == 200:
+                data = response.json()
+                if data and 'data' in data and data['data']:
+                    logger.info("✅ 东方财富插件连接成功，网络正常")
+                    self.plugin_state = PluginState.CONNECTED
+                    return True
+                else:
+                    logger.warning("⚠️ 东方财富插件连接成功，但测试数据异常")
+                    self.plugin_state = PluginState.CONNECTED  # 仍然认为连接成功
+                    return True
+            else:
+                raise Exception(f"API返回状态码: {response.status_code}")
 
         except Exception as e:
             self.last_error = str(e)
-            logger.error(f"东方财富股票数据源插件初始化失败: {e}")
+            self.plugin_state = PluginState.FAILED
+            logger.error(f"❌ 东方财富插件连接失败: {e}")
             return False
 
     def shutdown(self) -> bool:

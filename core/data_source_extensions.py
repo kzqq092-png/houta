@@ -421,11 +421,45 @@ class DataSourcePluginAdapter:
             return False
 
     def is_connected(self) -> bool:
-        """检查连接状态"""
+        """检查连接状态（支持异步插件）"""
         try:
-            return self.plugin.is_connected()
+            # 优先使用新的 is_ready() 方法（异步插件）
+            if hasattr(self.plugin, 'is_ready'):
+                return self.plugin.is_ready()
+            # 回退到旧的 is_connected() 方法
+            elif hasattr(self.plugin, 'is_connected'):
+                return self.plugin.is_connected()
+            else:
+                return False
         except Exception as e:
             self.logger.error(f"检查连接状态异常: {self.plugin_id} - {e}")
+            return False
+
+    def ensure_ready(self, timeout: float = 30.0) -> bool:
+        """
+        确保插件就绪（用于首次使用时）
+        如果插件尚未连接，会等待连接完成
+
+        Args:
+            timeout: 等待超时时间（秒）
+
+        Returns:
+            bool: 插件是否就绪
+        """
+        try:
+            # 如果已就绪，立即返回
+            if self.is_connected():
+                return True
+
+            # 如果插件支持异步等待，使用它
+            if hasattr(self.plugin, 'wait_until_ready'):
+                self.logger.info(f"等待插件就绪: {self.plugin_id} (最多{timeout}秒)...")
+                return self.plugin.wait_until_ready(timeout=timeout)
+
+            # 否则返回当前状态
+            return self.is_connected()
+        except Exception as e:
+            self.logger.error(f"等待插件就绪异常: {self.plugin_id} - {e}")
             return False
 
     def health_check(self) -> HealthCheckResult:

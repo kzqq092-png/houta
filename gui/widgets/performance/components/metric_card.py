@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QGraphicsD
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
 
+
 class ModernMetricCard(QFrame):
     """现代化指标卡片 - 参考TradingView设计"""
 
@@ -39,7 +40,7 @@ class ModernMetricCard(QFrame):
         """)
 
         # 设置固定大小和阴影效果 - 更紧凑的卡片
-        self.setFixedSize(130, 55)
+        self.setFixedSize(130, 52)
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(10)
         shadow.setOffset(0, 2)

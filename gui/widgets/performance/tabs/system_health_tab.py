@@ -72,6 +72,15 @@ class ModernSystemHealthTab(QWidget):
         control_group.setLayout(control_layout)
         layout.addWidget(control_group)
 
+        # 自适应连接池监控
+        try:
+            from gui.widgets.adaptive_pool_monitor_widget import AdaptivePoolMonitorWidget
+            self.adaptive_pool_monitor = AdaptivePoolMonitorWidget()
+            layout.addWidget(self.adaptive_pool_monitor)
+            logger.info("✅ 自适应连接池监控组件已添加")
+        except Exception as e:
+            logger.warning(f"添加自适应连接池监控组件失败: {e}")
+
         # 健康状态总览
         overview_group = QGroupBox("健康状态总览")
         overview_layout = QGridLayout()
@@ -90,6 +99,7 @@ class ModernSystemHealthTab(QWidget):
             ("内存使用", "memory_usage"),
             ("依赖检查", "dependencies"),
             ("数据库连接", "database_connectivity"),
+            ("连接池健康", "connection_pool_health"),  # ✅ 新增
             ("UI组件", "ui_components")
         ]
 
