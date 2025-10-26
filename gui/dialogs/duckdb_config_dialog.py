@@ -44,7 +44,7 @@ class DuckDBConfigTestThread(QThread):
     def __init__(self, profile: DuckDBConfigProfile):
         super().__init__()
         self.profile = profile
-        self.test_db_path = 'db/test_config_ui.db'
+        self.test_db_path = 'data/test_config_ui.duckdb'
 
     def run(self):
         """运行配置测试"""

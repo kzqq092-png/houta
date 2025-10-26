@@ -864,7 +864,7 @@ class DataService(BaseService):
 
 
 # 便利函数
-def create_data_request(symbol: str, data_type: DataType, asset_type: AssetType = AssetType.STOCK, **kwargs) -> DataRequest:
+def create_data_request(symbol: str, data_type: DataType, asset_type: AssetType = AssetType.STOCK_A, **kwargs) -> DataRequest:
     """创建数据请求的便利函数"""
     import uuid
 

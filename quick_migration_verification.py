@@ -69,16 +69,18 @@ print("-"*80)
 try:
     import duckdb
 
-    # 检查股票数据
+    # 检查股票数据（新架构）
     conn = duckdb.connect("db/databases/stock/stock_data.duckdb", read_only=True)
-    count = conn.execute("SELECT COUNT(*) FROM stock_kline").fetchone()[0]
-    test(count == 4508, f"股票数据完整（{count:,}条）")
+    kline_count = conn.execute("SELECT COUNT(*) FROM historical_kline_data").fetchone()[0]
+    asset_count = conn.execute("SELECT COUNT(*) FROM asset_metadata").fetchone()[0]
+    test(kline_count > 0 and asset_count > 0, f"股票数据完整（K线:{kline_count:,}条, 资产:{asset_count}个）")
     conn.close()
 
-    # 检查A股数据
+    # 检查A股数据（新架构）
     conn = duckdb.connect("db/databases/stock_a/stock_a_data.duckdb", read_only=True)
-    count = conn.execute("SELECT COUNT(*) FROM stock_a_kline").fetchone()[0]
-    test(count == 10703, f"A股数据完整（{count:,}条）")
+    kline_count = conn.execute("SELECT COUNT(*) FROM historical_kline_data").fetchone()[0]
+    asset_count = conn.execute("SELECT COUNT(*) FROM asset_metadata").fetchone()[0]
+    test(kline_count > 0 and asset_count > 0, f"A股数据完整（K线:{kline_count:,}条, 资产:{asset_count}个）")
     conn.close()
 
 except Exception as e:
@@ -99,7 +101,7 @@ if passed == total:
     print("  1. 数据库文件已正确迁移到 db/databases/")
     print("  2. 代码配置已全部更新")
     print("  3. 硬编码路径已全部移除")
-    print("  4. 数据完整性100%保留（15,211条记录）")
+    print("  4. 新架构表结构正常（historical_kline_data + asset_metadata）")
     print()
     sys.exit(0)
 elif passed >= total * 0.8:

@@ -437,7 +437,7 @@ class SectorFundFlowService(QObject):
                 from core.plugin_types import AssetType, DataType
 
                 routing_request = RoutingRequest(
-                    asset_type=AssetType.STOCK,
+                    asset_type=AssetType.STOCK_A,
                     data_type=DataType.SECTOR_FUND_FLOW,
                     symbol="",  # 板块资金流不需要具体股票代码
                     priority=0,

@@ -30,7 +30,7 @@ import sqlite3
 logger = logger
 
 DB_PATH = os.path.join(os.path.dirname(
-    os.path.dirname(__file__)), 'db', 'factorweave_system.sqlite')
+    os.path.dirname(__file__)), 'data', 'factorweave_system.sqlite')
 
 class ConfigManager(QObject):
     """
@@ -197,6 +197,8 @@ class ConfigManager(QObject):
             self.conn.close()
 
 # 为了兼容性，保留原有的函数接口
+
+
 def get_config_manager():
     """获取配置管理器实例"""
     try:
@@ -212,6 +214,8 @@ def get_config_manager():
     return ConfigManager()
 
 # 兼容性别名
+
+
 def create_config_manager():
     """创建配置管理器（兼容性函数）"""
     return get_config_manager()

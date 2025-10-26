@@ -256,9 +256,10 @@ class AssetAwareUnifiedDataManager(UnifiedDataManager):
                 params.append(route_result.primary_source.value)
 
             # 构建查询语句
+            # ✅ 使用unified_best_quality_kline视图，自动选择最优质量数据源
             query = f"""
                 SELECT timestamp, open, high, low, close, volume, amount, data_source, frequency
-                FROM historical_kline_data
+                FROM unified_best_quality_kline
                 WHERE {' AND '.join(where_conditions)}
                 ORDER BY timestamp
             """
@@ -311,9 +312,10 @@ class AssetAwareUnifiedDataManager(UnifiedDataManager):
         # 实时数据通常不存储在历史数据库中，需要调用实时数据源
         # 这里实现一个简单的最新数据查询
         try:
+            # ✅ 使用unified_best_quality_kline视图，自动选择最优质量数据源
             query = """
                 SELECT timestamp, open, high, low, close, volume, amount
-                FROM historical_kline_data
+                FROM unified_best_quality_kline
                 WHERE symbol = ?
                 ORDER BY timestamp DESC
                 LIMIT 1

@@ -263,9 +263,9 @@ class DatabaseService(BaseService):
 
         # 默认数据库配置
         self._default_db_configs = {
-                        "analytics_duckdb": DatabaseConfig(
+            "analytics_duckdb": DatabaseConfig(
                 db_type=DatabaseType.DUCKDB,
-                db_path="db/factorweave_analytics.duckdb",
+                db_path="data/factorweave_analytics.duckdb",
                 pool_size=15,      # 从5增加到15
                 max_pool_size=40   # 从20增加到40
             ),
@@ -731,18 +731,11 @@ class DatabaseService(BaseService):
     def begin_transaction(self, pool_name: str = "analytics_duckdb",
                           isolation_level: TransactionIsolationLevel = TransactionIsolationLevel.READ_COMMITTED) -> Generator[str, None, None]:
         """
-        开始数据库事务
+        开始事务（上下文管理器）
 
         Args:
             pool_name: 连接池名称（默认："analytics_duckdb"）
             isolation_level: 事务隔离级别
-
-        """
-        开始事务（上下文管理器）
-
-        Args:
-            pool_name: 连接池名称
-            isolation_level: 隔离级别
 
         Yields:
             事务ID

@@ -266,7 +266,7 @@ print()
 
 print("📁 新的数据库结构:")
 print("""
-db/
+data/
   ├── 核心系统数据库
   │   ├── factorweave_analytics.duckdb     # 分析数据库
   │   └── factorweave_system.sqlite        # 系统配置

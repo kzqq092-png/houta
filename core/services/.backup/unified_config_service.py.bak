@@ -166,7 +166,7 @@ class UnifiedConfigService(BaseService):
             if not self._db_path:
                 self._db_path = os.path.join(
                     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                    'db', 'factorweave_config.sqlite'
+                    'data', 'factorweave_config.sqlite'
                 )
 
             # 确保配置目录存在

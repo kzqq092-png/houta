@@ -100,6 +100,10 @@ class ImportTaskConfig:
     timeout: int = 300                 # 超时时间(秒)
     progress_interval: int = 5         # 进度更新间隔(秒)
     validate_data: bool = True         # 是否验证数据
+    # 增量更新配置
+    enable_incremental: bool = True    # 是否启用增量更新
+    incremental_days_threshold: int = 7 # 增量更新的天数阈值
+    force_full_update: bool = False    # 强制全量更新
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -112,10 +116,34 @@ class ImportTaskConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ImportTaskConfig':
-        """从字典创建"""
-        data['frequency'] = DataFrequency(data['frequency'])
-        data['mode'] = ImportMode(data['mode'])
-        return cls(**data)
+        """从字典创建（容错处理）"""
+        try:
+            # 处理frequency字段（可能是字符串或枚举值）
+            freq_value = data.get('frequency')
+            if isinstance(freq_value, str):
+                try:
+                    data['frequency'] = DataFrequency(freq_value)
+                except (ValueError, KeyError):
+                    logger.warning(f"无效的频率值 '{freq_value}'，使用默认值 DAILY")
+                    data['frequency'] = DataFrequency.DAILY
+            elif not isinstance(freq_value, DataFrequency):
+                data['frequency'] = DataFrequency.DAILY
+
+            # 处理mode字段（可能是字符串或枚举值）
+            mode_value = data.get('mode')
+            if isinstance(mode_value, str):
+                try:
+                    data['mode'] = ImportMode(mode_value)
+                except (ValueError, KeyError):
+                    logger.warning(f"无效的导入模式 '{mode_value}'，使用默认值 MANUAL")
+                    data['mode'] = ImportMode.MANUAL
+            elif not isinstance(mode_value, ImportMode):
+                data['mode'] = ImportMode.MANUAL
+
+            return cls(**data)
+        except Exception as e:
+            logger.error(f"从字典创建ImportTaskConfig失败: {e}")
+            raise
 
 
 @dataclass
@@ -170,7 +198,7 @@ class ImportConfigManager:
     管理数据源配置、导入任务配置和进度跟踪
     """
 
-    def __init__(self, db_path: str = "db/factorweave_system.sqlite"):
+    def __init__(self, db_path: str = "data/factorweave_system.sqlite"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -255,9 +283,13 @@ class ImportConfigManager:
             for task_id, config_json in cursor.fetchall():
                 try:
                     config_data = json.loads(config_json)
+                    logger.debug(f"加载任务配置: {task_id}, 数据: {config_data.get('name', 'Unknown')}")
                     self._tasks[task_id] = ImportTaskConfig.from_dict(config_data)
+                    logger.info(f"成功加载任务: {task_id} - {self._tasks[task_id].name}")
                 except Exception as e:
                     logger.error(f"加载任务配置失败 {task_id}: {e}")
+                    import traceback
+                    logger.error(f"详细错误: {traceback.format_exc()}")
 
             # 加载进度信息
             cursor.execute("SELECT task_id, progress FROM import_progress")
@@ -267,6 +299,9 @@ class ImportConfigManager:
                     self._progress[task_id] = ImportProgress.from_dict(progress_data)
                 except Exception as e:
                     logger.error(f"加载进度信息失败 {task_id}: {e}")
+
+            # 输出加载统计
+            logger.info(f"配置加载完成 - 数据源: {len(self._data_sources)}, 任务: {len(self._tasks)}, 进度: {len(self._progress)}")
 
     # 数据源配置管理
     def add_data_source(self, config: DataSourceConfig) -> bool:

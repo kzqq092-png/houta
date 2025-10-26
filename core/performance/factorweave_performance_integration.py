@@ -211,20 +211,25 @@ class FactorWeavePerformanceIntegrator:
             stats = []
 
             # 从DuckDB获取最近的策略执行结果
+            # 注意：strategy_execution_results表没有confidence列，使用profit_loss作为性能指标
             recent_strategies = self.analytics_db.execute_query("""
-                SELECT strategy_name, AVG(confidence) as avg_confidence, 
-                       COUNT(*) as execution_count
+                SELECT strategy_name, 
+                       AVG(profit_loss) as avg_profit_loss, 
+                       COUNT(*) as execution_count,
+                       SUM(CASE WHEN profit_loss > 0 THEN 1 ELSE 0 END) * 1.0 / COUNT(*) as win_rate
                 FROM strategy_execution_results 
                 WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL 1 HOUR
                 GROUP BY strategy_name
             """)
 
             for _, row in recent_strategies.iterrows():
+                # 使用胜率(win_rate)作为信号质量和可信度的度量
+                win_rate = row.get('win_rate', 0.5)
                 stats.append({
                     'name': f"strategy_{row['strategy_name']}",
-                    'confidence_avg': row['avg_confidence'],
+                    'confidence_avg': win_rate,  # 使用胜率代替confidence
                     'patterns_found': row['execution_count'],
-                    'signal_quality': row['avg_confidence'],
+                    'signal_quality': win_rate,  # 使用胜率代替confidence
                     'overall_score': self._calculate_strategy_score(row),
                     'conditions': {'type': 'strategy_execution', 'strategy': row['strategy_name']}
                 })
@@ -250,10 +255,20 @@ class FactorWeavePerformanceIntegrator:
     def _calculate_strategy_score(self, row: pd.Series) -> float:
         """计算策略综合评分"""
         try:
-            confidence_score = row.get('avg_confidence', 0.5)
+            # 使用胜率作为策略质量得分
+            win_rate_score = row.get('win_rate', 0.5)
             activity_score = min(row.get('execution_count', 0) / 10, 1.0)
 
-            return (confidence_score + activity_score) / 2
+            # 如果有盈亏数据，也纳入评分
+            avg_profit = row.get('avg_profit_loss', 0)
+            profit_score = 0.5  # 默认值
+            if avg_profit > 0:
+                profit_score = min(0.5 + (avg_profit / 100), 1.0)  # 归一化盈利
+            elif avg_profit < 0:
+                profit_score = max(0.5 + (avg_profit / 100), 0.0)  # 归一化亏损
+
+            # 综合评分：胜率40% + 活跃度30% + 盈利30%
+            return (win_rate_score * 0.4 + activity_score * 0.3 + profit_score * 0.3)
 
         except Exception:
             return 0.5
@@ -290,11 +305,13 @@ class FactorWeavePerformanceIntegrator:
         """获取当前指标值"""
         try:
             if metric_name == 'query_response_time':
+                # performance_metrics表使用timestamp列，不是test_time
                 result = self.analytics_db.execute_query("""
-                    SELECT AVG(execution_time) as avg_time
+                    SELECT AVG(value) as avg_time
                     FROM performance_metrics 
-                    WHERE test_time >= CURRENT_TIMESTAMP - INTERVAL 5 MINUTE
-                      AND execution_time > 0
+                    WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 5 MINUTE
+                      AND metric_name = 'execution_time'
+                      AND value > 0
                 """)
                 return result.iloc[0]['avg_time'] if not result.empty else None
 

@@ -216,11 +216,13 @@ class ServiceBootstrap:
         config_service = ConfigService(config_file='config/config.json', use_sqlite=True)
         config_service.initialize()
         self.service_container.register_instance(ConfigService, config_service)
+        # 也按名称注册，方便通过名称访问
+        self.service_container.register_instance(ConfigService, config_service, name='config_service')
 
         # 为了兼容性，也注册为ConfigManager类型
         from utils.config_manager import ConfigManager
         self.service_container.register_instance(ConfigManager, config_service)
-        logger.info("统一配置服务注册完成")
+        logger.info("统一配置服务注册完成（类型 + 名称 'config_service'）")
 
         # 注册扩展服务 (ExtensionService)
         extension_service = ExtensionService()
@@ -867,7 +869,7 @@ class ServiceBootstrap:
             logger.error(traceback.format_exc())
 
     def _register_advanced_services(self) -> None:
-        """注册高级服务（GPU加速等）"""
+        """注册高级服务（GPU加速、分布式等）"""
         logger.info("注册高级服务...")
 
         # GPU加速服务
@@ -892,6 +894,41 @@ class ServiceBootstrap:
             logger.warning("GPU加速模块不可用，跳过注册")
         except Exception as e:
             logger.error(f" GPU加速服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+        
+        # ✅ 分布式服务
+        try:
+            from .distributed_service import DistributedService
+            
+            def create_distributed_service():
+                """创建分布式服务实例"""
+                service = DistributedService()
+                # 自动启动服务
+                service.start_service()
+                logger.info("分布式服务已启动")
+                return service
+            
+            # 按类型注册（主注册）
+            self.service_container.register_factory(
+                DistributedService,
+                create_distributed_service,
+                scope=ServiceScope.SINGLETON
+            )
+            
+            # 添加名称注册，方便UI按名称访问
+            self.service_container.register_factory(
+                DistributedService,
+                create_distributed_service,
+                scope=ServiceScope.SINGLETON,
+                name='distributed_service'
+            )
+            
+            logger.info("✅ 分布式服务注册完成（类型 + 名称 'distributed_service'）")
+            
+        except ImportError as e:
+            logger.warning(f"分布式服务模块不可用，跳过注册: {e}")
+        except Exception as e:
+            logger.error(f"❌ 分布式服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
     def _register_plugin_manager_early(self) -> None:

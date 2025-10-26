@@ -28,7 +28,7 @@ def get_config() -> Dict[str, Any]:
                 'timeout': 30
             },
             'database': {
-                'path': 'db/factorweave_system.sqlite',
+                'path': 'data/factorweave_system.sqlite',
                 'connection_pool_size': 5
             },
             'import': {
@@ -53,7 +53,7 @@ def get_config() -> Dict[str, Any]:
         logger.warning(f"获取配置失败，使用默认配置: {e}")
         return {
             'real_data': {'cache_ttl': 300},
-            'database': {'path': 'db/factorweave_system.sqlite'},
+            'database': {'path': 'data/factorweave_system.sqlite'},
             'import': {'batch_size': 100}
         }
 

@@ -34,7 +34,7 @@ class PluginDatabaseService(QObject):
 
         # 设置数据库路径
         if db_path is None:
-            db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'db', 'factorweave_system.sqlite')
+            db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'factorweave_system.sqlite')
 
         self.db_path = os.path.abspath(db_path)
         self.db_manager = PluginDatabaseManager(self.db_path)

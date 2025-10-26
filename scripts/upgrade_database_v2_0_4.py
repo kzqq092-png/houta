@@ -234,16 +234,16 @@ def main():
 
     # 需要升级的数据库列表
     db_paths = [
-        "db/factorweave_system.sqlite",
+        "data/factorweave_system.sqlite",
         "data/enhanced_risk_monitor.db",
         # 自动搜索其他数据库
     ]
 
     # 自动搜索db和data目录下的所有数据库文件
-    search_dirs = ['db', 'data']
+    search_dirs = [ 'data']
     for search_dir in search_dirs:
         if Path(search_dir).exists():
-            for ext in ['*.db', '*.sqlite', '*.duckdb']:
+            for ext in ['*.sqlite', '*.duckdb']:
                 db_paths.extend(Path(search_dir).rglob(ext))
 
     # 去重

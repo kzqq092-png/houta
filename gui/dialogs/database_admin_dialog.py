@@ -18,15 +18,15 @@ class DatabaseScanThread(QThread):
     scan_error = pyqtSignal(str)
 
     def run(self):
-        """执行数据库扫描 - 递归扫描db目录最大5层深度"""
+        """执行数据库扫描 - 递归扫描data目录最大5层深度"""
         try:
             databases = {
                 'sqlite': [],
                 'duckdb': []
             }
 
-            # 扫描db目录
-            db_dir = os.path.join(os.getcwd(), 'db')
+            # 扫描data目录（数据库统一存储位置）
+            db_dir = os.path.join(os.getcwd(), 'data')
             if not os.path.exists(db_dir):
                 logger.warning(f"数据库目录不存在: {db_dir}")
                 self.scan_completed.emit(databases)
@@ -221,7 +221,7 @@ class TypeDelegate(QStyledItemDelegate):
 class TableDescriptionManager:
     """表描述管理器"""
 
-    def __init__(self, system_db_path="db/factorweave_system.sqlite"):
+    def __init__(self, system_db_path="data/factorweave_system.sqlite"):
         self.system_db_path = system_db_path
 
     def get_description(self, database_path, table_name):
@@ -322,6 +322,9 @@ class DatabaseAdminDialog(QDialog):
         self.selected_db_path = db_path  # 当前选择的数据库路径
 
         self.init_ui()
+
+        # 加载字段权限配置
+        self.load_field_permissions()
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -790,48 +793,102 @@ class DatabaseAdminDialog(QDialog):
         if not table_name:
             return
 
-        # 使用 load_table_data 来支持分页
-        self.load_table_data(table_name)
+        # 重新加载当前表数据
+        current_item = self.table_list.currentItem()
+        if current_item:
+            self.load_table(current_item)
 
     def add_row(self):
-        if hasattr(self, 'model'):
-            self.model.insertRow(self.model.rowCount())
-            self.log.append(f"新增行于表 {self.current_table}")
+        if hasattr(self, 'model') and self.model:
+            try:
+                self.model.insertRow(self.model.rowCount())
+                self.log.append(f"新增行于表 {self.current_table}")
+                logger.info(f"新增行到表 {self.current_table}")
+            except Exception as e:
+                error_msg = f"新增行失败: {str(e)}"
+                logger.error(error_msg)
+                QMessageBox.warning(self, "错误", error_msg)
 
     def del_row(self):
-        if hasattr(self, 'model'):
-            idxs = self.table_view.selectionModel().selectedRows()
-            if not idxs:
-                return
-            if QMessageBox.question(self, "确认删除", f"确定要删除选中{len(idxs)}行吗？") == QMessageBox.Yes:
-                for idx in sorted(idxs, key=lambda x: -x.row()):
-                    self.model.removeRow(idx.row())
-                self.log.append(f"批量删除{len(idxs)}行于表 {self.current_table}")
+        if hasattr(self, 'model') and self.model:
+            try:
+                idxs = self.table_view.selectionModel().selectedRows()
+                if not idxs:
+                    QMessageBox.information(self, "提示", "请先选择要删除的行")
+                    return
+
+                if QMessageBox.question(self, "确认删除", f"确定要删除选中{len(idxs)}行吗？") == QMessageBox.Yes:
+                    for idx in sorted(idxs, key=lambda x: -x.row()):
+                        self.model.removeRow(idx.row())
+                    self.log.append(f"批量删除{len(idxs)}行于表 {self.current_table}")
+                    logger.info(f"批量删除{len(idxs)}行于表 {self.current_table}")
+            except Exception as e:
+                error_msg = f"删除行失败: {str(e)}"
+                logger.error(error_msg)
+                QMessageBox.warning(self, "错误", error_msg)
 
     def save_changes(self):
-        if hasattr(self, 'model'):
-            if not self.model.submitAll():
-                QMessageBox.warning(
-                    self, "保存失败", self.model.lastError().text())
-            else:
-                QMessageBox.information(self, "保存成功", "所有更改已保存！")
-                self.log.append(f"保存更改于表 {self.current_table}")
+        if hasattr(self, 'model') and self.model:
+            try:
+                logger.info(f"开始保存更改到表 {self.current_table}")
+
+                if not self.model.submitAll():
+                    error_text = ""
+                    if hasattr(self.model, 'lastError'):
+                        error_info = self.model.lastError()
+                        if hasattr(error_info, 'text'):
+                            error_text = error_info.text()
+
+                    error_msg = error_text or "保存失败，请查看日志"
+                    logger.error(f"保存失败: {error_msg}")
+                    QMessageBox.warning(self, "保存失败", error_msg)
+                else:
+                    QMessageBox.information(self, "保存成功", "所有更改已保存！")
+                    self.log.append(f"保存更改于表 {self.current_table}")
+                    logger.info(f"保存更改成功")
+
+                    # 刷新数据显示
+                    self.refresh_table()
+
+            except Exception as e:
+                error_msg = f"保存更改失败: {str(e)}"
+                logger.error(error_msg)
+                import traceback
+                logger.error(traceback.format_exc())
+                QMessageBox.warning(self, "错误", error_msg)
 
     def import_csv(self):
+        if not hasattr(self, 'model') or not self.model:
+            QMessageBox.warning(self, "警告", "请先选择一个表")
+            return
+
         path, _ = QFileDialog.getOpenFileName(
             self, "导入CSV", "", "CSV Files (*.csv)")
         if not path:
             return
-        with open(path, encoding='utf-8') as f:
-            reader = csv.reader(f)
-            headers = next(reader)
-            for row in reader:
-                self.model.insertRow(self.model.rowCount())
-                for col, val in enumerate(row):
-                    self.model.setData(self.model.index(
-                        self.model.rowCount()-1, col), val)
-        QMessageBox.information(self, "导入完成", "CSV数据已导入，记得保存！")
-        self.log.append(f"导入CSV到表 {self.current_table}")
+
+        try:
+            logger.info(f"开始导入CSV: {path}")
+            with open(path, encoding='utf-8') as f:
+                reader = csv.reader(f)
+                headers = next(reader)
+                row_count = 0
+
+                for row in reader:
+                    row_index = self.model.rowCount()
+                    self.model.insertRow(row_index)
+                    for col, val in enumerate(row):
+                        if col < len(headers):
+                            self.model.setData(self.model.index(row_index, col), val)
+                    row_count += 1
+
+            logger.info(f"CSV导入完成，共导入 {row_count} 行")
+            QMessageBox.information(self, "导入完成", f"CSV数据已导入 {row_count} 行，记得保存！")
+            self.log.append(f"导入CSV到表 {self.current_table}，{row_count} 行")
+        except Exception as e:
+            error_msg = f"导入CSV失败: {str(e)}"
+            logger.error(error_msg)
+            QMessageBox.warning(self, "错误", error_msg)
 
     def export_csv(self):
         path, _ = QFileDialog.getSaveFileName(
@@ -868,13 +925,17 @@ class DatabaseAdminDialog(QDialog):
         """上一页"""
         if self.current_page > 0:
             self.current_page -= 1
-            self.load_table_data(self.current_table)
+            current_item = self.table_list.currentItem()
+            if current_item:
+                self.load_table(current_item)
 
     def next_page(self):
         """下一页"""
         if self.current_page < self.total_pages - 1:
             self.current_page += 1
-            self.load_table_data(self.current_table)
+            current_item = self.table_list.currentItem()
+            if current_item:
+                self.load_table(current_item)
 
     def update_page_label(self):
         """更新分页标签（使用实例变量）"""
@@ -1087,6 +1148,69 @@ class DatabaseAdminDialog(QDialog):
         apply_btn.clicked.connect(do_batch)
         dlg.exec_()
 
+    def save_field_permissions(self):
+        """保存字段权限配置到JSON文件"""
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        try:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+
+            # 保存权限配置
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.field_permissions, f, ensure_ascii=False, indent=2)
+
+            # 记录到日志
+            log_path = os.path.join(os.path.dirname(
+                __file__), 'db_field_permissions_log.json')
+
+            # 创建变更日志条目
+            log_entry = {
+                'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'diff': []
+            }
+
+            # 尝试加载现有日志
+            logs = []
+            if os.path.exists(log_path):
+                try:
+                    with open(log_path, 'r', encoding='utf-8') as f:
+                        logs = json.load(f)
+                except Exception:
+                    logs = []
+
+            logs.append(log_entry)
+
+            # 保存日志（限制日志数量）
+            if len(logs) > 100:
+                logs = logs[-100:]  # 只保留最近100条
+
+            with open(log_path, 'w', encoding='utf-8') as f:
+                json.dump(logs, f, ensure_ascii=False, indent=2)
+
+            logger.info(f"字段权限配置已保存: {config_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"保存字段权限配置失败: {e}")
+            return False
+
+    def load_field_permissions(self):
+        """从JSON文件加载字段权限配置"""
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    self.field_permissions = json.load(f)
+                logger.info(f"字段权限配置已加载: {config_path}")
+            else:
+                self.field_permissions = {}
+                logger.warning(f"字段权限配置文件不存在: {config_path}")
+        except Exception as e:
+            logger.error(f"加载字段权限配置失败: {e}")
+            self.field_permissions = {}
+
     def upload_permissions_to_cloud(self):
         config_path = os.path.join(os.path.dirname(
             __file__), 'db_field_permissions.json')
@@ -1173,6 +1297,12 @@ class DatabaseAdminDialog(QDialog):
         if not table:
             QMessageBox.warning(self, "未选择表", "请先选择要管理结构的表")
             return
+
+        # 检查是否为DuckDB，如果是则只提供删除功能
+        if self.current_db_type == 'duckdb':
+            self._show_duckdb_schema_manager(table)
+            return
+
         dlg = QDialog(self)
         dlg.setWindowTitle(f"表结构管理 - {table}")
         vbox = QVBoxLayout(dlg)
@@ -1258,15 +1388,36 @@ class DatabaseAdminDialog(QDialog):
             if reply != QMessageBox.Yes:
                 return
             try:
+                logger.info(f"开始删除表: {table}")
                 # 关闭可能的外键约束影响
-                self.db.exec("PRAGMA foreign_keys = OFF;")
-                self.db.exec(f"DROP TABLE IF EXISTS {table};")
-                self.db.exec("PRAGMA foreign_keys = ON;")
+                result = self.db.exec("PRAGMA foreign_keys = OFF;")
+                logger.debug(f"PRAGMA foreign_keys = OFF 执行结果: {result}")
+
+                # 执行删除操作
+                drop_sql = f"DROP TABLE IF EXISTS {table};"
+                logger.info(f"执行SQL: {drop_sql}")
+                result = self.db.exec(drop_sql)
+                logger.debug(f"DROP TABLE 执行结果: {result}")
+
+                # 检查是否有错误
+                if self.db.lastError().isValid():
+                    error_msg = self.db.lastError().text()
+                    logger.error(f"删除表失败: {error_msg}")
+                    raise Exception(error_msg)
+
+                result = self.db.exec("PRAGMA foreign_keys = ON;")
+                logger.debug(f"PRAGMA foreign_keys = ON 执行结果: {result}")
+
+                logger.info(f"表 {table} 删除成功")
                 QMessageBox.information(dlg, "成功", f"已删除表 {table}")
-                self.refresh_table()
+
+                # 重新加载表列表
+                self._reload_database_tables()
                 dlg.accept()
             except Exception as e:
-                QMessageBox.critical(dlg, "删除失败", str(e))
+                error_msg = f"删除表失败: {str(e)}"
+                logger.error(error_msg)
+                QMessageBox.critical(dlg, "删除失败", error_msg)
 
         def edit_comment():
             item = field_list.currentItem()
@@ -1292,6 +1443,96 @@ class DatabaseAdminDialog(QDialog):
         type_btn.clicked.connect(change_type)
         comment_btn.clicked.connect(edit_comment)
         drop_table_btn.clicked.connect(drop_table)
+
+        dlg.exec_()
+
+    def _show_duckdb_schema_manager(self, table):
+        """DuckDB表结构管理器"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"表结构管理 - {table} (DuckDB)")
+        dlg.resize(500, 400)
+        vbox = QVBoxLayout(dlg)
+
+        # 提示信息
+        info_label = QLabel("当前为DuckDB数据库")
+        info_label.setStyleSheet("color: #2196F3; font-weight: bold; padding: 10px;")
+        vbox.addWidget(info_label)
+
+        # 表信息
+        try:
+            if hasattr(self, '_duckdb_conn'):
+                # 获取表结构
+                schema_result = self._duckdb_conn.execute(f"DESCRIBE {table}").fetchall()
+
+                field_list = QListWidget()
+                for col_info in schema_result:
+                    field_name = col_info[0]
+                    field_type = col_info[1]
+                    field_list.addItem(f"{field_name} ({field_type})")
+
+                vbox.addWidget(QLabel("字段列表（只读）："))
+                vbox.addWidget(field_list)
+        except Exception as e:
+            error_label = QLabel(f"获取表结构失败: {str(e)}")
+            error_label.setStyleSheet("color: red;")
+            vbox.addWidget(error_label)
+            logger.error(f"获取DuckDB表结构失败: {e}")
+
+        # 删除表按钮
+        drop_table_btn = QPushButton("删除整表")
+        drop_table_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        vbox.addWidget(drop_table_btn)
+
+        def drop_duckdb_table():
+            reply = QMessageBox.question(
+                dlg, "确认删除",
+                f"确定要删除整张表 {table} 吗？该操作不可恢复！",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+            try:
+                logger.info(f"开始删除DuckDB表: {table}")
+
+                if not hasattr(self, '_duckdb_conn'):
+                    raise Exception("DuckDB连接不存在")
+
+                # 执行删除操作
+                drop_sql = f"DROP TABLE IF EXISTS {table};"
+                logger.info(f"执行SQL: {drop_sql}")
+                self._duckdb_conn.execute(drop_sql)
+
+                logger.info(f"表 {table} 删除成功")
+                QMessageBox.information(dlg, "成功", f"已删除表 {table}")
+
+                # 重新加载表列表
+                self._reload_database_tables()
+                dlg.accept()
+
+            except Exception as e:
+                error_msg = f"删除表失败: {str(e)}"
+                logger.error(error_msg)
+                QMessageBox.critical(dlg, "删除失败", error_msg)
+
+        drop_table_btn.clicked.connect(drop_duckdb_table)
+
+        # 关闭按钮
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dlg.accept)
+        vbox.addWidget(close_btn)
 
         dlg.exec_()
 
@@ -1551,7 +1792,7 @@ class DatabaseAdminDialog(QDialog):
             else:
                 # SQLite 处理（原有逻辑）
                 # 关闭当前数据库连接
-                if hasattr(self, 'db') and self.db.isOpen():
+                if hasattr(self, 'data') and self.db.isOpen():
                     self.db.close()
 
                 # 重新连接数据库
@@ -1584,17 +1825,22 @@ class DatabaseAdminDialog(QDialog):
             QMessageBox.critical(self, "错误", f"重新加载数据库表失败: {str(e)}")
 
     def _create_duckdb_table_model(self, schema_result, data_result, total_rows):
-        """为 DuckDB 创建自定义表模型"""
+        """为 DuckDB 创建可编辑的自定义表模型"""
 
         class DuckDBTableModel(QAbstractTableModel):
-            def __init__(self, schema, data, parent=None):
+            def __init__(self, schema, data, conn, table_name, parent=None):
                 super().__init__(parent)
                 self.schema = schema  # [(column_name, data_type, null, key, default, extra), ...]
-                self.data = data
+                self._data = [list(row) for row in data]  # 转换为可修改的列表
                 self.headers = [col[0] for col in schema]
+                self.conn = conn  # DuckDB连接
+                self.table_name = table_name
+                self._deleted_rows = []  # 记录待删除的行
+                self._new_rows = []  # 记录新增的行索引
+                self._modified_cells = {}  # 记录修改的单元格 {(row, col): value}
 
             def rowCount(self, parent=None):
-                return len(self.data)
+                return len(self._data)
 
             def columnCount(self, parent=None):
                 return len(self.headers)
@@ -1603,21 +1849,200 @@ class DatabaseAdminDialog(QDialog):
                 if not index.isValid():
                     return QVariant()
 
-                if role == Qt.DisplayRole:
-                    return str(self.data[index.row()][index.column()])
+                if role == Qt.DisplayRole or role == Qt.EditRole:
+                    try:
+                        value = self._data[index.row()][index.column()]
+                        return str(value) if value is not None else ""
+                    except IndexError:
+                        return QVariant()
+
+                # 标记修改过的单元格
+                if role == Qt.BackgroundRole:
+                    if (index.row(), index.column()) in self._modified_cells:
+                        return QBrush(QColor(255, 255, 200))  # 浅黄色背景
+                    if index.row() in self._new_rows:
+                        return QBrush(QColor(200, 255, 200))  # 浅绿色背景
 
                 return QVariant()
+
+            def setData(self, index, value, role=Qt.EditRole):
+                """设置数据"""
+                if not index.isValid() or role != Qt.EditRole:
+                    return False
+
+                try:
+                    row, col = index.row(), index.column()
+                    self._data[row][col] = value
+                    self._modified_cells[(row, col)] = value
+                    self.dataChanged.emit(index, index)
+                    return True
+                except Exception as e:
+                    logger.error(f"设置数据失败: {e}")
+                    return False
+
+            def flags(self, index):
+                """设置单元格标志（可编辑）"""
+                if not index.isValid():
+                    return Qt.ItemIsEnabled
+                return Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable
 
             def headerData(self, section, orientation, role=Qt.DisplayRole):
                 if role == Qt.DisplayRole and orientation == Qt.Horizontal:
                     return self.headers[section]
                 return QVariant()
 
+            def insertRow(self, row, parent=None):
+                """插入新行"""
+                try:
+                    self.beginInsertRows(parent or QVariant(), row, row)
+                    # 创建空行
+                    new_row = [None] * len(self.headers)
+                    self._data.insert(row, new_row)
+                    self._new_rows.append(row)
+                    self.endInsertRows()
+                    logger.info(f"新增行: {row}")
+                    return True
+                except Exception as e:
+                    logger.error(f"插入行失败: {e}")
+                    return False
+
+            def removeRow(self, row, parent=None):
+                """删除行"""
+                try:
+                    if row < 0 or row >= len(self._data):
+                        return False
+
+                    self.beginRemoveRows(parent or QVariant(), row, row)
+                    deleted_data = self._data.pop(row)
+
+                    # 如果不是新增的行，记录到待删除列表
+                    if row not in self._new_rows:
+                        self._deleted_rows.append(deleted_data)
+                    else:
+                        self._new_rows.remove(row)
+
+                    # 更新修改记录中的行号
+                    new_modified = {}
+                    for (r, c), v in self._modified_cells.items():
+                        if r < row:
+                            new_modified[(r, c)] = v
+                        elif r > row:
+                            new_modified[(r - 1, c)] = v
+                    self._modified_cells = new_modified
+
+                    self.endRemoveRows()
+                    logger.info(f"删除行: {row}")
+                    return True
+                except Exception as e:
+                    logger.error(f"删除行失败: {e}")
+                    return False
+
+            def submitAll(self):
+                """提交所有更改到DuckDB"""
+                try:
+                    logger.info(f"开始提交更改到表: {self.table_name}")
+
+                    # 1. 删除行
+                    for row_data in self._deleted_rows:
+                        # 构建WHERE条件（使用所有列）
+                        conditions = []
+                        params = []
+                        for i, (header, value) in enumerate(zip(self.headers, row_data)):
+                            if value is None:
+                                conditions.append(f"{header} IS NULL")
+                            else:
+                                conditions.append(f"{header} = ?")
+                                params.append(value)
+
+                        if conditions:
+                            delete_sql = f"DELETE FROM {self.table_name} WHERE {' AND '.join(conditions)}"
+                            logger.debug(f"执行删除SQL: {delete_sql}")
+                            self.conn.execute(delete_sql, params)
+
+                    # 2. 更新修改的单元格
+                    updated_rows = set()
+                    for (row, col) in self._modified_cells.keys():
+                        if row not in self._new_rows:
+                            updated_rows.add(row)
+
+                    for row in updated_rows:
+                        # 构建UPDATE语句
+                        set_clauses = []
+                        set_params = []
+                        for col in range(len(self.headers)):
+                            if (row, col) in self._modified_cells:
+                                set_clauses.append(f"{self.headers[col]} = ?")
+                                set_params.append(self._data[row][col])
+
+                        # 构建WHERE条件（使用原始数据）
+                        # 这里简化处理：假设有主键或使用所有列匹配
+                        where_clauses = []
+                        where_params = []
+                        for col, header in enumerate(self.headers):
+                            if (row, col) not in self._modified_cells:
+                                value = self._data[row][col]
+                                if value is None:
+                                    where_clauses.append(f"{header} IS NULL")
+                                else:
+                                    where_clauses.append(f"{header} = ?")
+                                    where_params.append(value)
+
+                        if set_clauses and where_clauses:
+                            update_sql = f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE {' AND '.join(where_clauses)}"
+                            logger.debug(f"执行更新SQL: {update_sql}")
+                            self.conn.execute(update_sql, set_params + where_params)
+
+                    # 3. 插入新行
+                    for row in self._new_rows:
+                        if row < len(self._data):
+                            row_data = self._data[row]
+                            placeholders = ', '.join(['?'] * len(row_data))
+                            columns = ', '.join(self.headers)
+                            insert_sql = f"INSERT INTO {self.table_name} ({columns}) VALUES ({placeholders})"
+                            logger.debug(f"执行插入SQL: {insert_sql}")
+                            self.conn.execute(insert_sql, row_data)
+
+                    # 清空修改记录
+                    self._deleted_rows.clear()
+                    self._new_rows.clear()
+                    self._modified_cells.clear()
+
+                    logger.info(f"提交更改成功")
+                    return True
+
+                except Exception as e:
+                    logger.error(f"提交更改失败: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    return False
+
+            def lastError(self):
+                """返回最后的错误（兼容接口）"""
+                class ErrorInfo:
+                    def __init__(self):
+                        self._text = ""
+
+                    def text(self):
+                        return self._text
+
+                    def isValid(self):
+                        return bool(self._text)
+
+                    def set_text(self, text):
+                        self._text = text
+
+                return ErrorInfo()
+
         # 创建并设置模型
         if hasattr(self, 'model'):
             self.model.deleteLater()
 
-        self.model = DuckDBTableModel(schema_result, data_result)
+        self.model = DuckDBTableModel(
+            schema_result,
+            data_result,
+            self._duckdb_conn,
+            self.current_table
+        )
         self.table_view.setModel(self.model)
 
     def _filter_database_files(self):
@@ -1636,7 +2061,7 @@ class DatabaseAdminDialog(QDialog):
                     self.db_file_combo.addItem(display_text, db_info['path'])
 
     def _scan_databases_async(self):
-        """异步扫描db目录中的数据库文件"""
+        """异步扫描data目录中的数据库文件"""
         from PyQt5.QtCore import QThread, pyqtSignal
 
         # 如果已有扫描线程在运行，先停止
@@ -1672,7 +2097,7 @@ class DatabaseAdminDialog(QDialog):
         all_dirs = set()
         for db_list in databases.values():
             for db_info in db_list:
-                all_dirs.add(db_info.get('directory', 'db'))
+                all_dirs.add(db_info.get('directory', 'data'))
 
         dirs_info = f"扫描目录: {', '.join(sorted(all_dirs))}" if len(all_dirs) > 1 else f"扫描目录: {list(all_dirs)[0]}"
 
@@ -1743,13 +2168,13 @@ class DatabaseAdminDialog(QDialog):
             # 按目录分组显示数据库文件
             databases_by_dir = {}
             for db_info in self.available_databases[db_type]:
-                directory = db_info.get('directory', 'db')
+                directory = db_info.get('directory', 'data')
                 if directory not in databases_by_dir:
                     databases_by_dir[directory] = []
                 databases_by_dir[directory].append(db_info)
 
             # 按目录名排序，优先显示根目录
-            sorted_dirs = sorted(databases_by_dir.keys(), key=lambda x: (x != 'db', x))
+            sorted_dirs = sorted(databases_by_dir.keys(), key=lambda x: (x != 'data', x))
 
             for directory in sorted_dirs:
                 # 添加目录分隔符（仅当有多个目录时）
@@ -1880,19 +2305,24 @@ class DatabaseAdminDialog(QDialog):
         """切换编辑模式"""
         try:
             if hasattr(self, 'model') and self.model:
-                # 检查当前是否处于编辑模式
-                current_strategy = self.model.editStrategy()
+                # 检查是否为SQLite模型（只有SQLite模型支持编辑策略）
+                if isinstance(self.model, QSqlTableModel):
+                    # 检查当前是否处于编辑模式
+                    current_strategy = self.model.editStrategy()
 
-                if current_strategy == QSqlTableModel.OnManualSubmit:
-                    # 当前是手动提交模式，切换到自动提交
-                    self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
-                    self.edit_btn.setText("锁定编辑")
-                    QMessageBox.information(self, "编辑模式", "已启用自动编辑模式")
+                    if current_strategy == QSqlTableModel.OnManualSubmit:
+                        # 当前是手动提交模式，切换到自动提交
+                        self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
+                        self.edit_btn.setText("锁定编辑")
+                        QMessageBox.information(self, "编辑模式", "已启用自动编辑模式")
+                    else:
+                        # 当前是自动提交模式，切换到手动提交
+                        self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
+                        self.edit_btn.setText("编辑")
+                        QMessageBox.information(self, "编辑模式", "已切换到手动提交模式")
                 else:
-                    # 当前是自动提交模式，切换到手动提交
-                    self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
-                    self.edit_btn.setText("编辑")
-                    QMessageBox.information(self, "编辑模式", "已切换到手动提交模式")
+                    # DuckDB模型默认手动提交模式
+                    QMessageBox.information(self, "提示", "DuckDB数据库采用手动提交模式，请修改后点击'保存修改'按钮")
             else:
                 QMessageBox.warning(self, "警告", "请先选择一个表")
         except Exception as e:
@@ -2114,7 +2544,7 @@ class DatabaseAdminDialog(QDialog):
                 self.model = None
 
             # 关闭数据库连接
-            if hasattr(self, 'db') and self.db and self.db.isOpen():
+            if hasattr(self, 'data') and self.db and self.db.isOpen():
                 self.db.close()
 
             # 移除数据库连接（使用唯一的连接名称）

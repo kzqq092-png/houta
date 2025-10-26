@@ -13,10 +13,10 @@ class UIAssetTypeUtils:
 
     # 资产类型中文显示名称映射
     DISPLAY_NAMES: Dict[AssetType, str] = {
-        # 股票类
-        AssetType.STOCK: "股票（通用）",
+        # 股票类（移除通用股票类型）
+        # AssetType.STOCK_A: "股票（通用）",  # 已移除
+        AssetType.STOCK_A: "A股",           # 默认股票类型
         AssetType.STOCK_US: "美股",
-        AssetType.STOCK_A: "A股",
         AssetType.STOCK_B: "B股",
         AssetType.STOCK_H: "H股",
         AssetType.STOCK_HK: "港股",
@@ -103,7 +103,7 @@ class UIAssetTypeUtils:
     @classmethod
     def get_asset_type(cls, display_name: str) -> AssetType:
         """根据中文显示名称获取AssetType"""
-        return cls.REVERSE_MAPPING.get(display_name, AssetType.STOCK)
+        return cls.REVERSE_MAPPING.get(display_name, AssetType.STOCK_A)
 
     @classmethod
     def get_common_display_names(cls) -> List[str]:

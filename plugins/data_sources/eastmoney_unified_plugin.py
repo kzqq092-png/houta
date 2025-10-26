@@ -44,6 +44,12 @@ class EastmoneyUnifiedPlugin(IDataSourcePlugin):
     def __init__(self, plugin_id: str = "eastmoney_unified"):
         self.plugin_id = plugin_id
         self.logger = logger.bind(plugin_id=self.plugin_id)
+
+        # 必须显式初始化这些属性（IDataSourcePlugin是抽象基类，不提供默认实现）
+        self.initialized = False
+        self.last_error = None
+        self.plugin_state = PluginState.CREATED  # 初始状态（插件对象已创建）
+
         self._is_connected = False
         self.session = requests.Session()
 
@@ -106,7 +112,7 @@ class EastmoneyUnifiedPlugin(IDataSourcePlugin):
                     # 资金流向
                     DataType.MONEY_FLOW
                 ],
-                'asset_types': [AssetType.STOCK, AssetType.FUND, AssetType.BOND, AssetType.INDEX],
+                'asset_types': [AssetType.STOCK_A, AssetType.FUND, AssetType.BOND, AssetType.INDEX],
                 'features': [
                     'realtime_data', 'historical_data', 'fundamental_data',
                     'macro_data', 'money_flow', 'websocket_support'
@@ -331,7 +337,7 @@ class EastmoneyUnifiedPlugin(IDataSourcePlugin):
     # 工具方法
     def _format_symbol(self, symbol: str, asset_type: AssetType) -> str:
         """格式化股票代码为东方财富格式"""
-        if asset_type == AssetType.STOCK:
+        if asset_type == AssetType.STOCK_A:
             if symbol.startswith('6'):
                 return f"1.{symbol}"  # 上海
             elif symbol.startswith(('0', '3')):

@@ -19,9 +19,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .plugin_types import AssetType, DataType
 from .data_source_router import DataSourceRouter, RoutingRequest, RoutingStrategy
 from .data_source_extensions import IDataSourcePlugin, DataSourcePluginAdapter, HealthCheckResult
-from .data.field_mapping_engine import FieldMappingEngine
+# NOTE: FieldMappingEngine使用延迟导入避免循环依赖
+# from .data.field_mapping_engine import FieldMappingEngine
 
 logger = logger
+
 
 @dataclass
 class StandardQuery:
@@ -47,6 +49,7 @@ class StandardQuery:
         if self.extra_params is None:
             self.extra_params = {}
 
+
 @dataclass
 class StandardData:
     """标准化数据输出"""
@@ -58,6 +61,7 @@ class StandardData:
     success: bool = True  # 处理是否成功
     error_message: Optional[str] = None  # 错误信息（如有）
 
+
 @dataclass
 class FailoverResult:
     """故障转移结果"""
@@ -67,6 +71,7 @@ class FailoverResult:
     successful_source: Optional[str]
     error_messages: List[str]
     total_time_ms: float
+
 
 class TETDataPipeline:
     """
@@ -339,8 +344,13 @@ class TETDataPipeline:
         # 空值表示（用于清理数据）
         self.null_values = ['N/A', 'null', 'NULL', '', 'nan', 'NaN', 'None', '--', '-']
 
-        # Stage 3 新增：智能字段映射引擎
-        self.field_mapping_engine = FieldMappingEngine(self.field_mappings)
+        # Stage 3 新增：智能字段映射引擎（延迟导入避免循环依赖）
+        try:
+            from .data.field_mapping_engine import FieldMappingEngine
+            self.field_mapping_engine = FieldMappingEngine(self.field_mappings)
+        except ImportError as e:
+            logger.warning(f"无法导入FieldMappingEngine，将使用基础映射: {e}")
+            self.field_mapping_engine = None
 
     def register_plugin(self, plugin_id: str, plugin: IDataSourcePlugin) -> bool:
         """
@@ -722,14 +732,18 @@ class TETDataPipeline:
         try:
             self.logger.info(f"开始数据标准化，数据类型: {query.data_type}, 原始字段: {list(raw_data.columns)}")
 
-            # 1. 应用智能字段映射
-            mapped_data = self.field_mapping_engine.map_fields(raw_data, query.data_type)
+            # 1. 应用智能字段映射（如果可用）
+            if self.field_mapping_engine:
+                mapped_data = self.field_mapping_engine.map_fields(raw_data, query.data_type)
+            else:
+                # 使用基础映射
+                mapped_data = raw_data
 
             # 2. 数据类型转换
             standardized_data = self._standardize_data_types(mapped_data, query.data_type)
 
             # 3. 数据验证
-            if not self.field_mapping_engine.validate_mapping_result(standardized_data, query.data_type):
+            if self.field_mapping_engine and not self.field_mapping_engine.validate_mapping_result(standardized_data, query.data_type):
                 self.logger.warning(f"数据映射验证失败: {query.data_type}")
                 # 降级到基础映射
                 standardized_data = self._apply_basic_mapping(raw_data, query)
@@ -752,6 +766,222 @@ class TETDataPipeline:
             self.logger.error(f"数据标准化失败: {e}")
             # 降级到基础映射
             return self._apply_basic_mapping(raw_data, query)
+
+    def transform_asset_list_data(self, raw_data: pd.DataFrame,
+                                  data_source: str = None) -> pd.DataFrame:
+        """
+        标准化资产列表数据（新增方法 - 真实数据处理）
+
+        功能：
+        1. 统一字段名称（不同插件字段名不同）
+        2. 数据类型转换和验证
+        3. symbol标准化（添加市场后缀）
+        4. market推断（从symbol或代码前缀）
+        5. 数据清洗和去重
+
+        Args:
+            raw_data: 插件返回的原始资产列表DataFrame
+            data_source: 数据源名称（用于记录）
+
+        Returns:
+            pd.DataFrame: 标准化后的资产列表
+
+        示例：
+            >>> raw_df = plugin.get_asset_list()
+            >>> standardized_df = pipeline.transform_asset_list_data(raw_df, "eastmoney")
+        """
+        try:
+            if raw_data is None or raw_data.empty:
+                return pd.DataFrame()
+
+            self.logger.info(f"开始标准化资产列表: {len(raw_data)} 条记录，数据源: {data_source}")
+            self.logger.debug(f"原始字段: {list(raw_data.columns)}")
+
+            # 1. 字段映射（统一不同插件的字段名）
+            field_mapping = {
+                # 基本字段
+                'code': 'symbol',
+                'stock_code': 'symbol',
+                'ts_code': 'symbol',
+                'symbol_code': 'symbol',
+                'stock_name': 'name',
+                'sec_name': 'name',
+                'stock_market': 'market',
+                'exchange': 'market',
+                'exchange_code': 'market',
+
+                # 分类字段
+                'industry_name': 'industry',
+                'industryname': 'industry',
+                'sector_name': 'sector',
+                'sectorname': 'sector',
+                'industry_code': 'industry_code',
+
+                # 上市信息
+                'list_date': 'listing_date',
+                'listdate': 'listing_date',
+                'delist_date': 'delisting_date',
+                'delistdate': 'delisting_date',
+                'status': 'listing_status',
+                'list_status': 'listing_status',
+
+                # 股本信息
+                'total_capital': 'total_shares',
+                'totalcapital': 'total_shares',
+                'float_capital': 'circulating_shares',
+                'floatcapital': 'circulating_shares',
+            }
+
+            # 应用字段映射
+            mapped_data = raw_data.rename(columns=field_mapping)
+
+            # 2. 确保必需字段存在
+            if 'symbol' not in mapped_data.columns:
+                if 'code' in raw_data.columns:
+                    mapped_data['symbol'] = raw_data['code']
+                else:
+                    self.logger.error("缺少symbol/code字段")
+                    return pd.DataFrame()
+
+            if 'name' not in mapped_data.columns:
+                mapped_data['name'] = None
+
+            # 3. 标准化symbol格式（添加市场后缀）
+            def standardize_symbol(symbol):
+                """标准化symbol格式：000001 -> 000001.SZ"""
+                if not symbol or pd.isna(symbol):
+                    return None
+
+                symbol = str(symbol).strip()
+
+                # 已有后缀，直接返回
+                if '.' in symbol:
+                    return symbol.upper()
+
+                # 根据代码前缀添加后缀
+                if symbol.startswith('6'):
+                    return f"{symbol}.SH"
+                elif symbol.startswith(('0', '3')):
+                    return f"{symbol}.SZ"
+                elif symbol.startswith(('4', '8')):
+                    return f"{symbol}.BJ"
+                else:
+                    return symbol
+
+            mapped_data['symbol'] = mapped_data['symbol'].apply(standardize_symbol)
+
+            # 4. 推断market字段
+            def infer_market(row):
+                """从symbol推断market"""
+                # 如果已有market字段且有效，保持不变
+                if 'market' in row and row['market'] and pd.notna(row['market']):
+                    return row['market']
+
+                # 从symbol推断
+                symbol = row['symbol']
+                if not symbol or pd.isna(symbol):
+                    return 'unknown'
+
+                if symbol.endswith('.SH'):
+                    return 'SH'
+                elif symbol.endswith('.SZ'):
+                    return 'SZ'
+                elif symbol.endswith('.BJ'):
+                    return 'BJ'
+
+                code = symbol.split('.')[0]
+                if code.startswith('6'):
+                    return 'SH'
+                elif code.startswith(('0', '3')):
+                    return 'SZ'
+                elif code.startswith(('4', '8')):
+                    return 'BJ'
+
+                return 'unknown'
+
+            mapped_data['market'] = mapped_data.apply(infer_market, axis=1)
+
+            # 5. 补全可选字段
+            optional_fields = {
+                'name_en': None,
+                'full_name': None,
+                'short_name': None,
+                'asset_type': 'stock_a',
+                'exchange': None,
+                'sector': None,
+                'industry': None,
+                'industry_code': None,
+                'listing_date': None,
+                'delisting_date': None,
+                'listing_status': 'active',
+                'total_shares': None,
+                'circulating_shares': None,
+                'currency': 'CNY',
+            }
+
+            for field, default_value in optional_fields.items():
+                if field not in mapped_data.columns:
+                    mapped_data[field] = default_value
+
+            # 6. 数据类型转换
+            # 数值字段
+            numeric_fields = ['total_shares', 'circulating_shares']
+            for field in numeric_fields:
+                if field in mapped_data.columns:
+                    mapped_data[field] = pd.to_numeric(
+                        mapped_data[field],
+                        errors='coerce'
+                    )
+
+            # 日期字段
+            date_fields = ['listing_date', 'delisting_date']
+            for field in date_fields:
+                if field in mapped_data.columns:
+                    mapped_data[field] = pd.to_datetime(
+                        mapped_data[field],
+                        errors='coerce'
+                    )
+
+            # 7. 数据验证和清洗
+            # 移除无效记录（symbol或name为空）
+            before_count = len(mapped_data)
+            mapped_data = mapped_data[
+                mapped_data['symbol'].notna() &
+                (mapped_data['symbol'] != '') &
+                (mapped_data['symbol'] != 'None')
+            ]
+            after_count = len(mapped_data)
+
+            if before_count > after_count:
+                self.logger.warning(
+                    f"移除了 {before_count - after_count} 条无效记录（symbol为空）"
+                )
+
+            # 8. 去重（按symbol）
+            before_count = len(mapped_data)
+            mapped_data = mapped_data.drop_duplicates(subset=['symbol'], keep='last')
+            after_count = len(mapped_data)
+
+            if before_count > after_count:
+                self.logger.warning(
+                    f"移除了 {before_count - after_count} 条重复记录"
+                )
+
+            # 9. 添加元数据管理字段
+            from datetime import datetime
+            mapped_data['primary_data_source'] = data_source if data_source else 'unknown'
+            mapped_data['last_verified'] = datetime.now()
+
+            self.logger.info(f"✅ 资产列表标准化完成: {len(mapped_data)} 条有效记录")
+            self.logger.debug(f"标准化后字段: {list(mapped_data.columns)}")
+
+            return mapped_data
+
+        except Exception as e:
+            self.logger.error(f"资产列表数据标准化失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
 
     def _clean_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """清洗数据"""
@@ -888,7 +1118,9 @@ class TETDataPipeline:
 
             # 数据类型一致性检查
             consistency_score = 1.0
-            required_fields = self.field_mapping_engine._get_required_fields(data_type)
+            required_fields = []
+            if self.field_mapping_engine:
+                required_fields = self.field_mapping_engine._get_required_fields(data_type)
 
             for field in required_fields:
                 if field in data.columns:
@@ -1058,6 +1290,7 @@ class TETDataPipeline:
 
         self.logger.info("TET数据管道已清理完成")
 
+
 class HistoryDataStrategy:
     """历史数据加载策略"""
 
@@ -1074,6 +1307,7 @@ class HistoryDataStrategy:
         except Exception as e:
             logger.error(f"Error loading historical data: {e}")
             return None
+
 
 class RealtimeDataStrategy:
     """实时数据加载策略"""

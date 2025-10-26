@@ -104,7 +104,7 @@ class MainWindowCoordinator(BaseCoordinator):
         # 中央数据状态（支持多资产类型）
         self._current_symbol: Optional[str] = None
         self._current_asset_name: Optional[str] = None
-        self._current_asset_type: AssetType = AssetType.STOCK
+        self._current_asset_type: AssetType = AssetType.STOCK_A
         self._current_market: Optional[str] = None
         self._current_asset_data: Dict[str, Any] = {}
         self._is_loading = False
@@ -820,7 +820,7 @@ class MainWindowCoordinator(BaseCoordinator):
                 logger.warning(f"使用TET模式获取数据失败，尝试传统方式: {e}")
 
                 # 如果是股票类型，降级到传统方式
-                if event.asset_type == AssetType.STOCK:
+                if event.asset_type == AssetType.STOCK_A:
                     kline_data_response = await self._data_manager.request_data(
                         stock_code=event.symbol,
                         data_type='kdata',
@@ -844,7 +844,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 如果是股票类型，进行传统分析
             analysis_data = None
-            if event.asset_type == AssetType.STOCK:
+            if event.asset_type == AssetType.STOCK_A:
                 try:
                     analysis_data = await self._analysis_service.analyze_stock(
                         stock_code=event.symbol,
@@ -879,7 +879,7 @@ class MainWindowCoordinator(BaseCoordinator):
             )
 
             # 同时发送向后兼容的UIDataReadyEvent（如果是股票）
-            if event.asset_type == AssetType.STOCK:
+            if event.asset_type == AssetType.STOCK_A:
                 ui_data_ready_event = UIDataReadyEvent(
                     stock_code=event.symbol,
                     stock_name=event.name,
@@ -916,7 +916,7 @@ class MainWindowCoordinator(BaseCoordinator):
     def _get_asset_type_display_name(self, asset_type: AssetType) -> str:
         """获取资产类型的显示名称"""
         display_names = {
-            AssetType.STOCK: "股票",
+            AssetType.STOCK_A: "股票",
             AssetType.CRYPTO: "加密货币",
             AssetType.FUTURES: "期货",
             AssetType.FOREX: "外汇",
@@ -1347,18 +1347,35 @@ FactorWeave-Quant  2.0 (重构版本)
 
     # 高级功能菜单方法（保持原有实现）
     def _on_node_management(self) -> None:
-        """节点管理"""
+        """节点管理（分布式节点监控）"""
         try:
-            from gui.dialogs.node_manager_dialog import NodeManagerDialog
+            # ✅ 使用新的真实数据UI
+            from gui.dialogs.distributed_node_monitor_dialog import DistributedNodeMonitorDialog
+            from core.containers import get_service_container
 
-            dialog = NodeManagerDialog(self._main_window)
+            # 获取分布式服务
+            container = get_service_container()
+            distributed_service = container.get('distributed_service')
+
+            if not distributed_service:
+                QMessageBox.warning(
+                    self._main_window,
+                    "警告",
+                    "分布式服务未初始化，请检查系统配置"
+                )
+                logger.warning("分布式服务未初始化")
+                return
+
+            dialog = DistributedNodeMonitorDialog(distributed_service, self._main_window)
             self.center_dialog(dialog)
             dialog.exec_()
 
         except Exception as e:
             logger.error(f"节点管理失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             QMessageBox.critical(self._main_window, "错误",
-                                 f"打开节点管理对话框失败: {str(e)}")
+                                 f"打开分布式节点监控失败: {str(e)}")
 
     def _on_cloud_api(self) -> None:
         """云端API管理"""
@@ -2039,7 +2056,7 @@ FactorWeave-Quant  2.0 (重构版本)
             from gui.dialogs.database_admin_dialog import DatabaseAdminDialog
 
             # 使用默认数据库路径
-            default_db = "db/factorweave_system.sqlite"
+            default_db = "data/factorweave_system.sqlite"
 
             dialog = DatabaseAdminDialog(default_db, self._main_window)
             self.center_dialog(dialog)

@@ -11,8 +11,9 @@ import threading
 import time
 import hashlib
 import pandas as pd
-from typing import Dict, List, Any, Optional, Callable
-from datetime import datetime
+import numpy as np
+from typing import Dict, List, Any, Optional, Callable, Tuple
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from enum import Enum
@@ -442,7 +443,7 @@ class DataImportExecutionEngine(QObject):
 
             # 检查是否为增强版分布式服务
             if hasattr(self.distributed_service, 'submit_enhanced_task'):
-                from ..services.enhanced_distributed_service import TaskPriority
+                from ..async_management.enhanced_async_manager import TaskPriority
 
                 # 转换优先级
                 priority_map = {
@@ -513,27 +514,25 @@ class DataImportExecutionEngine(QObject):
             return {"error": str(e)}
 
     def _init_distributed_service(self) -> Optional[DistributedService]:
-        """初始化增强版分布式服务"""
+        """初始化分布式服务"""
         try:
-            from ..services.enhanced_distributed_service import (
-                initialize_enhanced_distributed_service,
-                LoadBalancingStrategy
-            )
+            # ✅ 使用ServiceContainer中的DistributedService
+            from ..containers import get_service_container
 
-            # 配置增强版分布式服务
-            enhanced_service = initialize_enhanced_distributed_service(
-                discovery_port=8888,
-                load_balancing_strategy=LoadBalancingStrategy.INTELLIGENT,
-                enable_security=True,
-                enable_monitoring=True,
-                auto_start=False  # 手动启动以便更好控制
-            )
+            container = get_service_container()
 
-            # 启动服务
-            enhanced_service.start_service()
+            if container.is_registered(DistributedService):
+                distributed_service = container.resolve(DistributedService)
+                logger.info("✅ 使用ServiceContainer中的DistributedService")
+                return distributed_service
 
-            logger.info("增强版分布式服务初始化成功")
-            return enhanced_service
+            # Fallback：创建新实例
+            logger.info("ServiceContainer中无DistributedService，创建新实例")
+            distributed_service = DistributedService()
+            distributed_service.start_service()
+
+            logger.info("分布式服务初始化成功")
+            return distributed_service
 
         except ImportError:
             # 回退到原始分布式服务
@@ -607,18 +606,31 @@ class DataImportExecutionEngine(QObject):
             return False
 
         try:
-            # 检查是否有可用的分布式节点
-            if not hasattr(self, '_distributed_nodes'):
+            # ✅ 使用真实的DistributedService检查节点
+            if not self.distributed_service:
+                logger.debug("分布式服务未初始化")
+                return False
+
+            # 获取可用节点列表
+            nodes_status = self.distributed_service.get_all_nodes_status()
+
+            if not nodes_status:
+                logger.debug("无可用分布式节点")
                 return False
 
             available_nodes = [
-                node for node in self._distributed_nodes.values()
-                if node['available'] and node['task_count'] < 3  # 每个节点最多3个并发任务
+                node for node in nodes_status
+                if node.get('status') in ['active', 'idle'] and node.get('current_tasks', 0) < 3
             ]
 
             # 只有当任务足够大且有可用节点时才分布式执行
             symbol_count = len(task_config.symbols)
-            return symbol_count >= 100 and len(available_nodes) > 0
+            can_distribute = symbol_count >= 100 and len(available_nodes) > 0
+
+            if can_distribute:
+                logger.info(f"✅ 任务可分布式执行: {symbol_count}个股票，{len(available_nodes)}个可用节点")
+
+            return can_distribute
 
         except Exception as e:
             logger.error(f"检查分布式执行条件失败: {e}")
@@ -630,28 +642,40 @@ class DataImportExecutionEngine(QObject):
             return False
 
         try:
-            # 选择最佳节点
-            best_node = self._select_best_node()
-            if not best_node:
-                return False
+            # ✅ 使用真实的DistributedService提交任务
+            logger.info(f"开始分布式执行任务: {task_config.task_id}")
 
-            # 分割任务
-            subtasks = self._split_task(task_config)
+            # 构造导入配置
+            import_config = {
+                "symbols": task_config.symbols,
+                "data_source": task_config.data_source,
+                "start_date": task_config.start_date,
+                "end_date": task_config.end_date,
+                "frequency": task_config.frequency,
+                "asset_type": task_config.asset_type.value if hasattr(task_config.asset_type, 'value') else str(task_config.asset_type),
+                "batch_size": task_config.batch_size,
+                "parallel_workers": task_config.max_workers
+            }
 
-            # 分发子任务
-            distributed_count = 0
-            for subtask in subtasks:
-                if self._send_subtask_to_node(subtask, best_node):
-                    distributed_count += 1
+            # 提交数据导入任务到分布式服务
+            task_id = self.distributed_service.submit_data_import_task(import_config)
 
-            if distributed_count > 0:
-                logger.info(f"成功分发 {distributed_count} 个子任务到分布式节点")
+            if task_id:
+                logger.info(f"✅ 成功提交分布式任务: {task_id}")
+
+                # 记录任务ID用于后续跟踪
+                if not hasattr(self, '_distributed_task_ids'):
+                    self._distributed_task_ids = {}
+                self._distributed_task_ids[task_config.task_id] = task_id
+
                 return True
+            else:
+                logger.warning("分布式任务提交失败，无任务ID返回")
+                return False
 
         except Exception as e:
             logger.error(f"分布式执行任务失败: {e}")
-
-        return False
+            return False
 
     def _select_best_node(self) -> Optional[Dict[str, Any]]:
         """选择最佳分布式节点"""
@@ -1163,12 +1187,19 @@ class DataImportExecutionEngine(QObject):
     def _validate_imported_data(self, task_id: str, data: pd.DataFrame,
                                 data_source: str, data_type: str = 'kdata') -> ValidationResult:
         """验证导入的数据质量"""
+        logger.info(f"[数据质量验证] 开始验证 - 任务: {task_id}, 数据源: {data_source}, 类型: {data_type}, 记录数: {len(data) if not data.empty else 0}")
+
         if not self.enable_data_quality_monitoring or not self.data_quality_monitor:
+            logger.debug(f"[数据质量验证] 质量监控未启用，跳过验证")
             return ValidationResult(
                 is_valid=True,
+                quality_score=0.8,
                 quality_level=DataQuality.GOOD,
-                overall_score=0.8,
-                issues=[]
+                errors=[],
+                warnings=[],
+                suggestions=[],
+                metrics={},
+                validation_time=datetime.now()
             )
 
         try:
@@ -1176,15 +1207,86 @@ class DataImportExecutionEngine(QObject):
 
             # 计算数据质量评分
             quality_score = self.data_quality_monitor.calculate_quality_score(data, data_type)
+            logger.info(f"[数据质量验证] 质量评分计算完成: {quality_score:.3f}")
 
-            # 记录质量指标
+            # 记录质量指标（写入SQLite）
             table_name = f"{data_source}_{data_type}"
+            logger.debug(f"[数据质量验证] 记录质量指标到SQLite - 插件: {data_source}, 表: {table_name}")
             self.data_quality_monitor.record_quality_metrics(
                 plugin_name=data_source,
                 table_name=table_name,
                 data=data,
                 data_type=data_type
             )
+
+            # ✅ 关键：将质量评分写入DuckDB的data_quality_monitor表
+            #    这样unified_best_quality_kline视图才能使用实际评分
+            try:
+                from ..asset_database_manager import get_asset_separated_database_manager
+                from ..plugin_types import AssetType
+                from datetime import date
+
+                # 为每个symbol单独记录质量评分
+                if 'symbol' in data.columns:
+                    asset_manager = get_asset_separated_database_manager()
+                    symbols = data['symbol'].unique()
+                    logger.info(f"[质量评分写入] 开始写入质量评分到DuckDB - 总symbol数: {len(symbols)}, 写入前5个")
+
+                    for symbol in symbols[:5]:  # 限制写入前5个作为示例，避免过多写入
+                        try:
+                            # 确定资产类型
+                            asset_type = AssetType.STOCK_A if str(symbol).endswith(('.SZ', '.SH')) else AssetType.STOCK_A
+
+                            with asset_manager.get_connection(asset_type) as conn:
+                                # ✅ 确保data_quality_monitor表存在
+                                try:
+                                    conn.execute("""
+                                        CREATE TABLE IF NOT EXISTS stock_a_data.data_quality_monitor (
+                                            monitor_id VARCHAR PRIMARY KEY,
+                                            symbol VARCHAR NOT NULL,
+                                            data_source VARCHAR NOT NULL,
+                                            check_date DATE NOT NULL,
+                                            quality_score DECIMAL(5,2),
+                                            anomaly_count INTEGER DEFAULT 0,
+                                            missing_count INTEGER DEFAULT 0,
+                                            completeness_score DECIMAL(5,4),
+                                            details TEXT,
+                                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                                        )
+                                    """)
+                                    logger.debug(f"[质量评分写入] data_quality_monitor表已确保存在")
+                                except Exception as table_error:
+                                    logger.error(f"[质量评分写入] 创建data_quality_monitor表失败: {table_error}")
+                                    continue
+
+                                monitor_id = f"{symbol}_{data_source}_{date.today().isoformat()}"
+                                logger.debug(f"[质量评分写入] 准备写入symbol: {symbol}, 数据源: {data_source}, 评分: {quality_score:.3f}")
+                                conn.execute("""
+                                    INSERT OR REPLACE INTO stock_a_data.data_quality_monitor 
+                                    (monitor_id, symbol, data_source, check_date, quality_score, 
+                                     anomaly_count, missing_count, completeness_score, details)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """, [
+                                    monitor_id,
+                                    symbol,
+                                    data_source,
+                                    date.today(),
+                                    quality_score,
+                                    0,  # anomaly_count
+                                    int(data[data['symbol'] == symbol].isnull().sum().sum()),
+                                    1.0 - (data[data['symbol'] == symbol].isnull().sum().sum() / data[data['symbol'] == symbol].size),
+                                    f"Records: {len(data[data['symbol'] == symbol])}, Quality: {quality_score:.3f}"
+                                ])
+                                logger.debug(f"[质量评分写入] 成功写入DuckDB: {symbol} = {quality_score:.3f}")
+                        except Exception as e:
+                            logger.warning(f"[质量评分写入] 写入{symbol}质量评分失败: {e}")
+                            logger.debug(f"[质量评分写入] 失败详情 - symbol: {symbol}, 资产类型: {asset_type}, 错误: {str(e)}")
+
+                    logger.info(f" [质量评分写入] 已将质量评分写入data_quality_monitor表（示例前5个symbol）")
+            except Exception as e:
+                logger.warning(f"[质量评分写入] 写入质量评分到DuckDB失败: {e}")
+                logger.debug(f"[质量评分写入] 异常堆栈: ", exc_info=True)
 
             # 创建详细的验证结果
             validation_result = self._create_detailed_validation_result(
@@ -1202,11 +1304,17 @@ class DataImportExecutionEngine(QObject):
 
         except Exception as e:
             logger.error(f"数据质量验证失败: {e}")
+            error_msg = f"验证过程出错: {str(e)}"
+            logger.error(f"[数据质量验证] 异常详情: {error_msg}")
             return ValidationResult(
                 is_valid=False,
+                quality_score=0.0,
                 quality_level=DataQuality.POOR,
-                overall_score=0.0,
-                issues=[f"验证过程出错: {str(e)}"]
+                errors=[error_msg],
+                warnings=[],
+                suggestions=["检查数据源连接", "验证数据格式"],
+                metrics={},
+                validation_time=datetime.now()
             )
 
     def _create_detailed_validation_result(self, data: pd.DataFrame, quality_score: float,
@@ -1218,11 +1326,16 @@ class DataImportExecutionEngine(QObject):
             # 检查数据完整性
             if data.empty:
                 issues.append("数据为空")
+                logger.warning(f"[数据验证] 数据为空，数据源: {data_source}, 类型: {data_type}")
                 return ValidationResult(
                     is_valid=False,
+                    quality_score=0.0,
                     quality_level=DataQuality.POOR,
-                    overall_score=0.0,
-                    issues=issues
+                    errors=issues,
+                    warnings=[],
+                    suggestions=["检查数据源是否正常", "验证查询条件"],
+                    metrics={"total_records": 0},
+                    validation_time=datetime.now()
                 )
 
             # 检查空值
@@ -1275,40 +1388,73 @@ class DataImportExecutionEngine(QObject):
 
             is_valid = quality_score >= 0.70 and len(issues) == 0
 
+            # 生成建议
+            suggestions = []
+            if quality_score < 0.7:
+                suggestions.append("数据质量较低，建议检查数据源")
+            if null_percentage > 0.1:
+                suggestions.append("空值比例较高，建议数据清洗")
+            if duplicate_percentage > 0.05:
+                suggestions.append("存在较多重复数据，建议去重")
+
+            # 记录验证详情
+            logger.info(f"[数据验证] 数据源: {data_source}, 类型: {data_type}, 质量评分: {quality_score:.3f}, "
+                        f"质量等级: {quality_level.value}, 记录数: {len(data)}, "
+                        f"空值率: {null_percentage:.2%}, 重复率: {duplicate_percentage:.2%}")
+
             return ValidationResult(
                 is_valid=is_valid,
+                quality_score=quality_score,
                 quality_level=quality_level,
-                overall_score=quality_score,
-                issues=issues,
-                total_records=len(data),
-                null_records=int(data.isnull().sum().sum()),
-                duplicate_records=int(data.duplicated().sum()),
-                completeness_score=1.0 - null_percentage,
-                accuracy_score=quality_score  # 简化处理
+                errors=issues,
+                warnings=[f"空值比例: {null_percentage:.1%}", f"重复数据比例: {duplicate_percentage:.1%}"] if (null_percentage > 0 or duplicate_percentage > 0) else [],
+                suggestions=suggestions,
+                metrics={
+                    "total_records": len(data),
+                    "null_records": int(data.isnull().sum().sum()),
+                    "duplicate_records": int(data.duplicated().sum()),
+                    "completeness_score": 1.0 - null_percentage,
+                    "accuracy_score": quality_score,
+                    "data_source": data_source,
+                    "data_type": data_type
+                },
+                validation_time=datetime.now()
             )
 
         except Exception as e:
-            logger.error(f"创建验证结果失败: {e}")
+            error_msg = f"验证结果创建失败: {str(e)}"
+            logger.error(f"[数据验证] {error_msg}, 数据源: {data_source}, 类型: {data_type}")
             return ValidationResult(
                 is_valid=False,
+                quality_score=0.0,
                 quality_level=DataQuality.POOR,
-                overall_score=0.0,
-                issues=[f"验证结果创建失败: {str(e)}"]
+                errors=[error_msg],
+                warnings=[],
+                suggestions=["检查数据格式", "验证数据完整性"],
+                metrics={},
+                validation_time=datetime.now()
             )
 
     def _handle_quality_issues(self, validation_result: ValidationResult, task_id: str):
         """处理数据质量问题"""
         if not validation_result.is_valid or validation_result.quality_level == DataQuality.POOR:
-            logger.warning(f"任务 {task_id} 数据质量问题:")
-            for issue in validation_result.issues:
-                logger.warning(f"  - {issue}")
+            logger.warning(f"[质量问题处理] 任务 {task_id} 数据质量问题:")
+            for error in validation_result.errors:
+                logger.warning(f"  - 错误: {error}")
+            for warning in validation_result.warnings:
+                logger.warning(f"  - 警告: {warning}")
 
             # 可以在这里添加自动修复逻辑
-            if validation_result.duplicate_records > 0:
-                logger.info(f"  建议: 清理 {validation_result.duplicate_records} 条重复数据")
+            metrics = validation_result.metrics
+            if metrics.get('duplicate_records', 0) > 0:
+                logger.info(f"  建议: 清理 {metrics['duplicate_records']} 条重复数据")
 
-            if validation_result.null_records > 0:
-                logger.info(f"  建议: 处理 {validation_result.null_records} 个空值")
+            if metrics.get('null_records', 0) > 0:
+                logger.info(f"  建议: 处理 {metrics['null_records']} 个空值")
+
+            # 输出建议
+            for suggestion in validation_result.suggestions:
+                logger.info(f"  建议: {suggestion}")
 
     def get_data_quality_statistics(self) -> Dict[str, Any]:
         """获取数据质量统计信息"""
@@ -1505,6 +1651,18 @@ class DataImportExecutionEngine(QObject):
                 # 创建一个最小的替代
                 self.real_data_provider = None
                 self._real_data_provider_initialized = False
+
+    def _ensure_asset_database_manager(self):
+        """确保资产数据库管理器已初始化"""
+        if not hasattr(self, 'asset_manager') or self.asset_manager is None:
+            try:
+                logger.info("初始化资产数据库管理器...")
+                from ..asset_database_manager import AssetSeparatedDatabaseManager
+                self.asset_manager = AssetSeparatedDatabaseManager()
+                logger.info("资产数据库管理器初始化完成")
+            except Exception as e:
+                logger.error(f"资产数据库管理器初始化失败: {e}")
+                self.asset_manager = None
 
     def _get_data_source_plugin(self, plugin_id: str):
         """获取指定的数据源插件实例"""
@@ -1868,8 +2026,8 @@ class DataImportExecutionEngine(QObject):
             # 标准化数据字段，确保与表结构匹配
             kdata = self._standardize_kline_data_fields(kdata)
 
-            # 根据股票代码确定资产类型
-            asset_type = AssetType.STOCK_A if symbol.endswith(('.SZ', '.SH')) else AssetType.STOCK
+            # 使用任务配置中的资产类型，不再进行推断
+            asset_type = task_config.asset_type
 
             # 保存数据到新架构
             success = asset_manager.store_standardized_data(
@@ -1886,7 +2044,7 @@ class DataImportExecutionEngine(QObject):
         except Exception as e:
             logger.error(f"保存K线数据到数据库失败 {symbol}: {e}")
 
-    def _save_fundamental_data_to_database(self, symbol: str, data: 'pd.DataFrame', data_type: str):
+    def _save_fundamental_data_to_database(self, symbol: str, data: 'pd.DataFrame', data_type: str, asset_type):
         """保存基本面数据到数据库"""
         try:
             from ..database.duckdb_operations import get_duckdb_operations
@@ -1930,7 +2088,7 @@ class DataImportExecutionEngine(QObject):
         except Exception as e:
             logger.error(f"保存基本面数据到数据库失败 {symbol}: {e}")
 
-    def _save_realtime_data_to_database(self, symbol: str, data: 'pd.DataFrame'):
+    def _save_realtime_data_to_database(self, symbol: str, data: 'pd.DataFrame', asset_type):
         """保存实时数据到数据库"""
         try:
             from ..database.duckdb_operations import get_duckdb_operations
@@ -1973,8 +2131,81 @@ class DataImportExecutionEngine(QObject):
         except Exception as e:
             logger.error(f"保存实时数据到数据库失败 {symbol}: {e}")
 
+    def _check_incremental_update(self, symbol: str, task_config: ImportTaskConfig) -> Tuple[bool, Optional[datetime]]:
+        """
+        检查是否需要增量更新
+
+        Args:
+            symbol: 股票代码
+            task_config: 任务配置
+
+        Returns:
+            (是否需要更新, 最新数据日期)
+        """
+        try:
+            # 如果强制全量更新，直接返回需要更新
+            if task_config.force_full_update:
+                logger.debug(f"强制全量更新模式，跳过增量检查: {symbol}")
+                return True, None
+
+            # 如果未启用增量更新，直接返回需要更新
+            if not task_config.enable_incremental:
+                logger.debug(f"增量更新未启用，跳过增量检查: {symbol}")
+                return True, None
+
+            # 确保资产数据库管理器已初始化
+            self._ensure_asset_database_manager()
+
+            # 获取资产类型 - 支持中文显示名称到枚举值的映射
+            from core.plugin_types import AssetType
+            from core.ui_asset_type_utils import UIAssetTypeUtils
+
+            try:
+                # 首先尝试直接转换（如果是枚举值）
+                asset_type = AssetType(task_config.asset_type)
+            except ValueError:
+                try:
+                    # 尝试通过中文显示名称映射
+                    asset_type = UIAssetTypeUtils.REVERSE_MAPPING.get(task_config.asset_type)
+                    if asset_type is None:
+                        raise ValueError(f"未找到资产类型映射: {task_config.asset_type}")
+                    logger.debug(f"通过显示名称映射资产类型: {task_config.asset_type} -> {asset_type}")
+                except (ValueError, KeyError):
+                    logger.warning(f"无法解析资产类型: {task_config.asset_type}，使用默认值STOCK_A")
+                    asset_type = AssetType.STOCK_A
+
+            # 查询最新数据日期
+            latest_date = self.asset_manager.get_latest_date(
+                symbol=symbol,
+                asset_type=asset_type,
+                frequency=task_config.frequency.value,
+                data_source=task_config.data_source
+            )
+
+            if latest_date is None:
+                logger.debug(f"股票 {symbol} 无历史数据，需要全量下载")
+                return True, None
+
+            # 计算时间差
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            days_diff = (now - latest_date).days
+
+            # 判断是否需要更新
+            if days_diff >= task_config.incremental_days_threshold:
+                logger.info(f"股票 {symbol} 最新数据日期: {latest_date}，已过 {days_diff} 天，需要增量更新")
+                return True, latest_date
+            else:
+                logger.info(f"股票 {symbol} 最新数据日期: {latest_date}，仅过 {days_diff} 天，跳过更新")
+                return False, latest_date
+
+        except Exception as e:
+            logger.error(f"检查增量更新失败 {symbol}: {e}")
+            # 出错时默认需要更新
+            return True, None
+
     def _import_kline_data(self, task_config: ImportTaskConfig, result: TaskExecutionResult):
-        """导入K线数据（优化版本：并发下载+批量保存）"""
+        """导入K线数据（优化版本：并发下载+批量保存+增量更新）"""
         try:
             # 确保数据管理器已初始化
             self._ensure_data_manager()
@@ -1991,6 +2222,7 @@ class DataImportExecutionEngine(QObject):
             logger.info(f" 时间范围: {task_config.start_date} 到 {task_config.end_date}")
             logger.info(f" 频率: {task_config.frequency}")
             logger.info(f" 使用并发下载模式，最大工作线程: {task_config.max_workers}")
+            logger.info(f" 增量更新: {'启用' if task_config.enable_incremental else '禁用'}")
 
             # 使用并发下载优化性能
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -2005,9 +2237,27 @@ class DataImportExecutionEngine(QObject):
             progress_lock = threading.Lock()
 
             def download_single_stock(symbol: str) -> dict:
-                """下载单只股票的数据"""
+                """下载单只股票的数据（支持增量更新）"""
                 nonlocal completed_count  # 声明必须在函数开头
                 try:
+                    # 增量更新检查
+                    need_update, latest_date = self._check_incremental_update(symbol, task_config)
+
+                    if not need_update:
+                        # 跳过更新
+                        with progress_lock:
+                            completed_count += 1
+                            current_progress = (completed_count / len(symbols)) * 100
+
+                        self.task_progress.emit(
+                            task_config.task_id,
+                            current_progress,
+                            f"跳过 {symbol} (数据已是最新)"
+                        )
+
+                        logger.info(f" [{completed_count}/{len(symbols)}] 跳过 {symbol} - 数据已是最新 (最新日期: {latest_date})")
+                        return {'symbol': symbol, 'status': 'skipped', 'records': 0, 'reason': 'data_up_to_date'}
+
                     # 发送进度更新信号（下载开始时）
                     with progress_lock:
                         current_progress = (completed_count / len(symbols)) * 100
@@ -2017,15 +2267,25 @@ class DataImportExecutionEngine(QObject):
                         f"正在下载 {symbol} 的K线数据..."
                     )
 
+                    # 根据增量更新情况调整开始日期
+                    start_date = task_config.start_date
+                    if latest_date and task_config.enable_incremental:
+                        # 从最新日期的下一天开始下载
+                        from datetime import datetime, timedelta
+                        next_day = latest_date + timedelta(days=1)
+                        start_date = next_day.strftime('%Y-%m-%d')
+                        logger.info(f" [{completed_count + 1}/{len(symbols)}] {symbol} 增量更新，从 {start_date} 开始下载")
+
                     logger.info(f" [{completed_count + 1}/{len(symbols)}] 正在获取 {symbol} 的K线数据...")
 
-                    # 使用真实数据提供器获取K线数据，传递数据源信息
+                    # 使用真实数据提供器获取K线数据，传递数据源和资产类型信息
                     kdata = self.real_data_provider.get_real_kdata(
                         code=symbol,
                         freq=task_config.frequency.value,
-                        start_date=task_config.start_date,
+                        start_date=start_date,  # 使用调整后的开始日期
                         end_date=task_config.end_date,
-                        data_source=task_config.data_source  # 传递任务配置中的数据源
+                        data_source=task_config.data_source,  # 传递任务配置中的数据源
+                        asset_type=task_config.asset_type.value if hasattr(task_config.asset_type, 'value') else str(task_config.asset_type)  # 传递任务配置中的资产类型
                     )
 
                     # 更新进度
@@ -2122,18 +2382,46 @@ class DataImportExecutionEngine(QObject):
             # 批量保存所有数据到数据库
             if all_kdata_list and result.status != TaskExecutionStatus.CANCELLED:
                 logger.info(f" 开始批量保存数据到DuckDB，共 {len(all_kdata_list)} 只股票的数据...")
+
+                # ✅ 数据质量监控：在保存前验证数据
+                if self.enable_data_quality_monitoring and self.data_quality_monitor:
+                    logger.info(" 启用数据质量监控，开始验证数据...")
+                    import pandas as pd
+                    combined_for_validation = pd.concat(all_kdata_list, ignore_index=True)
+                    validation_result = self._validate_imported_data(
+                        task_config.task_id,
+                        combined_for_validation,
+                        task_config.data_source,
+                        'kdata'
+                    )
+                    logger.info(f"[数据质量验证] 验证完成: {validation_result.quality_level.value}, "
+                                f"综合评分: {validation_result.quality_score:.2f}")
+                    if not validation_result.is_valid:
+                        logger.warning(f"[数据质量验证] 数据质量错误: {validation_result.errors}")
+                        if validation_result.warnings:
+                            logger.warning(f"[数据质量验证] 数据质量警告: {validation_result.warnings}")
+
                 self._batch_save_kdata_to_database(all_kdata_list, task_config)
                 logger.info(f" 批量保存完成")
 
-            # 输出统计信息
+            # 输出统计信息（包含增量更新统计）
             success_count = sum(1 for r in download_results if r['status'] == 'success')
             failed_count = sum(1 for r in download_results if r['status'] in ['error', 'no_data'])
+            skipped_count = sum(1 for r in download_results if r['status'] == 'skipped')
             total_records = sum(r.get('records', 0) for r in download_results)
 
             logger.info(f" K线数据导入完成统计:")
             logger.info(f"   成功: {success_count} 只股票")
             logger.info(f"   失败: {failed_count} 只股票")
+            logger.info(f"   跳过: {skipped_count} 只股票 (数据已是最新)")
             logger.info(f"   总记录数: {total_records} 条")
+
+            # 增量更新统计
+            if task_config.enable_incremental:
+                logger.info(f" 增量更新统计:")
+                logger.info(f"   全量下载: {success_count} 只股票")
+                logger.info(f"   跳过更新: {skipped_count} 只股票")
+                logger.info(f"   更新效率: {skipped_count}/{len(symbols)} = {skipped_count/len(symbols)*100:.1f}% 的股票无需更新")
 
             # 清理数据源连接池
             if self.real_data_provider:
@@ -2174,26 +2462,25 @@ class DataImportExecutionEngine(QObject):
             # 标准化数据字段，确保与表结构匹配
             combined_data = self._standardize_kline_data_fields(combined_data)
 
+            # 补全name和market字段（从资产列表或symbol推断）
+            combined_data = self._enrich_kline_data_with_metadata(combined_data)
+
             logger.info(f"准备批量插入 {len(combined_data)} 条K线数据记录")
 
-            # 根据股票代码确定资产类型（批量处理时取第一个符号作为示例）
-            if not combined_data.empty and 'symbol' in combined_data.columns:
-                first_symbol = combined_data['symbol'].iloc[0]
-                asset_type = AssetType.STOCK_A if str(first_symbol).endswith(('.SZ', '.SH')) else AssetType.STOCK
+            # 使用任务配置中的资产类型，不再进行推断
+            asset_type = task_config.asset_type
 
-                # 保存数据到新架构
-                success = asset_manager.store_standardized_data(
-                    data=combined_data,
-                    asset_type=asset_type,
-                    data_type=DataType.HISTORICAL_KLINE
-                )
+            # 保存数据到新架构
+            success = asset_manager.store_standardized_data(
+                data=combined_data,
+                asset_type=asset_type,
+                data_type=DataType.HISTORICAL_KLINE
+            )
 
-                if success:
-                    logger.info(f"批量保存K线数据成功到新架构: {asset_type.value}, {len(combined_data)}条记录")
-                else:
-                    logger.error(f"批量保存K线数据失败到新架构: {asset_type.value}")
+            if success:
+                logger.info(f"批量保存K线数据成功到新架构: {asset_type.value}, {len(combined_data)}条记录")
             else:
-                logger.error("数据为空或缺少symbol字段，无法保存")
+                logger.error(f"批量保存K线数据失败到新架构: {asset_type.value}")
 
         except Exception as e:
             logger.error(f"批量保存K线数据到数据库失败: {e}")
@@ -2350,6 +2637,133 @@ class DataImportExecutionEngine(QObject):
             logger.error(f"详细错误: {traceback.format_exc()}")
             return df
 
+    def _enrich_kline_data_with_metadata(self, df: 'pd.DataFrame') -> 'pd.DataFrame':
+        """
+        补全K线数据的元数据字段（name, market）
+
+        策略：
+        1. 尝试从资产列表获取name和market
+        2. 如果失败，从symbol推断market
+        3. name无法推断则保持为空
+
+        Args:
+            df: K线数据DataFrame
+
+        Returns:
+            补全后的DataFrame
+        """
+        import pandas as pd
+
+        try:
+            if df.empty or 'symbol' not in df.columns:
+                logger.warning("数据为空或缺少symbol字段，跳过元数据补全")
+                return df
+
+            logger.info(f"开始补全K线数据元数据: {len(df)} 条记录")
+
+            # 策略1: 尝试从资产列表获取name和market
+            try:
+                from ..services.unified_data_manager import get_unified_data_manager
+                unified_manager = get_unified_data_manager()
+
+                if unified_manager:
+                    # 获取资产列表
+                    asset_list_df = unified_manager.get_asset_list()
+
+                    if not asset_list_df.empty:
+                        # 准备映射字典
+                        symbol_to_info = {}
+                        for _, row in asset_list_df.iterrows():
+                            symbol = row.get('symbol', row.get('code', ''))
+                            symbol_to_info[symbol] = {
+                                'name': row.get('name', ''),
+                                'market': row.get('market', '')
+                            }
+
+                        # 补全name字段
+                        if 'name' in df.columns:
+                            def enrich_name(row):
+                                if pd.notna(row['name']) and row['name']:
+                                    return row['name']  # 已有name，保持不变
+                                info = symbol_to_info.get(row['symbol'], {})
+                                return info.get('name', None)
+
+                            df['name'] = df.apply(enrich_name, axis=1)
+                            enriched_count = df['name'].notna().sum()
+                            logger.info(f"从资产列表补全了 {enriched_count} 条记录的name字段")
+
+                        # 补全market字段
+                        if 'market' in df.columns:
+                            def enrich_market(row):
+                                if pd.notna(row['market']) and row['market']:
+                                    return row['market']  # 已有market，保持不变
+                                info = symbol_to_info.get(row['symbol'], {})
+                                return info.get('market', None)
+
+                            df['market'] = df.apply(enrich_market, axis=1)
+                            enriched_count = df['market'].notna().sum()
+                            logger.info(f"从资产列表补全了 {enriched_count} 条记录的market字段")
+                    else:
+                        logger.debug("资产列表为空，将使用symbol推断market")
+                else:
+                    logger.debug("UnifiedDataManager不可用，将使用symbol推断market")
+
+            except Exception as e:
+                logger.debug(f"从资产列表补全元数据失败（非关键错误）: {e}")
+
+            # 策略2: 从symbol推断market（作为后备或补充）
+            if 'market' in df.columns:
+                def infer_market_from_symbol(row):
+                    """从symbol推断market"""
+                    # 如果已有有效market，保持不变
+                    if pd.notna(row['market']) and row['market'] and row['market'] != 'unknown':
+                        return row['market']
+
+                    symbol = str(row['symbol'])
+
+                    # 根据后缀判断
+                    if symbol.endswith('.SH'):
+                        return 'SH'
+                    elif symbol.endswith('.SZ'):
+                        return 'SZ'
+                    elif symbol.endswith('.BJ'):
+                        return 'BJ'
+
+                    # 根据前缀判断（去除后缀后）
+                    code = symbol.split('.')[0]
+                    if code.startswith('6'):
+                        return 'SH'  # 沪市A股
+                    elif code.startswith(('0', '3')):
+                        return 'SZ'  # 深市A股/创业板
+                    elif code.startswith(('4', '8')):
+                        return 'BJ'  # 北交所
+
+                    return 'unknown'
+
+                df['market'] = df.apply(infer_market_from_symbol, axis=1)
+                inferred_count = (df['market'] != 'unknown').sum()
+                logger.info(f"从symbol推断了 {inferred_count} 条记录的market字段")
+
+            # 策略3: 统计补全结果
+            stats = {
+                'total_records': len(df),
+                'name_filled': df['name'].notna().sum() if 'name' in df.columns else 0,
+                'market_filled': df['market'].notna().sum() if 'market' in df.columns else 0,
+            }
+
+            logger.info(f"元数据补全完成: "
+                        f"总记录={stats['total_records']}, "
+                        f"name填充率={stats['name_filled']/stats['total_records']*100:.1f}%, "
+                        f"market填充率={stats['market_filled']/stats['total_records']*100:.1f}%")
+
+            return df
+
+        except Exception as e:
+            logger.error(f"补全K线数据元数据失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return df
+
     def _import_realtime_data(self, task_config: ImportTaskConfig, result: TaskExecutionResult):
         """导入实时行情数据"""
         try:
@@ -2369,7 +2783,7 @@ class DataImportExecutionEngine(QObject):
                         if isinstance(quote_data, dict):
                             import pandas as pd
                             quote_df = pd.DataFrame([quote_data])
-                            self._save_realtime_data_to_database(symbol, quote_df)
+                            self._save_realtime_data_to_database(symbol, quote_df, task_config.asset_type)
                         logger.info(f"成功导入并保存 {symbol} 的实时行情数据")
                         result.processed_records += 1
                     else:
@@ -2407,7 +2821,7 @@ class DataImportExecutionEngine(QObject):
                                 fund_df = pd.DataFrame([fundamental_data])
                             else:
                                 fund_df = pd.DataFrame(fundamental_data)
-                            self._save_fundamental_data_to_database(symbol, fund_df, "基本面数据")
+                            self._save_fundamental_data_to_database(symbol, fund_df, "基本面数据", task_config.asset_type)
                         logger.info(f"成功导入并保存 {symbol} 的基本面数据")
                         result.processed_records += 1
                     else:

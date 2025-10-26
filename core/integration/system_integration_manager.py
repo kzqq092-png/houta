@@ -116,7 +116,7 @@ class SystemIntegrationManager:
             # DuckDB管理器
             duckdb_config = self.config.get('duckdb', {})
             self.duckdb_manager = DuckDBConnectionManager(
-                db_path=duckdb_config.get('db_path', 'db/factorweave_analytics.duckdb'),
+                db_path=duckdb_config.get('db_path', 'data/factorweave_analytics.duckdb'),
                 pool_size=duckdb_config.get('pool_size', 5)
             )
 
@@ -129,7 +129,7 @@ class SystemIntegrationManager:
             # SQLite扩展管理器
             sqlite_config = self.config.get('sqlite', {})
             self.sqlite_manager = SQLiteExtensionManager(
-                db_path=sqlite_config.get('db_path', 'db/factorweave_system.sqlite')
+                db_path=sqlite_config.get('db_path', 'data/factorweave_system.sqlite')
             )
 
             # 初始化SQLite扩展表

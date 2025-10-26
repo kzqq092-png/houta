@@ -30,7 +30,7 @@ from PyQt5.QtGui import *
 _theme_manager_instance: Optional['ThemeManager'] = None
 
 DB_PATH = os.path.join(os.path.dirname(
-    os.path.dirname(__file__)), 'db', 'factorweave_system.sqlite')
+    os.path.dirname(__file__)), 'data', 'factorweave_system.sqlite')
 
 
 def safe_read_file(filepath):

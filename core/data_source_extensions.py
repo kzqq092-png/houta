@@ -50,6 +50,7 @@ class PluginInfo:
     supported_asset_types: List[AssetType]
     supported_data_types: List[DataType]
     capabilities: Dict[str, Any]
+    chinese_name: Optional[str] = None  # 中文名称，用于更好的用户识别
 
 
 @dataclass
@@ -520,7 +521,7 @@ class DataSourcePluginAdapter:
     def get_stock_list(self, market: str = None) -> pd.DataFrame:
         """获取股票列表（兼容现有接口）"""
         try:
-            asset_list = self.plugin.get_asset_list(AssetType.STOCK, market)
+            asset_list = self.plugin.get_asset_list(AssetType.STOCK_A, market)
             return pd.DataFrame(asset_list)
         except Exception as e:
             self.logger.error(f"获取股票列表异常: {self.plugin_id} - {e}")

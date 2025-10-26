@@ -242,7 +242,7 @@ class UnifiedTableNameGenerator:
 
         # 标准化资产类型
         clean_asset_type = None
-        if asset_type and asset_type != AssetType.STOCK:
+        if asset_type and asset_type != AssetType.STOCK_A:
             clean_asset_type = cls._clean_name(asset_type.value.lower())
 
         # 清理后缀

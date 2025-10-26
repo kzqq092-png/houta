@@ -163,7 +163,7 @@ class Phase2FunctionalVerification:
             test_request = create_data_request(
                 symbol="TEST001",
                 data_type=DataType.REAL_TIME_QUOTE,
-                asset_type=AssetType.STOCK
+                asset_type=AssetType.STOCK_A
             )
 
             logger.info(f"✓ 创建数据请求: {test_request.symbol}")

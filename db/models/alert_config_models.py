@@ -99,7 +99,7 @@ class AlertConfigDatabase:
         if db_path is None:
             # 默认数据库路径
             db_dir = Path(__file__).parent.parent
-            db_path = db_dir / "alert_config.db"
+            db_path = db_dir / "data" / "alert_config.sqlite"
 
         self.db_path = str(db_path)
         self.init_database()
@@ -107,6 +107,10 @@ class AlertConfigDatabase:
     def init_database(self):
         """初始化数据库表结构"""
         try:
+            # 确保数据库目录存在
+            import os
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 

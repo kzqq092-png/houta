@@ -22,11 +22,13 @@ from .plugin_types import AssetType, DataType
 
 logger = logger.bind(module=__name__)
 
+
 class SchemaValidationLevel(Enum):
     """数据模式验证级别"""
     STRICT = "strict"      # 严格验证，任何不符合都报错
     RELAXED = "relaxed"    # 宽松验证，尽量修复
     MINIMAL = "minimal"    # 最小验证，只检查必需字段
+
 
 @dataclass
 class FieldMapping:
@@ -113,6 +115,7 @@ class FieldMapping:
         else:
             return pd.to_datetime(value)
 
+
 @dataclass
 class StandardDataSchema:
     """标准数据模式定义"""
@@ -152,6 +155,7 @@ class StandardDataSchema:
         """获取必需字段"""
         return [field_map.source_field for field_map in self.fields if field_map.is_required]
 
+
 class StandardDataSchemas:
     """标准数据模式集合"""
 
@@ -185,7 +189,7 @@ class StandardDataSchemas:
             schema_id="standard_kline",
             name="标准K线数据",
             description="标准化的K线数据格式，支持所有资产类型",
-            asset_type=AssetType.STOCK,  # 默认，运行时会动态设置
+            asset_type=AssetType.STOCK_A,  # 默认，运行时会动态设置
             data_type=DataType.HISTORICAL_KLINE,
             fields=[
                 FieldMapping("code", "code", "str", is_required=True),
@@ -216,7 +220,7 @@ class StandardDataSchemas:
             schema_id="standard_quote",
             name="标准实时行情",
             description="标准化的实时行情数据格式",
-            asset_type=AssetType.STOCK,
+            asset_type=AssetType.STOCK_A,
             data_type=DataType.REAL_TIME_QUOTE,
             fields=[
                 FieldMapping("code", "code", "str", is_required=True),
@@ -256,7 +260,7 @@ class StandardDataSchemas:
             schema_id="standard_stock_info",
             name="标准股票信息",
             description="标准化的股票基本信息格式",
-            asset_type=AssetType.STOCK,
+            asset_type=AssetType.STOCK_A,
             data_type=DataType.FUNDAMENTAL,
             fields=[
                 FieldMapping("code", "code", "str", validation_func=validate_stock_code, is_required=True),
@@ -284,7 +288,7 @@ class StandardDataSchemas:
             schema_id="standard_asset_list",
             name="标准资产列表",
             description="标准化的资产列表格式",
-            asset_type=AssetType.STOCK,  # 动态设置
+            asset_type=AssetType.STOCK_A,  # 动态设置
             data_type=DataType.ASSET_LIST,
             fields=[
                 FieldMapping("code", "code", "str", is_required=True),
@@ -384,18 +388,21 @@ class StandardDataSchemas:
 
         return len(errors) == 0, errors
 
+
 # 全局数据模式实例
 _global_schemas = StandardDataSchemas()
+
 
 def get_standard_schemas() -> StandardDataSchemas:
     """获取全局数据模式实例"""
     return _global_schemas
 
+
 def get_schema(schema_id: str) -> Optional[StandardDataSchema]:
     """获取指定数据模式"""
     return _global_schemas.get_schema(schema_id)
 
+
 def get_schema_by_type(asset_type: AssetType, data_type: DataType) -> Optional[StandardDataSchema]:
     """根据资产类型和数据类型获取数据模式"""
     return _global_schemas.get_schema_by_type(asset_type, data_type)
-

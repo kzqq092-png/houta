@@ -26,6 +26,7 @@ from .data_schemas import get_standard_schemas, get_schema_by_type, StandardData
 
 logger = logger.bind(module=__name__)
 
+
 class DataFormat(Enum):
     """数据格式枚举"""
     PANDAS_DATAFRAME = "pandas_dataframe"
@@ -35,6 +36,7 @@ class DataFormat(Enum):
     LIST = "list"
     NUMPY_ARRAY = "numpy_array"
     CUSTOM = "custom"
+
 
 @dataclass
 class FieldMapping:
@@ -90,6 +92,7 @@ class FieldMapping:
                 raise
             return self.default_value
 
+
 @dataclass
 class StandardDataSchema:
     """标准数据模式定义"""
@@ -110,6 +113,7 @@ class StandardDataSchema:
     def get_target_fields(self) -> List[str]:
         """获取目标字段列表"""
         return [field.target_field for field in self.fields]
+
 
 @dataclass
 class StandardizationRule:
@@ -152,6 +156,7 @@ class StandardizationRule:
 
         return issues
 
+
 @dataclass
 class StandardizationResult:
     """标准化结果"""
@@ -175,6 +180,7 @@ class StandardizationResult:
             'metadata': self.metadata,
             'processing_time_ms': self.processing_time_ms
         }
+
 
 class DataStandardizationEngine:
     """
@@ -230,7 +236,7 @@ class DataStandardizationEngine:
         self.register_standardization_rule(
             source=DataSource.TONGDAXIN,
             data_type=DataType.HISTORICAL_KLINE,
-            asset_type=AssetType.STOCK,
+            asset_type=AssetType.STOCK_A,
             schema=kline_schema,
             preprocessing_func=self._preprocess_tongdaxin_kline,
             quality_checks=[self._check_kline_price_validity, self._check_kline_completeness]
@@ -240,7 +246,7 @@ class DataStandardizationEngine:
         self.register_standardization_rule(
             source=DataSource.EASTMONEY,
             data_type=DataType.HISTORICAL_KLINE,
-            asset_type=AssetType.STOCK,
+            asset_type=AssetType.STOCK_A,
             schema=kline_schema,
             preprocessing_func=self._preprocess_eastmoney_kline,
             quality_checks=[self._check_kline_price_validity, self._check_kline_completeness]
@@ -261,7 +267,7 @@ class DataStandardizationEngine:
             self.register_standardization_rule(
                 source=DataSource.EASTMONEY,
                 data_type=DataType.REAL_TIME_QUOTE,
-                asset_type=AssetType.STOCK,
+                asset_type=AssetType.STOCK_A,
                 schema=quote_schema,
                 preprocessing_func=self._preprocess_eastmoney_quote,
                 quality_checks=[self._check_quote_validity]
@@ -272,7 +278,7 @@ class DataStandardizationEngine:
             self.register_standardization_rule(
                 source=DataSource.EASTMONEY,
                 data_type=DataType.FUNDAMENTAL,
-                asset_type=AssetType.STOCK,
+                asset_type=AssetType.STOCK_A,
                 schema=stock_info_schema,
                 preprocessing_func=self._preprocess_stock_info,
                 quality_checks=[self._check_stock_info_validity]
@@ -849,9 +855,11 @@ class DataStandardizationEngine:
 
             return combinations
 
+
 # 全局实例
 _standardization_engine: Optional[DataStandardizationEngine] = None
 _engine_lock = threading.Lock()
+
 
 def get_data_standardization_engine() -> DataStandardizationEngine:
     """获取全局数据标准化引擎实例"""
@@ -862,6 +870,7 @@ def get_data_standardization_engine() -> DataStandardizationEngine:
             _standardization_engine = DataStandardizationEngine()
 
         return _standardization_engine
+
 
 def initialize_data_standardization_engine() -> DataStandardizationEngine:
     """初始化数据标准化引擎"""

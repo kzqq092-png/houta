@@ -11,6 +11,7 @@
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import pandas as pd
+import time
 from loguru import logger
 
 
@@ -42,24 +43,36 @@ class RealDataQualityProvider:
 
             # 获取或创建质量监控器
             try:
-                from core.containers.service_container import ServiceContainer
+                from core.containers import get_service_container
                 from core.risk.data_quality_monitor import DataQualityMonitor
 
-                container = ServiceContainer()
-                self.quality_monitor = container.get('DataQualityMonitor')
+                container = get_service_container()  # 使用全局单例
+
+                # 尝试从容器获取
+                try:
+                    self.quality_monitor = container.get('DataQualityMonitor')
+                except:
+                    self.quality_monitor = None
+
+                # 如果容器中没有，创建新实例
                 if not self.quality_monitor:
-                    self.quality_monitor = DataQualityMonitor()
-                    logger.info("创建新的DataQualityMonitor实例")
+                    try:
+                        self.quality_monitor = DataQualityMonitor()
+                        logger.info("创建新的DataQualityMonitor实例")
+                    except Exception as create_error:
+                        logger.warning(f"创建DataQualityMonitor失败: {create_error}")
+                        self.quality_monitor = None
+
             except Exception as e:
                 logger.warning(f"质量监控器初始化失败: {e}")
                 self.quality_monitor = None
 
             # 获取数据管理器
             try:
-                from core.containers.service_container import ServiceContainer
+                from core.containers import get_service_container
                 from core.services.unified_data_manager import UnifiedDataManager
 
-                container = ServiceContainer()
+                container = get_service_container()  # 使用全局单例
                 self.data_manager = container.get('UnifiedDataManager')
                 if not self.data_manager:
                     self.data_manager = UnifiedDataManager()
@@ -80,7 +93,17 @@ class RealDataQualityProvider:
                 return self._get_default_metrics()
 
             # 从数据管理器获取统计信息
-            stats = self.data_manager.get_statistics()
+            all_stats = self.data_manager.get_statistics()
+
+            # 提取数据质量统计（扁平化处理）
+            # 合并所有相关字段到一个字典中，方便计算方法使用
+            stats = {}
+            if 'data_quality' in all_stats:
+                stats.update(all_stats['data_quality'])
+            if 'requests' in all_stats:
+                stats.update(all_stats['requests'])
+            if 'summary' in all_stats:
+                stats.update(all_stats['summary'])
 
             # 计算质量指标
             metrics = {
@@ -96,6 +119,8 @@ class RealDataQualityProvider:
 
         except Exception as e:
             logger.error(f"获取质量指标失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return self._get_default_metrics()
 
     def _calculate_completeness(self, stats: Dict) -> float:
@@ -260,9 +285,22 @@ class RealDataQualityProvider:
             except Exception as e:
                 logger.warning(f"K线统计失败: {e}")
 
-            # 股票列表统计
+            # 股票列表统计 - 优化：添加缓存机制减少重复查询
             try:
-                stock_list = self.data_manager.get_asset_list('stock')
+                # 检查缓存
+                current_time = time.time()
+                if (hasattr(self, '_stock_list_cache') and
+                    hasattr(self, '_stock_list_timestamp') and
+                        current_time - self._stock_list_timestamp < 60):  # 缓存60秒
+                    stock_list = self._stock_list_cache
+                    logger.debug("使用缓存的股票列表数据")
+                else:
+                    stock_list = self.data_manager.get_asset_list('stock')
+                    # 更新缓存
+                    self._stock_list_cache = stock_list
+                    self._stock_list_timestamp = current_time
+                    logger.debug("更新股票列表缓存")
+
                 stock_count = len(stock_list) if not stock_list.empty else 0
                 stock_quality = self._assess_datatype_quality('stock', stock_count)
                 datatypes_data.append({

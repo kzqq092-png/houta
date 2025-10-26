@@ -365,6 +365,15 @@ class MainMenuBar(QMenuBar):
             self.sentiment_plugin_action.setStatusTip("管理情绪分析数据源插件")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.sentiment_plugin_action)
+            
+            self.tools_menu.addSeparator()
+            
+            # ✅ 分布式节点监控
+            self.distributed_monitor_action = QAction("🌐 分布式节点监控", self)
+            self.distributed_monitor_action.setStatusTip("监控和管理分布式计算节点")
+            self.distributed_monitor_action.setShortcut("Ctrl+Shift+N")
+            # 注意：信号连接将在connect_signals方法中统一处理
+            self.tools_menu.addAction(self.distributed_monitor_action)
 
             self.plugin_menu.addSeparator()
 
@@ -981,6 +990,9 @@ class MainMenuBar(QMenuBar):
                 ('plugin_manager_action', 'show_plugin_manager'),
                 ('sentiment_plugin_action', 'show_sentiment_plugin_manager'),
                 ('plugin_market_action', 'show_plugin_market'),
+                
+                # ✅ 分布式节点监控
+                ('distributed_monitor_action', 'show_distributed_monitor'),
                 ('optimization_dashboard_action', '_on_optimization_dashboard'),
                 ('one_click_optimize_action', '_on_one_click_optimize'),
                 ('smart_optimize_action', '_on_smart_optimize'),
@@ -1061,6 +1073,38 @@ class MainMenuBar(QMenuBar):
             if True:  # 使用Loguru日志
                 logger.error(f"打开插件管理器失败: {str(e)}")
 
+    def show_distributed_monitor(self):
+        """显示分布式节点监控对话框"""
+        try:
+            from gui.dialogs.distributed_node_monitor_dialog import DistributedNodeMonitorDialog
+            from core.containers import get_service_container
+            
+            # 获取分布式服务
+            container = get_service_container()
+            distributed_service = container.get('distributed_service')
+            
+            if not distributed_service:
+                QMessageBox.warning(
+                    self.parent(),
+                    "警告",
+                    "分布式服务未初始化"
+                )
+                return
+            
+            # 创建并显示对话框
+            dialog = DistributedNodeMonitorDialog(distributed_service, self.parent())
+            dialog.exec_()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"打开分布式节点监控失败:\n{str(e)}"
+            )
+            logger.error(f"打开分布式节点监控失败: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+    
     def show_sentiment_plugin_manager(self):
         """显示情绪数据插件管理器"""
         try:
@@ -1156,8 +1200,28 @@ class MainMenuBar(QMenuBar):
             # 导入增强版数据导入UI
             from gui.enhanced_data_import_launcher import EnhancedDataImportMainWindow
 
+            # ✅ 获取plugin_manager
+            plugin_manager = None
+
+            # 方法1: 从ServiceContainer获取（推荐）
+            try:
+                from core.containers import get_service_container
+                from core.plugin_manager import PluginManager
+
+                container = get_service_container()
+                if container and container.is_registered(PluginManager):
+                    plugin_manager = container.resolve(PluginManager)
+                    logger.info("✅ 从ServiceContainer获取plugin_manager成功")
+            except Exception as e:
+                logger.debug(f"从ServiceContainer获取失败: {e}")
+
+            # 方法2: 从父窗口获取
+            if not plugin_manager and hasattr(self.parent(), 'plugin_manager'):
+                plugin_manager = self.parent().plugin_manager
+                logger.info("从父窗口获取plugin_manager成功")
+
             # 创建增强版数据导入窗口
-            self.enhanced_import_window = EnhancedDataImportMainWindow()
+            self.enhanced_import_window = EnhancedDataImportMainWindow(plugin_manager=plugin_manager)
             self.enhanced_import_window.show()
 
             logger.info("增强版数据导入系统已启动")

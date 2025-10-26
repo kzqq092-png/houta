@@ -114,13 +114,13 @@ class QualityTrendChart(FigureCanvas):
             else:
                 # 降级：使用默认值
                 sources_data = [{'name': 'System', 'score': 0.85}]
-            sources = [s['name'].rsplit('.', 1)[-1] if '.' in s['name'] else s['name'] for s in sources_data[:5]]  # 前5个数据源
-            health_scores = [s['score'] for s in sources_data[:5]]
+            sources = [s['name'].rsplit('.', 1)[-1] if '.' in s['name'] else s['name'] for s in sources_data[:30]]  # 前5个数据源
+            health_scores = [s['score'] for s in sources_data[:30]]
             colors = ['#27AE60' if s >= 0.9 else '#F39C12' if s >= 0.8 else '#E74C3C' for s in health_scores]
 
             bars = self.ax3.bar(sources, health_scores, color=colors, alpha=0.8)
             self.ax3.set_ylim(0, 1)
-            self.ax3.tick_params(axis='both', rotation=0, labelsize=9)
+            self.ax3.tick_params(axis='both', rotation=90, labelsize=9)
 
             # 在柱子上显示数值
             for bar, score in zip(bars, health_scores):
@@ -180,12 +180,15 @@ class DataQualityMonitorTab(QWidget):
         # 监控配置
         self.monitoring_enabled = True
         self.alert_threshold = 0.8
-        self.check_interval = 5  # 秒
+        self.check_interval = 30  # 秒 - 优化：从5秒改为30秒，减少频繁查询
 
-        # 数据缓存
+        # 数据缓存 - 优化：增加缓存机制避免重复查询
         self.quality_scores_cache = {}
         self.anomaly_history_cache = []
         self.plugin_status_cache = {}
+        self.asset_list_cache = None
+        self.cache_timestamp = None
+        self.cache_ttl = 60  # 缓存60秒
 
         # 定时器
         self.monitor_timer = QTimer()

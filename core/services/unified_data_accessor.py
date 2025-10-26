@@ -83,7 +83,7 @@ class UnifiedDataAccessor:
 
                 df = self.asset_service.get_historical_data(
                     symbol=stock_code,
-                    asset_type=AssetType.STOCK,
+                    asset_type=AssetType.STOCK_A,
                     start_date=start_date,
                     end_date=end_date,
                     period=period
@@ -130,7 +130,7 @@ class UnifiedDataAccessor:
 
             if self.asset_service:
                 # 通过资产服务获取股票列表
-                stock_list = self.asset_service.get_asset_list(AssetType.STOCK, market=market)
+                stock_list = self.asset_service.get_asset_list(AssetType.STOCK_A, market=market)
 
                 if stock_list:
                     self.logger.info(f" 通过资产服务获取股票列表成功: {len(stock_list)} 只股票")

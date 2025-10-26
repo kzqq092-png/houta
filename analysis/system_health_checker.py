@@ -296,9 +296,9 @@ class SystemHealthChecker:
         try:
             # 检查数据库文件是否存在
             db_paths = [
-                'db/pattern_algorithms.db',
-                'db/hikyuu.db',
-                'db/stock_data.db'
+                'data/pattern_algorithms.sqlite',
+                'data/hikyuu.sqlite',
+                'data/stock_data.duckdb'
             ]
 
             db_status = {}

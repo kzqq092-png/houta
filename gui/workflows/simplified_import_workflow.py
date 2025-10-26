@@ -89,7 +89,7 @@ class TemplateManager:
         """加载默认模板"""
         # 股票K线数据模板
         stock_kline_template = ImportTemplate(
-            template_id="stock_kline",
+            template_id="historical_kline_data",
             name="股票K线数据",
             description="导入股票的OHLC K线数据，包含开盘价、最高价、最低价、收盘价和成交量",
             data_source_type=DataSourceType.CSV_FILE,

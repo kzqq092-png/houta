@@ -61,7 +61,7 @@ class EnhancedStandardQuery(StandardQuery):
 class PluginTableManager:
     """插件表管理器"""
 
-    def __init__(self, duckdb_path: str = "db/factorweave_analytics.duckdb"):
+    def __init__(self, duckdb_path: str = "data/factorweave_analytics.duckdb"):
         self.duckdb_path = Path(duckdb_path)
         self.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
@@ -396,7 +396,7 @@ class PluginTableManager:
 class DataQualityMonitor:
     """数据质量监控器"""
 
-    def __init__(self, sqlite_path: str = "db/factorweave_system.sqlite"):
+    def __init__(self, sqlite_path: str = "data/factorweave_system.sqlite"):
         self.sqlite_path = Path(sqlite_path)
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_tables()
@@ -679,7 +679,7 @@ class DataQualityMonitor:
 class FieldMappingManager:
     """字段映射管理器"""
 
-    def __init__(self, sqlite_path: str = "db/factorweave_system.sqlite"):
+    def __init__(self, sqlite_path: str = "data/factorweave_system.sqlite"):
         self.sqlite_path = Path(sqlite_path)
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_tables()

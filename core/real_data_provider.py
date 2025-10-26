@@ -1,4 +1,3 @@
-from loguru import logger
 #!/usr/bin/env python3
 """
 真实数据提供器
@@ -7,6 +6,7 @@ from loguru import logger
 使用系统统一组件，确保数据的真实性和可靠性
 """
 
+from loguru import logger
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple, Callable
@@ -17,6 +17,7 @@ import time
 # 使用系统统一组件
 from core.adapters import get_config, get_data_validator
 from core.services.unified_data_manager import UnifiedDataManager
+from core.plugin_types import AssetType
 
 class RealDataProvider:
     """真实数据提供器 - 提供真实的市场数据"""
@@ -258,7 +259,8 @@ class RealDataProvider:
                        start_date: Optional[str] = None,
                        end_date: Optional[str] = None,
                        count: int = 250,
-                       data_source: Optional[str] = None) -> pd.DataFrame:
+                       data_source: Optional[str] = None,
+                       asset_type: Optional[str] = None) -> pd.DataFrame:
         """获取真实K线数据
 
         Args:
@@ -289,11 +291,28 @@ class RealDataProvider:
                 # 使用数据管理器获取真实数据
                 if data_source:
                     # 如果指定了数据源，使用指定的数据源
+                    # 将字符串转换为AssetType枚举
+                    final_asset_type = None
+                    if asset_type:
+                        try:
+                            # 尝试从字符串转换为AssetType枚举
+                            if hasattr(AssetType, asset_type.upper()):
+                                final_asset_type = getattr(AssetType, asset_type.upper())
+                            else:
+                                # 尝试通过value匹配
+                                for at in AssetType:
+                                    if at.value == asset_type:
+                                        final_asset_type = at
+                                        break
+                        except Exception as e:
+                            logger.warning(f"无法解析资产类型 {asset_type}: {e}")
+                    
                     kdata = data_manager_instance.get_kdata_from_source(
                         stock_code=code,
                         period=freq,
                         count=count,
-                        data_source=data_source
+                        data_source=data_source,
+                        asset_type=final_asset_type
                     )
                 else:
                     # 使用默认数据源

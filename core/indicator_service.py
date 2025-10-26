@@ -27,7 +27,7 @@ from functools import lru_cache
 
 # 统一数据库文件路径
 UNIFIED_DB_PATH = os.path.join(
-    os.path.dirname(__file__), '..', 'db', 'factorweave_system.sqlite')
+    os.path.dirname(__file__), '..', 'data', 'factorweave_system.sqlite')
 
 
 class IndicatorService:

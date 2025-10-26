@@ -22,6 +22,7 @@ from plugins.plugin_interface import IDataSourcePlugin
 
 logger = logger.bind(module=__name__)
 
+
 @dataclass
 class PluginMetrics:
     """插件性能指标"""
@@ -37,6 +38,7 @@ class PluginMetrics:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
+
 @dataclass
 class PluginCapability:
     """插件能力定义"""
@@ -48,6 +50,7 @@ class PluginCapability:
     quality_rating: float = 1.0
     reliability_rating: float = 1.0
 
+
 class PluginStatus(Enum):
     """插件状态枚举"""
     UNKNOWN = "unknown"
@@ -55,6 +58,7 @@ class PluginStatus(Enum):
     INACTIVE = "inactive"
     ERROR = "error"
     DISABLED = "disabled"
+
 
 class PluginCenter:
     """
@@ -324,7 +328,7 @@ class PluginCenter:
         # 根据插件名称推断支持的资产类型和市场
         plugin_name = plugin_id.lower()
         if 'stock' in plugin_name or 'tongdaxin' in plugin_name or 'eastmoney' in plugin_name:
-            supported_asset_types.append(AssetType.STOCK)
+            supported_asset_types.append(AssetType.STOCK_A)
             supported_markets.extend(['SH', 'SZ'])
         elif 'crypto' in plugin_name or 'binance' in plugin_name or 'okx' in plugin_name:
             supported_asset_types.append(AssetType.CRYPTO)
@@ -340,7 +344,7 @@ class PluginCenter:
             supported_markets.extend(['FOREX'])
         else:
             # 默认支持股票
-            supported_asset_types.append(AssetType.STOCK)
+            supported_asset_types.append(AssetType.STOCK_A)
             supported_markets.extend(['SH', 'SZ'])
 
         return PluginCapability(

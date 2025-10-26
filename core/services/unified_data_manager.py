@@ -48,7 +48,7 @@ except ImportError as e:
     # Cache = None  # 已统一使用MultiLevelCacheManager
 
 # 数据库路径
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'factorweave_system.sqlite')
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'factorweave_system.sqlite')
 
 
 def get_unified_data_manager() -> Optional['UnifiedDataManager']:
@@ -82,7 +82,7 @@ class DataRequest:
     """数据请求"""
     request_id: str
     symbol: str  # 统一使用symbol替代stock_code
-    asset_type: AssetType = AssetType.STOCK  # 新增资产类型支持
+    asset_type: AssetType = AssetType.STOCK_A  # 新增资产类型支持（A股）
     data_type: str = 'kdata'  # 'kdata', 'indicators', 'analysis'
     period: str = 'D'
     time_range: int = 365
@@ -298,6 +298,19 @@ class UnifiedDataManager:
         self._init_duckdb_integration()
 
         logger.info("统一数据管理器构造完成")
+
+        # 从配置服务读取缓存启用状态
+        try:
+            config_service = self.service_container.get('config_service')
+            if config_service:
+                self.cache_enabled = config_service.get('data.cache_enabled', True)
+                logger.info(f"缓存启用状态: {self.cache_enabled}")
+            else:
+                self.cache_enabled = True  # 配置服务不可用时默认启用缓存
+                logger.warning("配置服务不可用，使用默认缓存设置（已启用）")
+        except Exception as e:
+            self.cache_enabled = True  # 出错时默认启用缓存
+            logger.warning(f"读取缓存配置失败，使用默认值: {e}")
 
     def initialize(self):
         """延迟初始化，由服务容器控制时机"""
@@ -606,7 +619,8 @@ class UnifiedDataManager:
             logger.error(f"获取K线数据失败: {stock_code} - {e}")
             return pd.DataFrame()
 
-    def get_kdata_from_source(self, stock_code: str, period: str = 'D', count: int = 365, data_source: str = None) -> pd.DataFrame:
+    def get_kdata_from_source(self, stock_code: str, period: str = 'D', count: int = 365,
+                              data_source: str = None, asset_type: AssetType = None) -> pd.DataFrame:
         """
         从指定数据源获取K线数据
 
@@ -615,6 +629,7 @@ class UnifiedDataManager:
             period: 周期 (D/W/M/1/5/15/30/60/daily/weekly/monthly等)
             count: 数据条数
             data_source: 数据源名称 (如: '通达信', 'akshare', 'eastmoney'等)
+            asset_type: 资产类型（可选，如果不提供则使用默认值A股）
 
         Returns:
             K线数据DataFrame
@@ -657,9 +672,12 @@ class UnifiedDataManager:
                         start_date = end_date - timedelta(days=count)
 
                     # 调用插件管理器获取数据，传递data_source参数
+                    # ✅ 使用传入的资产类型，如果没有则使用默认值A股
+                    final_asset_type = asset_type or AssetType.STOCK_A
+
                     df = self._uni_plugin_manager.get_kline_data(
                         symbol=stock_code,
-                        asset_type=AssetType.STOCK,
+                        asset_type=final_asset_type,  # ✅ 使用传入的资产类型
                         start_date=start_date,
                         end_date=end_date,
                         frequency=frequency,
@@ -741,11 +759,11 @@ class UnifiedDataManager:
 
             # 1. 优先从DuckDB数据库获取资产列表
             if self.duckdb_available and self.duckdb_operations:
-                logger.info(f"🗄️ 从DuckDB数据库获取{asset_type}资产列表")
+                logger.debug(f"🗄️ 从DuckDB数据库获取{asset_type}资产列表")  # 优化：改为debug级别减少日志噪音
                 try:
                     asset_list_df = self._get_asset_list_from_duckdb(asset_type, market)
                     if asset_list_df is not None and not asset_list_df.empty:
-                        logger.info(f"✅ DuckDB数据库获取{asset_type}资产列表成功: {len(asset_list_df)} 个资产")
+                        logger.debug(f"✅ DuckDB数据库获取{asset_type}资产列表成功: {len(asset_list_df)} 个资产")  # 优化：改为debug级别
                         # 缓存结果
                         if self.cache_enabled:
                             self._cache_data(cache_key, asset_list_df)
@@ -781,42 +799,46 @@ class UnifiedDataManager:
             # 将字符串转换为AssetType枚举
             from ..plugin_types import AssetType
             asset_type_enum_mapping = {
-                'stock': AssetType.STOCK_US,  # 默认使用STOCK_US
+                'stock': AssetType.STOCK_A,  # 默认使用STOCK_A（A股）面向中国用户
                 'crypto': AssetType.CRYPTO,
                 'fund': AssetType.FUND,
                 'bond': AssetType.BOND,
                 'index': AssetType.INDEX,
                 'sector': AssetType.SECTOR
             }
-            asset_type_enum = asset_type_enum_mapping.get(asset_type, AssetType.STOCK_US)
+            asset_type_enum = asset_type_enum_mapping.get(asset_type, AssetType.STOCK_A)
 
-            # 根据资产类型选择对应的表和查询
-            table_mapping = {
-                'stock': 'stock_basic',
-                'crypto': 'crypto_basic',
-                'fund': 'fund_basic',
-                'bond': 'bond_basic',
-                'index': 'index_basic',
-                'sector': 'sector_basic'
+            # ✅ 新架构：所有资产类型统一使用asset_metadata表
+            table_name = 'asset_metadata'
+
+            # 资产类型映射（用于WHERE条件）
+            asset_type_value_mapping = {
+                'stock': 'stock_a',     # 默认A股
+                'crypto': 'crypto',
+                'fund': 'fund',
+                'bond': 'bond',
+                'index': 'index',
+                'sector': 'sector'
             }
+            asset_type_value = asset_type_value_mapping.get(asset_type, 'stock_a')
 
-            table_name = table_mapping.get(asset_type, 'stock_basic')
-
-            # 构建查询语句
-            # 构建查询SQL（直接拼接参数，因为query_data不支持参数化）
+            # 构建查询语句（使用新的字段名）
+            # 新字段映射：list_date→listing_date, status→listing_status
+            # 只选择有实际值的核心字段，减少空列显示
             if market and market != 'all':
                 query = f"""
                 SELECT DISTINCT 
                     symbol as code,
                     name,
                     market,
-                    industry,
-                    sector,
-                    list_date,
-                    status,
-                    '{asset_type}' as asset_type
+                    CASE WHEN industry IS NOT NULL AND industry != '' THEN industry ELSE NULL END as industry,
+                    CASE WHEN sector IS NOT NULL AND sector != '' THEN sector ELSE NULL END as sector,
+                    listing_date as list_date,
+                    listing_status as status
                 FROM {table_name} 
-                WHERE market = '{market.upper()}' AND status = 'L'
+                WHERE market = '{market.upper()}' 
+                  AND listing_status = 'active'
+                  AND asset_type = '{asset_type_value}'
                 ORDER BY symbol
                 """
             else:
@@ -825,26 +847,54 @@ class UnifiedDataManager:
                     symbol as code,
                     name,
                     market,
-                    industry,
-                    sector,
-                    list_date,
-                    status,
-                    '{asset_type}' as asset_type
+                    CASE WHEN industry IS NOT NULL AND industry != '' THEN industry ELSE NULL END as industry,
+                    CASE WHEN sector IS NOT NULL AND sector != '' THEN sector ELSE NULL END as sector,
+                    listing_date as list_date,
+                    listing_status as status
                 FROM {table_name} 
-                WHERE status = 'L'
+                WHERE listing_status = 'active'
+                  AND asset_type = '{asset_type_value}'
                 ORDER BY symbol
                 """
 
             # 执行查询 - 使用query_data方法
-            result = self.duckdb_operations.query_data(
-                database_path=self.asset_manager.get_database_path(asset_type_enum),
-                table_name=table_name,
-                custom_sql=query
-            )
+            import sys
+            import io
+
+            # 捕获所有输出
+            old_stdout = sys.stdout
+            old_stderr = sys.stderr
+            captured_stdout = io.StringIO()
+            captured_stderr = io.StringIO()
+
+            try:
+                sys.stdout = captured_stdout
+                sys.stderr = captured_stderr
+
+                result = self.duckdb_operations.query_data(
+                    database_path=self.asset_manager.get_database_path(asset_type_enum),
+                    table_name=table_name,
+                    custom_sql=query
+                )
+            finally:
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
+
+                # 检查是否有输出
+                stdout_content = captured_stdout.getvalue()
+                stderr_content = captured_stderr.getvalue()
+
+                if stdout_content:
+                    logger.warning(f"[CAPTURED STDOUT] query_data produced stdout output: {stdout_content!r}")
+                if stderr_content:
+                    logger.warning(f"[CAPTURED STDERR] query_data produced stderr output: {stderr_content!r}")
+
+            # DEBUG: 检查result对象
+            logger.debug(f"[DEBUG] query_data returned: type={type(result)}, success={result.success if result else 'None'}")
 
             if result.success and not result.data.empty:
                 df = result.data
-                logger.info(f"从DuckDB获取{asset_type}资产列表成功: {len(df)} 个资产")
+                logger.debug(f"从DuckDB获取{asset_type}资产列表成功: {len(df)} 个资产")  # 优化：改为debug级别减少日志噪音
                 return df
             else:
                 logger.info(f"DuckDB中没有{asset_type}资产列表数据")
@@ -854,7 +904,7 @@ class UnifiedDataManager:
             logger.error(f"从DuckDB获取{asset_type}资产列表失败: {e}")
             return pd.DataFrame()
 
-    def _get_kdata_from_duckdb(self, stock_code: str, period: str, count: int, data_source: str = None) -> pd.DataFrame:
+    def _get_kdata_from_duckdb(self, stock_code: str, period: str, count: int, data_source: str = None, asset_type: AssetType = None) -> pd.DataFrame:
         """从DuckDB获取K线数据（支持数据源隔离）"""
         try:
             if not self.duckdb_operations:
@@ -862,7 +912,8 @@ class UnifiedDataManager:
 
             # 使用现有的DuckDB操作器进行查询
             # 构建查询SQL - 使用标准的kline_stock数据库
-            database_path = self.asset_manager.get_database_path(asset_type)
+            final_asset_type = asset_type or AssetType.STOCK_A
+            database_path = self.asset_manager.get_database_path(final_asset_type)
 
             # 根据周期确定表名
             table_name = f"kline_{period.lower()}" if period != 'D' else "kline_daily"
@@ -1078,7 +1129,7 @@ class UnifiedDataManager:
                 try:
                     # 获取个股资金流数据
                     individual_query = StandardQuery(
-                        asset_type=AssetType.STOCK,
+                        asset_type=AssetType.STOCK_A,
                         data_type=DataType.INDIVIDUAL_FUND_FLOW,
                         symbol="",
                         extra_params={"period": "1d", "limit": 100}
@@ -1347,7 +1398,7 @@ class UnifiedDataManager:
         """获取当前数据源"""
         return getattr(self, '_current_source', 'tet_framework')
 
-    def get_historical_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK,
+    def get_historical_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK_A,
                             period: str = "D", count: int = 365, **kwargs) -> Optional[pd.DataFrame]:
         """
         获取历史数据（兼容AssetService接口）
@@ -1363,7 +1414,7 @@ class UnifiedDataManager:
             Optional[pd.DataFrame]: 历史数据
         """
         try:
-            if asset_type == AssetType.STOCK:
+            if asset_type == AssetType.STOCK_A:
                 # 对于股票，使用get_kdata方法
                 return self.get_kdata(symbol, period, count)
             else:
@@ -1373,7 +1424,7 @@ class UnifiedDataManager:
             logger.error(f"获取历史数据失败 {symbol}: {e}")
             return None
 
-    def get_asset_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK,
+    def get_asset_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK_A,
                        data_type: DataType = DataType.HISTORICAL_KLINE,
                        period: str = "D", **kwargs) -> Optional[pd.DataFrame]:
         """
@@ -1417,7 +1468,7 @@ class UnifiedDataManager:
                 logger.info("降级到传统数据获取模式")
 
         # 降级到传统方式
-        if asset_type == AssetType.STOCK:
+        if asset_type == AssetType.STOCK_A:
             logger.info(f" 使用传统模式获取股票数据: {symbol}")
             data = self._legacy_get_stock_data(symbol, period, **kwargs)
             if data is not None:
@@ -1552,6 +1603,133 @@ class UnifiedDataManager:
             Optional[Dict[str, Any]]: 数据源信息或None
         """
         return self._registered_data_sources.get(plugin_id)
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        获取数据管理器的统计信息
+
+        用于数据质量监控和系统状态评估
+
+        Returns:
+            Dict[str, Any]: 统计信息字典，包含：
+                - requests: 请求统计
+                - cache: 缓存统计
+                - data_sources: 数据源统计
+                - data_quality: 数据质量统计
+                - system: 系统状态统计
+        """
+        try:
+            # 1. 请求统计
+            request_stats = self._stats.copy()
+
+            # 计算成功率
+            total_requests = request_stats.get('requests_total', 0)
+            if total_requests > 0:
+                success_rate = (request_stats.get('requests_completed', 0) / total_requests) * 100
+                request_stats['success_rate'] = round(success_rate, 2)
+            else:
+                request_stats['success_rate'] = 0.0
+
+            # 2. 缓存统计
+            cache_total = request_stats.get('cache_hits', 0) + request_stats.get('cache_misses', 0)
+            if cache_total > 0:
+                cache_hit_rate = (request_stats.get('cache_hits', 0) / cache_total) * 100
+            else:
+                cache_hit_rate = 0.0
+
+            cache_stats = {
+                'hits': request_stats.get('cache_hits', 0),
+                'misses': request_stats.get('cache_misses', 0),
+                'hit_rate': round(cache_hit_rate, 2),
+                'total_queries': cache_total
+            }
+
+            # 3. 数据源统计
+            data_source_stats = {
+                'total_registered': len(self._registered_data_sources),
+                'available_sources': len(self.get_available_data_source_names()),
+                'registered_plugins': list(self._registered_data_sources.keys())
+            }
+
+            # 4. 数据质量统计（基于请求统计估算）
+            # 为UI数据质量监控提供所需的字段
+            completed = request_stats.get('requests_completed', 0)
+            failed = request_stats.get('requests_failed', 0)
+
+            quality_stats = {
+                # UI期望的字段
+                'expected_records': total_requests,  # 预期记录数
+                'actual_records': completed,  # 实际记录数
+                'total_count': completed,  # 总数（实际完成的）
+                'error_count': failed,  # 错误数
+                'failed_records': failed,  # 失败记录数
+                'cancelled_records': request_stats.get('requests_cancelled', 0),  # 取消记录数
+                'inconsistent_records': 0,  # 不一致记录数（暂无）
+                'invalid_records': failed,  # 无效记录数（与失败数相同）
+                'duplicate_records': 0,  # 重复记录数（暂无）
+                'quality_score': request_stats.get('success_rate', 0) / 100,  # 质量分数（0-1）
+                'last_update_time': datetime.now()  # 最后更新时间
+            }
+
+            # 5. 系统状态统计
+            system_stats = {
+                'initialized': self._is_initialized,
+                'tet_enabled': self.tet_enabled,
+                'plugins_discovered': self._plugins_discovered,
+                'active_requests': len(self._active_requests),
+                'pending_requests': len(self._pending_requests),
+                'completed_requests': len(self._completed_requests)
+            }
+
+            # 6. DuckDB统计（如果可用）
+            duckdb_stats = {}
+            if hasattr(self, 'duckdb_manager') and self.duckdb_manager:
+                try:
+                    # 获取DuckDB连接池统计
+                    duckdb_stats = {
+                        'enabled': True,
+                        'database_path': str(getattr(self.duckdb_manager, 'db_path', 'unknown'))
+                    }
+                except:
+                    duckdb_stats = {'enabled': False}
+            else:
+                duckdb_stats = {'enabled': False}
+
+            # 组装完整统计信息
+            statistics = {
+                'requests': request_stats,
+                'cache': cache_stats,
+                'data_sources': data_source_stats,
+                'data_quality': quality_stats,
+                'system': system_stats,
+                'duckdb': duckdb_stats,
+                'timestamp': datetime.now().isoformat(),
+                'summary': {
+                    'total_requests': total_requests,
+                    'success_rate': request_stats.get('success_rate', 0),
+                    'cache_hit_rate': round(cache_hit_rate, 2),
+                    'data_quality_score': quality_stats['quality_score'],
+                    'active_data_sources': data_source_stats['total_registered']
+                }
+            }
+
+            return statistics
+
+        except Exception as e:
+            logger.error(f"获取统计信息失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+            # 返回默认统计信息
+            return {
+                'requests': self._stats.copy(),
+                'cache': {'hits': 0, 'misses': 0, 'hit_rate': 0.0},
+                'data_sources': {'total_registered': 0, 'available_sources': 0},
+                'data_quality': {'expected_records': 0, 'actual_records': 0, 'quality_score': 0.0},
+                'system': {'initialized': self._is_initialized},
+                'timestamp': datetime.now().isoformat(),
+                'error': str(e)
+            }
 
     def _legacy_get_stock_data(self, symbol: str, period: str = "D", **kwargs) -> Optional[pd.DataFrame]:
         """传统方式获取股票数据"""
@@ -1738,7 +1916,7 @@ class UnifiedDataManager:
 
                     query = StandardQuery(
                         symbol=stock_code,
-                        asset_type=AssetType.STOCK,
+                        asset_type=AssetType.STOCK_A,
                         data_type=DataType.FINANCIAL_STATEMENT,
                         provider=self._current_source
                     )
@@ -1760,7 +1938,7 @@ class UnifiedDataManager:
             logger.error(f"获取财务数据失败: {e}", exc_info=True)
             return {}
 
-    async def _get_financial_from_duckdb(self, stock_code: str) -> Optional[Dict[str, Any]]:
+    async def _get_financial_from_duckdb(self, stock_code: str, asset_type: AssetType = None) -> Optional[Dict[str, Any]]:
         """从DuckDB获取财务数据"""
         try:
             query = """
@@ -1770,8 +1948,9 @@ class UnifiedDataManager:
                 LIMIT 1
             """
 
+            final_asset_type = asset_type or AssetType.STOCK_A
             result = self.duckdb_operations.execute_query(
-                database_path=self.asset_manager.get_database_path(asset_type),
+                database_path=self.asset_manager.get_database_path(final_asset_type),
                 query=query,
                 params=[stock_code]
             )
@@ -1879,7 +2058,7 @@ class UnifiedDataManager:
             logger.error(f"获取宏观经济数据失败: {indicator} - {e}")
             return pd.DataFrame()
 
-    def _get_macro_from_duckdb(self, indicator: str, period: str, count: int) -> pd.DataFrame:
+    def _get_macro_from_duckdb(self, indicator: str, period: str, count: int, asset_type: AssetType = None) -> pd.DataFrame:
         """从DuckDB获取宏观经济数据"""
         try:
             query = """
@@ -1889,8 +2068,9 @@ class UnifiedDataManager:
                 LIMIT ?
             """
 
+            final_asset_type = asset_type or AssetType.STOCK_A
             result = self.duckdb_operations.execute_query(
-                database_path=self.asset_manager.get_database_path(asset_type),
+                database_path=self.asset_manager.get_database_path(final_asset_type),
                 query=query,
                 params=[indicator, period, count]
             )
@@ -2452,23 +2632,173 @@ class UnifiedDataManager:
             logger.info("插件已发现，跳过重复发现")
             return
 
-        logger.info("开始发现和注册数据源插件...")
+        logger.info("🔍 开始发现和注册数据源插件...")
 
         try:
-            # 尝试自动发现插件
-            self._auto_discover_data_source_plugins()
+            # 使用插件管理器动态加载插件（替代硬编码）
+            registered_count = self._register_plugins_from_plugin_manager()
 
-            # 如果自动发现失败，尝试手动注册核心插件
-            if not self._plugins_discovered:
-                logger.info("自动发现失败，尝试手动注册核心插件...")
-                self._manual_register_core_plugins()
+            if registered_count > 0:
+                self._plugins_discovered = True
+                logger.info(f"✅ 插件发现和注册完成: 共注册 {registered_count} 个插件")
+            else:
+                logger.warning("⚠️ 未注册任何插件，请检查插件管理器状态")
 
         except Exception as e:
-            logger.error(f"插件发现和注册失败: {e}")
+            logger.error(f"❌ 插件发现和注册失败: {e}")
             logger.error(traceback.format_exc())
 
-    def _manual_register_core_plugins(self) -> None:
-        """手动注册核心数据源插件"""
+    def _register_plugins_from_plugin_manager(self) -> int:
+        """
+        从插件管理器动态注册数据源插件
+
+        Returns:
+            成功注册的插件数量
+        """
+        # 获取插件管理器
+        plugin_manager = None
+
+        # 方法1: 从service_container获取
+        if hasattr(self, 'service_container') and self.service_container:
+            try:
+                from core.plugin_manager import PluginManager
+                if self.service_container.is_registered(PluginManager):
+                    plugin_manager = self.service_container.resolve(PluginManager)
+                    logger.debug("从服务容器获取PluginManager成功")
+            except Exception as e:
+                logger.debug(f"从服务容器获取PluginManager失败: {e}")
+
+        # 方法2: 从全局实例获取
+        if not plugin_manager:
+            try:
+                from core.plugin_manager import PluginManager
+                # 通过ServiceContainer获取PluginManager实例
+                from core.containers import get_service_container
+                container = get_service_container()
+                plugin_manager = container.resolve(PluginManager) if container else None
+            except:
+                pass
+
+        if not plugin_manager:
+            logger.warning("⚠️ 插件管理器未初始化，无法注册插件")
+            return 0
+
+        registered_count = 0
+
+        try:
+            from core.plugin_types import PluginType
+
+            # 1. 获取所有插件实例
+            all_plugins = plugin_manager.plugin_instances
+
+            if not all_plugins:
+                logger.warning("⚠️ 插件管理器中没有加载任何插件")
+                return 0
+
+            logger.info(f"📦 插件管理器中有 {len(all_plugins)} 个插件")
+
+            # 2. 筛选数据源插件
+            data_source_plugins = []
+            for plugin_id, plugin_instance in all_plugins.items():
+                # 获取插件元数据
+                metadata = plugin_manager.plugin_metadata.get(plugin_id, {})
+                plugin_type = metadata.get('plugin_type') or metadata.get('type')
+
+                # 检查是否为数据源插件
+                is_data_source = False
+                if plugin_type:
+                    if isinstance(plugin_type, str):
+                        is_data_source = 'data_source' in plugin_type.lower()
+                    elif hasattr(plugin_type, 'value'):
+                        is_data_source = 'data_source' in str(plugin_type.value).lower()
+                    else:
+                        is_data_source = 'data_source' in str(plugin_type).lower()
+
+                # 也检查plugin_id前缀
+                if not is_data_source:
+                    is_data_source = plugin_id.startswith('data_sources.')
+
+                if is_data_source:
+                    data_source_plugins.append((plugin_id, plugin_instance, metadata))
+
+            logger.info(f"🔍 发现 {len(data_source_plugins)} 个数据源插件")
+
+            # 3. 注册每个数据源插件
+            for plugin_id, plugin_instance, metadata in data_source_plugins:
+                try:
+                    # 检查插件是否启用
+                    is_enabled = metadata.get('enabled', True)
+                    if not is_enabled:
+                        logger.debug(f"⏭️ 跳过禁用的插件: {plugin_id}")
+                        continue
+
+                    # 验证插件有必要的方法
+                    if not self._is_data_source_plugin(plugin_instance):
+                        logger.warning(f"⚠️ 插件缺少必要方法，跳过: {plugin_id}")
+                        continue
+
+                    # 获取优先级和权重
+                    priority = 0
+                    weight = 1.0
+
+                    if hasattr(plugin_instance, 'priority'):
+                        priority = plugin_instance.priority
+                    elif 'priority' in metadata:
+                        priority = metadata['priority']
+
+                    if hasattr(plugin_instance, 'weight'):
+                        weight = plugin_instance.weight
+                    elif 'weight' in metadata:
+                        weight = metadata['weight']
+
+                    # 注册插件
+                    success = self.register_data_source_plugin(
+                        plugin_id=plugin_id,
+                        adapter=plugin_instance,
+                        priority=priority,
+                        weight=weight
+                    )
+
+                    if success:
+                        registered_count += 1
+                        plugin_name = metadata.get('name', plugin_id)
+                        logger.info(f"  ✅ 成功注册: {plugin_name} ({plugin_id})")
+                    else:
+                        logger.warning(f"  ⚠️ 注册失败: {plugin_id}")
+
+                except Exception as e:
+                    logger.error(f"  ❌ 注册插件异常 {plugin_id}: {e}")
+                    continue
+
+            logger.info(f"📊 插件注册统计: 成功 {registered_count}/{len(data_source_plugins)}")
+            return registered_count
+
+        except Exception as e:
+            logger.error(f"❌ 从插件管理器注册插件失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return registered_count
+
+    # ==================================================================================
+    # 🗑️ 已废弃：_manual_register_core_plugins - 硬编码插件注册方法
+    # 替代方案：使用 _register_plugins_from_plugin_manager() 动态加载插件
+    # 保留此代码用于参考，待完全验证后删除
+    # ==================================================================================
+    def _manual_register_core_plugins_DEPRECATED(self) -> None:
+        """
+        【已废弃】手动注册核心数据源插件
+
+        ⚠️ 此方法已被 _register_plugins_from_plugin_manager() 替代
+        原因：硬编码导入18个examples插件，难以维护
+
+        请勿使用此方法！
+        """
+        logger.warning("⚠️ 调用了已废弃的 _manual_register_core_plugins 方法")
+        logger.warning("⚠️ 请使用 _register_plugins_from_plugin_manager 替代")
+        return  # 直接返回，不执行任何操作
+
+        # 以下代码已废弃，保留用于参考
+        """
         registered_count = 0
 
         # 插件注册开始
@@ -2832,8 +3162,9 @@ class UnifiedDataManager:
             # 创建基本回退数据源，避免TET管道完全无法工作
             self._create_fallback_data_source()
             self._plugins_discovered = True
+        """  # 废弃代码结束
 
-    def _create_fallback_data_source(self) -> None:
+    def _create_fallback_data_source_DEPRECATED(self) -> None:
         """创建基本回退数据源，确保TET管道有可用的数据源"""
         try:
             # 创建一个简单的回退数据源类

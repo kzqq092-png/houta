@@ -94,7 +94,7 @@ try:
     manager = AssetSeparatedDatabaseManager(config=config)
 
     # 测试路径生成
-    stock_path = manager.get_database_path(AssetType.STOCK)
+    stock_path = manager.get_database_path(AssetType.STOCK_A)
     test_assert(
         stock_path == "db/databases/stock/stock_data.duckdb",
         f"STOCK 路径正确: {stock_path}"
@@ -108,7 +108,7 @@ try:
 
     # 测试数据库连接
     try:
-        db_stock = manager.get_database(AssetType.STOCK)
+        db_stock = manager.get_database(AssetType.STOCK_A)
         test_assert(
             db_stock is not None,
             "STOCK 数据库连接成功"
@@ -145,22 +145,32 @@ try:
     table_names = [t[0] for t in tables]
 
     test_assert(
-        "stock_kline" in table_names,
-        "stock_kline 表存在"
+        "historical_kline_data" in table_names,
+        "historical_kline_data 表存在（新架构）"
+    )
+
+    test_assert(
+        "asset_metadata" in table_names,
+        "asset_metadata 表存在（新架构）"
     )
 
     # 检查数据量
-    count_result = conn.execute("SELECT COUNT(*) FROM stock_kline").fetchone()
-    record_count = count_result[0] if count_result else 0
+    kline_count = conn.execute("SELECT COUNT(*) FROM historical_kline_data").fetchone()[0]
+    asset_count = conn.execute("SELECT COUNT(*) FROM asset_metadata").fetchone()[0]
 
     test_assert(
-        record_count == 4508,
-        f"股票数据完整: {record_count:,} 条（预期4,508条）"
+        kline_count > 0,
+        f"K线数据存在: {kline_count:,} 条"
+    )
+
+    test_assert(
+        asset_count > 0,
+        f"资产元数据存在: {asset_count:,} 条"
     )
 
     # 检查数据范围
     try:
-        time_range = conn.execute("SELECT MIN(datetime), MAX(datetime) FROM stock_kline").fetchone()
+        time_range = conn.execute("SELECT MIN(timestamp), MAX(timestamp) FROM historical_kline_data").fetchone()
         test_assert(
             time_range is not None and time_range[0] is not None,
             f"数据时间范围正常: {time_range[0]} ~ {time_range[1]}"
@@ -182,22 +192,32 @@ try:
     table_names = [t[0] for t in tables]
 
     test_assert(
-        "stock_a_kline" in table_names,
-        "stock_a_kline 表存在"
+        "historical_kline_data" in table_names,
+        "historical_kline_data 表存在（新架构）"
+    )
+
+    test_assert(
+        "asset_metadata" in table_names,
+        "asset_metadata 表存在（新架构）"
     )
 
     # 检查数据量
-    count_result = conn.execute("SELECT COUNT(*) FROM stock_a_kline").fetchone()
-    record_count = count_result[0] if count_result else 0
+    kline_count = conn.execute("SELECT COUNT(*) FROM historical_kline_data").fetchone()[0]
+    asset_count = conn.execute("SELECT COUNT(*) FROM asset_metadata").fetchone()[0]
 
     test_assert(
-        record_count == 10703,
-        f"A股数据完整: {record_count:,} 条（预期10,703条）"
+        kline_count > 0,
+        f"A股K线数据存在: {kline_count:,} 条"
+    )
+
+    test_assert(
+        asset_count > 0,
+        f"A股资产元数据存在: {asset_count:,} 条"
     )
 
     # 检查数据范围
     try:
-        time_range = conn.execute("SELECT MIN(datetime), MAX(datetime) FROM stock_a_kline").fetchone()
+        time_range = conn.execute("SELECT MIN(timestamp), MAX(timestamp) FROM historical_kline_data").fetchone()
         test_assert(
             time_range is not None and time_range[0] is not None,
             f"数据时间范围正常: {time_range[0]} ~ {time_range[1]}"

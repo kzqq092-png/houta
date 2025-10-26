@@ -488,7 +488,7 @@ class PluginService(BaseService):
         try:
             return AssetType(asset_str.lower())
         except ValueError:
-            return AssetType.STOCK  # 默认股票类型
+            return AssetType.STOCK_A  # 默认股票类型
 
     def _parse_data_type(self, data_type_str: str) -> DataType:
         """解析数据类型"""

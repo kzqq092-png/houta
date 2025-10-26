@@ -15,6 +15,7 @@ from ..data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckR
 from ..plugin_types import AssetType, DataType
 from ..data_source import DataSource
 
+
 class LegacyDataSourceAdapter(IDataSourcePlugin):
     """
     传统数据源适配器
@@ -36,9 +37,9 @@ class LegacyDataSourceAdapter(IDataSourcePlugin):
 
         # 映射传统数据源类型到新的资产类型
         self._asset_type_mapping = {
-            'eastmoney': [AssetType.STOCK],
-            'sina': [AssetType.STOCK],
-            'tonghuashun': [AssetType.STOCK]
+            'eastmoney': [AssetType.STOCK_A],
+            'sina': [AssetType.STOCK_A],
+            'tonghuashun': [AssetType.STOCK_A]
         }
 
         # 支持的数据类型
@@ -57,7 +58,7 @@ class LegacyDataSourceAdapter(IDataSourcePlugin):
             version="1.0.0",
             description=f"传统{self.source_id}数据源的适配器",
             author="HIkyuu-UI Team",
-            supported_asset_types=self._asset_type_mapping.get(self.source_id, [AssetType.STOCK]),
+            supported_asset_types=self._asset_type_mapping.get(self.source_id, [AssetType.STOCK_A]),
             supported_data_types=self._supported_data_types,
             capabilities={
                 "markets": ["SH", "SZ"],

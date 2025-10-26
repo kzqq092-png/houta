@@ -66,7 +66,7 @@ class LeftPanel(BasePanel):
             logger.info(f"ℹ 多资产服务不可用，使用股票模式: {e}")
 
         # 当前选择的资产类型
-        self.current_asset_type = AssetType.STOCK
+        self.current_asset_type = AssetType.STOCK_A
         self.current_market = None
 
         # 添加防抖相关属性
@@ -134,7 +134,7 @@ class LeftPanel(BasePanel):
 
             # 添加支持的资产类型
             asset_types = [
-                ("股票 (Stock)", AssetType.STOCK),
+                ("股票 (Stock)", AssetType.STOCK_A),
                 ("加密货币 (Crypto)", AssetType.CRYPTO),
                 ("期货 (Futures)", AssetType.FUTURES),
                 ("外汇 (Forex)", AssetType.FOREX),
@@ -184,7 +184,7 @@ class LeftPanel(BasePanel):
 
             # 定义不同资产类型的市场选项
             market_options = {
-                AssetType.STOCK: ["全部", "上海", "深圳", "创业板", "科创板", "北交所"],
+                AssetType.STOCK_A: ["全部", "上海", "深圳", "创业板", "科创板", "北交所"],
                 AssetType.CRYPTO: ["全部", "Binance", "Coinbase", "OKX", "Huobi"],
                 AssetType.FUTURES: ["全部", "上期所", "大商所", "郑商所", "中金所"],
                 AssetType.FOREX: ["全部", "主要货币对", "次要货币对", "奇异货币对"],
@@ -208,7 +208,7 @@ class LeftPanel(BasePanel):
         try:
             if not self.asset_service:
                 # 如果没有资产服务，且不是股票类型，则显示空列表
-                if self.current_asset_type != AssetType.STOCK:
+                if self.current_asset_type != AssetType.STOCK_A:
                     self._clear_asset_list()
                     return
                 else:
@@ -647,7 +647,7 @@ class LeftPanel(BasePanel):
             logger.info(f"选择资产: {symbol} ({name}) - 类型: {self.current_asset_type.value}")
 
             # 发送资产选择事件
-            if self.current_asset_type == AssetType.STOCK:
+            if self.current_asset_type == AssetType.STOCK_A:
                 # 向后兼容：股票类型同时发送两种事件
                 stock_event = StockSelectedEvent(
                     stock_code=symbol,

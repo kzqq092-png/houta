@@ -90,7 +90,7 @@ class AdjMomentumPlugin(IStrategyPlugin):
                     required=True
                 )
             ],
-            supported_assets=[AssetType.STOCK],
+            supported_assets=[AssetType.STOCK_A],
             time_frames=[TimeFrame.DAILY],
             risk_level=RiskLevel.MEDIUM,
             tags=['momentum', 'trend', 'adjusted_price', '20-field']
@@ -458,7 +458,7 @@ class VWAPReversionPlugin(IStrategyPlugin):
                     required=True
                 )
             ],
-            supported_assets=[AssetType.STOCK],
+            supported_assets=[AssetType.STOCK_A],
             time_frames=[TimeFrame.DAILY, TimeFrame.INTRADAY],
             risk_level=RiskLevel.MEDIUM,
             tags=['mean_reversion', 'vwap', '20-field']

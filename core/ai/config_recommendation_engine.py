@@ -95,7 +95,7 @@ class ConfigRecommendationEngine:
     使用机器学习算法分析历史性能数据，为数据导入任务提供智能配置推荐
     """
 
-    def __init__(self, db_path: str = "db/factorweave_system.sqlite", model_cache_dir: str = "cache/ml_models"):
+    def __init__(self, db_path: str = "data/factorweave_system.sqlite", model_cache_dir: str = "cache/ml_models"):
         self.db_path = db_path
         self.model_cache_dir = Path(model_cache_dir)
         self.model_cache_dir.mkdir(parents=True, exist_ok=True)

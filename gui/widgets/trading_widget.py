@@ -22,6 +22,7 @@ from utils.config_manager import ConfigManager
 # log_structured已替换为直接的logger调用
 from core.containers import get_service_container
 
+
 class AnalysisStep:
     def __init__(self, step_id: str, name: str):
         self.step_id = step_id
@@ -43,6 +44,7 @@ class AnalysisStep:
         self.duration = self.end_time - self.start_time if self.start_time else None
         self.log = log
         self.error = error
+
 
 class AnalysisProcessManager:
     def __init__(self):
@@ -77,6 +79,7 @@ class AnalysisProcessManager:
 
     def get_history(self):
         return self.history
+
 
 class TradingWidget(QWidget):
     """交易控件类 - 重构版本"""
@@ -1121,7 +1124,7 @@ class TradingWidget(QWidget):
                     logger.info(f" TradingWidget使用TET模式获取数据: {self.current_stock.strip()}")
                     kdata = asset_service.get_historical_data(
                         symbol=self.current_stock.strip(),
-                        asset_type=AssetType.STOCK,
+                        asset_type=AssetType.STOCK_A,
                         period='D'
                     )
                     if kdata is not None and not kdata.empty:
@@ -1333,7 +1336,7 @@ class TradingWidget(QWidget):
                     if asset_service:
                         data = asset_service.get_historical_data(
                             symbol=stock_code,
-                            asset_type=AssetType.STOCK,
+                            asset_type=AssetType.STOCK_A,
                             period='D'
                         )
                         if data is not None and not data.empty:
@@ -1778,7 +1781,7 @@ class TradingWidget(QWidget):
                     try:
                         realtime_data = asset_service.get_real_time_data(
                             symbol=self.current_stock,
-                            asset_type=AssetType.STOCK
+                            asset_type=AssetType.STOCK_A
                         )
                         if realtime_data and 'price' in realtime_data:
                             return float(realtime_data['price'])
@@ -1788,7 +1791,7 @@ class TradingWidget(QWidget):
                     # 如果没有实时数据，使用最新的K线数据
                     kdata = asset_service.get_historical_data(
                         symbol=self.current_stock,
-                        asset_type=AssetType.STOCK,
+                        asset_type=AssetType.STOCK_A,
                         period='D'
                     )
                     if kdata is not None and len(kdata) > 0:

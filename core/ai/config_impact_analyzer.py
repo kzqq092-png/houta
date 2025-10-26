@@ -111,7 +111,7 @@ class ConfigImpactAnalyzer:
     分析配置变更对系统的潜在影响，提供风险评估和变更建议
     """
 
-    def __init__(self, db_path: str = "db/factorweave_system.sqlite"):
+    def __init__(self, db_path: str = "data/factorweave_system.sqlite"):
         self.db_path = db_path
         
         # 历史数据缓存

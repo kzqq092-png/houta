@@ -26,10 +26,11 @@ import os
 from gui.enhanced_batch_analysis_methods import EnhancedBatchAnalysisMixin
 import time
 import json
-from async_manager import AsyncManager
+from concurrent.futures import ThreadPoolExecutor
 import threading
 import random
 from PyQt5.QtWidgets import QApplication
+
 
 class BaseAnalysisPanel(QWidget):
     """基础分析面板，统一参数设置、导出、日志、信号、按钮等通用功能"""
@@ -169,6 +170,7 @@ class BaseAnalysisPanel(QWidget):
         except:
             pass
 
+
 class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
     """Analysis tools panel for the right side of the main window"""
 
@@ -194,7 +196,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
         self.progress_bar.setMaximum(100)
         self.step_list = QListWidget()
         self.step_status = {}
-        self.async_manager = AsyncManager(max_workers=8)
+        self.async_manager = ThreadPoolExecutor(max_workers=8, thread_name_prefix="AnalysisTools")
         self._batch_futures = []
         self._batch_cancelled = False
         self._batch_pause_events = []
@@ -453,10 +455,11 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
         try:
             self.cleanup_enhanced_batch_analysis()
             if hasattr(self, 'async_manager'):
-                self.async_manager.shutdown()
+                self.async_manager.shutdown(wait=False)
             super().__del__()
         except:
             pass
+
 
 # 导出主要类
 __all__ = ['BaseAnalysisPanel', 'AnalysisToolsPanel']

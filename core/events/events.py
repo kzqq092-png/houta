@@ -13,6 +13,7 @@ import uuid
 
 from ..plugin_types import AssetType
 
+
 @dataclass
 class BaseEvent(ABC):
     """
@@ -30,6 +31,7 @@ class BaseEvent(ABC):
         if not self.source:
             self.source = self.__class__.__name__
 
+
 @dataclass
 class AssetSelectedEvent(BaseEvent):
     """
@@ -39,7 +41,7 @@ class AssetSelectedEvent(BaseEvent):
     """
     symbol: str = ""                        # 交易代码
     name: str = ""                          # 资产名称
-    asset_type: AssetType = AssetType.STOCK  # 资产类型
+    asset_type: AssetType = AssetType.STOCK_A  # 资产类型（默认A股）
     market: str = ""                        # 市场
     period: str = ""                        # 周期：日线、周线、月线等
     time_range: str = ""                    # 时间范围：最近7天、最近30天等
@@ -56,6 +58,7 @@ class AssetSelectedEvent(BaseEvent):
             'time_range': self.time_range,
             'chart_type': self.chart_type
         })
+
 
 @dataclass
 class StockSelectedEvent(AssetSelectedEvent):
@@ -74,7 +77,7 @@ class StockSelectedEvent(AssetSelectedEvent):
         super().__init__(
             symbol=stock_code,
             name=stock_name,
-            asset_type=AssetType.STOCK,
+            asset_type=AssetType.STOCK_A,
             market=market,
             period=period,
             time_range=time_range,
@@ -94,6 +97,7 @@ class StockSelectedEvent(AssetSelectedEvent):
             'stock_name': self.stock_name
         })
 
+
 @dataclass
 class AssetDataReadyEvent(BaseEvent):
     """
@@ -103,7 +107,7 @@ class AssetDataReadyEvent(BaseEvent):
     """
     symbol: str = ""
     name: str = ""
-    asset_type: AssetType = AssetType.STOCK
+    asset_type: AssetType = AssetType.STOCK_A
     market: str = ""
     data_type: str = "kline"  # kline, realtime, analysis等
     data: Any = None
@@ -117,6 +121,7 @@ class AssetDataReadyEvent(BaseEvent):
             'market': self.market,
             'data_type': self.data_type
         })
+
 
 @dataclass
 class UIDataReadyEvent(AssetDataReadyEvent):
@@ -134,7 +139,7 @@ class UIDataReadyEvent(AssetDataReadyEvent):
         super().__init__(
             symbol=stock_code,
             name=stock_name,
-            asset_type=AssetType.STOCK,
+            asset_type=AssetType.STOCK_A,
             market=market,
             data_type="kline",
             data=kline_data,
@@ -154,6 +159,7 @@ class UIDataReadyEvent(AssetDataReadyEvent):
             'stock_name': self.stock_name,
             'kline_data': self.kline_data
         })
+
 
 @dataclass
 class ChartUpdateEvent(BaseEvent):
@@ -178,6 +184,7 @@ class ChartUpdateEvent(BaseEvent):
             'time_range': self.time_range
         })
 
+
 @dataclass
 class AnalysisCompleteEvent(BaseEvent):
     """
@@ -197,6 +204,7 @@ class AnalysisCompleteEvent(BaseEvent):
             'results': self.results
         })
 
+
 @dataclass
 class DataUpdateEvent(BaseEvent):
     """
@@ -215,6 +223,7 @@ class DataUpdateEvent(BaseEvent):
             'stock_code': self.stock_code,
             'update_info': self.update_info
         })
+
 
 @dataclass
 class ErrorEvent(BaseEvent):
@@ -237,6 +246,7 @@ class ErrorEvent(BaseEvent):
             'severity': self.severity
         })
 
+
 @dataclass
 class UIUpdateEvent(BaseEvent):
     """
@@ -256,6 +266,7 @@ class UIUpdateEvent(BaseEvent):
             'update_data': self.update_data
         })
 
+
 @dataclass
 class ThemeChangedEvent(BaseEvent):
     """
@@ -273,6 +284,7 @@ class ThemeChangedEvent(BaseEvent):
             'theme_config': self.theme_config
         })
 
+
 @dataclass
 class PerformanceUpdateEvent(BaseEvent):
     """
@@ -287,6 +299,7 @@ class PerformanceUpdateEvent(BaseEvent):
         self.data.update({
             'metrics': self.metrics
         })
+
 
 @dataclass
 class IndicatorChangedEvent(BaseEvent):
@@ -304,6 +317,7 @@ class IndicatorChangedEvent(BaseEvent):
             'selected_indicators': self.selected_indicators,
             'indicator_params': self.indicator_params
         })
+
 
 @dataclass
 class UIDataReadyEvent(BaseEvent):
@@ -325,6 +339,7 @@ class UIDataReadyEvent(BaseEvent):
             'stock_name': self.stock_name
         })
 
+
 @dataclass
 class MultiScreenToggleEvent(BaseEvent):
     """
@@ -340,6 +355,7 @@ class MultiScreenToggleEvent(BaseEvent):
             'is_multi_screen': self.is_multi_screen
         })
 
+
 @dataclass
 class TradeExecutedEvent(BaseEvent):
     """
@@ -354,6 +370,7 @@ class TradeExecutedEvent(BaseEvent):
         self.data.update({
             'trade_record': self.trade_record
         })
+
 
 @dataclass
 class PositionUpdatedEvent(BaseEvent):
@@ -371,6 +388,7 @@ class PositionUpdatedEvent(BaseEvent):
             'portfolio': self.portfolio,
             'updated_positions': self.updated_positions
         })
+
 
 @dataclass
 class PatternSignalsDisplayEvent(BaseEvent):
@@ -393,12 +411,14 @@ class PatternSignalsDisplayEvent(BaseEvent):
 
 # 告警相关事件
 
+
 class AlertLevel(Enum):
     """告警级别枚举"""
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
     CRITICAL = "critical"
+
 
 @dataclass
 class ResourceAlert(BaseEvent):
@@ -426,6 +446,7 @@ class ResourceAlert(BaseEvent):
             'threshold': self.threshold,
             'unit': self.unit
         })
+
 
 @dataclass
 class ApplicationAlert(BaseEvent):
@@ -458,6 +479,7 @@ class ApplicationAlert(BaseEvent):
 
 # 实时数据相关事件
 
+
 @dataclass
 class RealtimeDataEvent(BaseEvent):
     """
@@ -477,6 +499,7 @@ class RealtimeDataEvent(BaseEvent):
             'data_type': self.data_type
         })
 
+
 @dataclass
 class TickDataEvent(BaseEvent):
     """
@@ -494,6 +517,7 @@ class TickDataEvent(BaseEvent):
             'symbol': self.symbol
         })
 
+
 @dataclass
 class OrderBookEvent(BaseEvent):
     """
@@ -510,6 +534,7 @@ class OrderBookEvent(BaseEvent):
             'order_book_data': self.order_book_data,
             'symbol': self.symbol
         })
+
 
 @dataclass
 class ComputedIndicatorEvent(BaseEvent):

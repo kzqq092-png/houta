@@ -117,7 +117,7 @@ class CacheConfig:
             redis_config = {
                 'host': self.redis_host,
                 'port': self.redis_port,
-                'db': self.redis_db,
+                'data': self.redis_db,
                 'key_prefix': self.redis_key_prefix,
                 'default_ttl': self.redis_default_ttl,
                 'decode_responses': True,

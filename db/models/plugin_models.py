@@ -903,7 +903,7 @@ class DataSourcePluginConfigManager:
 _data_source_config_manager = None
 
 
-def get_data_source_config_manager(db_path: str = "db/factorweave_system.sqlite") -> DataSourcePluginConfigManager:
+def get_data_source_config_manager(db_path: str = "data/factorweave_system.sqlite") -> DataSourcePluginConfigManager:
     """获取数据源插件配置管理器实例"""
     global _data_source_config_manager
     if _data_source_config_manager is None:

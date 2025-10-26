@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # Loguru自动处理所有日志配置
 
 # 统一数据库路径
-UNIFIED_DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db', 'factorweave_system.sqlite')
+UNIFIED_DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'factorweave_system.sqlite')
 
 # 尝试导入TA-Lib
 try:
@@ -73,12 +73,133 @@ class UnifiedIndicatorService:
     def _init_connection(self):
         """初始化数据库连接"""
         try:
+            # 确保数据库目录存在
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            
             self.conn = sqlite3.connect(self.db_path)
             self.conn.row_factory = sqlite3.Row  # 使用字典式访问
             logger.info(f" 连接到统一数据库: {self.db_path}")
+            
+            # 确保数据库表结构存在
+            self._create_tables()
         except Exception as e:
             logger.error(f" 数据库连接失败: {str(e)}")
             raise
+    
+    def _create_tables(self):
+        """创建必要的数据库表（如果不存在）"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # 创建指标分类表
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS indicator_categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                description TEXT,
+                parent_id INTEGER,
+                sort_order INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                FOREIGN KEY (parent_id) REFERENCES indicator_categories (id)
+            )
+            ''')
+            
+            # 创建指标表
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS indicator (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                category_id INTEGER NOT NULL,
+                description TEXT NOT NULL,
+                formula TEXT,
+                output_names TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                version TEXT DEFAULT '1.0.0',
+                is_builtin BOOLEAN DEFAULT 1,
+                is_active INTEGER DEFAULT 1,
+                FOREIGN KEY (category_id) REFERENCES indicator_categories (id)
+            )
+            ''')
+            
+            # 创建指标参数表
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS indicator_parameters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                indicator_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                param_type TEXT NOT NULL,
+                default_value TEXT NOT NULL,
+                min_value TEXT,
+                max_value TEXT,
+                step_value TEXT,
+                choices TEXT,
+                is_required INTEGER DEFAULT 1,
+                sort_order INTEGER DEFAULT 0,
+                FOREIGN KEY (indicator_id) REFERENCES indicator (id) ON DELETE CASCADE,
+                UNIQUE (indicator_id, name)
+            )
+            ''')
+            
+            # 创建指标实现表
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS indicator_implementations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                indicator_id INTEGER NOT NULL,
+                engine TEXT NOT NULL,
+                function_name TEXT NOT NULL,
+                implementation_code TEXT,
+                is_default BOOLEAN DEFAULT 0,
+                priority INTEGER DEFAULT 50,
+                performance_score REAL DEFAULT 1.0,
+                is_active INTEGER DEFAULT 1,
+                FOREIGN KEY (indicator_id) REFERENCES indicator (id) ON DELETE CASCADE,
+                UNIQUE (indicator_id, engine)
+            )
+            ''')
+            
+            # 创建形态类型表
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pattern_types (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                english_name TEXT NOT NULL UNIQUE,
+                category TEXT NOT NULL,
+                signal_type TEXT NOT NULL,
+                description TEXT,
+                min_periods INTEGER DEFAULT 5,
+                max_periods INTEGER DEFAULT 20,
+                confidence_threshold REAL DEFAULT 0.7,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                algorithm_code TEXT,
+                parameters TEXT,
+                success_rate REAL DEFAULT 0.7,
+                risk_level TEXT DEFAULT 'medium'
+            )
+            ''')
+            
+            # 创建趋势预警配置表
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS trend_alert_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                config_key TEXT NOT NULL,
+                config_value TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+            
+            self.conn.commit()
+            logger.info("数据库表结构初始化完成")
+        except Exception as e:
+            logger.error(f"创建数据库表失败: {str(e)}")
+            # 不抛出异常，允许系统继续运行
 
     def close(self):
         """关闭数据库连接"""

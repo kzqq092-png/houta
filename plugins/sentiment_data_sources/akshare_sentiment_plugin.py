@@ -17,6 +17,14 @@ from plugins.sentiment_data_source_interface import SentimentData, SentimentResp
 from core.network.universal_network_config import INetworkConfigurable, NetworkEndpoint, PluginNetworkConfig
 from core.network.universal_network_config import network_config
 
+# 应用反爬虫补丁（自动为所有AKShare请求添加浏览器请求头）
+try:
+    from plugins.data_sources.utils.akshare_wrapper import patch_akshare_headers
+    if patch_akshare_headers():
+        logger.info("✅ AKShare情绪插件反爬虫补丁已激活")
+except Exception as patch_error:
+    logger.warning(f"AKShare情绪插件反爬虫补丁应用失败（将使用默认配置）: {patch_error}")
+
 
 class AkShareSentimentPlugin(BaseSentimentPlugin, INetworkConfigurable):
     """AkShare情绪数据源插件"""

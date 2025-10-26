@@ -48,7 +48,17 @@ class AssetType(Enum):
 
     定义系统支持的金融资产类型，用于数据源插件的分类和路由。
     """
-    STOCK = "stock"                          # 股票
+    # ✅ 简化：移除通用STOCK类型，统一使用具体的股票类型
+    # STOCK = "stock"                        # 已移除：通用股票类型
+    
+    # 股票类型（具体化）
+    STOCK_A = "stock_a"                      # A股（默认股票类型）
+    STOCK_B = "stock_b"                      # B股
+    STOCK_H = "stock_h"                      # H股
+    STOCK_US = "stock_us"                    # 美股
+    STOCK_HK = "stock_hk"                    # 港股
+    
+    # 其他资产类型
     FUTURES = "futures"                      # 期货
     CRYPTO = "crypto"                        # 数字货币
     FOREX = "forex"                          # 外汇
@@ -65,13 +75,6 @@ class AssetType(Enum):
     CONCEPT_SECTOR = "concept_sector"        # 概念板块
     STYLE_SECTOR = "style_sector"            # 风格板块
     THEME_SECTOR = "theme_sector"            # 主题板块
-
-    # 扩展：中国特色资产类型
-    STOCK_A = "stock_a"                      # A股
-    STOCK_B = "stock_b"                      # B股
-    STOCK_H = "stock_h"                      # H股
-    STOCK_US = "stock_us"                    # 美股
-    STOCK_HK = "stock_hk"                    # 港股
 
     # 扩展：宏观经济数据类型
     MACRO = "macro"                          # 宏观经济数据
@@ -261,7 +264,7 @@ PLUGIN_TYPE_CONFIGS = {
         ],
         optional_interfaces=["get_config_schema", "validate_config"],
         default_priority=PluginPriority.HIGH,
-        supported_asset_types=[AssetType.STOCK, AssetType.INDEX, AssetType.FUND]
+        supported_asset_types=[AssetType.STOCK_A, AssetType.INDEX, AssetType.FUND]
     ),
 
     PluginType.DATA_SOURCE_FUTURES: PluginTypeInfo(
@@ -419,7 +422,7 @@ def get_default_provider_for_asset_type(asset_type: AssetType) -> DataSourceProv
         DataSourceProvider: 默认数据源提供商
     """
     provider_mapping = {
-        AssetType.STOCK: DataSourceProvider.HIKYUU,
+        AssetType.STOCK_A: DataSourceProvider.HIKYUU,  # ✅ 使用STOCK_A替代STOCK
         AssetType.INDEX: DataSourceProvider.HIKYUU,
         AssetType.FUND: DataSourceProvider.AKSHARE,
         AssetType.FUTURES: DataSourceProvider.CTP,

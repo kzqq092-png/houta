@@ -659,7 +659,7 @@ class ModernUnifiedPerformanceWidget(QWidget):
                         try:
                             import sqlite3
                             from pathlib import Path
-                            db_path = Path("db/factorweave_system.sqlite")
+                            db_path = Path("data/factorweave_system.sqlite")
                             if db_path.exists():
                                 with sqlite3.connect(db_path) as conn:
                                     cursor = conn.cursor()

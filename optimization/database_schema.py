@@ -20,7 +20,7 @@ class OptimizationDatabaseManager:
     _lock = threading.Lock()
     _initialized = False
 
-    def __new__(cls, db_path: str = 'db/factorweave_system.sqlite'):
+    def __new__(cls, db_path: str = 'data/factorweave_system.sqlite'):
         """单例模式实现"""
         if cls._instance is None:
             with cls._lock:
@@ -28,7 +28,7 @@ class OptimizationDatabaseManager:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, db_path: str = 'db/factorweave_system.sqlite'):
+    def __init__(self, db_path: str = 'data/factorweave_system.sqlite'):
         # 避免重复初始化
         if OptimizationDatabaseManager._initialized:
             return

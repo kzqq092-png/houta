@@ -35,7 +35,7 @@ class DuckDBConfig:
     max_memory: str = '6GB'  # 修改为绝对单位，避免百分比解析错误
     checkpoint_threshold: str = '16MB'
     enable_progress_bar: bool = True
-    enable_profiling: bool = True
+    enable_profiling: bool = False  # 禁用profiling以避免JSON输出污染日志
     preserve_insertion_order: bool = False
     enable_external_access: bool = True
     enable_fsst_vectors: bool = True  # 启用FSST字符串压缩
@@ -110,11 +110,21 @@ class DuckDBConnectionPool:
             db_dir = Path(self.database_path).parent
             db_dir.mkdir(parents=True, exist_ok=True)
 
-            # 创建初始连接
+            # 创建初始连接 - 使用智能策略避免重复失败
+            first_connection_failed = False
             for i in range(self.pool_size):
+                # 如果第一个连接失败（通常是数据库文件损坏），不再尝试创建更多连接
+                if first_connection_failed:
+                    logger.warning(f"跳过剩余连接创建（首次连接失败），已创建 {i} 个连接")
+                    break
+
                 conn = self._create_connection()
                 if conn:
                     self._pool.put(conn)
+                elif i == 0:
+                    # 第一个连接创建失败，标记并停止
+                    first_connection_failed = True
+                    logger.error("首次连接创建失败，停止初始化更多连接")
 
         except Exception as e:
             logger.error(f"连接池初始化失败: {e}")
@@ -139,7 +149,31 @@ class DuckDBConnectionPool:
             try:
                 # DuckDB可能在读取现有数据库时遇到编码问题
                 # 尝试使用read_only=False确保可以修复可能的编码问题
-                conn = duckdb.connect(db_path, read_only=False)
+
+                # 捕获DuckDB的输出
+                import sys
+                import io
+                old_stdout = sys.stdout
+                old_stderr = sys.stderr
+                captured_stdout = io.StringIO()
+                captured_stderr = io.StringIO()
+
+                try:
+                    sys.stdout = captured_stdout
+                    sys.stderr = captured_stderr
+                    conn = duckdb.connect(db_path, read_only=False)
+                finally:
+                    sys.stdout = old_stdout
+                    sys.stderr = old_stderr
+
+                    # 检查捕获的输出
+                    stdout_content = captured_stdout.getvalue()
+                    stderr_content = captured_stderr.getvalue()
+
+                    if stdout_content and '{"result"' in stdout_content:
+                        logger.warning(f"[DUCKDB OUTPUT] DuckDB connect() produced output: {stdout_content!r}")
+                    if stderr_content and '{"result"' in stderr_content:
+                        logger.warning(f"[DUCKDB ERROR] DuckDB connect() produced error: {stderr_content!r}")
 
             except UnicodeDecodeError as ude:
                 # UTF-8解码错误 - 可能是数据库文件损坏或包含无效字符
@@ -148,24 +182,47 @@ class DuckDBConnectionPool:
 
                 # 如果是现有数据库文件损坏，尝试备份并重建
                 if db_exists:
-                    import shutil
+                    import os
                     backup_path = db_path + f".corrupted_backup_{int(time.time())}"
-                    logger.warning(f"检测到数据库文件可能损坏，创建备份: {backup_path}")
+                    logger.warning(f"检测到数据库文件可能损坏，尝试处理: {backup_path}")
+
                     try:
-                        shutil.copy2(db_path, backup_path)
-                        logger.info(f"备份完成，尝试删除损坏的数据库文件")
-                        db_file.unlink()
+                        # 尝试使用 os.replace 进行快速重命名（不复制）
+                        # 这避免了读取损坏文件内容，也不会因为文件锁定而失败
+                        os.replace(db_path, backup_path)
+                        logger.info(f"✅ 已将损坏文件重命名为备份: {backup_path}")
+
                         # 尝试创建新的数据库
                         conn = duckdb.connect(db_path, read_only=False)
-                        logger.info("成功创建新数据库文件")
+                        logger.info("✅ 成功创建新数据库文件")
+
+                    except PermissionError as pe:
+                        # 文件被其他进程锁定，尝试直接删除
+                        logger.warning(f"⚠️ 无法重命名文件（可能被锁定），尝试直接删除: {pe}")
+                        try:
+                            db_file.unlink(missing_ok=True)
+                            logger.info("✅ 已删除损坏的数据库文件")
+
+                            # 尝试创建新的数据库
+                            conn = duckdb.connect(db_path, read_only=False)
+                            logger.info("✅ 成功创建新数据库文件")
+
+                        except Exception as delete_error:
+                            logger.error(f"❌ 删除损坏文件失败: {delete_error}")
+                            logger.error(f"💡 解决方案: 请手动停止所有Python进程，然后删除文件: {db_path}")
+                            # 不抛出异常，而是返回None，让上层处理
+                            return None
+
                     except Exception as backup_error:
-                        logger.error(f"备份和重建失败: {backup_error}")
-                        raise ude
+                        logger.error(f"❌ 处理损坏文件失败: {backup_error}")
+                        logger.error(f"💡 解决方案: 请手动删除损坏的数据库文件: {db_path}")
+                        # 不抛出异常，而是返回None，让上层处理
+                        return None
                 else:
                     # 新建数据库时出现编码错误，可能是路径问题
                     logger.error("创建新数据库时出现UTF-8编码错误")
                     logger.error("可能原因: 1) 路径包含特殊字符 2) 磁盘权限问题 3) 文件系统编码问题")
-                    raise
+                    return None
 
             except Exception as conn_error:
                 logger.error(f"创建DuckDB连接时出错: {type(conn_error).__name__}: {conn_error}")
@@ -364,30 +421,70 @@ class DuckDBConnectionPool:
             ]
 
     def close_all_connections(self):
-        """关闭所有连接"""
+        """
+        关闭所有连接（优雅关闭）
+
+        执行流程：
+        1. 提交所有未完成的事务
+        2. 执行CHECKPOINT（将WAL合并到主文件）
+        3. 关闭所有连接
+        """
         try:
+            logger.info(f"🔄 关闭DuckDB连接池: {self.database_path}")
+            logger.info(f"   活跃连接: {self._active_connections}/{self._total_connections}")
+
             with self._lock:
-                # 关闭池中的连接
+                # 1. 关闭池中的连接（带checkpoint）
+                closed_from_pool = 0
                 while not self._pool.empty():
                     try:
                         conn = self._pool.get_nowait()
+                        # 提交事务
+                        try:
+                            conn.commit()
+                        except:
+                            pass  # 可能没有活跃事务
+
+                        # 执行checkpoint（合并WAL）
+                        try:
+                            conn.execute("CHECKPOINT")
+                            logger.debug(f"   ✅ Checkpoint完成")
+                        except Exception as e:
+                            logger.warning(f"   ⚠️ Checkpoint失败: {e}")
+
+                        # 关闭连接
                         conn.close()
+                        closed_from_pool += 1
                     except Empty:
                         break
                     except Exception as e:
-                        logger.error(f"关闭连接失败: {e}")
+                        logger.error(f"   ❌ 关闭连接失败: {e}")
 
-                # 关闭所有记录的连接
-                for conn_id, conn in self._all_connections.items():
+                # 2. 关闭所有记录的连接
+                closed_from_registry = 0
+                for conn_id, conn in list(self._all_connections.items()):
                     try:
+                        # 提交事务
+                        try:
+                            conn.commit()
+                        except:
+                            pass
+
+                        # Checkpoint
+                        try:
+                            conn.execute("CHECKPOINT")
+                        except:
+                            pass
+
+                        # 关闭
                         conn.close()
                         self._connection_info[conn_id].is_active = False
+                        closed_from_registry += 1
                     except Exception as e:
-                        logger.error(f"关闭连接 {conn_id} 失败: {e}")
+                        logger.error(f"   ❌ 关闭连接 {conn_id} 失败: {e}")
 
                 self._active_connections = 0
-
-            logger.info("所有DuckDB连接已关闭")
+                logger.info(f"   ✅ 已关闭连接: 池={closed_from_pool}, 注册={closed_from_registry}")
 
         except Exception as e:
             logger.error(f"关闭连接时出错: {e}")

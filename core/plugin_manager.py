@@ -374,11 +374,16 @@ class PluginManager(QObject):
         """根据插件名称获取文件路径"""
         # 移除前缀并转换为文件路径
         if plugin_name.startswith('examples.'):
-            relative_path = plugin_name.replace('examples.', 'plugins/examples/')
+            # 移除前缀，然后将所有点替换为斜杠
+            relative_path = plugin_name.replace('examples.', 'plugins/examples/', 1).replace('.', '/')
         elif plugin_name.startswith('data_sources.'):
-            relative_path = plugin_name.replace('data_sources.', 'plugins/data_sources/')
+            # 移除前缀，然后将所有点替换为斜杠
+            relative_path = plugin_name.replace('data_sources.', 'plugins/data_sources/', 1).replace('.', '/')
+        elif plugin_name.startswith('sentiment_data_sources.'):
+            # 处理情感数据源插件
+            relative_path = plugin_name.replace('sentiment_data_sources.', 'plugins/sentiment_data_sources/', 1).replace('.', '/')
         else:
-            # 默认在plugins目录下
+            # 默认在plugins目录下，将所有点替换为斜杠
             relative_path = f"plugins/{plugin_name.replace('.', '/')}"
 
         return f"{relative_path}.py"
@@ -1460,7 +1465,7 @@ class PluginManager(QObject):
             # 扫描插件目录
             for plugin_path in self.plugin_dir.glob("*.py"):
                 if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
-                    logger.info(f"跳过非插件文件: {plugin_path.name}")
+                    logger.debug(f"跳过非插件文件: {plugin_path.name}")
                     continue
 
                 plugin_name = plugin_path.stem
@@ -1470,26 +1475,6 @@ class PluginManager(QObject):
 
                 if self.load_plugin(plugin_name, plugin_path):
                     loaded_count += 1
-
-            # 加载examples目录中的示例插件（默认禁用，避免与正式插件重复）
-            # examples_dir = self.plugin_dir / "examples"
-            # if examples_dir.exists():
-            #     # 确保examples目录是一个包
-            #     init_file = examples_dir / "__init__.py"
-            #     if not init_file.exists():
-            #         with open(init_file, 'w') as f:
-            #             f.write('"""插件示例包"""')
-            #         logger.info(f"创建examples包的__init__.py文件")
-            #
-            #     for plugin_path in examples_dir.glob("*.py"):
-            #         if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
-            #             logger.info(f"跳过非插件文件: {plugin_path.name}")
-            #             continue
-            #
-            #         plugin_name = f"examples.{plugin_path.stem}"
-            #         if self.load_plugin(plugin_name, plugin_path):
-            #             loaded_count += 1
-            logger.info("跳过 examples 目录（示例插件已禁用，避免与正式插件重复）")
 
             # 加载sentiment_data_sources目录中的情绪数据源插件
             sentiment_dir = self.plugin_dir / "sentiment_data_sources"
@@ -1503,14 +1488,14 @@ class PluginManager(QObject):
 
                 for plugin_path in sentiment_dir.glob("*.py"):
                     if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
-                        logger.info(f"跳过非插件文件: {plugin_path.name}")
+                        logger.debug(f"跳过非插件文件: {plugin_path.name}")
                         continue
 
                     plugin_name = f"sentiment_data_sources.{plugin_path.stem}"
                     if self.load_plugin(plugin_name, plugin_path):
                         loaded_count += 1
 
-            # 加载data_sources目录中的数据源插件
+            # 加载data_sources目录中的数据源插件（包括分类子目录）
             data_sources_dir = self.plugin_dir / "data_sources"
             if data_sources_dir.exists():
                 # 确保data_sources目录是一个包
@@ -1520,14 +1505,49 @@ class PluginManager(QObject):
                         f.write('"""数据源插件包"""')
                     logger.info(f"创建data_sources包的__init__.py文件")
 
+                # 1. 加载data_sources根目录的插件（向后兼容）
                 for plugin_path in data_sources_dir.glob("*.py"):
                     if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
-                        logger.info(f"跳过非插件文件: {plugin_path.name}")
+                        logger.debug(f"跳过非插件文件: {plugin_path.name}")
                         continue
 
                     plugin_name = f"data_sources.{plugin_path.stem}"
                     if self.load_plugin(plugin_name, plugin_path):
                         loaded_count += 1
+
+                # 2. 加载data_sources分类子目录中的插件（新架构）
+                # 分类目录：stock、crypto、futures、forex、bond、commodity、custom、stock_international
+                # 排除目录：templates、examples、__pycache__、test、tests
+                excluded_subdirs = {'templates', 'examples', '__pycache__', 'test', 'tests', '.git'}
+                category_dirs = ["stock", "crypto", "futures", "forex", "bond", "commodity", "custom", "stock_international"]
+
+                for category in category_dirs:
+                    if category in excluded_subdirs:
+                        continue
+
+                    category_dir = data_sources_dir / category
+                    if not category_dir.exists() or not category_dir.is_dir():
+                        continue
+
+                    # 确保分类目录是一个包
+                    category_init = category_dir / "__init__.py"
+                    if not category_init.exists():
+                        with open(category_init, 'w', encoding='utf-8') as f:
+                            f.write(f'"""数据源插件 - {category} 分类"""')
+                        logger.info(f"创建data_sources/{category}包的__init__.py文件")
+
+                    # 加载该分类目录下的所有插件
+                    for plugin_path in category_dir.glob("*_plugin.py"):
+                        if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
+                            continue
+
+                        plugin_name = f"data_sources.{category}.{plugin_path.stem}"
+                        logger.info(f"🔍 发现分类插件: {plugin_name}")
+                        if self.load_plugin(plugin_name, plugin_path):
+                            loaded_count += 1
+                            logger.info(f"✅ 成功加载分类插件: {plugin_name}")
+                        else:
+                            logger.warning(f"❌ 加载分类插件失败: {plugin_name}")
 
             # 加载indicators目录中的指标插件
             indicators_dir = self.plugin_dir / "indicators"
@@ -1541,7 +1561,7 @@ class PluginManager(QObject):
 
                 for plugin_path in indicators_dir.glob("*.py"):
                     if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
-                        logger.info(f"跳过非插件文件: {plugin_path.name}")
+                        logger.debug(f"跳过非插件文件: {plugin_path.name}")
                         continue
 
                     plugin_name = f"indicators.{plugin_path.stem}"
@@ -1560,7 +1580,7 @@ class PluginManager(QObject):
 
                 for plugin_path in strategies_dir.glob("*.py"):
                     if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
-                        logger.info(f"跳过非插件文件: {plugin_path.name}")
+                        logger.debug(f"跳过非插件文件: {plugin_path.name}")
                         continue
 
                     plugin_name = f"strategies.{plugin_path.stem}"
@@ -1600,21 +1620,28 @@ class PluginManager(QObject):
 
             module = importlib.util.module_from_spec(spec)
 
-            # 处理相对导入问题
+            # 处理相对导入问题（支持多层嵌套）
             if "." in plugin_name:  # 如果是子包中的模块
-                parent_name = plugin_name.rsplit(".", 1)[0]
-                if parent_name not in sys.modules:
-                    # 确保父包已经在sys.modules中
-                    parent_path = plugin_path.parent
-                    parent_init = parent_path / "__init__.py"
-                    if parent_init.exists():
-                        parent_spec = importlib.util.spec_from_file_location(
-                            parent_name, parent_init)
-                        if parent_spec and parent_spec.loader:
-                            parent_module = importlib.util.module_from_spec(
-                                parent_spec)
-                            sys.modules[parent_name] = parent_module
-                            parent_spec.loader.exec_module(parent_module)
+                # 确保所有祖先包都在sys.modules中
+                parts = plugin_name.split(".")
+                current_path = plugin_path.parent
+
+                # 从最深层往上遍历，确保每一层父包都已加载
+                for i in range(len(parts) - 1, 0, -1):
+                    parent_name = ".".join(parts[:i])
+                    if parent_name not in sys.modules:
+                        parent_init = current_path / "__init__.py"
+                        if parent_init.exists():
+                            parent_spec = importlib.util.spec_from_file_location(
+                                parent_name, parent_init)
+                            if parent_spec and parent_spec.loader:
+                                parent_module = importlib.util.module_from_spec(parent_spec)
+                                sys.modules[parent_name] = parent_module
+                                try:
+                                    parent_spec.loader.exec_module(parent_module)
+                                except Exception as e:
+                                    logger.warning(f"加载父包 {parent_name} 时出错: {e}")
+                    current_path = current_path.parent
 
             sys.modules[plugin_name] = module  # 将模块添加到sys.modules，确保可以被导入
 
@@ -1641,10 +1668,13 @@ class PluginManager(QObject):
             except Exception as e:
                 # 如果是抽象类或接口，跳过
                 if "Can't instantiate abstract class" in str(e):
-                    logger.warning(f"跳过抽象类或接口: {plugin_name}")
+                    logger.debug(f"跳过抽象类或接口: {plugin_name}")
                     return False
                 else:
                     logger.error(f"创建插件实例失败 {plugin_name}: {e}")
+                    logger.error(f"错误详情: {type(e).__name__}: {e}")
+                    import traceback
+                    logger.error(f"堆栈跟踪: {traceback.format_exc()}")
                     return False
 
             # 优先：V2 插件元信息

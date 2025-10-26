@@ -31,6 +31,7 @@ from core.tet_data_pipeline import StandardQuery, StandardData
 
 logger = logger.bind(module=__name__)
 
+
 class EastmoneyFundamentalPlugin(IDataSourcePlugin):
     """
     东方财富基本面数据源插件
@@ -40,6 +41,12 @@ class EastmoneyFundamentalPlugin(IDataSourcePlugin):
     def __init__(self, plugin_id: str = "eastmoney_fundamental_plugin"):
         self.plugin_id = plugin_id
         self.logger = logger.bind(plugin_id=self.plugin_id)
+
+        # 必须显式初始化这些属性（IDataSourcePlugin是抽象基类，不提供默认实现）
+        self.initialized = False
+        self.last_error = None
+        self.plugin_state = PluginState.CREATED  # 初始状态（插件对象已创建）
+
         self._is_connected = False
         self.session = requests.Session()
 
@@ -71,7 +78,7 @@ class EastmoneyFundamentalPlugin(IDataSourcePlugin):
             plugin_type=PluginType.DATA_SOURCE,
             capabilities={
                 'data_types': [DataType.FINANCIAL_STATEMENT, DataType.ANNOUNCEMENT, DataType.ANALYST_RATING],
-                'asset_types': [AssetType.STOCK, AssetType.FUND],
+                'asset_types': [AssetType.STOCK_A, AssetType.FUND],
                 'features': ['financial_reports', 'company_news', 'analyst_research']
             }
         )

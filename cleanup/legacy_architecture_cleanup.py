@@ -550,10 +550,8 @@ class LegacyArchitectureCleanup:
 
             # Mapping of old imports to new imports
             import_replacements = {
-                "from .plugin_service import PluginService",
-                "from .plugin_service import PluginService",
-                "import core.plugin_manager": "from .plugin_service import PluginService",
-                "import core.plugin_center": "from .plugin_service import PluginService",
+                "from core.plugin_manager import PluginManager": "from core.services.unified_plugin_service import UnifiedPluginService",
+                "from core.plugin_center import PluginCenter": "from core.services.unified_plugin_service import UnifiedPluginService",
             }
 
             # Class name replacements

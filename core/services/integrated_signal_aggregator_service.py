@@ -30,7 +30,7 @@ class TETDataProvider:
         self.asset_service = asset_service
         self.logger = logger
 
-    async def get_multi_source_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK) -> Dict[str, Any]:
+    async def get_multi_source_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK_A) -> Dict[str, Any]:
         """
         通过TET框架获取多源数据
         包括K线数据、技术指标、基本面数据等
@@ -48,7 +48,7 @@ class TETDataProvider:
             tasks.append(self._get_realtime_quote(symbol, asset_type))
 
             # 3. 基本面数据（如果支持）
-            if asset_type == AssetType.STOCK:
+            if asset_type == AssetType.STOCK_A:
                 tasks.append(self._get_fundamental_data(symbol, asset_type))
 
             # 4. 技术指标数据（基于K线计算）
@@ -128,7 +128,7 @@ class TETDataProvider:
     async def _get_fundamental_data(self, symbol: str, asset_type: AssetType) -> Dict[str, Any]:
         """获取基本面数据"""
         try:
-            if asset_type != AssetType.STOCK:
+            if asset_type != AssetType.STOCK_A:
                 return {}
 
             loop = asyncio.get_event_loop()
@@ -320,7 +320,7 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
             logger.error(f" 服务初始化失败: {e}")
             raise
 
-    async def analyze_stock_signals(self, symbol: str, asset_type: AssetType = AssetType.STOCK) -> List[AggregatedAlert]:
+    async def analyze_stock_signals(self, symbol: str, asset_type: AssetType = AssetType.STOCK_A) -> List[AggregatedAlert]:
         """分析股票信号（TET模式）"""
         try:
             logger.info(f" 开始TET模式信号分析: {symbol}")

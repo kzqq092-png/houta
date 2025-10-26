@@ -32,7 +32,7 @@ class CninfoPlugin(StandardDataSourcePlugin):
             author="HIkyuu-UI增强团队",
             description="提供公司公告等基本面数据",
             supported_data_types=[DataType.ANNOUNCEMENT],
-            supported_asset_types=[AssetType.STOCK],
+            supported_asset_types=[AssetType.STOCK_A],
             capabilities={
                 'data_types': ['company_announcements'],
                 'asset_types': ['stock'],

@@ -22,6 +22,7 @@ from core.plugin_types import DataType, AssetType
 
 logger = logger.bind(module=__name__)
 
+
 class TETFrameworkOptimizer:
     """
     TET框架优化器
@@ -106,6 +107,8 @@ class TETFrameworkOptimizer:
         }
 
 # 正确的使用方式示例
+
+
 async def correct_usage_example():
     """
     正确使用原有TET框架的示例
@@ -120,7 +123,7 @@ async def correct_usage_example():
     query = StandardQuery(
         symbol="000001",
         data_type=DataType.REAL_TIME_QUOTE,
-        asset_type=AssetType.STOCK
+        asset_type=AssetType.STOCK_A
     )
 
     # 方式1：直接使用UniPluginDataManager（推荐）
@@ -131,6 +134,7 @@ async def correct_usage_example():
     # result = await optimizer.get_data_via_tet(query)
 
     logger.info("正确使用原有TET框架获取数据")
+
 
 def remove_unnecessary_components():
     """
@@ -147,6 +151,7 @@ def remove_unnecessary_components():
     - core/tet_data_pipeline.py (TET数据管道)
     """
     logger.info("建议移除重复的插件管理组件，使用原有TET框架")
+
 
 if __name__ == "__main__":
     import asyncio

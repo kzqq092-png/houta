@@ -11,6 +11,7 @@ from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QPixmap
 import io
 
+
 class InteractionMixin:
     """交互功能Mixin"""
 
@@ -49,7 +50,7 @@ class InteractionMixin:
                 if asset_service:
                     kdata = asset_service.get_historical_data(
                         symbol=code,
-                        asset_type=AssetType.STOCK,
+                        asset_type=AssetType.STOCK_A,
                         period='D'
                     )
                     if kdata is not None and not kdata.empty:
@@ -313,7 +314,7 @@ class InteractionMixin:
             # 修复：严格的索引边界检查
             if not isinstance(idx, (int, float)) or idx < 0 or idx >= len(kdata):
                 logger.warning(
-                        f"形态信号索引超出范围: {idx}, 数据长度: {len(kdata)}")
+                    f"形态信号索引超出范围: {idx}, 数据长度: {len(kdata)}")
                 invalid_patterns += 1
                 continue
 
@@ -361,7 +362,7 @@ class InteractionMixin:
 
         # 记录绘制结果
         logger.info(
-                f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
+            f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
 
         # 高亮特定形态（如果指定）
         if highlight_index is not None and highlight_index in self._pattern_info:

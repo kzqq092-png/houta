@@ -27,7 +27,7 @@ class MetricsRepository:
     负责存储和检索系统性能指标数据，支持内存缓存和数据库持久化。
     """
 
-    def __init__(self, db_path: str = "db/metrics.sqlite", cache_size: int = 1000):
+    def __init__(self, db_path: str = "data/metrics.sqlite", cache_size: int = 1000):
         """
         初始化指标数据仓储
 

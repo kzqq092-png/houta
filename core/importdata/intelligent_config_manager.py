@@ -120,7 +120,7 @@ class IntelligentConfigManager(ImportConfigManager):
     在原有配置管理基础上增加智能化功能
     """
 
-    def __init__(self, db_path: str = "db/factorweave_system.sqlite"):
+    def __init__(self, db_path: str = "data/factorweave_system.sqlite"):
         super().__init__(db_path)
 
         # AI预测服务

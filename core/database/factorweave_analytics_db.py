@@ -78,7 +78,7 @@ class FactorWeaveAnalyticsDB:
     _instances = {}  # 每个数据库路径一个实例
     _lock = threading.Lock()
 
-    def __new__(cls, db_path: str = 'db/factorweave_analytics.duckdb'):
+    def __new__(cls, db_path: str = 'data/factorweave_analytics.duckdb'):
         """单例模式实现 - 按数据库路径区分实例"""
         db_path = str(Path(db_path).resolve())  # 标准化路径
 
@@ -89,7 +89,7 @@ class FactorWeaveAnalyticsDB:
 
         return cls._instances[db_path]
 
-    def __init__(self, db_path: str = 'db/factorweave_analytics.duckdb'):
+    def __init__(self, db_path: str = 'data/factorweave_analytics.duckdb'):
         """
         初始化分析数据库
 
@@ -279,32 +279,32 @@ class FactorWeaveAnalyticsDB:
 
                 # 创建策略执行结果表
                 conn.execute("""
-                    CREATE TABLE IF NOT EXISTS strategy_execution_results (
+                CREATE TABLE IF NOT EXISTS strategy_execution_results (
                         id BIGINT PRIMARY KEY DEFAULT nextval('strategy_execution_results_seq'),
                         strategy_name VARCHAR,
                         symbol VARCHAR,
                         execution_time TIMESTAMP,
                         signal_type VARCHAR,
-                        price DOUBLE,
-                        quantity INTEGER,
+                    price DOUBLE,
+                    quantity INTEGER,
                         profit_loss DOUBLE,
                         metadata JSON,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
                 # 创建技术指标计算结果表
                 conn.execute("""
-                    CREATE TABLE IF NOT EXISTS indicator_calculation_results (
+                CREATE TABLE IF NOT EXISTS indicator_calculation_results (
                         id BIGINT PRIMARY KEY DEFAULT nextval('indicator_calculation_results_seq'),
                         indicator_name VARCHAR,
                         symbol VARCHAR,
                         calculation_time TIMESTAMP,
-                        value DOUBLE,
+                    value DOUBLE,
                         parameters JSON,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
                 # 创建回测监控表
                 conn.execute("""
@@ -315,26 +315,26 @@ class FactorWeaveAnalyticsDB:
                         metric_name VARCHAR,
                         metric_value DOUBLE,
                         metadata JSON,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
                 # 创建性能指标表
                 conn.execute("""
-                    CREATE TABLE IF NOT EXISTS performance_metrics (
+                CREATE TABLE IF NOT EXISTS performance_metrics (
                         id BIGINT PRIMARY KEY DEFAULT nextval('performance_metrics_seq'),
                         metric_type VARCHAR,
                         metric_name VARCHAR,
                         value DOUBLE,
                         timestamp TIMESTAMP,
                         tags JSON,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
                 # 创建优化日志表
                 conn.execute("""
-                    CREATE TABLE IF NOT EXISTS optimization_logs (
+                CREATE TABLE IF NOT EXISTS optimization_logs (
                         id BIGINT PRIMARY KEY DEFAULT nextval('optimization_logs_seq'),
                         optimization_type VARCHAR,
                         parameters JSON,
@@ -342,9 +342,9 @@ class FactorWeaveAnalyticsDB:
                         improvement DOUBLE,
                         timestamp TIMESTAMP,
                         metadata JSON,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
                 logger.info("✅ 数据库表结构初始化完成")
 
@@ -417,7 +417,7 @@ class FactorWeaveAnalyticsDB:
         try:
             import json
             sql = """
-                INSERT INTO strategy_execution_results 
+                INSERT INTO strategy_execution_results
                 (strategy_name, symbol, execution_time, signal_type, price, quantity, profit_loss, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """
@@ -484,7 +484,7 @@ class FactorWeaveAnalyticsDB:
                 sql += " AND symbol = ?"
                 params.append(symbol)
 
-            sql += " ORDER BY execution_time DESC LIMIT ?"
+                sql += " ORDER BY execution_time DESC LIMIT ?"
             params.append(limit)
 
             return self.execute_query(sql, params)
@@ -621,7 +621,7 @@ class FactorWeaveAnalyticsDB:
 
 # 为了确保现有代码能够继续工作，提供别名
 # 但这些别名在未来版本中可能会被移除
-def create_factorweave_db(db_path: str = 'db/factorweave_analytics.duckdb') -> FactorWeaveAnalyticsDB:
+def create_factorweave_db(db_path: str = 'data/factorweave_analytics.duckdb') -> FactorWeaveAnalyticsDB:
     """
     创建FactorWeave分析数据库实例
 
@@ -636,7 +636,7 @@ def create_factorweave_db(db_path: str = 'db/factorweave_analytics.duckdb') -> F
     return FactorWeaveAnalyticsDB(db_path)
 
 
-def get_analytics_db(db_path: str = 'db/factorweave_analytics.duckdb') -> FactorWeaveAnalyticsDB:
+def get_analytics_db(db_path: str = 'data/factorweave_analytics.duckdb') -> FactorWeaveAnalyticsDB:
     """
     获取FactorWeave分析数据库实例（单例模式）
 

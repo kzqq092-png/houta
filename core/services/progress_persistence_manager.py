@@ -110,7 +110,7 @@ class TaskProgress:
 class ProgressDatabase:
     """进度数据库管理器"""
 
-    def __init__(self, db_path: str = "db/factorweave_system.sqlite"):
+    def __init__(self, db_path: str = "data/factorweave_system.sqlite"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
@@ -353,7 +353,7 @@ class ProgressPersistenceManager(QObject):
     progress_loaded = pyqtSignal(str, dict)  # 任务ID, 进度数据
     checkpoint_created = pyqtSignal(str, str)  # 任务ID, 检查点ID
 
-    def __init__(self, db_path: str = "db/factorweave_system.sqlite", parent=None):
+    def __init__(self, db_path: str = "data/factorweave_system.sqlite", parent=None):
         super().__init__(parent)
         self.db = ProgressDatabase(db_path)
         self.active_progress: Dict[str, TaskProgress] = {}

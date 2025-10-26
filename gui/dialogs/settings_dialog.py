@@ -421,7 +421,7 @@ class SettingsDialog(QDialog):
             from core.database.duckdb_performance_optimizer import DuckDBPerformanceOptimizer, WorkloadType
 
             # 创建临时优化器来应用配置
-            optimizer = DuckDBPerformanceOptimizer("db/factorweave_analytics.duckdb")
+            optimizer = DuckDBPerformanceOptimizer("data/factorweave_analytics.duckdb")
 
             # 根据模式选择工作负载类型
             if "高性能模式" in mode:

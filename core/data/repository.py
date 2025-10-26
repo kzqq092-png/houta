@@ -413,7 +413,7 @@ class KlineRepository(BaseRepository):
 
                     kline_df = self.asset_service.get_historical_data(
                         symbol=params.stock_code,
-                        asset_type=AssetType.STOCK,
+                        asset_type=AssetType.STOCK_A,
                         period=params.period
                     )
 

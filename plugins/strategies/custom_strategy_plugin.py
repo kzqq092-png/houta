@@ -28,6 +28,7 @@ from core.strategy_extensions import (
 
 logger = logger
 
+
 class CustomStrategyBase:
     """自定义策略基类"""
 
@@ -113,6 +114,7 @@ class CustomStrategyBase:
             metadata={'custom_strategy': True}
         )
 
+
 class TrendFollowingTemplate(CustomStrategyBase):
     """趋势跟踪策略模板"""
 
@@ -165,6 +167,7 @@ class TrendFollowingTemplate(CustomStrategyBase):
 
         return signals
 
+
 class MeanReversionTemplate(CustomStrategyBase):
     """均值回归策略模板"""
 
@@ -214,6 +217,7 @@ class MeanReversionTemplate(CustomStrategyBase):
                 signals.append(signal)
 
         return signals
+
 
 class MomentumTemplate(CustomStrategyBase):
     """动量策略模板"""
@@ -268,6 +272,7 @@ class MomentumTemplate(CustomStrategyBase):
 
         return signals
 
+
 class BollingerBandsTemplate(CustomStrategyBase):
     """布林带策略模板"""
 
@@ -320,6 +325,7 @@ class BollingerBandsTemplate(CustomStrategyBase):
                 signals.append(signal)
 
         return signals
+
 
 class CustomStrategyPlugin(IStrategyPlugin):
     """自定义策略框架插件"""
@@ -377,7 +383,7 @@ class CustomStrategyPlugin(IStrategyPlugin):
                 ParameterDef("bollinger_std", float, 2.0, "布林带标准差", 1.0, 3.0),
                 ParameterDef("position_size", int, 100, "仓位大小", 1, 10000),
             ],
-            supported_assets=[AssetType.STOCK, AssetType.INDEX, AssetType.FUND, AssetType.CRYPTO],
+            supported_assets=[AssetType.STOCK_A, AssetType.INDEX, AssetType.FUND, AssetType.CRYPTO],
             time_frames=[TimeFrame.MINUTE_1, TimeFrame.MINUTE_5, TimeFrame.MINUTE_15,
                          TimeFrame.MINUTE_30, TimeFrame.HOUR_1, TimeFrame.DAY_1],
             risk_level=RiskLevel.MEDIUM,
@@ -646,6 +652,7 @@ class CustomStrategyPlugin(IStrategyPlugin):
             logger.error(f"加载自定义策略失败: {e}")
             return False
 
+
 # 导出的策略类
 AVAILABLE_STRATEGIES = {
     'custom_trend_following': lambda: CustomStrategyPlugin(),
@@ -654,9 +661,11 @@ AVAILABLE_STRATEGIES = {
     'custom_bollinger_bands': lambda: CustomStrategyPlugin(),
 }
 
+
 def get_available_strategies() -> Dict[str, callable]:
     """获取可用的自定义策略"""
     return AVAILABLE_STRATEGIES
+
 
 def create_strategy(strategy_name: str) -> Optional[CustomStrategyPlugin]:
     """创建策略实例"""

@@ -20,6 +20,7 @@ from core.events import EventBus, get_event_bus
 from core.containers import ServiceContainer, get_service_container
 from core.containers.service_registry import ServiceScope
 from core.services.service_bootstrap import bootstrap_services
+from core.graceful_shutdown import shutdown_manager  # 优雅关闭管理器
 import sys
 import asyncio
 import traceback
@@ -369,6 +370,17 @@ def main():
         # 确保日志目录存在
         log_dir = project_root / "logs"
         log_dir.mkdir(exist_ok=True)
+
+        # 注册DuckDB清理到优雅关闭管理器
+        try:
+            from core.database.duckdb_manager import cleanup_duckdb_manager
+            shutdown_manager.register_cleanup_handler(
+                cleanup_duckdb_manager,
+                name="DuckDB连接管理器"
+            )
+            logger.info("✅ 已注册DuckDB优雅关闭处理器")
+        except Exception as e:
+            logger.warning(f"注册DuckDB清理失败: {e}")
 
         # 创建并运行应用程序
         if QEventLoop is not None:

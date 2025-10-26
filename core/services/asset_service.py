@@ -15,6 +15,7 @@ from ..tet_data_pipeline import StandardQuery, StandardData
 
 logger = logger
 
+
 class AssetService:
     """
     统一资产服务
@@ -46,7 +47,7 @@ class AssetService:
 
         # 资产类型到服务的映射（用于优化特定资产类型的处理）
         self.asset_service_mapping = {
-            AssetType.STOCK: self.stock_service,
+            AssetType.STOCK_A: self.stock_service,
             AssetType.INDEX: self.stock_service,  # 指数复用股票服务
             AssetType.FUND: self.stock_service,   # 基金复用股票服务
             # 其他资产类型通过UnifiedDataManager的TET管道处理
@@ -76,7 +77,7 @@ class AssetService:
 
         Examples:
             # 获取股票历史数据
-            stock_data = asset_service.get_historical_data("000001", AssetType.STOCK)
+            stock_data = asset_service.get_historical_data("000001", AssetType.STOCK_A)
 
             # 获取加密货币历史数据
             crypto_data = asset_service.get_historical_data("BTCUSDT", AssetType.CRYPTO)
@@ -135,7 +136,7 @@ class AssetService:
 
         Examples:
             # 获取股票列表
-            stocks = asset_service.get_asset_list(AssetType.STOCK, market="上海")
+            stocks = asset_service.get_asset_list(AssetType.STOCK_A, market="上海")
 
             # 获取加密货币列表
             cryptos = asset_service.get_asset_list(AssetType.CRYPTO)
@@ -177,7 +178,7 @@ class AssetService:
 
         Examples:
             # 获取多只股票实时数据
-            quotes = asset_service.get_real_time_data(["000001", "000002"], AssetType.STOCK)
+            quotes = asset_service.get_real_time_data(["000001", "000002"], AssetType.STOCK_A)
         """
         try:
             self.logger.info(f"获取实时数据: {symbols} ({asset_type.value})")
@@ -222,7 +223,7 @@ class AssetService:
 
                 # 获取所有支持的资产类型的市场
                 asset_types = [asset_type] if asset_type else [
-                    AssetType.STOCK, AssetType.CRYPTO, AssetType.FUTURES, AssetType.FOREX
+                    AssetType.STOCK_A, AssetType.CRYPTO, AssetType.FUTURES, AssetType.FOREX
                 ]
 
                 for at in asset_types:
@@ -303,7 +304,7 @@ class AssetService:
             List[Dict]: 默认市场列表
         """
         default_markets = {
-            AssetType.STOCK: [
+            AssetType.STOCK_A: [
                 {'id': 'sh', 'name': '上海证券交易所', 'asset_type': 'STOCK'},
                 {'id': 'sz', 'name': '深圳证券交易所', 'asset_type': 'STOCK'},
                 {'id': 'bj', 'name': '北京证券交易所', 'asset_type': 'STOCK'}
@@ -361,11 +362,11 @@ class AssetService:
                 return list(supported_types)
 
             # 降级到默认支持的类型
-            return [AssetType.STOCK, AssetType.INDEX, AssetType.FUND]
+            return [AssetType.STOCK_A, AssetType.INDEX, AssetType.FUND]
 
         except Exception as e:
             self.logger.error(f"获取支持的资产类型失败: {e}")
-            return [AssetType.STOCK]
+            return [AssetType.STOCK_A]
 
     def get_provider_info(self, asset_type: AssetType = None) -> List[Dict[str, Any]]:
         """
@@ -459,6 +460,8 @@ class AssetService:
         return status
 
 # 便捷函数
+
+
 def create_asset_service(unified_data_manager: UnifiedDataManager,
                          stock_service: StockService,
                          service_container) -> AssetService:

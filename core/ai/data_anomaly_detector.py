@@ -135,7 +135,7 @@ class DataAnomalyDetector:
     提供全面的数据质量监控、异常检测和自动修复功能
     """
 
-    def __init__(self, config: Optional[AnomalyDetectionConfig] = None, db_path: str = "db/factorweave_system.sqlite"):
+    def __init__(self, config: Optional[AnomalyDetectionConfig] = None, db_path: str = "data/factorweave_system.sqlite"):
         self.config = config or AnomalyDetectionConfig()
         self.db_path = db_path
         
@@ -250,7 +250,7 @@ class DataAnomalyDetector:
         """加载检测模型"""
         try:
             # 初始化默认的异常检测模型
-            default_models = ['stock_kline', 'index_kline', 'fund_nav', 'realtime_quote']
+            default_models = ['historical_kline_data', 'index_kline', 'fund_nav', 'realtime_quote']
             
             for model_type in default_models:
                 # 异常值检测器

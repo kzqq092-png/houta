@@ -90,20 +90,69 @@ except ImportError as e:
 logger = logger.bind(module=__name__) if logger else None
 
 
+class DataLoadWorker(QThread):
+    """数据加载工作线程"""
+    finished = pyqtSignal(list)  # 加载完成信号
+    error = pyqtSignal(str)  # 错误信号
+    progress = pyqtSignal(int, str)  # 进度信号 (百分比, 消息)
+
+    def __init__(self, asset_type: str, parent_dialog):
+        super().__init__()
+        self.asset_type = asset_type
+        self.parent_dialog = parent_dialog
+
+    def run(self):
+        """在后台线程执行数据加载"""
+        try:
+            self.progress.emit(10, f"正在连接{self.asset_type}数据源...")
+
+            # 调用父对话框的数据获取方法
+            if self.asset_type == "股票" or self.asset_type == "A股":
+                self.progress.emit(30, "正在获取股票列表...")
+                data = self.parent_dialog.get_stock_data()
+            elif self.asset_type == "指数":
+                self.progress.emit(30, "正在获取指数列表...")
+                data = self.parent_dialog.get_index_data()
+            elif self.asset_type == "期货":
+                self.progress.emit(30, "正在获取期货列表...")
+                data = self.parent_dialog.get_futures_data()
+            elif self.asset_type == "基金":
+                self.progress.emit(30, "正在获取基金列表...")
+                data = self.parent_dialog.get_fund_data()
+            elif self.asset_type == "债券":
+                self.progress.emit(30, "正在获取债券列表...")
+                data = self.parent_dialog.get_bond_data()
+            else:
+                data = []
+
+            self.progress.emit(90, "正在处理数据...")
+            self.finished.emit(data if data else [])
+
+        except Exception as e:
+            logger.error(f"数据加载失败: {e}") if logger else None
+            import traceback
+            logger.error(traceback.format_exc()) if logger else None
+            self.error.emit(str(e))
+
+
 class BatchSelectionDialog(QDialog):
-    """批量选择对话化"""
+    """批量选择对话框（异步加载版）"""
 
     def __init__(self, asset_type: str, parent=None):
         super().__init__(parent)
         self.asset_type = asset_type
         self.selected_codes = []
+        self.all_items = []
+        self.loading_worker = None
+        self.progress_dialog = None
 
         self.setWindowTitle(f"批量选择{asset_type}代码")
         self.setModal(True)
         self.resize(800, 600)
 
         self.setup_ui()
-        self.load_data()
+        # 延迟加载数据，避免阻塞UI
+        QTimer.singleShot(100, self.load_data_async)
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -119,28 +168,16 @@ class BatchSelectionDialog(QDialog):
 
         layout.addLayout(search_layout)
 
-        # 分类选择区域（仅股票化
-        if self.asset_type == "股票":
-            category_layout = QHBoxLayout()
-            category_layout.addWidget(QLabel("📂 分类:"))
-
-            self.category_combo = QComboBox()
-            self.category_combo.addItems(["全部", "银行", "地产", "电力", "白酒", "医药", "科技", "制造业", "沪深300", "中证500", "创业化0"])
-            self.category_combo.currentTextChanged.connect(self.filter_by_category)
-            category_layout.addWidget(self.category_combo)
-
-            category_layout.addStretch()
-            layout.addLayout(category_layout)
-
         # 列表区域
         self.item_list = QTableWidget()
+        self.item_list.setEditTriggers(QTableWidget.NoEditTriggers)
         self.item_list.setColumnCount(3)
-        self.item_list.setHorizontalHeaderLabels(["选择", "代码", "名称"])
+        self.item_list.setHorizontalHeaderLabels(["", "代码", "名称"])
 
         # 设置列宽
         header = self.item_list.horizontalHeader()
         header.setStretchLastSection(True)
-        self.item_list.setColumnWidth(0, 60)
+        self.item_list.setColumnWidth(0, 10)
         self.item_list.setColumnWidth(1, 100)
 
         layout.addWidget(self.item_list)
@@ -185,117 +222,246 @@ class BatchSelectionDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-    def load_data(self):
-        """加载数据"""
+    def load_data_async(self):
+        """异步加载数据（使用QThread）"""
         try:
-            # 根据资产类型加载不同的数化
-            if self.asset_type == "股票":
-                self.all_items = self.get_stock_data()
-            elif self.asset_type == "指数":
-                self.all_items = self.get_index_data()
-            elif self.asset_type == "期货":
-                self.all_items = self.get_futures_data()
-            elif self.asset_type == "基金":
-                self.all_items = self.get_fund_data()
-            elif self.asset_type == "债券":
-                self.all_items = self.get_bond_data()
-            else:
-                self.all_items = []
+            # 创建进度对话框
+            from PyQt5.QtWidgets import QProgressDialog
+            self.progress_dialog = QProgressDialog(
+                f"正在加载{self.asset_type}数据，请稍候...",
+                "取消",
+                0,
+                100,
+                self
+            )
+            self.progress_dialog.setWindowTitle("数据加载中")
+            self.progress_dialog.setWindowModality(Qt.WindowModal)
+            self.progress_dialog.setMinimumDuration(0)
+            self.progress_dialog.setValue(0)
 
+            # 创建并启动工作线程
+            self.loading_worker = DataLoadWorker(self.asset_type, self)
+            self.loading_worker.progress.connect(self.on_loading_progress)
+            self.loading_worker.finished.connect(self.on_loading_finished)
+            self.loading_worker.error.connect(self.on_loading_error)
+
+            # 连接取消按钮
+            self.progress_dialog.canceled.connect(self.on_loading_canceled)
+
+            self.loading_worker.start()
+
+        except Exception as e:
+            logger.error(f"启动异步加载失败: {e}") if logger else None
+            import traceback
+            logger.error(traceback.format_exc()) if logger else None
+            QMessageBox.warning(self, "加载失败", f"启动数据加载失败: {str(e)}")
+
+    def on_loading_progress(self, value: int, message: str):
+        """更新加载进度"""
+        if self.progress_dialog:
+            self.progress_dialog.setValue(value)
+            self.progress_dialog.setLabelText(message)
+
+    def on_loading_finished(self, data: list):
+        """数据加载完成"""
+        try:
+            if self.progress_dialog:
+                self.progress_dialog.setValue(100)
+                self.progress_dialog.close()
+
+            self.all_items = data
+            logger.info(f"✅ 数据加载完成: {len(self.all_items)} 条记录") if logger else None
+
+            # 更新UI
             self.populate_table(self.all_items)
 
         except Exception as e:
-            logger.error(f"加载{self.asset_type}数据失败: {e}") if logger else None
-            self.all_items = []
+            logger.error(f"处理加载完成事件失败: {e}") if logger else None
+
+    def on_loading_error(self, error_msg: str):
+        """数据加载错误"""
+        if self.progress_dialog:
+            self.progress_dialog.close()
+
+        QMessageBox.critical(
+            self,
+            "加载失败",
+            f"加载{self.asset_type}数据失败:\n{error_msg}\n\n请检查数据源连接或稍后重试。"
+        )
+
+    def on_loading_canceled(self):
+        """用户取消加载"""
+        if self.loading_worker and self.loading_worker.isRunning():
+            self.loading_worker.terminate()
+            self.loading_worker.wait()
+        logger.info("用户取消了数据加载") if logger else None
 
     def get_stock_data(self):
-        """获取股票数据 - 异步版本避免UI卡顿"""
+        """获取股票数据 - 根据用户选择的数据源"""
         try:
-            # 首先尝试使用统一插件数据管理器（最新架构）
-            from core.services.uni_plugin_data_manager import get_uni_plugin_data_manager
+            # 获取父窗口中用户选择的数据源
+            selected_data_source = None
+            selected_plugin_name = None
 
-            uni_manager = get_uni_plugin_data_manager()
-            if uni_manager:
-                # 显示进度对话框
-                from PyQt5.QtWidgets import QProgressDialog
-                from PyQt5.QtCore import Qt, QTimer
+            logger.info("🔍 [DEBUG] 开始获取股票数据...") if logger else None
 
-                progress = QProgressDialog("正在获取股票数据...", "取消", 0, 0, self)
-                progress.setWindowTitle("数据加载")
-                progress.setWindowModality(Qt.WindowModal)
-                progress.setMinimumDuration(1000)  # 1秒后显示
-                progress.setValue(0)
-                progress.show()
+            if hasattr(self.parent(), 'data_source_combo') and hasattr(self.parent(), 'data_source_mapping'):
+                selected_display_name = self.parent().data_source_combo.currentText()
+                selected_plugin_name = self.parent().data_source_mapping.get(selected_display_name)
+                logger.info(f"🔍 [DEBUG] 父窗口数据源信息: combo={hasattr(self.parent(), 'data_source_combo')}, mapping={hasattr(self.parent(), 'data_source_mapping')}") if logger else None
+                logger.info(f"🔍 [DEBUG] 选择的显示名称: {selected_display_name}") if logger else None
+                logger.info(f"🔍 [DEBUG] 映射的插件名称: {selected_plugin_name}") if logger else None
+                logger.info(f"🔍 [DEBUG] 完整映射表: {self.parent().data_source_mapping}") if logger else None
+            else:
+                logger.warning("🔍 [DEBUG] 父窗口缺少必要属性") if logger else None
 
-                # 记录开始时间
-                start_time = datetime.now()
+            # 方案1: 优先通过选定的插件获取（符合业务逻辑）
+            if selected_plugin_name:
+                logger.info(f"🔍 [DEBUG] 尝试直接从插件 {selected_plugin_name} 获取数据...") if logger else None
 
-                # 通过统一插件数据管理器获取股票列表
-                stock_list_data = uni_manager.get_stock_list()
+                from core.plugin_manager import PluginManager
 
-                # 计算耗时
-                elapsed = (datetime.now() - start_time).total_seconds()
+                try:
+                    # 通过ServiceContainer获取PluginManager实例
+                    from core.containers import get_service_container
+                    container = get_service_container()
+                    plugin_manager = container.resolve(PluginManager) if container else None
+                    logger.info(f"🔍 [DEBUG] PluginManager实例: {plugin_manager is not None}") if logger else None
 
-                progress.close()
+                    if plugin_manager:
+                        plugin = plugin_manager.get_plugin(selected_plugin_name)
+                        logger.info(f"🔍 [DEBUG] 插件实例: {plugin is not None}, 类型: {type(plugin)}") if logger else None
 
-                if stock_list_data:
-                    logger.info(f"通过统一插件数据管理器成功获取最新股票数据: {len(stock_list_data)} 只股票，耗时 {elapsed:.2f}秒") if logger else None
-                    return stock_list_data
+                        if plugin:
+                            # 尝试调用插件的股票列表获取方法
+                            if hasattr(plugin, 'get_stock_list'):
+                                logger.info("🔍 [DEBUG] 插件有get_stock_list方法") if logger else None
+                                stock_list_data = plugin.get_stock_list()
 
-            # 备用方案：使用原有统一数据管理器
+                                # 处理DataFrame和列表两种格式
+                                if hasattr(stock_list_data, 'empty'):  # DataFrame
+                                    logger.info(f"🔍 [DEBUG] get_stock_list返回DataFrame: {len(stock_list_data) if not stock_list_data.empty else 0} 条数据") if logger else None
+                                    if not stock_list_data.empty:
+                                        # 将DataFrame转换为标准格式
+                                        stock_list = []
+                                        for _, row in stock_list_data.iterrows():
+                                            stock_info = {
+                                                "code": row.get('code', ''),
+                                                "name": row.get('name', ''),
+                                                "category": row.get('industry', '其他')
+                                            }
+                                            stock_list.append(stock_info)
+                                        logger.info(f"✅ 从插件DataFrame获取股票数据: {len(stock_list)} 只") if logger else None
+                                        return stock_list
+                                else:  # 列表格式
+                                    logger.info(f"🔍 [DEBUG] get_stock_list返回列表: {len(stock_list_data) if stock_list_data else 0} 条数据") if logger else None
+                                    if stock_list_data:
+                                        logger.info(f"✅ 直接从插件获取股票数据: {len(stock_list_data)} 只") if logger else None
+                                        return stock_list_data
+                            elif hasattr(plugin, 'get_asset_list'):
+                                logger.info("🔍 [DEBUG] 插件有get_asset_list方法") if logger else None
+                                from core.plugin_types import AssetType
+                                asset_list_data = plugin.get_asset_list(AssetType.STOCK_A)
+                                logger.info(f"🔍 [DEBUG] get_asset_list返回: {len(asset_list_data) if asset_list_data else 0} 条数据") if logger else None
+                                if asset_list_data:
+                                    logger.info(f"✅ 从插件获取资产数据: {len(asset_list_data)} 只") if logger else None
+                                    return asset_list_data
+                            else:
+                                logger.warning("🔍 [DEBUG] 插件没有get_stock_list或get_asset_list方法") if logger else None
+                        else:
+                            logger.warning("🔍 [DEBUG] 无法获取插件实例") if logger else None
+                    else:
+                        logger.warning("🔍 [DEBUG] PluginManager实例为空") if logger else None
+                except Exception as e:
+                    logger.error(f"🔍 [DEBUG] 从插件获取数据失败: {e}") if logger else None
+                    import traceback
+                    logger.error(f"🔍 [DEBUG] 详细错误: {traceback.format_exc()}") if logger else None
+            else:
+                logger.warning("🔍 [DEBUG] selected_plugin_name为空，无法从插件获取数据") if logger else None
+
+            # 方案2: 备用方案 - 通过 UnifiedDataManager 获取（当插件获取失败时）
+            logger.info("🔍 [DEBUG] 插件获取失败，尝试备用方案...") if logger else None
             from core.services.unified_data_manager import get_unified_data_manager
+            from core.containers import get_service_container
+            from core.services.unified_data_manager import UnifiedDataManager
+            from core.events import get_event_bus
 
-            data_manager = get_unified_data_manager()
+            data_manager = None
+
+            # 尝试从get_unified_data_manager获取
+            try:
+                data_manager = get_unified_data_manager()
+                if data_manager:
+                    logger.info("通过get_unified_data_manager获取UnifiedDataManager成功") if logger else None
+            except Exception as e:
+                logger.debug(f"get_unified_data_manager失败: {e}") if logger else None
+
+            # 如果失败，尝试从ServiceContainer获取
+            if not data_manager:
+                try:
+                    container = get_service_container()
+                    if container and container.is_registered(UnifiedDataManager):
+                        data_manager = container.resolve(UnifiedDataManager)
+                        logger.info("从ServiceContainer获取UnifiedDataManager成功") if logger else None
+                except Exception as e:
+                    logger.debug(f"从ServiceContainer获取失败: {e}") if logger else None
+
+            # 如果仍然失败，尝试手动创建
+            if not data_manager:
+                try:
+                    container = get_service_container()
+                    event_bus = get_event_bus()
+                    if container and event_bus:
+                        data_manager = UnifiedDataManager(container, event_bus)
+                        # 注册到容器
+                        container.register_instance(UnifiedDataManager, data_manager)
+                        logger.info("手动创建并注册UnifiedDataManager成功") if logger else None
+                except Exception as e:
+                    logger.debug(f"手动创建UnifiedDataManager失败: {e}") if logger else None
+
             if data_manager:
-                # 确保TET功能开启
-                if hasattr(data_manager, 'tet_enabled'):
-                    if not data_manager.tet_enabled:
-                        logger.info("启用TET数据管道以获取最新股票数据") if logger else None
-                        data_manager.tet_enabled = True
+                logger.info("尝试通过UnifiedDataManager获取股票数据...") if logger else None
 
-                # 获取股票列表DataFrame - 这里会优先使用TET管道
-                stock_df = data_manager.get_stock_list()
-                if not stock_df.empty:
-                    # 转换为所需格式
+                # 获取资产列表（从DuckDB或数据源）
+                asset_df = data_manager.get_asset_list(asset_type='stock', market='all')
+
+                if not asset_df.empty:
                     stock_list = []
-                    for _, row in stock_df.iterrows():
+                    for _, row in asset_df.iterrows():
                         stock_info = {
                             "code": row.get('code', ''),
                             "name": row.get('name', ''),
                             "category": row.get('industry', '其他')
                         }
                         stock_list.append(stock_info)
-                    logger.info(f"通过TET管道成功获取最新股票数据: {len(stock_list)} 只股票") if logger else None
+
+                    logger.info(f"✅ 成功获取股票数据: {len(stock_list)} 只股票") if logger else None
                     return stock_list
+                else:
+                    logger.warning("UnifiedDataManager返回空DataFrame") if logger else None
 
-            # 最后备用方案：使用股票服务
-            from core.services.stock_service import StockService
-            from core.containers import get_service_container
-
-            container = get_service_container()
-            if container:
-                stock_service = container.resolve(StockService)
-                if stock_service:
-                    stock_list_data = stock_service.get_stock_list()
-                    if stock_list_data:
-                        # 转换格式
-                        stock_list = []
-                        for stock in stock_list_data:
-                            stock_info = {
-                                "code": stock.get('code', ''),
-                                "name": stock.get('name', ''),
-                                "category": stock.get('industry', '其他')
-                            }
-                            stock_list.append(stock_info)
-                        logger.info(f"通过股票服务获取数据: {len(stock_list)} 只股票") if logger else None
-                        return stock_list
-
-            # 最后备用方案
-            logger.warning("无法获取真实股票数据，返回空列表") if logger else None
+            # 失败提示
+            logger.error("所有方案都无法获取股票数据") if logger else None
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "数据获取失败",
+                f"无法获取股票列表数据。\n\n"
+                f"可能原因:\n"
+                f"1. 数据源插件未正确注册或初始化\n"
+                f"2. DuckDB数据库为空，需先导入数据\n"
+                f"3. 网络连接问题（如使用在线数据源）\n\n"
+                f"建议:\n"
+                f"• 检查插件状态\n"
+                f"• 尝试运行数据导入\n"
+                f"• 查看日志了解详细错误"
+            )
             return []
 
         except Exception as e:
-            logger.error(f"获取股票数据失败: {e}") if logger else None
+            logger.error(f"获取股票数据失败: {e}", exc_info=True) if logger else None
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "错误", f"获取股票数据时发生错误:\n{str(e)}")
             return []
 
     def get_index_data(self):
@@ -500,9 +666,20 @@ class BatchSelectionDialog(QDialog):
 
     def populate_table(self, items):
         """填充表格"""
+        logger.info(f"🔍 [DEBUG] populate_table被调用，数据量: {len(items) if items else 0}") if logger else None
+
+        if not items:
+            logger.warning("🔍 [DEBUG] items为空，设置表格行数为0") if logger else None
+            self.item_list.setRowCount(0)
+            self.update_stats()
+            return
+
+        logger.info(f"🔍 [DEBUG] 设置表格行数: {len(items)}") if logger else None
         self.item_list.setRowCount(len(items))
 
         for row, item in enumerate(items):
+            # logger.debug(f"🔍 [DEBUG] 处理第{row}行数据: {item}") if logger else None
+
             # 选择
             checkbox = QCheckBox()
             checkbox.stateChanged.connect(self.update_selection)
@@ -514,6 +691,7 @@ class BatchSelectionDialog(QDialog):
             # 名称
             self.item_list.setItem(row, 2, QTableWidgetItem(item["name"]))
 
+        logger.info("🔍 [INFO] 表格填充完成，调用update_stats") if logger else None
         self.update_stats()
 
     def filter_items(self, text):
@@ -525,33 +703,6 @@ class BatchSelectionDialog(QDialog):
             filtered_items = [
                 item for item in self.all_items
                 if text in item["code"].lower() or text in item["name"].lower()
-            ]
-
-        self.populate_table(filtered_items)
-
-    def filter_by_category(self, category):
-        """按分类过滤"""
-        if category == "全部":
-            filtered_items = self.all_items
-        else:
-            # 根据分类映射
-            category_mapping = {
-                "银行": ["银行"],
-                "地产": ["地产"],
-                "电力": ["电力"],
-                "白酒": ["白酒"],
-                "医药": ["医药"],
-                "科技": ["科技"],
-                "制造业": ["制造业"],
-                "沪深300": ["沪深300"],
-                "中证500": ["中证500"],
-                "创业化0": ["创业化0"]
-            }
-
-            target_categories = category_mapping.get(category, [category])
-            filtered_items = [
-                item for item in self.all_items
-                if item.get("category") in target_categories
             ]
 
         self.populate_table(filtered_items)
@@ -582,7 +733,10 @@ class BatchSelectionDialog(QDialog):
             checkbox = self.item_list.cellWidget(row, 0)
             if checkbox and checkbox.isChecked():
                 selected += 1
-        self.stats_label.setText(f"共 {total} 项，已选择 {selected} 项")
+
+        stats_text = f"共 {total} 项，已选择 {selected} 项"
+        # logger.info(f"🔍 [DEBUG] 更新统计信息: {stats_text}") if logger else None
+        self.stats_label.setText(stats_text)
 
     def get_selected_codes(self):
         """获取选中的代码"""
@@ -606,7 +760,7 @@ class EnhancedDataImportWidget(QWidget):
     task_completed = pyqtSignal(str, object)  # 任务完成
     task_failed = pyqtSignal(str, str)  # 任务失败
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, plugin_manager=None):
         super().__init__(parent)
 
         # 初始化核心组化
@@ -614,6 +768,10 @@ class EnhancedDataImportWidget(QWidget):
         self.config_manager = None
         self.ui_adapter = None
         self.ui_synchronizer = None
+        self.plugin_manager = plugin_manager  # ✅ 直接保存plugin_manager
+
+        # 初始化数据源映射（用于动态加载数据源插件）
+        self.data_source_mapping = {}
 
         # 初始化主题系统
         self.theme_manager = None
@@ -909,7 +1067,7 @@ class EnhancedDataImportWidget(QWidget):
         batch_buttons_layout.addWidget(self.batch_select_btn)
 
         # 快速选择按钮
-        self.quick_select_btn = QPushButton("快速选择")
+        self.quick_select_btn = QPushButton("🔍 快速选择")
         self.quick_select_btn.clicked.connect(self.show_quick_selection_dialog)
         batch_buttons_layout.addWidget(self.quick_select_btn)
 
@@ -932,9 +1090,9 @@ class EnhancedDataImportWidget(QWidget):
         datasource_group = QGroupBox("🔌 数据源配置")
         datasource_layout = QFormLayout(datasource_group)
 
-        # 数据源选择
+        # 数据源选择 - 动态加载已注册的数据源插件
         self.data_source_combo = QComboBox()
-        self.data_source_combo.addItems(["通达信", "东方财富", "新浪财经", "腾讯财经"])
+        self._load_available_data_sources()
         datasource_layout.addRow("数据源:", self.data_source_combo)
 
         # 数据时间范围
@@ -1171,9 +1329,9 @@ class EnhancedDataImportWidget(QWidget):
         datasource_group = QGroupBox("🔌 数据源配置")
         datasource_layout = QFormLayout(datasource_group)
 
-        # 数据源选择
+        # 数据源选择 - 动态加载已注册的数据源插件
         self.data_source_combo = QComboBox()
-        self.data_source_combo.addItems(["通达信", "东方财富", "新浪财经", "腾讯财经"])
+        self._load_available_data_sources()
         datasource_layout.addRow("数据源:", self.data_source_combo)
 
         # 数据范围
@@ -1322,9 +1480,9 @@ class EnhancedDataImportWidget(QWidget):
         widget = QWidget()
         layout = QFormLayout(widget)
 
-        # 数据源选择
+        # 数据源选择 - 动态加载已注册的数据源插件
         self.data_source_combo = QComboBox()
-        self.data_source_combo.addItems(["通达信", "东方财富", "新浪财经", "腾讯财经"])
+        self._load_available_data_sources()
         layout.addRow("🔌 数据源:", self.data_source_combo)
 
         # 数据范围
@@ -2490,16 +2648,19 @@ class EnhancedDataImportWidget(QWidget):
         """刷新任务列表"""
         try:
             if not self.config_manager:
+                logger.warning("配置管理器未初始化，无法刷新任务列表") if logger else None
                 return
 
             # 获取所有任务
             tasks = self.config_manager.get_import_tasks()
+            logger.info(f"从配置管理器加载了 {len(tasks)} 个任务") if logger else None
 
             # 清空表格
             self.task_table.setRowCount(0)
 
             # 填充任务数据
             for task in tasks:
+                logger.debug(f"正在添加任务到表格: {task.task_id} - {task.name}") if logger else None
                 row = self.task_table.rowCount()
                 self.task_table.insertRow(row)
 
@@ -2523,9 +2684,41 @@ class EnhancedDataImportWidget(QWidget):
                         delta = datetime.now() - task_status.start_time
                         runtime = str(delta).split('.')[0]  # 去除微秒
 
+                # 状态中文映射
+                status_map = {
+                    'pending': '待执行',
+                    'running': '运行中',
+                    'completed': '已完成',
+                    'failed': '失败',
+                    'cancelled': '已取消',
+                    'paused': '已暂停'
+                }
+
+                # 获取状态（优先使用中文映射）
+                if task_status:
+                    status_value = task_status.status.value if hasattr(task_status.status, 'value') else str(task_status.status)
+                    status_text = status_map.get(status_value.lower(), status_value)
+                else:
+                    status_text = "未开始"
+
+                # 计算成功数和失败数（使用TaskExecutionResult的实际字段）
+                success_count = 0
+                failure_count = 0
+                if task_status:
+                    # TaskExecutionResult 有 processed_records 和 failed_records
+                    if hasattr(task_status, 'processed_records'):
+                        total_processed = task_status.processed_records
+                        failed = getattr(task_status, 'failed_records', 0)
+                        success_count = total_processed - failed
+                        failure_count = failed
+                    # 兼容旧版本可能有 success_count 和 failure_count
+                    elif hasattr(task_status, 'success_count'):
+                        success_count = task_status.success_count
+                        failure_count = getattr(task_status, 'failure_count', 0)
+
                 items = [
                     task.name,
-                    task_status.status.value if task_status else "未开始",
+                    status_text,
                     f"{task_status.progress:.1f}%" if task_status and hasattr(task_status, 'progress') else "0%",
                     task.data_source,
                     task.asset_type,
@@ -2535,8 +2728,8 @@ class EnhancedDataImportWidget(QWidget):
                     start_time,
                     end_time,
                     runtime,
-                    str(task_status.success_count) if task_status and hasattr(task_status, 'success_count') else "0",
-                    str(task_status.failure_count) if task_status and hasattr(task_status, 'failure_count') else "0"
+                    str(success_count),
+                    str(failure_count)
                 ]
 
                 for col, item_text in enumerate(items):
@@ -3890,6 +4083,153 @@ class EnhancedDataImportWidget(QWidget):
         except Exception as e:
             logger.error(f"获取快速选择代码失败: {e}") if logger else None
             return []
+
+    def _load_available_data_sources(self):
+        """动态加载可用的数据源插件"""
+        try:
+            logger.info("开始动态加载数据源插件...") if logger else None
+
+            # 方案1: 使用初始化时传入的plugin_manager（推荐）
+            plugin_manager = None
+            if hasattr(self, 'plugin_manager') and self.plugin_manager:
+                plugin_manager = self.plugin_manager
+                logger.info("✅ 使用初始化时传入的PluginManager") if logger else None
+
+            # 方案2: 从容器获取
+            if not plugin_manager:
+                try:
+                    from core.containers import get_service_container
+                    container = get_service_container()
+                    if container:
+                        plugin_manager = container.get('plugin_manager')
+                        if plugin_manager:
+                            logger.info("从ServiceContainer获取PluginManager") if logger else None
+                except Exception as e:
+                    logger.debug(f"从容器获取PluginManager失败: {e}") if logger else None
+
+            # 方案3: 从全局导入的PluginManager实例
+            if not plugin_manager:
+                try:
+                    # 尝试从main模块获取（如果已经启动）
+                    import sys
+                    if 'main' in sys.modules:
+                        main_module = sys.modules['main']
+                        if hasattr(main_module, 'plugin_manager'):
+                            plugin_manager = main_module.plugin_manager
+                            logger.info("从main模块获取PluginManager") if logger else None
+                except Exception as e:
+                    logger.debug(f"从main模块获取PluginManager失败: {e}") if logger else None
+
+            if plugin_manager:
+                # 获取所有数据源插件 - 使用与插件管理UI相同的方法
+                data_source_plugins = []
+
+                # 方法1: 尝试get_all_enhanced_plugins()（优先）
+                enhanced_plugins = None
+                if hasattr(plugin_manager, 'get_all_enhanced_plugins'):
+                    try:
+                        enhanced_plugins = plugin_manager.get_all_enhanced_plugins()
+                        logger.info(f"通过get_all_enhanced_plugins获取到 {len(enhanced_plugins) if enhanced_plugins else 0} 个插件") if logger else None
+                    except Exception as e:
+                        logger.debug(f"get_all_enhanced_plugins失败: {e}") if logger else None
+
+                # 方法2: 尝试get_all_plugins()
+                if not enhanced_plugins:
+                    if hasattr(plugin_manager, 'get_all_plugins'):
+                        try:
+                            all_plugins = plugin_manager.get_all_plugins()
+                            logger.info(f"通过get_all_plugins获取到 {len(all_plugins) if all_plugins else 0} 个插件") if logger else None
+
+                            # 转换为enhanced格式
+                            if all_plugins:
+                                for plugin_name, plugin_instance in all_plugins.items():
+                                    # 筛选数据源插件 - 只匹配plugins/data_sources/目录下的插件
+                                    if (plugin_name.startswith('data_sources.') and
+                                            'sentiment' not in plugin_name.lower()):
+                                        display_name = getattr(plugin_instance, 'name', plugin_name)
+
+                                        data_source_plugins.append({
+                                            'name': plugin_name,
+                                            'display_name': display_name,
+                                            'info': plugin_instance
+                                        })
+                                        logger.debug(f"找到数据源插件: {plugin_name} -> {display_name}") if logger else None
+                        except Exception as e:
+                            logger.debug(f"get_all_plugins失败: {e}") if logger else None
+
+                # 方法3: 使用enhanced_plugins（如果获取到了）
+                if enhanced_plugins:
+                    for plugin_name, plugin_info in enhanced_plugins.items():
+                        # 筛选数据源插件 - 只匹配plugins/data_sources/目录下的插件
+                        if (plugin_name.startswith('data_sources.') and
+                                'sentiment' not in plugin_name.lower()):
+                            display_name = plugin_info.name if hasattr(plugin_info, 'name') else plugin_name
+
+                            data_source_plugins.append({
+                                'name': plugin_name,
+                                'display_name': display_name,
+                                'info': plugin_info
+                            })
+                            logger.debug(f"找到数据源插件: {plugin_name} -> {display_name}") if logger else None
+
+                if data_source_plugins:
+                    # 按显示名称排序
+                    data_source_plugins.sort(key=lambda x: x['display_name'])
+
+                    # 填充下拉列表
+                    self.data_source_combo.clear()
+                    self.data_source_mapping = {}  # 映射：display_name -> plugin_name
+
+                    for plugin in data_source_plugins:
+                        self.data_source_combo.addItem(plugin['display_name'])
+                        self.data_source_mapping[plugin['display_name']] = plugin['name']
+
+                    logger.info(f"✅ 成功加载 {len(data_source_plugins)} 个数据源插件到UI") if logger else None
+                    return True
+                else:
+                    logger.warning("PluginManager中没有找到data_sources插件") if logger else None
+            else:
+                logger.warning("PluginManager不可用或没有plugins属性") if logger else None
+
+            # 备用方案：使用默认列表
+            logger.warning("⚠️ 无法获取插件管理器或无可用插件，使用默认数据源列表（4个）") if logger else None
+            self._load_default_data_sources()
+            return False
+
+        except Exception as e:
+            logger.error(f"❌ 加载数据源失败: {e}", exc_info=True) if logger else None
+            self._load_default_data_sources()
+            return False
+
+    def _load_default_data_sources(self):
+        """加载默认数据源列表（备用）"""
+        default_sources = {
+            "AKShare": "data_sources.akshare_plugin",
+            "东方财富": "data_sources.eastmoney_plugin",
+            "新浪财经": "data_sources.sina_plugin",
+            "通达信": "data_sources.tongdaxin_plugin"
+        }
+
+        self.data_source_combo.clear()
+        self.data_source_mapping = default_sources
+
+        for display_name in default_sources.keys():
+            self.data_source_combo.addItem(display_name)
+
+        logger.info(f"使用默认数据源列表: {len(default_sources)} 个") if logger else None
+
+    def showEvent(self, event):
+        """UI显示时重新加载数据源插件列表"""
+        super().showEvent(event)
+
+        try:
+            # 只在首次显示时加载，避免重复加载
+            if not hasattr(self, '_data_sources_loaded'):
+                logger.info("UI首次显示，重新加载数据源插件列表") if logger else None
+                self._load_available_data_sources()
+                self._data_sources_loaded = True
+        except Exception as e:
+            logger.error(f"showEvent加载数据源失败: {e}") if logger else None
 
     def _initialize_batch_buttons(self):
         """初始化批量按钮状态"""

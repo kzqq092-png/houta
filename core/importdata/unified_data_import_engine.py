@@ -1168,26 +1168,188 @@ class UnifiedDataImportEngine(QObject):
                 f"已导入 {imported_count}/{total_count} 条数据",
                 {'imported': imported_count, 'total': total_count}
             )
+    
+    def _extract_asset_metadata_from_kline(self, symbol: str, kline_data: pd.DataFrame, 
+                                          data_source: str, asset_type) -> dict:
+        """从K线数据和数据源获取完整的资产元数据"""
+        from core.plugin_types import AssetType
+        
+        # 1. 从数据源插件获取股票列表（包含name、industry等信息）
+        stock_info = None
+        if self.real_data_provider:
+            try:
+                # 尝试从插件获取股票列表
+                plugin = self.real_data_provider.get_plugin(data_source)
+                if plugin and hasattr(plugin, 'get_stock_list'):
+                    stock_list_df = plugin.get_stock_list()
+                    if stock_list_df is not None and not stock_list_df.empty:
+                        # 查找当前symbol的信息
+                        matching_stocks = stock_list_df[stock_list_df['code'] == symbol]
+                        if not matching_stocks.empty:
+                            stock_info = matching_stocks.iloc[0].to_dict()
+                            logger.debug(f"从插件获取到股票信息: {symbol} - {stock_info.get('name', symbol)}")
+            except Exception as e:
+                logger.debug(f"从插件获取股票信息失败: {e}")
+        
+        # 2. 推断market
+        if symbol.startswith(('000', '001', '002', '003')):
+            market = 'SZ'
+        elif symbol.startswith(('600', '601', '603', '605')):
+            market = 'SH'
+        elif symbol.startswith('HK'):
+            market = 'HK'
+        elif len(symbol) <= 5 and symbol.isalpha():
+            market = 'US'
+        else:
+            market = 'SZ'
+        
+        # 3. 从K线数据中提取可能包含的元数据字段
+        name = symbol  # 默认值
+        industry = None
+        sector = None
+        
+        if kline_data is not None and not kline_data.empty:
+            first_row = kline_data.iloc[0]
+            # 尝试从K线数据中获取name（某些数据源可能包含）
+            if 'name' in first_row:
+                name = first_row['name']
+            if 'industry' in first_row:
+                industry = first_row['industry']
+            if 'sector' in first_row:
+                sector = first_row['sector']
+        
+        # 4. 如果从插件获取到了信息，优先使用插件数据
+        if stock_info:
+            name = stock_info.get('name', name)
+            market = stock_info.get('market', market)
+            # 注意：通达信插件可能没有industry/sector字段，但其他插件可能有
+            if 'industry' in stock_info and stock_info['industry']:
+                industry = stock_info['industry']
+            if 'sector' in stock_info and stock_info['sector']:
+                sector = stock_info['sector']
+        
+        # 5. 构建完整的元数据
+        metadata = {
+            'symbol': symbol,
+            'name': name,
+            'market': market,
+            'asset_type': asset_type.value,
+            'primary_data_source': data_source,
+            'data_sources': [data_source],
+            'listing_status': 'active',
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        # 添加可选字段
+        if industry:
+            metadata['industry'] = industry
+        if sector:
+            metadata['sector'] = sector
+        
+        return metadata
 
     def _import_kline_data(self, task_config: ImportTaskConfig, result: UnifiedImportResult):
-        """导入K线数据"""
+        """导入K线数据 - 真实实现"""
         try:
             logger.info(f"开始导入K线数据: {len(task_config.symbols)}个股票")
-
+            
+            from core.asset_database_manager import get_asset_separated_database_manager
+            from core.plugin_types import DataType, AssetType
+            from datetime import datetime
+            
             result.total_records = len(task_config.symbols)
+            asset_db_manager = get_asset_separated_database_manager()
 
             for i, symbol in enumerate(task_config.symbols):
                 # 检查任务是否被暂停或取消
                 if result.status in [UnifiedTaskStatus.PAUSED, UnifiedTaskStatus.CANCELLED]:
+                    logger.info(f"任务被{result.status.value}，停止导入")
                     break
 
                 try:
-                    # 模拟数据导入过程
-                    logger.info(f"导入股票数据: {symbol}")
+                    logger.info(f"导入股票数据: {symbol} ({i+1}/{len(task_config.symbols)})")
 
-                    # 这里应该调用真实的数据导入逻辑
-                    # 暂时使用模拟延迟
-                    time.sleep(0.1)
+                    # 1. 从真实数据提供器获取K线数据（若无则使用模拟）
+                    kline_data = None
+                    if self.real_data_provider and hasattr(self.real_data_provider, 'fetch_kline'):
+                        try:
+                            kline_data = self.real_data_provider.fetch_kline(
+                                symbol=symbol,
+                                data_source=task_config.data_source,
+                                frequency=task_config.frequency,
+                                start_date=task_config.start_date,
+                                end_date=task_config.end_date
+                            )
+                        except Exception as e:
+                            logger.warning(f"获取K线数据失败: {e}")
+
+                    if kline_data is None or kline_data.empty:
+                        logger.warning(f"未获取到股票数据: {symbol}")
+                        result.skipped_records += 1
+                        continue
+
+                    # 2. 识别资产类型
+                    asset_type = AssetType.STOCK_A
+                    try:
+                        if hasattr(self, 'asset_identifier'):
+                            asset_type = self.asset_identifier.identify_asset_type_by_symbol(symbol)
+                    except:
+                        pass
+
+                    # 3. 标准化K线数据字段
+                    import pandas as pd
+                    df = kline_data.copy()
+                    required_fields = ['datetime', 'open', 'high', 'low', 'close', 'volume']
+                    for field in required_fields:
+                        if field not in df.columns:
+                            if field == 'datetime' and 'date' in df.columns:
+                                df['datetime'] = df['date']
+                            elif field == 'volume':
+                                df[field] = 0
+                            else:
+                                df[field] = 0.0
+                    
+                    df['symbol'] = symbol
+                    df['data_source'] = task_config.data_source
+                    df['frequency'] = task_config.frequency
+                    df['updated_at'] = datetime.now()
+                    
+                    if 'datetime' in df.columns and not pd.api.types.is_datetime64_any_dtype(df['datetime']):
+                        df['datetime'] = pd.to_datetime(df['datetime'])
+
+                    # 4. 保存K线数据到资产数据库
+                    rows_affected = asset_db_manager.store_standardized_data(
+                        df,
+                        asset_type,
+                        DataType.HISTORICAL_KLINE
+                    )
+                    logger.info(f"保存K线数据: {symbol}, 条数: {rows_affected}")
+
+                    # 5. 提取并保存资产元数据 - 从数据源获取完整信息
+                    asset_metadata = self._extract_asset_metadata_from_kline(
+                        symbol, 
+                        kline_data, 
+                        task_config.data_source,
+                        asset_type
+                    )
+
+                    # 6. 使用asset_database_manager保存元数据
+                    save_success = asset_db_manager.upsert_asset_metadata(
+                        symbol,
+                        asset_type,
+                        asset_metadata
+                    )
+                    
+                    if save_success:
+                        logger.info(f"✅ 保存资产元数据成功: {symbol}, market={market}, asset_type={asset_type.value}, data_source={task_config.data_source}")
+                        # 立即验证是否保存成功
+                        saved_metadata = asset_db_manager.get_asset_metadata(symbol, asset_type)
+                        if saved_metadata:
+                            logger.debug(f"验证成功: {symbol} 元数据已存在于asset_metadata表")
+                        else:
+                            logger.error(f"验证失败: {symbol} 元数据未能成功保存到asset_metadata表")
+                    else:
+                        logger.error(f"❌ 保存资产元数据失败: {symbol}")
 
                     result.processed_records += 1
 
@@ -1197,18 +1359,18 @@ class UnifiedDataImportEngine(QObject):
                         task_config.task_id,
                         progress,
                         f"正在导入 {symbol} ({result.processed_records}/{result.total_records})",
-                        {'current_symbol': symbol, 'processed': result.processed_records}
+                        {'current_symbol': symbol, 'processed': result.processed_records, 'rows': rows_affected}
                     )
 
                 except Exception as e:
-                    logger.error(f"导入股票数据失败 {symbol}: {e}")
+                    logger.error(f"导入股票数据失败 {symbol}: {e}", exc_info=True)
                     result.failed_records += 1
                     result.warnings.append(f"导入{symbol}失败: {str(e)}")
 
-            logger.info(f"K线数据导入完成: 成功={result.processed_records}, 失败={result.failed_records}")
+            logger.info(f"K线数据导入完成: 成功={result.processed_records}, 失败={result.failed_records}, 跳过={result.skipped_records}")
 
         except Exception as e:
-            logger.error(f"K线数据导入失败: {e}")
+            logger.error(f"K线数据导入失败: {e}", exc_info=True)
             raise
 
     def _import_realtime_data(self, task_config: ImportTaskConfig, result: UnifiedImportResult):
@@ -1229,39 +1391,116 @@ class UnifiedDataImportEngine(QObject):
         """同步导入K线数据（用于异步工作线程）"""
         try:
             logger.info(f"开始同步导入K线数据: {len(task_config.symbols)}个股票")
-
+            
+            from core.asset_database_manager import get_asset_separated_database_manager
+            from core.plugin_types import DataType, AssetType
+            from datetime import datetime
+            
             result.total_records = len(task_config.symbols)
+            asset_db_manager = get_asset_separated_database_manager()
 
             for i, symbol in enumerate(task_config.symbols):
                 # 检查任务是否被取消
                 if result.status == UnifiedTaskStatus.CANCELLED:
+                    logger.info(f"任务被取消，停止导入")
                     break
 
                 try:
-                    # 模拟数据导入过程
-                    logger.info(f"同步导入股票数据: {symbol}")
+                    logger.info(f"同步导入股票数据: {symbol} ({i+1}/{len(task_config.symbols)})")
 
-                    # 这里应该调用真实的数据导入逻辑
-                    # 暂时使用模拟延迟
-                    time.sleep(0.1)
+                    # 1. 从真实数据提供器获取K线数据
+                    kline_data = None
+                    if self.real_data_provider and hasattr(self.real_data_provider, 'fetch_kline'):
+                        try:
+                            kline_data = self.real_data_provider.fetch_kline(
+                                symbol=symbol,
+                                data_source=task_config.data_source,
+                                frequency=task_config.frequency,
+                                start_date=task_config.start_date,
+                                end_date=task_config.end_date
+                            )
+                        except Exception as e:
+                            logger.warning(f"获取K线数据失败: {e}")
+
+                    if kline_data is None or kline_data.empty:
+                        logger.warning(f"未获取到股票数据: {symbol}")
+                        result.skipped_records += 1
+                        continue
+
+                    # 2. 识别资产类型
+                    asset_type = AssetType.STOCK_A
+                    try:
+                        if hasattr(self, 'asset_identifier'):
+                            asset_type = self.asset_identifier.identify_asset_type_by_symbol(symbol)
+                    except:
+                        pass
+
+                    # 3. 标准化K线数据字段
+                    import pandas as pd
+                    df = kline_data.copy()
+                    required_fields = ['datetime', 'open', 'high', 'low', 'close', 'volume']
+                    for field in required_fields:
+                        if field not in df.columns:
+                            if field == 'datetime' and 'date' in df.columns:
+                                df['datetime'] = df['date']
+                            elif field == 'volume':
+                                df[field] = 0
+                            else:
+                                df[field] = 0.0
+                    
+                    df['symbol'] = symbol
+                    df['data_source'] = task_config.data_source
+                    df['frequency'] = task_config.frequency
+                    df['updated_at'] = datetime.now()
+                    
+                    if 'datetime' in df.columns and not pd.api.types.is_datetime64_any_dtype(df['datetime']):
+                        df['datetime'] = pd.to_datetime(df['datetime'])
+
+                    # 4. 保存K线数据到资产数据库
+                    rows_affected = asset_db_manager.store_standardized_data(
+                        df,
+                        asset_type,
+                        DataType.HISTORICAL_KLINE
+                    )
+                    logger.info(f"保存K线数据: {symbol}, 条数: {rows_affected}")
+
+                    # 5. 提取并保存资产元数据 - 从数据源获取完整信息
+                    asset_metadata = self._extract_asset_metadata_from_kline(
+                        symbol, 
+                        kline_data, 
+                        task_config.data_source,
+                        asset_type
+                    )
+
+                    # 6. 使用asset_database_manager保存元数据
+                    save_success = asset_db_manager.upsert_asset_metadata(
+                        symbol,
+                        asset_type,
+                        asset_metadata
+                    )
+                    
+                    if save_success:
+                        logger.info(f"✅ 同步保存资产元数据成功: {symbol}, market={market}, asset_type={asset_type.value}, data_source={task_config.data_source}")
+                        # 立即验证是否保存成功
+                        saved_metadata = asset_db_manager.get_asset_metadata(symbol, asset_type)
+                        if saved_metadata:
+                            logger.debug(f"验证成功: {symbol} 元数据已存在于asset_metadata表")
+                        else:
+                            logger.error(f"验证失败: {symbol} 元数据未能成功保存到asset_metadata表")
+                    else:
+                        logger.error(f"❌ 同步保存资产元数据失败: {symbol}")
 
                     result.processed_records += 1
 
-                    # 计算进度
-                    progress = int((result.processed_records / result.total_records) * 100)
-
-                    # 通过引擎引用发射进度信号（如果在异步工作线程中）
-                    # 这里不直接发射信号，由异步工作线程处理
-
                 except Exception as e:
-                    logger.error(f"同步导入股票数据失败 {symbol}: {e}")
+                    logger.error(f"同步导入股票数据失败 {symbol}: {e}", exc_info=True)
                     result.failed_records += 1
                     result.warnings.append(f"导入{symbol}失败: {str(e)}")
 
-            logger.info(f"同步K线数据导入完成: 成功={result.processed_records}, 失败={result.failed_records}")
+            logger.info(f"同步K线数据导入完成: 成功={result.processed_records}, 失败={result.failed_records}, 跳过={result.skipped_records}")
 
         except Exception as e:
-            logger.error(f"同步K线数据导入失败: {e}")
+            logger.error(f"同步K线数据导入失败: {e}", exc_info=True)
             raise
 
     def _import_realtime_data_sync(self, task_config: ImportTaskConfig, result: UnifiedImportResult):

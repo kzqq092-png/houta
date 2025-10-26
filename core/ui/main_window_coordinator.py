@@ -31,15 +31,24 @@ class MainWindowCoordinator(QObject):
                                  f"无法打开设置对话框: {str(e)}")
 
     def show_node_manager_dialog(self):
-        """显示节点管理对话框"""
+        """显示分布式节点监控对话框（已更新为真实数据UI）"""
         try:
-            from gui.dialogs.node_manager_dialog import NodeManagerDialog
-            dialog = NodeManagerDialog(self.main_window)
+            from gui.dialogs.distributed_node_monitor_dialog import DistributedNodeMonitorDialog
+            from core.containers import get_service_container
+            
+            container = get_service_container()
+            distributed_service = container.get('distributed_service')
+            
+            if not distributed_service:
+                QMessageBox.warning(self.main_window, "警告", "分布式服务未初始化")
+                return
+            
+            dialog = DistributedNodeMonitorDialog(distributed_service, self.main_window)
             dialog.exec_()
         except Exception as e:
-            self.logger.error(f"显示节点管理对话框失败: {e}")
+            self.logger.error(f"显示分布式节点监控对话框失败: {e}")
             QMessageBox.critical(self.main_window, "错误",
-                                 f"无法打开节点管理对话框: {str(e)}")
+                                 f"无法打开分布式节点监控对话框: {str(e)}")
 
     def show_cloud_api_dialog(self):
         """显示云端API管理对话框"""

@@ -748,7 +748,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                     try:
                         realtime_fund_flow_data = unified_data_manager.get_asset_data(
                             symbol="ALL",
-                            asset_type=AssetType.STOCK,
+                            asset_type=AssetType.STOCK_A,
                             data_type=DataType.REAL_TIME_FUND_FLOW,
                             period='D'
                         )
@@ -771,7 +771,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                         try:
                             stock_data = unified_data_manager.get_asset_data(
                                 symbol=stock_code,
-                                asset_type=AssetType.STOCK,
+                                asset_type=AssetType.STOCK_A,
                                 data_type=DataType.FUNDAMENTAL,
                                 period='D'
                             )

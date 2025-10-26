@@ -284,7 +284,7 @@ class UniPluginDataManager:
             List[Dict[str, Any]]: 标准化的股票列表
         """
         context = RequestContext(
-            asset_type=AssetType.STOCK,
+            asset_type=AssetType.STOCK_A,
             data_type=DataType.ASSET_LIST,
             market=market
         )
@@ -438,43 +438,85 @@ class UniPluginDataManager:
             if specified_data_source:
                 logger.info(f"[DATA_SOURCE] 指定数据源: {specified_data_source}")
 
+            # 首先尝试获取基于能力的可用插件
             available_plugins = self.plugin_center.get_available_plugins(
                 context.data_type, context.asset_type, context.market
             )
 
-            # 如果指定了数据源，过滤插件列表
-            if specified_data_source and available_plugins:
+            # 如果指定了数据源，优先使用指定的数据源（即使不在能力列表中）
+            if specified_data_source:
                 # 尝试匹配插件名称（支持中文名称和英文名称）
                 filtered_plugins = []
                 data_source_lower = specified_data_source.lower()
-                for plugin_id in available_plugins:
+
+                # 从所有注册的插件中查找匹配的数据源
+                all_registered_plugins = list(self.plugin_center.data_source_plugins.keys())
+                logger.debug(f"[DATA_SOURCE] 从 {len(all_registered_plugins)} 个已注册插件中查找 '{specified_data_source}'")
+
+                for plugin_id in all_registered_plugins:
                     plugin = self.plugin_center.get_plugin(plugin_id)
                     if plugin:
                         # 获取插件信息
                         plugin_info = getattr(plugin, 'plugin_info', None)
                         if plugin_info:
-                            plugin_name = getattr(plugin_info, 'name', '').lower()
-                            plugin_chinese_name = getattr(plugin_info, 'chinese_name', '').lower()
+                            # 安全地获取属性值，处理 None 的情况
+                            plugin_name_raw = getattr(plugin_info, 'name', '')
+                            plugin_name = (plugin_name_raw.lower() if plugin_name_raw else '')
 
-                            # 检查是否匹配
+                            plugin_chinese_raw = getattr(plugin_info, 'chinese_name', '')
+                            plugin_chinese_name = (plugin_chinese_raw.lower() if plugin_chinese_raw else '')
+
+                            # 检查是否匹配（支持多种匹配方式）
                             if (data_source_lower in plugin_name or
                                 data_source_lower in plugin_chinese_name or
                                 data_source_lower in plugin_id.lower() or
                                 specified_data_source in plugin_name or
                                     specified_data_source in plugin_chinese_name):
                                 filtered_plugins.append(plugin_id)
-                                logger.info(f"[DATA_SOURCE] 匹配到插件: {plugin_id} (名称: {plugin_name}/{plugin_chinese_name})")
+                                logger.info(f"[DATA_SOURCE] 匹配到指定数据源插件: {plugin_id} (名称: {plugin_name}/{plugin_chinese_name})")
+                        else:
+                            # 如果没有plugin_info，尝试从name属性匹配
+                            plugin_name_attr_raw = getattr(plugin, 'name', '')
+                            plugin_name_attr = (plugin_name_attr_raw.lower() if plugin_name_attr_raw else '')
+                            if (data_source_lower in plugin_name_attr or
+                                specified_data_source in plugin_name_attr or
+                                data_source_lower in plugin_id.lower() or
+                                    specified_data_source in plugin_id.lower()):
+                                filtered_plugins.append(plugin_id)
+                                logger.info(f"[DATA_SOURCE] 匹配到指定数据源插件: {plugin_id} (通过name属性: {plugin_name_attr})")
 
                 if filtered_plugins:
                     available_plugins = filtered_plugins
-                    logger.info(f"[DATA_SOURCE] 根据数据源 {specified_data_source} 过滤后的插件: {available_plugins}")
+                    logger.info(f"[DATA_SOURCE] 根据指定数据源 '{specified_data_source}' 优先使用: {available_plugins}")
                 else:
-                    logger.warning(f"[DATA_SOURCE] 未找到匹配数据源 {specified_data_source} 的插件，将使用所有可用插件")
+                    logger.warning(f"[DATA_SOURCE] 未在已注册插件中找到数据源 '{specified_data_source}'，尝试使用能力匹配的插件。已注册插件: {all_registered_plugins}")
+
+                    # 如果能力列表为空，使用所有已注册插件作为备选
+                    if not available_plugins:
+                        available_plugins = all_registered_plugins
+                        logger.warning(f"[DATA_SOURCE] 能力匹配为空，使用所有已注册插件作为备选: {available_plugins}")
 
             if not available_plugins:
-                raise RuntimeError(f"没有可用的插件支持数据类型: {context.data_type.value}/{context.asset_type.value}")
+                error_msg = f"没有可用的插件支持数据类型: {context.data_type.value}/{context.asset_type.value}"
+                if specified_data_source:
+                    error_msg += f"\n指定的数据源 '{specified_data_source}' 无法在已注册插件中找到"
+                    # 列出所有已注册的插件，帮助调试
+                    registered_plugins = list(self.plugin_center.data_source_plugins.keys())
+                    error_msg += f"\n已注册的插件列表: {registered_plugins}"
+                raise RuntimeError(error_msg)
 
             logger.info(f"[DISCOVERY] TET插件发现阶段完成 - 找到 {len(available_plugins)} 个可用插件: {available_plugins}")
+
+            # 调试信息：列出每个可用插件的详细信息
+            for plugin_id in available_plugins[:5]:  # 只列出前5个，避免日志过长
+                plugin = self.plugin_center.get_plugin(plugin_id)
+                if plugin:
+                    try:
+                        plugin_info = getattr(plugin, 'plugin_info', None)
+                        if plugin_info:
+                            logger.debug(f"[DISCOVERY] 可用插件详情: {plugin_id} - 名称: {getattr(plugin_info, 'name', 'Unknown')}/{getattr(plugin_info, 'chinese_name', 'Unknown')}")
+                    except Exception as e:
+                        logger.debug(f"[DISCOVERY] 获取插件信息失败: {plugin_id} - {e}")
 
             # 2.1 过滤出真正可用的插件（检查连接状态）
             connected_plugins = self._filter_connected_plugins(available_plugins)
@@ -851,9 +893,17 @@ class UniPluginDataManager:
                     method_params['market'] = context.market
 
                 # 参数名称映射（不同插件可能使用不同的参数名）
-                # frequency -> period (部分插件如通达信使用period而不是frequency)
-                if 'frequency' in method_params and method_name == 'get_kline_data':
-                    method_params['period'] = method_params.pop('frequency')
+                # 处理K线数据的参数转换
+                if method_name in ('get_kline_data', 'get_kdata'):
+                    # frequency 可能需要转换为 period（通达信使用）或 freq（某些插件使用）
+                    if 'frequency' in method_params:
+                        freq_value = method_params.pop('frequency')
+                        # 对于 get_kdata 方法，通常使用 freq 而不是 frequency
+                        if method_name == 'get_kdata':
+                            method_params['freq'] = freq_value
+                        # 对于 get_kline_data，某些插件使用 period
+                        elif method_name == 'get_kline_data':
+                            method_params['period'] = freq_value
 
                 # 移除插件不支持的参数
                 # data_source参数用于插件选择，不应传递给插件方法本身

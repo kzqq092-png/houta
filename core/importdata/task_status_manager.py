@@ -17,6 +17,7 @@ from enum import Enum
 from pathlib import Path
 from loguru import logger
 
+
 class TaskStatus(Enum):
     """任务状态枚举"""
     CREATED = "created"           # 已创建
@@ -32,6 +33,7 @@ class TaskStatus(Enum):
     TIMEOUT = "timeout"          # 超时
     ERROR = "error"              # 错误
 
+
 class TaskPriority(Enum):
     """任务优先级"""
     LOW = 1
@@ -39,6 +41,7 @@ class TaskPriority(Enum):
     HIGH = 3
     URGENT = 4
     CRITICAL = 5
+
 
 @dataclass
 class TaskStatusInfo:
@@ -103,6 +106,7 @@ class TaskStatusInfo:
             return (datetime.now() - self.started_time).total_seconds()
         return None
 
+
 class TaskStatusTransition:
     """任务状态转换规则"""
 
@@ -133,6 +137,7 @@ class TaskStatusTransition:
         """获取当前状态的合法后续状态"""
         return cls.VALID_TRANSITIONS.get(current_status, [])
 
+
 class TaskStatusManager:
     """
     统一任务状态管理器
@@ -161,7 +166,7 @@ class TaskStatusManager:
 
         # 持久化配置
         self.enable_persistence = enable_persistence
-        self.db_path = db_path or "data/task_status.db"
+        self.db_path = db_path or "data/task_status.sqlite"
         self._db_lock = threading.Lock()
 
         # 状态变更监听器
@@ -590,9 +595,11 @@ class TaskStatusManager:
         except Exception as e:
             logger.error(f"关闭任务状态管理器失败: {e}")
 
+
 # 全局单例实例
 _task_status_manager: Optional[TaskStatusManager] = None
 _manager_lock = threading.Lock()
+
 
 def get_task_status_manager() -> TaskStatusManager:
     """获取全局任务状态管理器实例"""
@@ -604,6 +611,7 @@ def get_task_status_manager() -> TaskStatusManager:
                 _task_status_manager = TaskStatusManager()
 
     return _task_status_manager
+
 
 def initialize_task_status_manager(db_path: Optional[str] = None,
                                    enable_persistence: bool = True) -> TaskStatusManager:
@@ -617,4 +625,3 @@ def initialize_task_status_manager(db_path: Optional[str] = None,
         _task_status_manager = TaskStatusManager(db_path, enable_persistence)
 
     return _task_status_manager
-

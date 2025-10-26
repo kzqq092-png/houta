@@ -428,7 +428,7 @@ class RealTimeDataWorker(QThread):
                     kdata = loop.run_until_complete(
                         self.unified_data_manager.get_asset_data(
                             symbol=symbol,
-                            asset_type=AssetType.STOCK,
+                            asset_type=AssetType.STOCK_A,
                             data_type=DataType.HISTORICAL_KLINE,
                             period='D'
                         )
@@ -443,7 +443,7 @@ class RealTimeDataWorker(QThread):
                     realtime_df = loop.run_until_complete(
                         self.unified_data_manager.get_asset_data(
                             symbol=symbol,
-                            asset_type=AssetType.STOCK,
+                            asset_type=AssetType.STOCK_A,
                             data_type=DataType.REAL_TIME_QUOTE,
                             period='1m'
                         )
@@ -459,7 +459,7 @@ class RealTimeDataWorker(QThread):
                     indicators_df = loop.run_until_complete(
                         self.unified_data_manager.get_asset_data(
                             symbol=symbol,
-                            asset_type=AssetType.STOCK,
+                            asset_type=AssetType.STOCK_A,
                             data_type=DataType.TECHNICAL_INDICATORS,
                             period='D'
                         )
@@ -475,7 +475,7 @@ class RealTimeDataWorker(QThread):
                     fundamental_df = loop.run_until_complete(
                         self.unified_data_manager.get_asset_data(
                             symbol=symbol,
-                            asset_type=AssetType.STOCK,
+                            asset_type=AssetType.STOCK_A,
                             data_type=DataType.FUNDAMENTAL,
                             period='D'
                         )

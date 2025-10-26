@@ -425,7 +425,7 @@ class Level2DataPanel(QWidget):
             await self.realtime_manager.subscribe_realtime_data(
                 symbols=[symbol],
                 data_types=[DataType.LEVEL2, DataType.TICK_DATA, DataType.ORDER_BOOK],
-                asset_type=AssetType.STOCK
+                asset_type=AssetType.STOCK_A
             )
 
             self.subscribed_symbols.add(symbol)

@@ -781,7 +781,7 @@ class FundamentalAnalysisTab(QWidget):
                 symbol=self.current_symbol,
                 report_type="income_statement",
                 periods=periods,
-                asset_type=AssetType.STOCK
+                asset_type=AssetType.STOCK_A
             )
 
             if income_data is not None:

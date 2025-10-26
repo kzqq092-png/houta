@@ -149,7 +149,7 @@ class DuckDBConnectionPool:
             pandas.DataFrame: 查询结果
 
         使用示例:
-            >>> df = pool.execute_query("SELECT * FROM stock_kline WHERE symbol = ?", ["000001"])
+            >>> df = pool.execute_query("SELECT * FROM historical_kline_data WHERE symbol = ?", ["000001"])
         """
         try:
             with self.get_connection() as conn:

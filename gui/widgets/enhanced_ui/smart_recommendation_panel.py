@@ -924,11 +924,11 @@ class SmartRecommendationPanel(QWidget):
     def _load_stock_content_items(self) -> int:
         """从UnifiedDataManager加载股票数据"""
         try:
-            from core.containers import ServiceContainer
+            from core.containers import get_service_container
             from core.services.smart_recommendation_engine import ContentItem, RecommendationType
 
-            # 获取数据管理器
-            container = ServiceContainer()
+            # 获取数据管理器（使用全局单例）
+            container = get_service_container()
             data_manager = container.get('UnifiedDataManager')
 
             if not data_manager:

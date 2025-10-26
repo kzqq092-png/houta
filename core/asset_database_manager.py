@@ -32,7 +32,7 @@ logger = logger.bind(module=__name__)
 @dataclass
 class AssetDatabaseConfig:
     """资产数据库配置"""
-    base_path: str = "db/databases"
+    base_path: str = "data/databases"
     pool_size: int = 10
     auto_create: bool = True
     enable_wal: bool = True
@@ -160,21 +160,43 @@ class AssetSeparatedDatabaseManager:
     def _initialize_table_schemas(self) -> Dict[str, str]:
         """初始化标准表结构定义"""
         return {
-            # K线数据表（通用）
+            # K线数据表（通用）- 使用合理的小数点精度
             'historical_kline_data': """
                 CREATE TABLE IF NOT EXISTS historical_kline_data (
+                    -- 主键字段
                     symbol VARCHAR NOT NULL,
                     data_source VARCHAR NOT NULL,
                     timestamp TIMESTAMP NOT NULL,
-                    open DECIMAL(18,6) NOT NULL,
-                    high DECIMAL(18,6) NOT NULL,
-                    low DECIMAL(18,6) NOT NULL,
-                    close DECIMAL(18,6) NOT NULL,
-                    volume BIGINT DEFAULT 0,
-                    amount DECIMAL(18,6) DEFAULT 0,
                     frequency VARCHAR NOT NULL DEFAULT '1d',
+                    
+                    -- 基础OHLCV字段（A股标准：2位小数）
+                    open DECIMAL(10,2) NOT NULL,
+                    high DECIMAL(10,2) NOT NULL,
+                    low DECIMAL(10,2) NOT NULL,
+                    close DECIMAL(10,2) NOT NULL,
+                    volume BIGINT DEFAULT 0,
+                    amount DECIMAL(18,2) DEFAULT 0,
+                    
+                    -- 扩展交易数据（量化必需）
+                    turnover DECIMAL(18,2) DEFAULT 0,
+                    adj_close DECIMAL(10,4),           -- 复权价格：4位小数
+                    adj_factor DECIMAL(10,6) DEFAULT 1.0,  -- 复权因子：6位小数
+                    turnover_rate DECIMAL(8,2),        -- 换手率：2位小数（百分比）
+                    vwap DECIMAL(10,2),                -- VWAP：2位小数
+                    
+                    -- 涨跌数据
+                    change DECIMAL(10,2),              -- 涨跌额：2位小数
+                    change_pct DECIMAL(8,2),           -- 涨跌幅：2位小数（百分比）
+                    
+                    -- 元数据字段已移除，改用asset_metadata表关联
+                    -- name VARCHAR,          -- 已移除：从asset_metadata表获取
+                    -- market VARCHAR,        -- 已移除：从asset_metadata表获取
+                    -- period VARCHAR,        -- 已移除：与frequency重复
+                    
+                    -- 时间戳
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
                     PRIMARY KEY (symbol, data_source, timestamp, frequency)
                 )
             """,
@@ -215,15 +237,34 @@ class AssetSeparatedDatabaseManager:
             """,
 
             # 统一视图 - 最优质量K线数据
+            # 逻辑：优先选择质量分数高的数据源，若无质量评分则选择最新更新的数据
             'unified_best_quality_kline': """
                 CREATE VIEW IF NOT EXISTS unified_best_quality_kline AS
                 WITH ranked_data AS (
                     SELECT 
                         hkd.*,
                         dqm.quality_score,
+                        -- 数据源优先级：有质量评分的优先，其次按数据源名称稳定排序
+                        CASE 
+                            WHEN dqm.quality_score IS NOT NULL THEN dqm.quality_score
+                            WHEN hkd.data_source = 'tongdaxin' THEN 60.0
+                            WHEN hkd.data_source = 'akshare' THEN 55.0
+                            WHEN hkd.data_source = 'tushare' THEN 65.0
+                            ELSE 50.0
+                        END as effective_quality_score,
                         ROW_NUMBER() OVER (
                             PARTITION BY hkd.symbol, hkd.timestamp, hkd.frequency 
-                            ORDER BY COALESCE(dqm.quality_score, 50) DESC, hkd.updated_at DESC
+                            ORDER BY 
+                                -- 首先按有效质量分数排序（降序）
+                                CASE 
+                                    WHEN dqm.quality_score IS NOT NULL THEN dqm.quality_score
+                                    WHEN hkd.data_source = 'tongdaxin' THEN 60.0
+                                    WHEN hkd.data_source = 'akshare' THEN 55.0
+                                    WHEN hkd.data_source = 'tushare' THEN 65.0
+                                    ELSE 50.0
+                                END DESC,
+                                -- 其次按更新时间排序（降序，最新的优先）
+                                hkd.updated_at DESC
                         ) as quality_rank
                     FROM historical_kline_data hkd
                     LEFT JOIN data_quality_monitor dqm ON (
@@ -243,6 +284,78 @@ class AssetSeparatedDatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+            """,
+
+            # 资产元数据表（新增）
+            'asset_metadata': """
+                CREATE TABLE IF NOT EXISTS asset_metadata (
+                    -- 主键
+                    symbol VARCHAR PRIMARY KEY,
+                    
+                    -- 基本信息
+                    name VARCHAR NOT NULL,
+                    name_en VARCHAR,
+                    full_name VARCHAR,
+                    short_name VARCHAR,
+                    
+                    -- 分类信息
+                    asset_type VARCHAR NOT NULL,
+                    market VARCHAR NOT NULL,
+                    exchange VARCHAR,
+                    
+                    -- 行业分类
+                    sector VARCHAR,
+                    industry VARCHAR,
+                    industry_code VARCHAR,
+                    
+                    -- 上市信息
+                    listing_date DATE,
+                    delisting_date DATE,
+                    listing_status VARCHAR DEFAULT 'active',
+                    
+                    -- 股本信息（BIGINT，单位：股）
+                    total_shares BIGINT,
+                    circulating_shares BIGINT,
+                    currency VARCHAR DEFAULT 'CNY',
+                    
+                    -- 加密货币/期货特有字段
+                    base_currency VARCHAR,
+                    quote_currency VARCHAR,
+                    contract_type VARCHAR,
+                    
+                    -- 数据源信息（JSON字符串）
+                    data_sources VARCHAR,              -- JSON: ["eastmoney", "sina"]
+                    primary_data_source VARCHAR,
+                    last_update_source VARCHAR,
+                    
+                    -- 元数据管理
+                    metadata_version INTEGER DEFAULT 1,
+                    data_quality_score DECIMAL(3,2),   -- 0.00 ~ 1.00
+                    last_verified TIMESTAMP,
+                    
+                    -- 扩展字段（JSON字符串）
+                    tags VARCHAR,                      -- JSON: ["蓝筹股", "高股息"]
+                    attributes VARCHAR,                -- JSON: {key: value}
+                    
+                    -- 时间戳
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+
+            # K线数据+元数据视图（便捷查询）
+            'kline_with_metadata': """
+                CREATE VIEW IF NOT EXISTS kline_with_metadata AS
+                SELECT 
+                    k.*,
+                    m.name,
+                    m.market,
+                    m.industry,
+                    m.sector,
+                    m.listing_status,
+                    m.exchange
+                FROM historical_kline_data k
+                LEFT JOIN asset_metadata m ON k.symbol = m.symbol
             """
         }
 
@@ -264,14 +377,56 @@ class AssetSeparatedDatabaseManager:
 
     def _get_database_path(self, asset_type: AssetType) -> str:
         """获取资产类型对应的数据库路径"""
-        # 别名映射：STOCK → STOCK_US（通用股票默认为美股）
-        if asset_type == AssetType.STOCK:
-            asset_type = AssetType.STOCK_US
+        # ✅ 增强：完善资产类型映射逻辑
+        mapped_asset_type = self._map_asset_type_to_database(asset_type)
 
         base_path = Path(self.config.base_path)
-        asset_dir = base_path / asset_type.value.lower()
-        db_file = asset_dir / f"{asset_type.value.lower()}_data.duckdb"
+        asset_dir = base_path / mapped_asset_type.value.lower()
+        db_file = asset_dir / f"{mapped_asset_type.value.lower()}_data.duckdb"
         return str(db_file)
+
+    def _map_asset_type_to_database(self, asset_type: AssetType) -> AssetType:
+        """
+        将资产类型映射到对应的数据库类型
+
+        Args:
+            asset_type: 原始资产类型
+
+        Returns:
+            AssetType: 映射后的资产类型
+        """
+        # 别名映射规则
+        mapping_rules = {
+            # ✅ 移除STOCK映射，因为STOCK类型已被移除
+            # AssetType.STOCK_A: AssetType.STOCK_A,  # 已移除
+
+            # 板块相关资产类型映射到通用板块
+            AssetType.INDUSTRY_SECTOR: AssetType.SECTOR,
+            AssetType.CONCEPT_SECTOR: AssetType.SECTOR,
+            AssetType.STYLE_SECTOR: AssetType.SECTOR,
+            AssetType.THEME_SECTOR: AssetType.SECTOR,
+
+            # 其他资产类型保持原样
+            # AssetType.STOCK_A: AssetType.STOCK_A,
+            # AssetType.STOCK_US: AssetType.STOCK_US,
+            # AssetType.STOCK_HK: AssetType.STOCK_HK,
+            # AssetType.CRYPTO: AssetType.CRYPTO,
+            # AssetType.FUTURES: AssetType.FUTURES,
+            # AssetType.FOREX: AssetType.FOREX,
+            # AssetType.BOND: AssetType.BOND,
+            # AssetType.COMMODITY: AssetType.COMMODITY,
+            # AssetType.INDEX: AssetType.INDEX,
+            # AssetType.FUND: AssetType.FUND,
+            # AssetType.OPTION: AssetType.OPTION,
+            # AssetType.WARRANT: AssetType.WARRANT,
+            # AssetType.MACRO: AssetType.MACRO,
+        }
+
+        # 应用映射规则
+        mapped_type = mapping_rules.get(asset_type, asset_type)
+
+        logger.debug(f"资产类型映射: {asset_type.value} → {mapped_type.value}")
+        return mapped_type
 
     def get_database_path(self, asset_type: AssetType) -> str:
         """获取资产类型对应的数据库路径 (公共方法)"""
@@ -401,10 +556,13 @@ class AssetSeparatedDatabaseManager:
             )
 
             with self.duckdb_manager.get_connection(db_path, config=duckdb_config) as conn:
-                # 创建标准表结构，跳过视图
+                # 区分表和视图
+                view_names = ['unified_best_quality_kline', 'kline_with_metadata']
+
+                # 第一步：创建所有基础表
                 for table_name, schema_sql in self._table_schemas.items():
-                    if table_name == 'unified_best_quality_kline':
-                        continue  # 先跳过视图创建，待基础表创建完成后再创建
+                    if table_name in view_names:
+                        continue  # 跳过视图，待基础表创建完成后再创建
                     try:
                         conn.execute(schema_sql)
                         logger.debug(f"创建表 {table_name} 成功")
@@ -412,20 +570,15 @@ class AssetSeparatedDatabaseManager:
                         logger.error(f"创建表 {table_name} 失败: {e}")
                         raise
 
-                # 创建视图（在表创建完成后）
-                if 'unified_best_quality_kline' in self._table_schemas:
-                    try:
-                        # 获取实际的K线表名
-                        actual_kline_table = f"{asset_type.value.lower()}_kline"
-
-                        # 替换视图SQL中的表名引用
-                        view_sql = self._table_schemas['unified_best_quality_kline']
-                        view_sql = view_sql.replace('historical_kline_data', actual_kline_table)
-
-                        conn.execute(view_sql)
-                        logger.debug(f"创建视图 unified_best_quality_kline 成功（引用表: {actual_kline_table}）")
-                    except Exception as e:
-                        logger.warning(f"创建视图失败: {e}")
+                # 第二步：创建所有视图（依赖基础表）
+                for view_name in view_names:
+                    if view_name in self._table_schemas:
+                        try:
+                            view_sql = self._table_schemas[view_name]
+                            conn.execute(view_sql)
+                            logger.debug(f"创建视图 {view_name} 成功")
+                        except Exception as e:
+                            logger.warning(f"创建视图 {view_name} 失败: {e}")
 
                 # 插入元数据
                 conn.execute("""
@@ -683,17 +836,18 @@ class AssetSeparatedDatabaseManager:
             return False
 
     def _generate_table_name(self, data_type: DataType, asset_type: AssetType) -> str:
-        """生成表名"""
+        """生成表名 - 新架构使用统一的表名"""
+        # ✅ 新架构：所有资产类型使用统一的标准表名
         type_mapping = {
-            DataType.HISTORICAL_KLINE: "kline",
-            DataType.REAL_TIME_QUOTE: "quotes",
+            DataType.HISTORICAL_KLINE: "historical_kline_data",  # 统一K线数据表
+            DataType.REAL_TIME_QUOTE: "realtime_quotes",
             DataType.FUNDAMENTAL: "fundamentals",
-            DataType.ASSET_LIST: "assets",
+            DataType.ASSET_LIST: "asset_metadata",  # 统一资产元数据表
             DataType.SECTOR_FUND_FLOW: "sector_fund_flow"
         }
 
-        base_name = type_mapping.get(data_type, data_type.value.lower())
-        return f"{asset_type.value}_{base_name}"
+        # 直接返回标准表名，不再添加asset_type前缀
+        return type_mapping.get(data_type, data_type.value.lower())
 
     def _ensure_table_exists(self, conn, table_name: str, data: pd.DataFrame, data_type: DataType):
         """确保表存在，如果不存在则创建"""
@@ -722,11 +876,12 @@ class AssetSeparatedDatabaseManager:
         """生成创建表的SQL"""
         # 根据数据类型定义标准表结构
         if data_type == DataType.HISTORICAL_KLINE:
+            # ✅ 新架构标准表结构：使用timestamp字段和(symbol, data_source, timestamp, frequency)主键
             return f"""
                 CREATE TABLE {table_name} (
-                    symbol VARCHAR,
-                    market VARCHAR,
-                    datetime TIMESTAMP,
+                    symbol VARCHAR NOT NULL,
+                    data_source VARCHAR NOT NULL,
+                    timestamp TIMESTAMP NOT NULL,
                     frequency VARCHAR NOT NULL DEFAULT '1d',
                     open DOUBLE,
                     high DOUBLE,
@@ -739,9 +894,9 @@ class AssetSeparatedDatabaseManager:
                     adj_factor DOUBLE DEFAULT 1.0,
                     turnover_rate DOUBLE,
                     vwap DOUBLE,
-                    data_source VARCHAR DEFAULT 'unknown',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (symbol, datetime, frequency)
+                    PRIMARY KEY (symbol, data_source, timestamp, frequency)
                 )
             """
         elif data_type == DataType.REAL_TIME_QUOTE:
@@ -841,8 +996,9 @@ class AssetSeparatedDatabaseManager:
         try:
             if data_type == DataType.HISTORICAL_KLINE:
                 conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol ON {table_name}(symbol)")
-                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_datetime ON {table_name}(datetime)")
-                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol_datetime ON {table_name}(symbol, datetime)")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_timestamp ON {table_name}(timestamp)")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol_timestamp ON {table_name}(symbol, timestamp)")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_data_source ON {table_name}(data_source)")
             elif data_type == DataType.REAL_TIME_QUOTE:
                 conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol ON {table_name}(symbol)")
                 conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_timestamp ON {table_name}(timestamp)")
@@ -869,47 +1025,75 @@ class AssetSeparatedDatabaseManager:
 
     def _filter_dataframe_columns(self, data: pd.DataFrame, table_columns: list) -> pd.DataFrame:
         """过滤DataFrame，只保留表中存在的列"""
+        # ✅ 新架构：字段名映射（数据字段→表字段）
+        field_mapping = {
+            'datetime': 'timestamp',  # 关键映射：datetime字段映射到timestamp列
+        }
+
+        # 应用字段映射
+        data_copy = data.copy()
+        for data_field, table_field in field_mapping.items():
+            if data_field in data_copy.columns and table_field in table_columns:
+                data_copy.rename(columns={data_field: table_field}, inplace=True)
+                logger.debug(f"[字段映射] {data_field} → {table_field}")
+
         # 找出data中存在但表中不存在的列
-        extra_columns = [col for col in data.columns if col not in table_columns]
+        extra_columns = [col for col in data_copy.columns if col not in table_columns]
 
         if extra_columns:
             logger.debug(f"过滤掉不在表中的列: {extra_columns}")
             # 只保留表中存在的列
-            valid_columns = [col for col in data.columns if col in table_columns]
-            filtered_data = data[valid_columns].copy()
+            valid_columns = [col for col in data_copy.columns if col in table_columns]
+            filtered_data = data_copy[valid_columns].copy()
 
             # 检查关键字段是否存在
             logger.debug(f"过滤后的列: {filtered_data.columns.tolist()}")
-            if 'datetime' not in filtered_data.columns:
-                logger.warning(f"过滤后缺少datetime字段！原始列: {data.columns.tolist()}, 表列: {table_columns}")
+            if 'timestamp' not in filtered_data.columns and 'datetime' not in filtered_data.columns:
+                logger.warning(f"过滤后缺少时间字段！原始列: {data.columns.tolist()}, 表列: {table_columns}")
 
             return filtered_data
 
-        return data
+        return data_copy
 
     def _upsert_data(self, conn, table_name: str, data: pd.DataFrame, data_type: DataType) -> int:
-        """插入或更新数据"""
+        """插入或更新数据（增强版本，包含数据质量验证）"""
         try:
             # 调试：检查输入数据
-            logger.debug(f"准备插入数据到 {table_name}，输入列: {data.columns.tolist()}")
+            logger.info(f"[数据插入] 准备插入数据到 {table_name}，数据类型: {data_type}, 记录数: {len(data)}")
+            logger.debug(f"[数据插入] 输入列: {data.columns.tolist()}")
             if 'datetime' in data.columns:
-                logger.debug(f"datetime字段存在，非空记录数: {data['datetime'].notna().sum()}/{len(data)}")
+                logger.debug(f"[数据插入] datetime字段存在，非空记录数: {data['datetime'].notna().sum()}/{len(data)}")
             else:
-                logger.warning(f"输入数据缺少datetime字段！")
+                logger.warning(f"[数据插入] 输入数据缺少datetime字段！")
+
+            if 'timestamp' in data.columns:
+                logger.warning(f"[数据插入] 检测到timestamp字段，这可能导致问题！应该使用datetime字段")
+
+            # 数据质量验证（仅对K线数据）
+            if data_type == DataType.HISTORICAL_KLINE:
+                is_valid, errors = self._validate_kline_data_quality(data)
+                if not is_valid:
+                    logger.warning(f"[数据质量] 数据质量验证失败: {errors}")
+                    # 记录警告但继续处理（根据配置可以选择拒绝数据）
+                    for error in errors:
+                        logger.warning(f"[数据质量] {error}")
+                else:
+                    logger.debug(f"[数据质量] 数据质量验证通过")
 
             # 获取表的实际列名
             table_columns = self._get_table_columns(conn, table_name)
             if not table_columns:
-                logger.error(f"无法获取表 {table_name} 的列信息")
+                logger.error(f"[数据插入] 无法获取表 {table_name} 的列信息")
                 return 0
 
-            logger.debug(f"表 {table_name} 的列: {table_columns}")
+            logger.debug(f"[数据插入] 表 {table_name} 的列: {table_columns}")
 
             # 过滤数据，只保留表中存在的列
             filtered_data = self._filter_dataframe_columns(data, table_columns)
+            logger.debug(f"[数据插入] 过滤后的列: {filtered_data.columns.tolist()}")
 
             if filtered_data.empty or len(filtered_data.columns) == 0:
-                logger.warning(f"过滤后没有有效数据可插入")
+                logger.warning(f"[数据插入] 过滤后没有有效数据可插入")
                 return 0
 
             # 使用DuckDB的INSERT ... ON CONFLICT语法
@@ -917,20 +1101,28 @@ class AssetSeparatedDatabaseManager:
             columns = ', '.join(filtered_data.columns)
 
             if data_type == DataType.HISTORICAL_KLINE:
-                # K线数据使用symbol、datetime和frequency作为唯一键
+                # ✅ K线数据使用(symbol, data_source, timestamp, frequency)作为复合主键（与表结构定义一致）
                 update_fields = []
-                # 基础OHLCV + 扩展字段（包括新增的复权数据等）
+                # 基础OHLCV + 扩展字段（包括复权数据等）
                 for col in ['open', 'high', 'low', 'close', 'volume', 'amount', 'turnover',
-                            'adj_close', 'adj_factor', 'turnover_rate', 'vwap']:
+                            'adj_close', 'adj_factor', 'turnover_rate', 'vwap', 'change', 'change_pct']:
                     if col in filtered_data.columns:
                         update_fields.append(f"{col} = EXCLUDED.{col}")
 
-                update_clause = ', '.join(update_fields) if update_fields else "open = EXCLUDED.open"
+                # 添加updated_at字段（注意：使用NOW()而不是CURRENT_TIMESTAMP）
+                if update_fields:
+                    update_fields.append("updated_at = NOW()")
+                    update_clause = ', '.join(update_fields)
+                else:
+                    update_clause = "open = EXCLUDED.open, updated_at = NOW()"
 
+                # 注意：主键字段必须与CREATE TABLE中的PRIMARY KEY定义完全一致
+                # 表结构定义: PRIMARY KEY (symbol, data_source, timestamp, frequency)
+                logger.debug(f"[K线数据插入] 准备插入数据，ON CONFLICT字段: (symbol, data_source, timestamp, frequency)")
                 sql = f"""
                     INSERT INTO {table_name} ({columns}) 
                     VALUES ({placeholders})
-                    ON CONFLICT (symbol, datetime, frequency) DO UPDATE SET
+                    ON CONFLICT (symbol, data_source, timestamp, frequency) DO UPDATE SET
                     {update_clause}
                 """
             elif data_type == DataType.REAL_TIME_QUOTE:
@@ -952,13 +1144,219 @@ class AssetSeparatedDatabaseManager:
 
             # 批量插入数据
             data_tuples = [tuple(row) for row in filtered_data.values]
+            logger.info(f"[数据插入] 执行批量插入，SQL列: {columns}")
+            logger.debug(f"[数据插入] SQL语句: {sql[:200]}...")
             conn.executemany(sql, data_tuples)
+            logger.info(f"[数据插入] 成功插入 {len(filtered_data)} 条记录到 {table_name}")
 
             return len(filtered_data)
 
         except Exception as e:
-            logger.error(f"插入数据失败: {e}")
+            logger.error(f"[数据插入] 插入数据失败: {e}")
+            logger.debug(f"[数据插入] 失败详情 - 表: {table_name}, 数据类型: {data_type}, 列: {filtered_data.columns.tolist() if 'filtered_data' in locals() else 'N/A'}")
             raise
+
+    def get_latest_date(self, symbol: str, asset_type: AssetType, frequency: str = '1d', data_source: str = None) -> Optional[datetime]:
+        """
+        获取指定股票在指定数据库中的最新数据日期
+
+        Args:
+            symbol: 股票代码
+            asset_type: 资产类型
+            frequency: 数据频率
+            data_source: 数据源（可选，如果提供则只查询该数据源的数据）
+
+        Returns:
+            最新的数据日期，如果没有数据则返回None
+        """
+        try:
+            # 获取数据库路径
+            db_path = self._get_database_path(asset_type)
+            if not db_path or not os.path.exists(db_path):
+                logger.debug(f"数据库不存在: {db_path}")
+                return None
+
+            # 构建查询SQL
+            if data_source:
+                query = """
+                    SELECT MAX(timestamp) as latest_date 
+                    FROM historical_kline_data 
+                    WHERE symbol = ? AND frequency = ? AND data_source = ?
+                """
+                params = [symbol, frequency, data_source]
+            else:
+                query = """
+                    SELECT MAX(timestamp) as latest_date 
+                    FROM historical_kline_data 
+                    WHERE symbol = ? AND frequency = ?
+                """
+                params = [symbol, frequency]
+
+            # 执行查询
+            with self.duckdb_manager.get_connection(db_path) as conn:
+                # 首先检查表是否存在
+                table_exists = conn.execute(f"""
+                    SELECT COUNT(*) 
+                    FROM duckdb_tables() 
+                    WHERE table_name = 'historical_kline_data'
+                """).fetchone()[0] > 0
+
+                if not table_exists:
+                    logger.debug(f"表 historical_kline_data 不存在，股票 {symbol} 无历史数据")
+                    return None
+
+                result = conn.execute(query, params).fetchone()
+
+                if result and result[0]:
+                    latest_date = pd.to_datetime(result[0])
+                    logger.debug(f"股票 {symbol} 最新数据日期: {latest_date}")
+                    return latest_date
+                else:
+                    logger.debug(f"股票 {symbol} 无历史数据")
+                    return None
+
+        except Exception as e:
+            logger.error(f"获取最新数据日期失败 {symbol}: {e}")
+            return None
+
+    def get_data_statistics(self, asset_type: AssetType) -> Dict[str, Any]:
+        """
+        获取指定资产类型的数据统计信息
+
+        Args:
+            asset_type: 资产类型
+
+        Returns:
+            数据统计信息字典
+        """
+        try:
+            # 获取数据库路径
+            db_path = self._get_database_path(asset_type)
+            if not db_path or not os.path.exists(db_path):
+                return {
+                    'asset_type': asset_type.value,
+                    'database_exists': False,
+                    'symbol_count': 0,
+                    'record_count': 0,
+                    'date_range': None,
+                    'data_sources': [],
+                    'size_mb': 0.0
+                }
+
+            with self.duckdb_manager.get_connection(db_path) as conn:
+                # 统计股票数量
+                symbol_count_result = conn.execute("SELECT COUNT(DISTINCT symbol) FROM historical_kline_data").fetchone()
+                symbol_count = symbol_count_result[0] if symbol_count_result else 0
+
+                # 统计记录数量
+                record_count_result = conn.execute("SELECT COUNT(*) FROM historical_kline_data").fetchone()
+                record_count = record_count_result[0] if record_count_result else 0
+
+                # 统计日期范围
+                date_range_result = conn.execute("""
+                    SELECT MIN(timestamp) as min_date, MAX(timestamp) as max_date 
+                    FROM historical_kline_data
+                """).fetchone()
+
+                date_range = None
+                if date_range_result and date_range_result[0] and date_range_result[1]:
+                    date_range = {
+                        'min_date': pd.to_datetime(date_range_result[0]).isoformat(),
+                        'max_date': pd.to_datetime(date_range_result[1]).isoformat()
+                    }
+
+                # 统计数据源
+                data_sources_result = conn.execute("""
+                    SELECT DISTINCT data_source, COUNT(*) as count 
+                    FROM historical_kline_data 
+                    GROUP BY data_source 
+                    ORDER BY count DESC
+                """).fetchall()
+
+                data_sources = [{'source': row[0], 'count': row[1]} for row in data_sources_result]
+
+                # 获取数据库大小
+                size_mb = 0.0
+                try:
+                    if os.path.exists(db_path):
+                        size_mb = os.path.getsize(db_path) / (1024 * 1024)
+                except Exception:
+                    pass
+
+                return {
+                    'asset_type': asset_type.value,
+                    'database_exists': True,
+                    'symbol_count': symbol_count,
+                    'record_count': record_count,
+                    'date_range': date_range,
+                    'data_sources': data_sources,
+                    'size_mb': round(size_mb, 2)
+                }
+
+        except Exception as e:
+            logger.error(f"获取数据统计失败 {asset_type}: {e}")
+            return {
+                'asset_type': asset_type.value,
+                'database_exists': False,
+                'symbol_count': 0,
+                'record_count': 0,
+                'date_range': None,
+                'data_sources': [],
+                'size_mb': 0.0,
+                'error': str(e)
+            }
+
+    def _validate_kline_data_quality(self, data: pd.DataFrame) -> Tuple[bool, List[str]]:
+        """
+        验证K线数据质量
+
+        Args:
+            data: K线数据DataFrame
+
+        Returns:
+            (是否通过验证, 错误信息列表)
+        """
+        errors = []
+
+        try:
+            # 检查必需字段
+            required_fields = ['open', 'high', 'low', 'close']
+            missing_fields = [field for field in required_fields if field not in data.columns]
+            if missing_fields:
+                errors.append(f"缺少必需字段: {missing_fields}")
+                return False, errors
+
+            # OHLC逻辑验证
+            if not data.empty:
+                # 检查 high >= max(open, close, low)
+                invalid_high = data[data['high'] < data[['open', 'close', 'low']].max(axis=1)]
+                if not invalid_high.empty:
+                    errors.append(f"发现 {len(invalid_high)} 条OHLC逻辑异常数据: high < max(open, close, low)")
+
+                # 检查 low <= min(open, close, high)
+                invalid_low = data[data['low'] > data[['open', 'close', 'high']].min(axis=1)]
+                if not invalid_low.empty:
+                    errors.append(f"发现 {len(invalid_low)} 条OHLC逻辑异常数据: low > min(open, close, high)")
+
+                # 检查负数价格
+                price_fields = ['open', 'high', 'low', 'close']
+                for field in price_fields:
+                    if field in data.columns:
+                        negative_prices = data[data[field] < 0]
+                        if not negative_prices.empty:
+                            errors.append(f"发现 {len(negative_prices)} 条负数{field}数据")
+
+                # 检查成交量
+                if 'volume' in data.columns:
+                    negative_volume = data[data['volume'] < 0]
+                    if not negative_volume.empty:
+                        errors.append(f"发现 {len(negative_volume)} 条负数成交量数据")
+
+            return len(errors) == 0, errors
+
+        except Exception as e:
+            errors.append(f"数据质量验证失败: {e}")
+            return False, errors
 
     def check_database_health(self, asset_type: AssetType) -> Dict[str, Any]:
         """检查指定资产类型数据库的健康状态"""
@@ -1013,6 +1411,192 @@ class AssetSeparatedDatabaseManager:
                 "reason": "health_check_failed",
                 "error": str(e)
             }
+
+    # ========================================================================
+    # 资产元数据管理 API（新增 - 真实数据，无mock）
+    # ========================================================================
+
+    def upsert_asset_metadata(self, symbol: str, asset_type: AssetType,
+                              metadata: Dict[str, Any]) -> bool:
+        """
+        插入或更新资产元数据（真实数据，无mock）
+
+        Args:
+            symbol: 资产代码
+            asset_type: 资产类型
+            metadata: 元数据字典（必需：name, market, asset_type）
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            db_path = self._get_database_path(asset_type)
+
+            with self.duckdb_manager.get_pool(db_path).get_connection() as conn:
+                # 检查是否已存在
+                existing = conn.execute(
+                    "SELECT * FROM asset_metadata WHERE symbol = ?",
+                    [symbol]
+                ).fetchone()
+
+                import json
+
+                if existing:
+                    # 更新逻辑：追加数据源
+                    columns = [desc[0] for desc in conn.description]
+                    existing_dict = dict(zip(columns, existing))
+                    existing_sources_str = existing_dict.get('data_sources', '[]')
+
+                    try:
+                        existing_sources = json.loads(existing_sources_str) if existing_sources_str else []
+                    except:
+                        existing_sources = []
+
+                    # 追加新数据源
+                    new_source = metadata.get('primary_data_source')
+                    if new_source and new_source not in existing_sources:
+                        existing_sources.append(new_source)
+
+                    # 构建UPDATE
+                    update_fields = []
+                    update_params = []
+
+                    for key, value in metadata.items():
+                        if key in ['symbol', 'created_at']:
+                            continue
+
+                        if key == 'data_sources':
+                            update_fields.append(f"{key} = ?")
+                            update_params.append(json.dumps(existing_sources))
+                        elif key in ['tags', 'attributes'] and isinstance(value, (list, dict)):
+                            update_fields.append(f"{key} = ?")
+                            update_params.append(json.dumps(value))
+                        else:
+                            update_fields.append(f"{key} = ?")
+                            update_params.append(value)
+
+                    update_fields.extend([
+                        "metadata_version = metadata_version + 1",
+                        "last_verified = CURRENT_TIMESTAMP",
+                        "updated_at = CURRENT_TIMESTAMP"
+                    ])
+
+                    if new_source:
+                        update_fields.append("last_update_source = ?")
+                        update_params.append(new_source)
+
+                    update_params.append(symbol)
+
+                    sql = f"UPDATE asset_metadata SET {', '.join(update_fields)} WHERE symbol = ?"
+                    conn.execute(sql, update_params)
+                    logger.info(f"✅ 更新资产元数据: {symbol}")
+
+                else:
+                    # 插入逻辑
+                    if not metadata.get('name') or not metadata.get('market'):
+                        logger.error(f"缺少必需字段: {symbol}")
+                        return False
+
+                    # JSON字段处理
+                    if 'data_sources' in metadata:
+                        if isinstance(metadata['data_sources'], list):
+                            metadata['data_sources'] = json.dumps(metadata['data_sources'])
+                    else:
+                        sources = [metadata.get('primary_data_source')] if metadata.get('primary_data_source') else []
+                        metadata['data_sources'] = json.dumps(sources)
+
+                    if 'tags' in metadata and isinstance(metadata['tags'], list):
+                        metadata['tags'] = json.dumps(metadata['tags'])
+
+                    if 'attributes' in metadata and isinstance(metadata['attributes'], dict):
+                        metadata['attributes'] = json.dumps(metadata['attributes'])
+
+                    metadata['symbol'] = symbol
+                    metadata.setdefault('listing_status', 'active')
+                    metadata.setdefault('metadata_version', 1)
+
+                    columns = list(metadata.keys())
+                    placeholders = ['?' for _ in columns]
+                    values = [metadata[col] for col in columns]
+
+                    sql = f"INSERT INTO asset_metadata ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
+                    conn.execute(sql, values)
+                    logger.info(f"✅ 插入资产元数据: {symbol}")
+
+                conn.commit()
+                return True
+
+        except Exception as e:
+            logger.error(f"保存资产元数据失败: {symbol}, {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+
+    def get_asset_metadata(self, symbol: str, asset_type: AssetType) -> Optional[Dict[str, Any]]:
+        """获取单个资产的元数据"""
+        try:
+            db_path = self._get_database_path(asset_type)
+            with self.duckdb_manager.get_pool(db_path).get_connection() as conn:
+                result = conn.execute(
+                    "SELECT * FROM asset_metadata WHERE symbol = ?",
+                    [symbol]
+                ).fetchone()
+
+                if result:
+                    columns = [desc[0] for desc in conn.description]
+                    metadata_dict = dict(zip(columns, result))
+
+                    # 解析JSON字段
+                    import json
+                    for field in ['data_sources', 'tags', 'attributes']:
+                        if field in metadata_dict and metadata_dict[field]:
+                            try:
+                                metadata_dict[field] = json.loads(metadata_dict[field])
+                            except:
+                                pass
+
+                    return metadata_dict
+                return None
+
+        except Exception as e:
+            logger.error(f"获取资产元数据失败: {symbol}, {e}")
+            return None
+
+    def get_asset_metadata_batch(self, symbols: List[str],
+                                 asset_type: AssetType) -> Dict[str, Dict[str, Any]]:
+        """批量获取资产元数据"""
+        try:
+            if not symbols:
+                return {}
+
+            db_path = self._get_database_path(asset_type)
+            with self.duckdb_manager.get_pool(db_path).get_connection() as conn:
+                placeholders = ','.join(['?' for _ in symbols])
+                query = f"SELECT * FROM asset_metadata WHERE symbol IN ({placeholders})"
+
+                result = conn.execute(query, symbols).fetchall()
+                columns = [desc[0] for desc in conn.description]
+
+                import json
+                result_dict = {}
+                for row in result:
+                    metadata_dict = dict(zip(columns, row))
+                    symbol = metadata_dict['symbol']
+
+                    for field in ['data_sources', 'tags', 'attributes']:
+                        if field in metadata_dict and metadata_dict[field]:
+                            try:
+                                metadata_dict[field] = json.loads(metadata_dict[field])
+                            except:
+                                pass
+
+                    result_dict[symbol] = metadata_dict
+
+                return result_dict
+
+        except Exception as e:
+            logger.error(f"批量获取资产元数据失败: {e}")
+            return {}
 
     def close_all_connections(self):
         """关闭所有数据库连接"""

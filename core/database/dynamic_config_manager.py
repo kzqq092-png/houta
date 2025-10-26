@@ -484,7 +484,7 @@ if __name__ == '__main__':
     manager = get_dynamic_config_manager()
 
     # 注册测试连接
-    success = manager.register_connection('test_conn', 'db/test_dynamic.db')
+    success = manager.register_connection('test_conn', 'data/test_dynamic.sqlite')
     logger.info(f"注册连接: {success}")
 
     # 列出连接

@@ -16,6 +16,7 @@ from analysis.pattern_base import (
     PatternAlgorithmFactory, SignalType
 )
 
+
 class PatternManager:
     """形态管理器 - 增强版，支持数据库算法和统一接口"""
 
@@ -28,7 +29,7 @@ class PatternManager:
         """
         if db_path is None:
             self.db_path = os.path.join(os.path.dirname(
-                __file__), '..', 'db', 'factorweave_system.sqlite')
+                __file__), '..', 'data', 'factorweave_system.sqlite')
         else:
             self.db_path = db_path
 

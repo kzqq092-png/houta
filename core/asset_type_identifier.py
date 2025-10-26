@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from .plugin_types import AssetType
 
+
 @dataclass
 class IdentificationRule:
     """资产类型识别规则"""
@@ -23,6 +24,7 @@ class IdentificationRule:
     pattern: str
     description: str
     priority: int = 100  # 优先级，数字越小优先级越高
+
 
 class AssetTypeIdentifier:
     """
@@ -204,7 +206,7 @@ class AssetTypeIdentifier:
 
             # 默认股票类型 (优先级最低)
             IdentificationRule(
-                asset_type=AssetType.STOCK,
+                asset_type=AssetType.STOCK_A,
                 pattern=r'^[A-Za-z0-9]+.*$',
                 description="通用股票代码",
                 priority=999
@@ -234,7 +236,7 @@ class AssetTypeIdentifier:
         """
         if not symbol or not isinstance(symbol, str):
             self.logger.warning(f"无效的股票代码: {symbol}")
-            return AssetType.STOCK
+            return AssetType.STOCK_A
 
         # 检查缓存
         symbol_upper = symbol.upper().strip()
@@ -250,8 +252,8 @@ class AssetTypeIdentifier:
 
         # 如果没有匹配到任何规则，返回默认股票类型
         self.logger.warning(f"无法识别股票代码 {symbol} 的资产类型，使用默认股票类型")
-        self._symbol_cache[symbol_upper] = AssetType.STOCK
-        return AssetType.STOCK
+        self._symbol_cache[symbol_upper] = AssetType.STOCK_A
+        return AssetType.STOCK_A
 
     def identify_asset_type_by_exchange(self, symbol: str, exchange: str) -> AssetType:
         """
@@ -377,7 +379,7 @@ class AssetTypeIdentifier:
         """
         database_mapping = {
             # 股票相关资产类型 -> 股票数据库
-            AssetType.STOCK: "stock_data.duckdb",
+            AssetType.STOCK_A: "stock_data.duckdb",
             AssetType.STOCK_A: "stock_data.duckdb",
             AssetType.STOCK_B: "stock_data.duckdb",
             AssetType.STOCK_H: "stock_data.duckdb",
@@ -418,8 +420,10 @@ class AssetTypeIdentifier:
             "total_rules": len(self._identification_rules)
         }
 
+
 # 单例模式，提供全局访问点
 _global_identifier = None
+
 
 def get_asset_type_identifier() -> AssetTypeIdentifier:
     """获取全局资产类型识别器实例"""
@@ -429,13 +433,17 @@ def get_asset_type_identifier() -> AssetTypeIdentifier:
     return _global_identifier
 
 # 便捷函数
+
+
 def identify_asset_type(symbol: str) -> AssetType:
     """便捷函数：识别单个股票代码的资产类型"""
     return get_asset_type_identifier().identify_asset_type_by_symbol(symbol)
 
+
 def get_asset_type_identifier() -> AssetTypeIdentifier:
     """获取资产类型识别器实例"""
     return AssetTypeIdentifier.get_instance()
+
 
 def batch_identify_asset_types(symbols: List[str]) -> Dict[str, AssetType]:
     """便捷函数：批量识别股票代码的资产类型"""

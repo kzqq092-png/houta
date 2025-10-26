@@ -61,7 +61,7 @@ class ExecutionHistoryRecord:
 class PerformanceHistoryManager:
     """性能历史数据管理器"""
 
-    def __init__(self, db_path: str = 'db/factorweave_system.sqlite'):
+    def __init__(self, db_path: str = 'data/factorweave_system.sqlite'):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logger
