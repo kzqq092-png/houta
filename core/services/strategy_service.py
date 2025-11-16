@@ -8,7 +8,9 @@ from loguru import logger
 
 import json
 import os
+import sys
 import asyncio
+from pathlib import Path
 from typing import Dict, Any, List, Optional, Union, Tuple, Callable
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
@@ -16,6 +18,11 @@ from enum import Enum
 import uuid
 import numpy as np
 import pandas as pd
+
+# ✅ 修复：确保项目根目录在 Python 路径中，以便导入 strategies 模块
+_project_root = Path(__file__).parent.parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 from .base_service import BaseService
 from ..events import EventBus
@@ -175,13 +182,30 @@ class StrategyService(BaseService):
                 logger.warning("Backtrader策略插件不可用")
 
             # 20字段标准策略插件 (New)
+            # ✅ 修复：确保路径正确，然后尝试导入策略插件
             try:
+                # 确保项目根目录在路径中
+                project_root = Path(__file__).parent.parent.parent
+                if str(project_root) not in sys.path:
+                    sys.path.insert(0, str(project_root))
+                
                 from strategies.adj_vwap_strategies import AdjMomentumPlugin, VWAPReversionPlugin
                 self._plugin_factories['adj_momentum_v2'] = lambda: AdjMomentumPlugin()
                 self._plugin_factories['vwap_reversion_v2'] = lambda: VWAPReversionPlugin()
                 logger.info(">> 已注册20字段标准策略: adj_momentum_v2, vwap_reversion_v2")
             except ImportError as e:
-                logger.warning(f"20字段标准策略插件不可用: {e}")
+                # ✅ 修复：详细记录导入错误，帮助诊断问题
+                error_msg = str(e)
+                import traceback
+                logger.warning(
+                    f"20字段标准策略插件导入失败: {e}\n"
+                    f"项目根目录: {Path(__file__).parent.parent.parent}\n"
+                    f"Python路径: {sys.path[:3]}\n"
+                    f"详细错误: {traceback.format_exc()}"
+                )
+            except Exception as e:
+                # 其他类型的错误（非导入错误）
+                logger.error(f"20字段标准策略插件初始化失败: {e}", exc_info=True)
 
             # 自定义策略插件
             try:

@@ -184,7 +184,20 @@ class DuckDBOperations:
         """插入单个批次数据"""
         # 使用DuckDB的高效批量插入，明确指定列名
         columns = list(batch_data.columns)
-        columns_str = ', '.join(columns)
+
+        # ✅ 修复：过滤SQL关键字和函数名，并用双引号引用列名
+        sql_keywords = {
+            'CURRENT_TIMESTAMP', 'NOW', 'CURRENT_DATE', 'CURRENT_TIME',
+            'DEFAULT', 'NULL', 'TRUE', 'FALSE', 'SELECT', 'INSERT', 'UPDATE',
+            'DELETE', 'FROM', 'WHERE', 'ORDER', 'GROUP', 'BY', 'HAVING',
+            'LIMIT', 'OFFSET', 'AS', 'ON', 'IN', 'EXISTS', 'LIKE', 'AND', 'OR', 'NOT'
+        }
+        safe_columns = [col for col in columns if col.upper() not in sql_keywords]
+        if len(safe_columns) != len(columns):
+            removed_cols = [col for col in columns if col.upper() in sql_keywords]
+            logger.warning(f"[批量插入] 过滤掉SQL关键字列名: {removed_cols}")
+
+        columns_str = ', '.join(f'"{col}"' for col in safe_columns)
 
         conn.register('temp_batch', batch_data)
         conn.execute(f"INSERT INTO {table_name} ({columns_str}) SELECT {columns_str} FROM temp_batch")
@@ -195,13 +208,26 @@ class DuckDBOperations:
         """Upsert单个批次数据"""
         # 构建upsert SQL
         columns = list(batch_data.columns)
-        conflict_cols = ', '.join(conflict_columns)
+
+        # ✅ 修复：过滤SQL关键字和函数名，并用双引号引用列名
+        sql_keywords = {
+            'CURRENT_TIMESTAMP', 'NOW', 'CURRENT_DATE', 'CURRENT_TIME',
+            'DEFAULT', 'NULL', 'TRUE', 'FALSE', 'SELECT', 'INSERT', 'UPDATE',
+            'DELETE', 'FROM', 'WHERE', 'ORDER', 'GROUP', 'BY', 'HAVING',
+            'LIMIT', 'OFFSET', 'AS', 'ON', 'IN', 'EXISTS', 'LIKE', 'AND', 'OR', 'NOT'
+        }
+        safe_columns = [col for col in columns if col.upper() not in sql_keywords]
+        if len(safe_columns) != len(columns):
+            removed_cols = [col for col in columns if col.upper() in sql_keywords]
+            logger.warning(f"[批量Upsert] 过滤掉SQL关键字列名: {removed_cols}")
+
+        conflict_cols = ', '.join(f'"{col}"' for col in conflict_columns if col.upper() not in sql_keywords)
 
         # 构建UPDATE SET子句
         update_clauses = []
-        for col in columns:
+        for col in safe_columns:
             if col not in conflict_columns:
-                update_clauses.append(f"{col} = EXCLUDED.{col}")
+                update_clauses.append(f'"{col}" = EXCLUDED."{col}"')
 
         update_set = ', '.join(update_clauses)
 
@@ -209,7 +235,7 @@ class DuckDBOperations:
         conn.register('temp_batch', batch_data)
 
         # 执行upsert
-        columns_str = ', '.join(columns)
+        columns_str = ', '.join(f'"{col}"' for col in safe_columns)
         upsert_sql = f"""
         INSERT INTO {table_name} ({columns_str})
         SELECT {columns_str} FROM temp_batch

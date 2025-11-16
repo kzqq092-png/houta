@@ -48,6 +48,7 @@ logger = logger
 
 # 导入指标收集
 
+
 class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                   CrosshairMixin, InteractionMixin, ZoomMixin, SignalMixin,
                   ExportMixin, UtilityMixin):
@@ -302,15 +303,7 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
         try:
             # 调用RenderingMixin中的update_chart方法
             super().update_chart(data)
-
-            # 重置十字光标状态，确保在图表更新后仍然正常工作
-            if hasattr(self, 'reset_crosshair'):
-                self.reset_crosshair()
-                if True:  # 使用Loguru日志
-                    logger.info("已重置十字光标状态")
-            else:
-                if True:  # 使用Loguru日志
-                    logger.warning("ChartWidget没有reset_crosshair方法，无法重置十字光标")
+            logger.debug("✅ 十字光标重置已由rendering_mixin统一处理（性能优化）")
 
         except Exception as e:
             if True:  # 使用Loguru日志
@@ -324,11 +317,12 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             if self.canvas:
                 self.canvas.draw_idle()
 
-            # 重置十字光标状态
-            if hasattr(self, 'reset_crosshair'):
-                self.reset_crosshair()
-                if True:  # 使用Loguru日志
-                    logger.info("已重置十字光标状态")
+            # ✅ 性能优化：延迟十字光标重置 - 避免重复调用
+            # 十字光标重置已在rendering_mixin中统一处理
+            # if hasattr(self, 'reset_crosshair'):
+            #     self.reset_crosshair()
+            #     logger.info("已重置十字光标状态")
+            logger.debug("✅ 十字光标重置已由rendering_mixin统一处理（性能优化）")
         except Exception as e:
             if True:  # 使用Loguru日志
                 logger.error(f"更新图表失败: {e}")
@@ -453,6 +447,32 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                     if True:  # 使用Loguru日志
                         logger.warning("K线数据为空DataFrame")
                     return
+
+                # ✅ 修复：验证数据顺序（确保按时间升序排列）
+                if 'datetime' in kdata.columns:
+                    try:
+                        datetime_series = pd.to_datetime(kdata['datetime'])
+                        # 检查是否已排序
+                        is_sorted = datetime_series.is_monotonic_increasing
+                        if not is_sorted:
+                            logger.warning("⚠️ K线数据未按时间升序排列，正在自动排序...")
+                            kdata = kdata.sort_values(by='datetime', ascending=True).reset_index(drop=True)
+                            datetime_series = pd.to_datetime(kdata['datetime'])
+                            logger.info("✅ K线数据已按时间升序排序")
+
+                        # ✅ 修复：输出数据时间范围日志
+                        time_min = datetime_series.min()
+                        time_max = datetime_series.max()
+                        time_span = time_max - time_min
+                        logger.info(f"📊 K线数据时间范围: {time_min.strftime('%Y-%m-%d %H:%M:%S')} ~ {time_max.strftime('%Y-%m-%d %H:%M:%S')} (跨度: {time_span.days}天)")
+
+                        # ✅ 修复：验证数据完整性
+                        missing_count = datetime_series.isna().sum()
+                        if missing_count > 0:
+                            logger.warning(f"⚠️ K线数据包含 {missing_count} 个缺失的datetime值")
+                    except Exception as e:
+                        logger.warning(f"⚠️ datetime列验证失败: {e}")
+
                 self.current_kdata = kdata
                 if True:  # 使用Loguru日志
                     logger.info(
@@ -486,17 +506,30 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             if True:  # 使用Loguru日志
                 logger.info(f"获取样式: {style}")
 
-            # 创建X轴
-            x = np.arange(len(self.current_kdata))
-            if True:  # 使用Loguru日志
-                logger.info(f"创建x轴: 长度={len(x)}")
+            # ✅ 修复：使用datetime作为X轴（如果数据包含datetime列）
+            use_datetime_axis = False
+            x = None
 
-            # 渲染K线图
+            if 'datetime' in self.current_kdata.columns:
+                try:
+                    # 验证datetime列是否有效
+                    datetime_series = pd.to_datetime(self.current_kdata['datetime'])
+                    if datetime_series.notna().any():
+                        use_datetime_axis = True
+                        logger.info("✅ 使用datetime作为X轴")
+                    else:
+                        logger.warning("⚠️ datetime列全部为空，回退到数字索引X轴")
+                except Exception as e:
+                    logger.warning(f"⚠️ datetime列无效: {e}，回退到数字索引X轴")
+            else:
+                logger.info("ℹ️ 数据不包含datetime列，使用数字索引X轴（向后兼容）")
+
+            # 渲染K线图（传递use_datetime_axis参数）
             if True:  # 使用Loguru日志
                 logger.info(
-                    f"调用renderer.render_candlesticks: price_ax={self.price_ax}, kdata形状={self.current_kdata.shape}")
+                    f"调用renderer.render_candlesticks: price_ax={self.price_ax}, kdata形状={self.current_kdata.shape}, use_datetime_axis={use_datetime_axis}")
             self.renderer.render_candlesticks(
-                self.price_ax, self.current_kdata, style, x=x)
+                self.price_ax, self.current_kdata, style, x=x, use_datetime_axis=use_datetime_axis)
             if True:  # 使用Loguru日志
                 logger.info("K线绘制完成")
 
@@ -508,19 +541,38 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             if True:  # 使用Loguru日志
                 logger.info(f"设置Y轴范围: {ymin - margin} - {ymax + margin}")
 
-            # 设置X轴范围
-            self.price_ax.set_xlim(0, len(self.current_kdata) - 1)
+            # ✅ 修复：X轴范围设置
+            if not use_datetime_axis:
+                # 数字索引X轴：手动设置范围
+                self.price_ax.set_xlim(0, len(self.current_kdata) - 1)
+            else:
+                # datetime X轴：显式设置X轴范围，确保K线图正确显示
+                try:
+                    # 导入matplotlib.dates
+                    import matplotlib.dates as mdates
+                    datetime_series = pd.to_datetime(self.current_kdata['datetime'])
+                    x_min = mdates.date2num(datetime_series.min())
+                    x_max = mdates.date2num(datetime_series.max())
+                    # 添加2%边距，确保K线图完全可见
+                    margin = (x_max - x_min) * 0.04 if x_max > x_min else 1.0
+                    self.price_ax.set_xlim(x_min - margin, x_max + margin)
+                    logger.debug(f"✅ datetime X轴范围已设置: {datetime_series.min()} ~ {datetime_series.max()}")
+                except Exception as e:
+                    logger.warning(f"⚠️ 设置datetime X轴范围失败: {e}，使用autoscale_view()")
+                    # 失败时使用autoscale_view()作为后备
+                    self.price_ax.autoscale_view()
 
             # 更新画布
             if True:  # 使用Loguru日志
                 logger.info("更新画布")
             self.canvas.draw_idle()
 
-            # 重置十字光标状态，确保在图表更新后仍然正常工作
-            if hasattr(self, 'reset_crosshair'):
-                self.reset_crosshair()
-                if True:  # 使用Loguru日志
-                    logger.info("已重置十字光标状态")
+            # ✅ 性能优化：延迟十字光标重置 - 已在rendering_mixin中处理
+            # 不再在这里重复重置，避免重复调用开销
+            # if hasattr(self, 'reset_crosshair'):
+            #     self.reset_crosshair()
+            #     logger.info("已重置十字光标状态")
+            logger.debug("✅ 十字光标重置已由rendering_mixin统一处理（性能优化）")
 
             if True:  # 使用Loguru日志
                 logger.info("基础K线数据更新完成")
@@ -559,9 +611,23 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             # 获取样式
             style = self._get_chart_style()
 
-            # 绘制成交量
-            x = np.arange(len(kdata))
-            self.renderer.render_volume(self.volume_ax, kdata, style, x=x)
+            # ✅ 修复：使用datetime作为X轴（与K线图保持一致）
+            use_datetime_axis = False
+            x = None
+
+            if 'datetime' in kdata.columns:
+                try:
+                    datetime_series = pd.to_datetime(kdata['datetime'])
+                    if datetime_series.notna().any():
+                        use_datetime_axis = True
+                        logger.debug("✅ 成交量使用datetime作为X轴")
+                except Exception as e:
+                    logger.warning(f"⚠️ 成交量datetime列无效: {e}，回退到数字索引X轴")
+            else:
+                logger.debug("ℹ️ 成交量数据不包含datetime列，使用数字索引X轴（向后兼容）")
+
+            # 绘制成交量（传递use_datetime_axis参数）
+            self.renderer.render_volume(self.volume_ax, kdata, style, x=x, use_datetime_axis=use_datetime_axis)
 
             # 更新画布
             self.canvas.draw_idle()

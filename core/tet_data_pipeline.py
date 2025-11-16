@@ -901,11 +901,8 @@ class TETDataPipeline:
 
             mapped_data['market'] = mapped_data.apply(infer_market, axis=1)
 
-            # 5. 补全可选字段
+            # 5. 补全可选字段（✅ 删除了不使用的name_en, full_name, short_name字段）
             optional_fields = {
-                'name_en': None,
-                'full_name': None,
-                'short_name': None,
                 'asset_type': 'stock_a',
                 'exchange': None,
                 'sector': None,

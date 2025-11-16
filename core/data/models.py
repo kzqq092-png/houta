@@ -110,12 +110,13 @@ class MarketData:
 
 @dataclass
 class QueryParams:
-    """查询参数"""
+    """查询参数（✅ 优化：支持多资产类型）"""
     stock_code: str
     period: str = 'D'
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     count: Optional[int] = None
+    asset_type: Optional['AssetType'] = None  # ✅ 新增：资产类型（默认None表示股票）
 
     def validate(self) -> bool:
         """验证参数"""
@@ -127,6 +128,13 @@ class QueryParams:
 
         if self.period not in ['1m', '5m', '15m', '30m', '1H', 'D', 'W', 'M']:
             return False
+        
+        # ✅ 验证asset_type（如果提供）
+        if self.asset_type is not None:
+            from core.plugin_types import AssetType
+            if not isinstance(self.asset_type, AssetType):
+                return False
+        
         return True
 
     def _normalize_period(self, period: str) -> str:

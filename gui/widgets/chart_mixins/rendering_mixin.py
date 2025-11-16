@@ -123,6 +123,7 @@ class RenderingMixin:
             logger.info(f"准备调用renderer.render_candlesticks，x轴长度: {len(x)}")
             logger.info(f"price_ax: {self.price_ax}")
 
+            # ✅ 性能优化：延迟绘制 - 先完成所有渲染，最后统一绘制
             # 调用渲染器
             try:
                 self.renderer.render_candlesticks(self.price_ax, kdata, style, x=x)
@@ -136,13 +137,28 @@ class RenderingMixin:
                 logger.info("成交量渲染成功")
             except Exception as e:
                 logger.error(f"成交量渲染失败: {e}", exc_info=True)
-
+            
+            # ✅ 性能优化：合并autoscale_view()调用 - 在所有渲染完成后统一调用
+            # 统一设置两个轴的自动缩放范围
+            try:
+                self.price_ax.autoscale_view()
+                self.volume_ax.autoscale_view()
+                logger.debug("✅ 统一调用autoscale_view()完成")
+            except Exception as e:
+                logger.warning(f"autoscale_view()调用失败: {e}")
+            
             # 处理indicators_data（如果存在）
             indicators_data = data.get('indicators_data', {})
             if indicators_data:
                 # 将indicators_data传递给渲染函数
                 logger.info(f"开始渲染指标数据，指标数量: {len(indicators_data)}")
                 self._render_indicator_data(indicators_data, kdata, x)
+                # ✅ 性能优化：指标渲染后也需要更新范围
+                try:
+                    if hasattr(self, 'indicator_ax') and self.indicator_ax:
+                        self.indicator_ax.autoscale_view()
+                except Exception as e:
+                    logger.warning(f"指标轴autoscale_view()调用失败: {e}")
 
             # 修复：自动同步主窗口指标
             if hasattr(self, 'parentWidget') and callable(getattr(self, 'parentWidget', None)):
@@ -157,7 +173,12 @@ class RenderingMixin:
             pattern_signals = data.get('pattern_signals', None)
             if pattern_signals:
                 self.plot_patterns(pattern_signals)
+            
+            # ✅ 性能优化P1: 统一调用_optimize_display()设置所有轴的完整样式
+            # 替代chart_renderer中的_optimize_display()调用，避免重复设置样式
+            # _optimize_display()会设置所有轴（price_ax、volume_ax、indicator_ax）的样式
             self._optimize_display()
+            
             if not kdata.empty:
                 for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                     ax.set_xlim(0, len(kdata)-1)
@@ -183,8 +204,35 @@ class RenderingMixin:
                 ax.yaxis.set_tick_params(direction='in', pad=0)
                 ax.yaxis.set_label_position('left')
                 ax.tick_params(axis='y', direction='in', pad=0)
+            
+            # ✅ 性能优化：延迟十字光标初始化到渲染完成后
+            # 不在渲染过程中初始化，避免影响渲染性能
             self.crosshair_enabled = True
-            self.enable_crosshair(force_rebind=True)
+            # self.enable_crosshair(force_rebind=True)  # 已移除，延迟到绘制完成后
+            
+            # ✅ 性能优化：延迟绘制 - 所有渲染和范围设置完成后，只调用一次draw_idle()
+            # 这样可以避免K线、成交量、指标分别触发绘制，大幅提升性能
+            if hasattr(self, 'canvas') and self.canvas:
+                self.canvas.draw_idle()
+                logger.debug("✅ 统一绘制完成（延迟绘制优化）")
+            
+            # ✅ 性能优化：延迟十字光标初始化到渲染和绘制完成后
+            # 在渲染和绘制完成后，再初始化十字光标，避免影响渲染性能
+            if hasattr(self, 'crosshair_enabled') and self.crosshair_enabled:
+                if not (hasattr(self, '_crosshair_initialized') and self._crosshair_initialized):
+                    try:
+                        self.enable_crosshair(force_rebind=False)  # 不强制重新绑定，检查状态
+                        logger.debug("✅ 十字光标延迟初始化完成")
+                    except Exception as e:
+                        logger.warning(f"十字光标延迟初始化失败: {e}")
+                else:
+                    # 如果已经初始化，只需要清除旧元素（不重新绑定事件）
+                    try:
+                        if hasattr(self, '_clear_crosshair_elements'):
+                            self._clear_crosshair_elements()
+                            logger.debug("✅ 十字光标元素已清除（已初始化，不重新绑定）")
+                    except Exception as e:
+                        logger.warning(f"清除十字光标元素失败: {e}")
             # 左上角显示股票名称和代码
             if hasattr(self, '_stock_info_text') and self._stock_info_text:
                 try:
@@ -219,7 +267,9 @@ class RenderingMixin:
                           edgecolor='none', boxstyle='round,pad=0.2'),
                 zorder=200
             )
-            self.canvas.draw_idle()
+            # ✅ 性能优化P0: 移除draw_idle()调用，由最后统一绘制处理
+            # 不再在这里触发绘制，避免在渲染过程中触发额外绘制
+            # self.canvas.draw_idle()  # 已移除，在最后统一绘制
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                     label.set_fontsize(8)
@@ -792,9 +842,10 @@ class RenderingMixin:
                     label.set_color(text_color)
                     label.set_rotation(30)
 
-            # 保存当前状态
-            if hasattr(self, 'canvas') and self.canvas:
-                self.canvas.draw_idle()
+            # ✅ 性能优化P0: 移除draw_idle()调用，由调用方统一绘制
+            # 不再在这里触发绘制，避免在渲染过程中触发额外绘制
+            # if hasattr(self, 'canvas') and self.canvas:
+            #     self.canvas.draw_idle()
 
         except Exception as e:
             logger.error(f"优化显示失败: {str(e)}")

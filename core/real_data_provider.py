@@ -44,14 +44,19 @@ class RealDataProvider:
             'real_data', {}).get('cache_ttl', 300)  # 5分钟缓存
 
         # 数据源连接池管理
-        self._data_source_pool = {}
+        self._data_source_pool = {}  # 空闲实例池 {data_source: [instances]}
+        self._active_instances = {}  # 正在使用的实例 {data_source: count}
         self._pool_lock = threading.RLock()
         self._max_pool_size = 5  # 默认值，将从数据库动态加载
         self._pool_timeout = 30  # 连接池超时时间
         self._pool_cleanup_interval = 300  # 连接池清理间隔
 
-        # 动态加载线程池配置
+        # 动态加载数据源实例池配置
         self._load_pool_config_from_database()
+
+        # 启动后台清理定时器（按 _pool_cleanup_interval 清理实例池）
+        self._cleanup_thread_stop = False
+        self._start_cleanup_timer()
 
         # 默认股票池
         self._default_stocks = [
@@ -70,7 +75,7 @@ class RealDataProvider:
         self.logger.info("真实数据提供器初始化完成")
 
     def _load_pool_config_from_database(self):
-        """从数据库动态加载线程池配置"""
+        """从数据库动态加载数据源实例池配置"""
         try:
             from db.models.plugin_models import get_data_source_config_manager
 
@@ -80,27 +85,100 @@ class RealDataProvider:
             # 获取默认配置（使用第一个启用的数据源配置，或使用系统默认值）
             if all_configs:
                 # 使用第一个配置的线程池设置作为全局设置
+                # 注意：由于set_pool_config()会更新所有插件的配置，所以所有插件的pool配置应该是一致的
                 first_config = next(iter(all_configs.values()))
-                self._max_pool_size = first_config.get('max_pool_size', 5)
-                self._pool_timeout = first_config.get('pool_timeout', 30)
-                self._pool_cleanup_interval = first_config.get('pool_cleanup_interval', 300)
+                loaded_max_pool_size = first_config.get('max_pool_size', 5)
+                loaded_pool_timeout = first_config.get('pool_timeout', 30)
+                loaded_pool_cleanup_interval = first_config.get('pool_cleanup_interval', 300)
+                
+                # 更新实例变量
+                self._max_pool_size = loaded_max_pool_size
+                self._pool_timeout = loaded_pool_timeout
+                self._pool_cleanup_interval = loaded_pool_cleanup_interval
 
-                self.logger.info(f"从数据库加载线程池配置: max_pool_size={self._max_pool_size}, "
+                self.logger.info(f"从数据库加载数据源实例池配置: max_pool_size={self._max_pool_size}, "
                                  f"pool_timeout={self._pool_timeout}, pool_cleanup_interval={self._pool_cleanup_interval}")
             else:
-                self.logger.info("未找到数据源配置，使用默认线程池配置")
+                self.logger.info("未找到数据源配置，使用默认的数据源实例池配置")
 
         except Exception as e:
-            self.logger.warning(f"从数据库加载线程池配置失败，使用默认值: {e}")
+            self.logger.warning(f"从数据库加载线程池配置失败，使用默认值: {e}", exc_info=True)
 
     def reload_pool_config(self):
-        """重新加载线程池配置（用于UI动态更新）"""
-        self.logger.info("重新加载线程池配置...")
+        """重新加载数据源实例池配置（用于UI动态更新）"""
+        self.logger.info("重新加载数据源实例池配置...")
         self._load_pool_config_from_database()
 
         # 清理现有连接池以应用新配置
         self.cleanup_data_source_pool()
-        self.logger.info("线程池配置已重新加载并清理连接池")
+        self.logger.info("数据源实例池配置已重新加载并清理连接池")
+
+    def _start_cleanup_timer(self):
+        """启动后台定时清理任务，周期性清理实例池，避免长期占用"""
+        def _worker():
+            while not self._cleanup_thread_stop:
+                try:
+                    time.sleep(max(30, int(self._pool_cleanup_interval)))
+                    self.cleanup_data_source_pool()
+                except Exception as e:
+                    self.logger.debug(f"实例池定时清理异常: {e}")
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+
+    def set_pool_config(self, max_pool_size: int = None, pool_timeout: int = None, pool_cleanup_interval: int = None) -> None:
+        """
+        通过UI动态设置数据源实例池配置并立即生效（无需依赖DB）
+        """
+        try:
+            with self._pool_lock:
+                if isinstance(max_pool_size, int) and max_pool_size > 0:
+                    self._max_pool_size = max_pool_size
+                if isinstance(pool_timeout, int) and pool_timeout > 0:
+                    self._pool_timeout = pool_timeout
+                if isinstance(pool_cleanup_interval, int) and pool_cleanup_interval > 0:
+                    self._pool_cleanup_interval = pool_cleanup_interval
+            # 应用新配置：清理当前池，新的请求将按新上限创建/复用
+            self.cleanup_data_source_pool()
+            self.logger.info(f"数据源实例池配置已更新: max_pool_size={self._max_pool_size}, "
+                             f"pool_timeout={self._pool_timeout}, pool_cleanup_interval={self._pool_cleanup_interval}")
+
+            # 尝试持久化到数据库（若可用）
+            try:
+                from db.models.plugin_models import get_data_source_config_manager
+                cfg_mgr = get_data_source_config_manager()
+                payload = {
+                    'max_pool_size': self._max_pool_size,
+                    'pool_timeout': self._pool_timeout,
+                    'pool_cleanup_interval': self._pool_cleanup_interval
+                }
+                persisted = False
+                # 优先使用明确的API
+                if hasattr(cfg_mgr, 'set_pool_config'):
+                    cfg_mgr.set_pool_config(**payload)  # type: ignore
+                    persisted = True
+                elif hasattr(cfg_mgr, 'save_config'):
+                    # 保存到统一键名下
+                    cfg_mgr.save_config('instance_pool', payload)  # type: ignore
+                    persisted = True
+                elif hasattr(cfg_mgr, 'update_config'):
+                    cfg_mgr.update_config('instance_pool', payload)  # type: ignore
+                    persisted = True
+                elif hasattr(cfg_mgr, 'set_global_setting'):
+                    # 分别写入（某些管理器只支持K/V）
+                    cfg_mgr.set_global_setting('max_pool_size', self._max_pool_size)  # type: ignore
+                    cfg_mgr.set_global_setting('pool_timeout', self._pool_timeout)  # type: ignore
+                    cfg_mgr.set_global_setting('pool_cleanup_interval', self._pool_cleanup_interval)  # type: ignore
+                    persisted = True
+
+                if persisted:
+                    self.logger.info("数据源实例池配置已持久化到数据库")
+                else:
+                    self.logger.debug("未检测到可用的配置持久化API，跳过数据库持久化")
+            except Exception as persist_err:
+                # 持久化失败不影响运行时生效
+                self.logger.warning(f"实例池配置持久化失败（忽略继续）: {persist_err}")
+        except Exception as e:
+            self.logger.error(f"更新数据源实例池配置失败: {e}")
 
     def _get_pooled_data_manager(self, data_source: Optional[str] = None):
         """获取池化的数据管理器实例
@@ -118,30 +196,37 @@ class RealDataProvider:
             # 检查连接池中是否已有该数据源的实例
             if data_source not in self._data_source_pool:
                 self._data_source_pool[data_source] = []
+            if data_source not in self._active_instances:
+                self._active_instances[data_source] = 0
 
             pool = self._data_source_pool[data_source]
 
             # 如果池中有可用实例，直接返回
             if pool:
                 instance = pool.pop(0)
-                self.logger.debug(f"从连接池获取数据源实例: {data_source}")
+                self._active_instances[data_source] += 1
+                self.logger.debug(f"从连接池获取数据源实例: {data_source} (活跃: {self._active_instances[data_source]}, 空闲: {len(pool)})")
                 return instance
 
             # 如果池为空，创建新实例（但不超过最大池大小）
-            total_instances = sum(len(p) for p in self._data_source_pool.values())
+            total_idle = sum(len(p) for p in self._data_source_pool.values())
+            total_active = sum(self._active_instances.values())
+            total_instances = total_idle + total_active
+            
             if total_instances < self._max_pool_size:
                 # 创建新的数据管理器实例
                 try:
                     from .services.unified_data_manager import get_unified_data_manager
                     new_instance = get_unified_data_manager()
-                    self.logger.debug(f"创建新的数据源实例: {data_source}")
+                    self._active_instances[data_source] += 1
+                    self.logger.debug(f"创建新的数据源实例: {data_source} (总实例: {total_instances + 1}/{self._max_pool_size})")
                     return new_instance
                 except Exception as e:
                     self.logger.warning(f"创建数据源实例失败: {e}")
                     return self.data_manager
             else:
                 # 池已满，返回默认实例
-                self.logger.debug(f"连接池已满，使用默认数据管理器: {data_source}")
+                self.logger.debug(f"连接池已满，使用默认数据管理器: {data_source} (总实例: {total_instances}/{self._max_pool_size})")
                 return self.data_manager
 
     def _return_pooled_data_manager(self, instance, data_source: Optional[str] = None):
@@ -159,14 +244,20 @@ class RealDataProvider:
                 pool = self._data_source_pool[data_source]
                 if len(pool) < self._max_pool_size and instance not in pool:
                     pool.append(instance)
-                    self.logger.debug(f"数据源实例返回连接池: {data_source}")
+                    # 减少活跃实例计数
+                    if data_source in self._active_instances and self._active_instances[data_source] > 0:
+                        self._active_instances[data_source] -= 1
+                    self.logger.debug(f"数据源实例返回连接池: {data_source} (活跃: {self._active_instances.get(data_source, 0)}, 空闲: {len(pool)})")
 
     def cleanup_data_source_pool(self):
         """清理数据源连接池"""
         with self._pool_lock:
-            total_instances = sum(len(pool) for pool in self._data_source_pool.values())
+            total_idle = sum(len(pool) for pool in self._data_source_pool.values())
+            total_active = sum(self._active_instances.values())
+            total_instances = total_idle + total_active
             self._data_source_pool.clear()
-            self.logger.info(f"数据源连接池已清理，释放了 {total_instances} 个实例")
+            self._active_instances.clear()
+            self.logger.info(f"数据源连接池已清理，释放了 {total_idle} 个空闲实例（活跃实例: {total_active}）")
 
     def get_pool_status(self) -> Dict[str, Any]:
         """获取连接池状态信息"""
@@ -176,15 +267,37 @@ class RealDataProvider:
                 'pools': {}
             }
 
-            for data_source, pool in self._data_source_pool.items():
+            # 统计空闲和活跃实例
+            total_idle = 0
+            total_active = 0
+            
+            # ✅ 修复：确保所有数据源都被统计，即使池为空
+            # 合并所有已知的数据源（从pool和active_instances）
+            all_data_sources = set(self._data_source_pool.keys()) | set(self._active_instances.keys())
+            
+            for data_source in all_data_sources:
+                idle_count = len(self._data_source_pool.get(data_source, []))
+                active_count = self._active_instances.get(data_source, 0)
+                total_idle += idle_count
+                total_active += active_count
+                
                 status['pools'][data_source] = {
-                    'active_instances': len(pool),
-                    'pool_utilization': f"{len(pool)}/{self._max_pool_size}"
+                    'idle_instances': idle_count,
+                    'active_instances': active_count,
+                    'total_instances': idle_count + active_count,
+                    'pool_utilization': f"{idle_count + active_count}/{self._max_pool_size}"
                 }
 
-            total_instances = sum(len(pool) for pool in self._data_source_pool.values())
+            # 总实例数 = 空闲 + 活跃
+            total_instances = total_idle + total_active
             status['total_instances'] = total_instances
+            status['total_idle'] = total_idle
+            status['total_active'] = total_active
             status['total_utilization'] = f"{total_instances}/{self._max_pool_size}"
+            
+            # ✅ 修复：添加调试日志，便于排查统计问题
+            if total_instances == 0:
+                self.logger.debug(f"实例池统计为0: 数据源池={list(self._data_source_pool.keys())}, 活跃实例={dict(self._active_instances)}")
 
             return status
 
@@ -282,7 +395,7 @@ class RealDataProvider:
                 self.logger.debug(f"从缓存获取K线数据: {code}")
                 return cached_data
 
-            self.logger.info(f"获取真实K线数据: {code}, 频率: {freq}, 数据源: {data_source or '默认'}")
+            self.logger.info(f"[数据获取] 获取真实K线数据: {code}, 频率: {freq}, 数据源: {data_source or '默认'}, count: {count}, 日期范围: {start_date} ~ {end_date}")
 
             # 使用连接池获取数据管理器实例
             data_manager_instance = self._get_pooled_data_manager(data_source)
@@ -291,35 +404,51 @@ class RealDataProvider:
                 # 使用数据管理器获取真实数据
                 if data_source:
                     # 如果指定了数据源，使用指定的数据源
-                    # 将字符串转换为AssetType枚举
+                    # ✅ 统一资产类型转换逻辑（支持AssetType对象、枚举值字符串、中文名称）
                     final_asset_type = None
                     if asset_type:
-                        try:
-                            # 尝试从字符串转换为AssetType枚举
-                            if hasattr(AssetType, asset_type.upper()):
-                                final_asset_type = getattr(AssetType, asset_type.upper())
-                            else:
-                                # 尝试通过value匹配
-                                for at in AssetType:
-                                    if at.value == asset_type:
-                                        final_asset_type = at
-                                        break
-                        except Exception as e:
-                            logger.warning(f"无法解析资产类型 {asset_type}: {e}")
+                        # 0. 如果已经是AssetType对象，直接使用
+                        if isinstance(asset_type, AssetType):
+                            final_asset_type = asset_type
+                            self.logger.debug(f"资产类型已是AssetType对象: {final_asset_type.value}")
+                        elif isinstance(asset_type, str):
+                            # 1. 尝试作为枚举值字符串（如"stock_a"）
+                            try:
+                                final_asset_type = AssetType(asset_type)
+                                self.logger.debug(f"从枚举值字符串转换: '{asset_type}' -> {final_asset_type.value}")
+                            except ValueError:
+                                # 2. 尝试从中文显示名称转换（如"A股"）
+                                try:
+                                    from ..ui_asset_type_utils import parse_asset_type_from_combo
+                                    final_asset_type = parse_asset_type_from_combo(asset_type)
+                                    self.logger.debug(f"从中文名称转换: '{asset_type}' -> {final_asset_type.value}")
+                                except Exception as e:
+                                    # 3. 转换失败，使用默认值
+                                    self.logger.warning(f"无法解析资产类型 '{asset_type}' (类型: {type(asset_type)}): {e}，使用默认值 STOCK_A")
+                                    final_asset_type = AssetType.STOCK_A
+                        else:
+                            self.logger.warning(f"资产类型格式不支持 (类型: {type(asset_type)}, 值: {asset_type})，使用默认值 STOCK_A")
+                            final_asset_type = AssetType.STOCK_A
                     
                     kdata = data_manager_instance.get_kdata_from_source(
                         stock_code=code,
                         period=freq,
                         count=count,
                         data_source=data_source,
-                        asset_type=final_asset_type
+                        asset_type=final_asset_type,
+                        start_date=start_date,
+                        end_date=end_date
                     )
                 else:
-                    # 使用默认数据源
-                    kdata = data_manager_instance.get_kdata(
+                    # ✅ 修复：即使没有指定data_source，也使用get_kdata_from_source以支持日期参数
+                    kdata = data_manager_instance.get_kdata_from_source(
                         stock_code=code,
                         period=freq,
-                        count=count
+                        count=count,
+                        data_source=None,  # 使用默认数据源
+                        asset_type=final_asset_type,
+                        start_date=start_date,
+                        end_date=end_date
                     )
             finally:
                 # 将实例返回连接池
@@ -336,7 +465,7 @@ class RealDataProvider:
             # 缓存数据
             self._set_to_cache(cache_key, kdata)
 
-            self.logger.info(f"成功获取真实K线数据: {code}, 数据量: {len(kdata)}")
+            self.logger.info(f"[数据获取] 成功获取真实K线数据: {code}, 数据量: {len(kdata)}, 日期范围: {kdata['datetime'].min() if not kdata.empty and 'datetime' in kdata.columns else 'N/A'} ~ {kdata['datetime'].max() if not kdata.empty and 'datetime' in kdata.columns else 'N/A'}")
             return kdata
 
         except Exception as e:
@@ -525,6 +654,12 @@ class RealDataProvider:
             if kdata.empty:
                 return kdata
 
+            # ✅ 关键修复：在处理任何数据前，先解决datetime索引/列歧义问题
+            # 如果datetime既是索引又是列，会导致"'datetime' is both an index level and a column label"错误
+            if 'datetime' in kdata.columns and (kdata.index.name == 'datetime' or isinstance(kdata.index, pd.DatetimeIndex)):
+                self.logger.debug(f"[{code}] 检测到datetime既是列又是索引，重置索引")
+                kdata = kdata.reset_index(drop=True)
+
             # 确保必要的列存在
             required_columns = ['open', 'high', 'low', 'close', 'volume']
             missing_columns = [
@@ -559,14 +694,23 @@ class RealDataProvider:
             if 'code' not in kdata.columns:
                 kdata['code'] = code
 
-            # 确保索引为时间类型
-            if not isinstance(kdata.index, pd.DatetimeIndex):
-                if 'datetime' in kdata.columns:
-                    kdata['datetime'] = pd.to_datetime(kdata['datetime'])
-                    kdata.set_index('datetime', inplace=True)
-
-            # 按时间排序
-            kdata = kdata.sort_index()
+            # ✅ 修复：确保datetime是列而不是索引
+            # 这样可以避免后续验证时"datetime is both an index level and a column label"错误
+            if 'datetime' in kdata.columns:
+                kdata['datetime'] = pd.to_datetime(kdata['datetime'])
+                # ✅ 不设置datetime为索引，保持为列以兼容后续数据验证
+            elif isinstance(kdata.index, pd.DatetimeIndex):
+                # 如果datetime是索引，转换为列
+                kdata = kdata.reset_index(drop=False)
+                if kdata.index.name == 'datetime' or 'datetime' not in kdata.columns:
+                    kdata = kdata.reset_index(drop=True)
+            
+            # 按datetime列排序（如果存在）
+            if 'datetime' in kdata.columns:
+                kdata = kdata.sort_values('datetime').reset_index(drop=True)
+            else:
+                # 如果没有datetime列但有索引，则按索引排序
+                kdata = kdata.sort_index()
 
             self.logger.debug(f"数据验证完成: {code}, 有效数据量: {len(kdata)}")
             return kdata

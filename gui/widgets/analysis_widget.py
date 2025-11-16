@@ -278,23 +278,15 @@ class AnalysisWidget(QWidget):
             self.wave_tab.parent_widget = self
             self.tab_components['wave'] = self.wave_tab
 
-            # 情绪分析标签页 - 使用合并后的专业版（包含实时分析和报告功能）
-            try:
-                from .analysis_tabs.professional_sentiment_tab import ProfessionalSentimentTab
-                self.sentiment_tab = ProfessionalSentimentTab(self.config_manager)
-                self.sentiment_tab.parent_widget = self
-                self.tab_components['sentiment'] = self.sentiment_tab
-
-                # 情绪报告标签页 - 现在使用同一个类，因为已经包含报告功能
-                self.sentiment_report_tab = self.sentiment_tab  # 共享同一个实例
-                self.tab_components['sentiment_report'] = self.sentiment_report_tab
-            except ImportError as e:
-                logger.info(f" 专业情绪分析标签页导入失败: {e}")
-                # 使用占位符
-                self.sentiment_tab = QLabel("情绪分析功能暂不可用")
-                self.sentiment_report_tab = QLabel("情绪报告功能暂不可用")
-                self.tab_components['sentiment'] = self.sentiment_tab
-                self.tab_components['sentiment_report'] = self.sentiment_report_tab
+            # 情绪分析标签页已移除（性能优化）
+            # 使用占位符说明
+            logger.info("情绪分析标签页已优化移除")
+            self.sentiment_tab = QLabel("情绪分析功能已优化移除\n推荐使用热点分析、资金流向等功能")
+            self.sentiment_tab.setAlignment(Qt.AlignCenter)
+            self.sentiment_tab.setStyleSheet("font-size: 14px; color: #666; padding: 20px;")
+            self.sentiment_report_tab = self.sentiment_tab  # 共享同一个占位符
+            self.tab_components['sentiment'] = self.sentiment_tab
+            self.tab_components['sentiment_report'] = self.sentiment_report_tab
 
             # 板块资金流标签页
             self.sector_flow_tab = SectorFlowTab(self.config_manager, self.service_container)
@@ -308,7 +300,7 @@ class AnalysisWidget(QWidget):
 
             # K线技术分析标签页 - 重命名删除重复情绪功能
             try:
-                from .analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineTechnicalTab
+                from .analysis_tabs.enhanced_kline_technical_tab import EnhancedKLineTechnicalTab
                 self.kline_technical_tab = EnhancedKLineTechnicalTab(self.config_manager)
                 self.kline_technical_tab.parent_widget = self
                 self.tab_components['kline_technical'] = self.kline_technical_tab
@@ -350,10 +342,10 @@ class AnalysisWidget(QWidget):
         layout.addWidget(QLabel("波浪分析功能正在加载中..."))
         self.tab_components['wave'] = self.wave_tab
 
-        # 情绪分析占位标签页
-        self.sentiment_tab = QWidget()
-        layout = QVBoxLayout(self.sentiment_tab)
-        layout.addWidget(QLabel("情绪分析功能正在加载中..."))
+        # 情绪分析占位标签页（已优化移除）
+        self.sentiment_tab = QLabel("情绪分析功能已优化移除\n推荐使用热点分析、资金流向等功能")
+        self.sentiment_tab.setAlignment(Qt.AlignCenter)
+        self.sentiment_tab.setStyleSheet("font-size: 14px; color: #666; padding: 20px;")
         self.tab_components['sentiment'] = self.sentiment_tab
 
         # 板块资金流占位标签页
@@ -368,10 +360,8 @@ class AnalysisWidget(QWidget):
         layout.addWidget(QLabel("热点分析功能正在加载中..."))
         self.tab_components['hotspot'] = self.hotspot_tab
 
-        # 情绪报告占位标签页
-        self.sentiment_report_tab = QWidget()
-        layout = QVBoxLayout(self.sentiment_report_tab)
-        layout.addWidget(QLabel("情绪报告功能正在加载中..."))
+        # 情绪报告占位标签页（已优化移除）
+        self.sentiment_report_tab = self.sentiment_tab  # 共享同一个占位符
         self.tab_components['sentiment_report'] = self.sentiment_report_tab
 
     def _add_tabs_to_widget(self):

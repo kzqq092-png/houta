@@ -1759,11 +1759,37 @@ class DataSourcePluginConfigDialog(QDialog):
                 self.server_status_table.setItem(i, 1, QTableWidgetItem(status_text))
 
                 # 响应时间
-                response_time = server.get("response_time", 0)
-                if response_time > 0:
-                    time_text = f"{response_time}ms"
+                rt_raw = server.get("response_time", None)
+                rt_ms_raw = server.get("response_time_ms", None)
+
+                numeric_ms = None
+                # 优先使用毫秒字段
+                if isinstance(rt_ms_raw, (int, float)):
+                    numeric_ms = float(rt_ms_raw)
                 else:
-                    time_text = "-"
+                    # 兼容字符串类型
+                    if isinstance(rt_ms_raw, str):
+                        try:
+                            numeric_ms = float(rt_ms_raw)
+                        except Exception:
+                            numeric_ms = None
+
+                # 其次使用秒或毫秒的response_time字段（根据数值范围推断单位）
+                if numeric_ms is None:
+                    value = None
+                    if isinstance(rt_raw, (int, float)):
+                        value = float(rt_raw)
+                    elif isinstance(rt_raw, str):
+                        try:
+                            value = float(rt_raw)
+                        except Exception:
+                            value = None
+
+                    if value is not None:
+                        # 经验规则：小于50的多为秒，转换为毫秒；否则视为已是毫秒
+                        numeric_ms = value * 1000.0 if value < 50 else value
+
+                time_text = f"{numeric_ms:.1f}ms" if (isinstance(numeric_ms, (int, float)) and numeric_ms > 0) else "-"
                 self.server_status_table.setItem(i, 2, QTableWidgetItem(time_text))
 
                 # 数据类型

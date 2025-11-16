@@ -524,8 +524,20 @@ class DataQualityMonitor:
                 'recommendations': ['检查数据格式和验证逻辑']
             }
 
-    def calculate_quality_score(self, data: pd.DataFrame, data_type: str) -> float:
-        """计算数据质量综合评分"""
+    def calculate_quality_score(self, data: pd.DataFrame, data_type: str, 
+                                data_usage: str = 'general', data_source: str = None) -> float:
+        """
+        计算数据质量综合评分（智能权重系统）
+        
+        Args:
+            data: 待评估的数据
+            data_type: 数据类型
+            data_usage: 数据用途 ('historical', 'realtime', 'backtest', 'live_trading', 'general')
+            data_source: 数据源名称（用于可靠性调整）
+            
+        Returns:
+            综合质量评分 (0.0-1.0)
+        """
         if data is None or data.empty:
             return 0.0
 
@@ -534,8 +546,8 @@ class DataQualityMonitor:
         # 完整性检查
         scores['completeness'] = self._check_completeness(data)
 
-        # 准确性检查
-        scores['accuracy'] = self._check_accuracy(data, data_type)
+        # 准确性检查（增强版，包含异常值检测）
+        scores['accuracy'] = self._check_accuracy_enhanced(data, data_type)
 
         # 一致性检查
         scores['consistency'] = self._check_consistency(data, data_type)
@@ -543,17 +555,118 @@ class DataQualityMonitor:
         # 及时性检查
         scores['timeliness'] = self._check_timeliness(data)
 
-        # 加权计算综合评分
-        weights = {
-            'completeness': 0.3,
-            'accuracy': 0.3,
-            'consistency': 0.2,
-            'timeliness': 0.2
+        # 🎯 智能权重配置：根据数据用途动态调整
+        weights = self._get_dynamic_weights(data_usage)
+        
+        # 计算基础评分
+        base_score = sum(scores[key] * weights[key] for key in scores)
+        
+        # 🌟 数据源可靠性调整（±5%）
+        source_adjustment = self._get_source_reliability_adjustment(data_source)
+        
+        # 最终评分 = 基础评分 × 数据源系数
+        final_score = min(1.0, base_score * source_adjustment)
+
+        logger.debug(f"[质量评分] 用途:{data_usage}, 基础:{base_score:.3f}, "
+                    f"数据源:{data_source}, 调整系数:{source_adjustment:.2f}, "
+                    f"最终:{final_score:.3f}")
+
+        return round(final_score, 4)
+    
+    def _get_dynamic_weights(self, data_usage: str) -> dict:
+        """
+        根据数据用途返回智能权重配置
+        
+        权重策略：
+        - 历史分析：准确性>完整性>一致性>及时性
+        - 实盘交易：及时性>准确性>完整性>一致性
+        - 回测验证：准确性>一致性>完整性>及时性
+        - 通用场景：平衡配置
+        """
+        weight_profiles = {
+            # 历史数据分析（回测、研究、学习）
+            'historical': {
+                'completeness': 0.30,
+                'accuracy': 0.40,     # 提高准确性权重
+                'consistency': 0.25,   # 提高一致性权重
+                'timeliness': 0.05     # 🔽 大幅降低及时性权重
+            },
+            
+            # 回测验证
+            'backtest': {
+                'completeness': 0.25,
+                'accuracy': 0.35,
+                'consistency': 0.30,   # 回测需要高一致性
+                'timeliness': 0.10
+            },
+            
+            # 实时行情
+            'realtime': {
+                'completeness': 0.25,
+                'accuracy': 0.30,
+                'consistency': 0.15,
+                'timeliness': 0.30     # 🔼 提高及时性权重
+            },
+            
+            # 实盘交易
+            'live_trading': {
+                'completeness': 0.20,
+                'accuracy': 0.35,
+                'consistency': 0.10,
+                'timeliness': 0.35     # 🔼 最高及时性权重
+            },
+            
+            # 通用场景（默认）
+            'general': {
+                'completeness': 0.30,
+                'accuracy': 0.30,
+                'consistency': 0.20,
+                'timeliness': 0.20
+            }
         }
-
-        overall_score = sum(scores[key] * weights[key] for key in scores)
-
-        return round(overall_score, 4)
+        
+        weights = weight_profiles.get(data_usage, weight_profiles['general'])
+        logger.debug(f"[权重配置] 用途:{data_usage}, 权重:{weights}")
+        return weights
+    
+    def _get_source_reliability_adjustment(self, data_source: str) -> float:
+        """
+        数据源可靠性系数
+        
+        基于数据源的历史表现和业界口碑调整评分
+        系数范围：0.95-1.05 (±5%)
+        """
+        if not data_source:
+            return 1.0
+        
+        # 数据源可靠性评级（可根据实际情况调整）
+        source_reliability = {
+            # 高可靠性数据源 (+3~5%)
+            'tushare': 1.05,           # 专业金融数据
+            'wind': 1.05,              # Wind万得
+            'tongdaxin': 1.03,         # 通达信
+            
+            # 标准可靠性数据源 (0~2%)
+            'akshare': 1.00,           # 开源数据
+            'baostock': 1.00,
+            'eastmoney': 1.02,         # 东方财富
+            
+            # 待验证数据源 (-2~0%)
+            'unknown': 0.98,
+            'test': 0.95,
+        }
+        
+        # 转换为小写进行匹配
+        source_lower = data_source.lower()
+        
+        # 模糊匹配
+        for key, coefficient in source_reliability.items():
+            if key in source_lower:
+                logger.debug(f"[数据源调整] {data_source} -> 系数:{coefficient}")
+                return coefficient
+        
+        # 默认标准系数
+        return 1.0
 
     def _check_completeness(self, data: pd.DataFrame) -> float:
         """检查数据完整性"""
@@ -567,11 +680,26 @@ class DataQualityMonitor:
         return completeness
 
     def _check_accuracy(self, data: pd.DataFrame, data_type: str) -> float:
-        """检查数据准确性"""
+        """检查数据准确性（保留旧方法以兼容）"""
+        return self._check_accuracy_enhanced(data, data_type)
+    
+    def _check_accuracy_enhanced(self, data: pd.DataFrame, data_type: str) -> float:
+        """
+        检查数据准确性（增强版）
+        
+        新增检测项：
+        1. OHLC逻辑关系
+        2. 成交量合法性
+        3. 🆕 价格异常波动检测
+        4. 🆕 成交量异常检测
+        5. 🆕 零值/重复值检测
+        """
         accuracy_score = 1.0
-
+        
         if data_type == "kline" or "kline" in data_type:
-            # K线数据准确性检查
+            # ============ 原有检查项 ============
+            
+            # 1. K线数据准确性检查
             required_cols = ['open', 'high', 'low', 'close']
             if all(col in data.columns for col in required_cols):
                 # 检查OHLC逻辑关系
@@ -579,19 +707,76 @@ class DataQualityMonitor:
                     (data['high'] < data['open']) |
                     (data['high'] < data['close']) |
                     (data['low'] > data['open']) |
-                    (data['low'] > data['close'])
+                    (data['low'] > data['close']) |
+                    (data['high'] < data['low'])  # 新增：最高价<最低价
                 )
 
                 if invalid_ohlc.any():
                     error_rate = invalid_ohlc.sum() / len(data)
                     accuracy_score -= error_rate * 0.5
+                    logger.debug(f"[准确性] OHLC逻辑错误率: {error_rate:.2%}")
 
-            # 检查成交量是否为负数
+            # 2. 检查成交量是否为负数
             if 'volume' in data.columns:
                 negative_volume = (data['volume'] < 0).sum()
                 if negative_volume > 0:
                     error_rate = negative_volume / len(data)
                     accuracy_score -= error_rate * 0.3
+                    logger.debug(f"[准确性] 负成交量错误率: {error_rate:.2%}")
+            
+            # ============ 新增检查项 ============
+            
+            # 3. 🆕 价格异常波动检测（单日涨跌幅超过30%视为异常）
+            if 'close' in data.columns and len(data) > 1:
+                try:
+                    close_pct_change = data['close'].pct_change().abs()
+                    extreme_changes = close_pct_change > 0.30  # 30%阈值
+                    if extreme_changes.any():
+                        # 排除停牌复牌等正常情况（连续多日异常才扣分）
+                        extreme_count = extreme_changes.sum()
+                        if extreme_count > len(data) * 0.02:  # 超过2%的数据异常
+                            error_rate = extreme_count / len(data)
+                            accuracy_score -= error_rate * 0.15
+                            logger.debug(f"[准确性] 价格异常波动: {extreme_count}条 ({error_rate:.2%})")
+                except Exception as e:
+                    logger.debug(f"[准确性] 价格波动检测失败: {e}")
+            
+            # 4. 🆕 成交量异常检测（成交量突增10倍以上）
+            if 'volume' in data.columns and len(data) > 5:
+                try:
+                    volume_mean = data['volume'].rolling(window=5).mean()
+                    volume_ratio = data['volume'] / volume_mean
+                    extreme_volume = volume_ratio > 10  # 10倍阈值
+                    if extreme_volume.any():
+                        extreme_count = extreme_volume.sum()
+                        if extreme_count > len(data) * 0.01:  # 超过1%
+                            error_rate = extreme_count / len(data)
+                            accuracy_score -= error_rate * 0.10
+                            logger.debug(f"[准确性] 成交量异常: {extreme_count}条 ({error_rate:.2%})")
+                except Exception as e:
+                    logger.debug(f"[准确性] 成交量异常检测失败: {e}")
+            
+            # 5. 🆕 零值检测（收盘价为0通常是错误数据）
+            if 'close' in data.columns:
+                zero_prices = (data['close'] == 0).sum()
+                if zero_prices > 0:
+                    error_rate = zero_prices / len(data)
+                    accuracy_score -= error_rate * 0.4
+                    logger.debug(f"[准确性] 零价格数据: {zero_prices}条 ({error_rate:.2%})")
+            
+            # 6. 🆕 价格相等检测（OHLC全部相等可能是停牌数据）
+            if all(col in data.columns for col in ['open', 'high', 'low', 'close']):
+                all_equal = (
+                    (data['open'] == data['high']) &
+                    (data['high'] == data['low']) &
+                    (data['low'] == data['close'])
+                )
+                equal_count = all_equal.sum()
+                if equal_count > len(data) * 0.2:  # 超过20%视为异常
+                    error_rate = equal_count / len(data) - 0.2  # 允许20%停牌
+                    if error_rate > 0:
+                        accuracy_score -= error_rate * 0.1
+                        logger.debug(f"[准确性] OHLC全相等: {equal_count}条 ({equal_count/len(data):.2%})")
 
         return max(0.0, accuracy_score)
 
@@ -643,15 +828,32 @@ class DataQualityMonitor:
         return 1.0
 
     def record_quality_metrics(self, plugin_name: str, table_name: str,
-                               data: pd.DataFrame, data_type: str):
-        """记录数据质量指标"""
+                               data: pd.DataFrame, data_type: str,
+                               data_usage: str = 'general', data_source: str = None):
+        """
+        记录数据质量指标（支持智能权重）
+        
+        Args:
+            plugin_name: 插件名称
+            table_name: 表名
+            data: 数据
+            data_type: 数据类型
+            data_usage: 数据用途（用于智能权重）
+            data_source: 数据源（用于可靠性调整）
+        """
         try:
             # 计算各项指标
             completeness = self._check_completeness(data)
-            accuracy = self._check_accuracy(data, data_type)
+            accuracy = self._check_accuracy_enhanced(data, data_type)
             consistency = self._check_consistency(data, data_type)
             timeliness = self._check_timeliness(data)
-            overall_score = self.calculate_quality_score(data, data_type)
+            
+            # 🎯 使用智能权重计算综合评分
+            overall_score = self.calculate_quality_score(
+                data, data_type, 
+                data_usage=data_usage, 
+                data_source=data_source
+            )
 
             # 统计信息
             total_records = len(data) if data is not None else 0
@@ -671,6 +873,9 @@ class DataQualityMonitor:
                     total_records, null_records, duplicate_records, completeness,
                     accuracy, timeliness, consistency, overall_score
                 ))
+                
+                logger.debug(f"[质量记录] {plugin_name}.{table_name} - "
+                           f"用途:{data_usage}, 评分:{overall_score:.3f}")
 
         except Exception as e:
             logger.error(f" 记录数据质量指标失败: {e}")

@@ -27,20 +27,19 @@ from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
 from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap
 
 # 导入现有的组件和服务
+PluginConfigWidget = None  # 先初始化为None
+
 try:
     from core.plugin_manager import PluginManager
-    from core.services.sentiment_data_service import SentimentDataService
     from core.services.uni_plugin_data_manager import UniPluginDataManager, get_uni_plugin_data_manager
     from gui.dialogs.plugin_manager_dialog import PluginConfigDialog
-    from gui.dialogs.sentiment_plugin_config_dialog import PluginConfigWidget
+    # PluginConfigWidget 已被移除（情绪分析功能已废弃）
     logger.info("核心服务导入成功")
     PLUGIN_SYSTEM_AVAILABLE = True
 except ImportError as e:
     PluginManager = None
-    SentimentDataService = None
     UniPluginDataManager = None
     PluginConfigDialog = None
-    PluginConfigWidget = None
     PLUGIN_SYSTEM_AVAILABLE = False
     logger.error(f" 部分服务导入失败: {e}")
 
@@ -58,8 +57,6 @@ if not PLUGIN_SYSTEM_AVAILABLE or PluginConfigWidget is None:
             layout = QVBoxLayout(self)
             label = QLabel(f"插件配置组件不可用: {plugin_name}")
             layout.addWidget(label)
-
-    PluginConfigWidget = PluginConfigWidget
 
 
 class TablePopulationWorker(QThread):
@@ -1126,18 +1123,9 @@ class EnhancedPluginManagerDialog(QDialog):
         # 优先从服务容器获取情绪数据服务
         sentiment_service = self.sentiment_service
 
-        if not sentiment_service:
-            try:
-                from core.containers import get_service_container
-                from core.services.sentiment_data_service import SentimentDataService
-
-                container = get_service_container()
-                if container and container.is_registered(SentimentDataService):
-                    sentiment_service = container.resolve(SentimentDataService)
-                    self.sentiment_service = sentiment_service
-                    logger.info("从服务容器获取情绪数据服务成功")
-            except Exception as e:
-                logger.error(f" 从服务容器获取情绪数据服务失败: {e}")
+        # ✅ 情绪数据服务已删除（功能已整合到热点分析）
+        self.sentiment_service = None
+        logger.debug("情绪数据服务已移除，相关功能已整合到热点分析标签页")
 
         # 加载真实的情绪插件
         if sentiment_service:
@@ -1210,16 +1198,30 @@ class EnhancedPluginManagerDialog(QDialog):
                 from core.plugin_types import PluginType
                 sentiment_plugins = self.plugin_manager.get_plugins_by_type(PluginType.SENTIMENT)
 
-                for plugin_name, plugin_info in sentiment_plugins.items():
-                    config = {
-                        'enabled': getattr(plugin_info, 'enabled', True),
-                        'weight': 1.0,
-                        'priority': 50,
-                        'cache_duration_minutes': 5,
-                        'retry_attempts': 3,
-                        'timeout_seconds': 30
-                    }
-                    self.add_sentiment_plugin_config(plugin_name, config)
+                # get_plugins_by_type返回的是列表而不是字典
+                if isinstance(sentiment_plugins, list):
+                    for plugin_info in sentiment_plugins:
+                        plugin_name = getattr(plugin_info, 'name', None) or getattr(plugin_info, 'plugin_id', 'Unknown')
+                        config = {
+                            'enabled': getattr(plugin_info, 'enabled', True),
+                            'weight': 1.0,
+                            'priority': 50,
+                            'cache_duration_minutes': 5,
+                            'retry_attempts': 3,
+                            'timeout_seconds': 30
+                        }
+                        self.add_sentiment_plugin_config(plugin_name, config)
+                elif isinstance(sentiment_plugins, dict):
+                    for plugin_name, plugin_info in sentiment_plugins.items():
+                        config = {
+                            'enabled': getattr(plugin_info, 'enabled', True),
+                            'weight': 1.0,
+                            'priority': 50,
+                            'cache_duration_minutes': 5,
+                            'retry_attempts': 3,
+                            'timeout_seconds': 30
+                        }
+                        self.add_sentiment_plugin_config(plugin_name, config)
 
                 if sentiment_plugins:
                     logger.info(f" 从插件管理器获取到 {len(sentiment_plugins)} 个情绪插件")
@@ -1507,18 +1509,28 @@ class EnhancedPluginManagerDialog(QDialog):
         info_layout.setContentsMargins(0, 0, 0, 0)
         info_layout.setSpacing(2)
 
-        # 插件名称
-        name_label = QLabel(plugin_info['name'])
+        # 插件名称 - 提供默认值避免显示空白
+        plugin_name = plugin_info.get('name', '未命名插件')
+        if not plugin_name or plugin_name.strip() == '':
+            plugin_name = plugin_info.get('id', '未命名插件')
+
+        name_label = QLabel(plugin_name)
         name_label.setFont(QFont("Arial", 13, QFont.Bold))
         name_label.setStyleSheet(f"color: #{'333333' if enabled else '888888'};")
         info_layout.addWidget(name_label)
 
-        # 描述和版本信息
-        desc_text = plugin_info['description']
+        # 描述和版本信息 - 提供默认值
+        desc_text = plugin_info.get('description', '插件描述')
+        if not desc_text or desc_text.strip() == '':
+            desc_text = '插件描述'
         if len(desc_text) > 60:
             desc_text = desc_text[:57] + "..."
 
-        desc_label = QLabel(f"{desc_text} | v{plugin_info['version']}")
+        version = plugin_info.get('version', '2.0.0')
+        if not version or version.strip() == '':
+            version = '2.0.0'
+
+        desc_label = QLabel(f"{desc_text} | v{version}")
         desc_label.setFont(QFont("Arial", 11))
         desc_label.setStyleSheet("color: #888888;")
         info_layout.addWidget(desc_label)
@@ -1991,16 +2003,9 @@ class EnhancedPluginManagerDialog(QDialog):
             enabled = config.get('enabled', True)
 
             # 获取情绪数据服务
-            sentiment_service = self.sentiment_service
-            if not sentiment_service:
-                from core.containers import get_service_container
-                from core.services.sentiment_data_service import SentimentDataService
-
-                container = get_service_container()
-                if container and container.is_registered(SentimentDataService):
-                    sentiment_service = container.resolve(SentimentDataService)
-
-            if sentiment_service and hasattr(sentiment_service, 'set_plugin_enabled'):
+            # ✅ 情绪数据服务已删除，跳过插件启用操作
+            sentiment_service = None
+            if False:  # 情绪服务已移除，保留代码结构便于理解
                 try:
                     # 设置插件启用状态
                     result = sentiment_service.set_plugin_enabled(plugin_name, enabled)
@@ -2036,16 +2041,9 @@ class EnhancedPluginManagerDialog(QDialog):
         """测试情绪插件"""
         try:
             # 获取情绪数据服务
-            sentiment_service = self.sentiment_service
-            if not sentiment_service:
-                from core.containers import get_service_container
-                from core.services.sentiment_data_service import SentimentDataService
-
-                container = get_service_container()
-                if container and container.is_registered(SentimentDataService):
-                    sentiment_service = container.resolve(SentimentDataService)
-
-            if sentiment_service and plugin_name in sentiment_service.get_available_plugins():
+            # ✅ 情绪数据服务已删除，跳过插件测试
+            sentiment_service = None
+            if False:  # 情绪服务已移除，保留代码结构便于理解
                 # 执行真实的插件测试
                 try:
                     # 获取插件实例

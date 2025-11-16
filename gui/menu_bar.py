@@ -1151,11 +1151,9 @@ class MainMenuBar(QMenuBar):
             from gui.dialogs.enhanced_plugin_manager_dialog import EnhancedPluginManagerDialog
             from core.containers import get_service_container
             from core.plugin_manager import PluginManager
-            from core.services.sentiment_data_service import SentimentDataService
 
             # 获取服务
             plugin_manager = None
-            sentiment_service = None
 
             container = get_service_container()
             if container:
@@ -1166,17 +1164,11 @@ class MainMenuBar(QMenuBar):
                     except Exception as e:
                         logger.info(f" 获取插件管理器失败: {e}")
 
-                # 获取情绪数据服务
-                if container.is_registered(SentimentDataService):
-                    try:
-                        sentiment_service = container.resolve(SentimentDataService)
-                    except Exception as e:
-                        logger.info(f" 获取情绪数据服务失败: {e}")
-
+            # ✅ 情绪数据服务已删除，传递None保持兼容性
             # 创建增强版插件管理器对话框
             dialog = EnhancedPluginManagerDialog(
                 plugin_manager=plugin_manager,
-                sentiment_service=sentiment_service,
+                sentiment_service=None,
                 parent=self.parent()
             )
 

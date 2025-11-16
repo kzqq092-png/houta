@@ -16,6 +16,7 @@ from core.unified_indicator_service import (
 import os
 import sys
 import json
+import traceback
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Optional, Union, Tuple
@@ -38,11 +39,17 @@ class IndicatorService:
         初始化指标计算服务
 
         参数:
-            db_path: 统一数据库文件路径
+            db_path: 统一数据库文件路径（保留用于兼容性，实际使用全局单例）
         """
         self.db_path = db_path
-        # 使用统一指标服务
-        self.unified_service = None
+        # 使用统一指标服务（全局单例，不需要传递db_path）
+        try:
+            self.unified_service = get_unified_service()
+            logger.info(f"✓ 统一指标服务初始化成功")
+        except Exception as e:
+            logger.error(f"✗ 统一指标服务初始化失败: {e}")
+            logger.error(traceback.format_exc())
+            self.unified_service = None
         self._custom_functions = {}  # 存储自定义函数
 
     def close(self):
@@ -108,6 +115,9 @@ class IndicatorService:
         返回:
             计算结果
         """
+        if self.unified_service is None:
+            logger.error(f"✗ 统一指标服务未初始化，无法计算指标: {name}")
+            raise RuntimeError("统一指标服务未初始化")
         return self.unified_service.calculate_indicator(name, data, params if params else {})
 
     def get_all_categories(self) -> List[Dict[str, Any]]:

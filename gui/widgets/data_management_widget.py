@@ -45,7 +45,6 @@ try:
     from core.plugin_types import AssetType, DataType, PluginType, DataSourceProvider
     from core.asset_type_identifier import AssetTypeIdentifier
     from core.data_router import DataRouter, get_data_router
-    from core.services.asset_aware_unified_data_manager import AssetAwareUnifiedDataManager
     from core.ui_integration.data_missing_manager import DataMissingManager, get_data_missing_manager
     from core.ui_integration.smart_data_integration import SmartDataIntegration, get_smart_data_integration
     from core.database_maintenance_engine import DatabaseMaintenanceEngine

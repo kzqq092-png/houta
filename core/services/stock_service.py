@@ -268,18 +268,36 @@ class StockService(CacheableService, ConfigurableService):
             self._no_data_cache.add(stock_code)
             return None
 
-    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365, 
+                  asset_type: 'AssetType' = None) -> pd.DataFrame:
         """
-        获取K线数据（兼容性方法）
+        获取K线数据（✅ 优化：支持多资产类型智能路由）
 
         Args:
-            stock_code: 股票代码
+            stock_code: 股票代码（或其他资产代码）
             period: 周期
             count: 数据条数
+            asset_type: 资产类型（可选，如果是非股票资产则路由到UnifiedDataManager）
 
         Returns:
             K线数据DataFrame
         """
+        # ✅ 智能路由：如果指定了非股票资产类型，使用UnifiedDataManager
+        if asset_type is not None:
+            from core.plugin_types import AssetType
+            if asset_type != AssetType.STOCK_A:
+                # 非股票资产，路由到UnifiedDataManager
+                try:
+                    from core.services.unified_data_manager import get_unified_data_manager
+                    data_manager = get_unified_data_manager()
+                    if data_manager:
+                        logger.debug(f"路由到UnifiedDataManager查询{asset_type.value}资产: {stock_code}")
+                        return data_manager.get_kdata(stock_code, period, count, asset_type=asset_type)
+                except Exception as e:
+                    logger.error(f"UnifiedDataManager路由失败: {e}")
+                    return pd.DataFrame()
+        
+        # 股票资产或未指定类型，使用传统方法
         stock_data = self.get_stock_data(stock_code, period, count)
         if stock_data is not None:
             return stock_data

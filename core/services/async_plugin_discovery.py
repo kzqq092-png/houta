@@ -137,13 +137,32 @@ class AsyncPluginDiscoveryWorker(QThread):
                     plugin_files.append((plugin_path.stem, plugin_path))
 
             # 扫描子目录
-            for subdir in ["examples", "sentiment_data_sources"]:
+            for subdir in ["sentiment_data_sources"]:  # ✅ 修复：移除examples
                 sub_path = plugin_dir / subdir
                 if sub_path.exists():
                     for plugin_path in sub_path.glob("*.py"):
                         if plugin_path.name not in excluded_files and not plugin_path.name.startswith("__"):
                             plugin_name = f"{subdir}.{plugin_path.stem}"
                             plugin_files.append((plugin_name, plugin_path))
+            
+            # ✅ 修复：扫描data_sources及其分类子目录
+            data_sources_dir = plugin_dir / "data_sources"
+            if data_sources_dir.exists():
+                # 扫描data_sources根目录
+                for plugin_path in data_sources_dir.glob("*.py"):
+                    if plugin_path.name not in excluded_files and not plugin_path.name.startswith("__"):
+                        plugin_name = f"data_sources.{plugin_path.stem}"
+                        plugin_files.append((plugin_name, plugin_path))
+                
+                # 扫描分类子目录
+                excluded_subdirs = {'templates', 'examples', '__pycache__', 'test', 'tests', '.git', 'utils', 'fundamental_data_plugins', 'macro_data_plugins'}
+                for category_dir in data_sources_dir.iterdir():
+                    if category_dir.is_dir() and category_dir.name not in excluded_subdirs:
+                        for plugin_path in category_dir.glob("*_plugin.py"):
+                            if plugin_path.name not in excluded_files and not plugin_path.name.startswith("__"):
+                                plugin_name = f"data_sources.{category_dir.name}.{plugin_path.stem}"
+                                plugin_files.append((plugin_name, plugin_path))
+                                logger.debug(f"发现data_sources插件: {plugin_name}")
 
         except Exception as e:
             logger.error(f"扫描插件文件失败: {e}")

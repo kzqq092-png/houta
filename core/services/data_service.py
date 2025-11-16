@@ -2,7 +2,7 @@
 统一数据服务 - 架构精简重构版本
 
 统一所有数据管理器功能，提供单一的数据访问接口。
-整合UnifiedDataManager、UniPluginDataManager、SentimentDataService等。
+整合UnifiedDataManager、UniPluginDataManager等核心数据管理器。
 完全重构以符合15个核心服务的架构精简目标。
 """
 
@@ -130,7 +130,6 @@ class DataService(BaseService):
     整合所有数据管理器功能：
     - UnifiedDataManager: 统一数据管理
     - UniPluginDataManager: 插件数据管理
-    - SentimentDataService: 情绪数据服务
     - 其他各类数据管理器
 
     提供统一的数据访问接口，支持：

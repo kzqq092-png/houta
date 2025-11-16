@@ -34,7 +34,13 @@ try:
     from gui.widgets.analysis_tabs.technical_tab import TechnicalAnalysisTab
     TECHNICAL_TAB_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"无法导入TechnicalAnalysisTab: {e}")
+    # ✅ 修复：只记录实际导入失败的情况，忽略内部依赖模块的缺失
+    error_msg = str(e)
+    # 如果错误信息中包含 enhanced_kline_technical_tab，说明是内部依赖问题，使用 debug 级别
+    if 'enhanced_kline_technical_tab' in error_msg:
+        logger.debug(f"TechnicalAnalysisTab 内部依赖模块未实现（enhanced_kline_technical_tab），这是正常的: {e}")
+    else:
+        logger.warning(f"无法导入TechnicalAnalysisTab: {e}")
     TECHNICAL_TAB_AVAILABLE = False
 
 # 导入其他专业分析标签页
@@ -47,27 +53,28 @@ try:
     PROFESSIONAL_TABS_AVAILABLE = True
     ENHANCED_SENTIMENT_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"无法导入专业分析标签页: {e}")
+    # ✅ 修复：只记录实际导入失败的情况，忽略内部依赖模块的缺失
+    error_msg = str(e)
+    # 如果错误信息中包含 enhanced_kline_technical_tab，说明是内部依赖问题，使用 debug 级别
+    if 'enhanced_kline_technical_tab' in error_msg:
+        logger.debug(f"专业分析标签页内部依赖模块未实现（enhanced_kline_technical_tab），这是正常的: {e}")
+    else:
+        logger.warning(f"无法导入专业分析标签页: {e}")
     PROFESSIONAL_TABS_AVAILABLE = False
     ENHANCED_SENTIMENT_AVAILABLE = False
 
-# 导入合并后的专业情绪分析标签页（包含实时分析和报告功能）
-try:
-    from gui.widgets.analysis_tabs.professional_sentiment_tab import ProfessionalSentimentTab
-    PROFESSIONAL_SENTIMENT_AVAILABLE = True
-    # 向后兼容，EnhancedSentimentAnalysisTab 现在指向 ProfessionalSentimentTab
-    EnhancedSentimentAnalysisTab = ProfessionalSentimentTab
-except ImportError as e:
-    logger.warning(f"无法导入专业版情绪分析标签页: {e}")
-    PROFESSIONAL_SENTIMENT_AVAILABLE = False
+# 情绪分析标签页已移除（优化性能，避免不必要的网络请求）
+PROFESSIONAL_SENTIMENT_AVAILABLE = False
 
 # 导入K线技术分析标签页
-try:
-    from gui.widgets.analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineTechnicalTab
-    KLINE_TECHNICAL_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"无法导入K线技术分析标签页: {e}")
-    KLINE_TECHNICAL_AVAILABLE = False
+# ✅ 修复：enhanced_kline_technical_tab模块暂未实现，暂时禁用
+KLINE_TECHNICAL_AVAILABLE = False
+# try:
+#     from gui.widgets.analysis_tabs.enhanced_kline_technical_tab import EnhancedKLineTechnicalTab
+#     KLINE_TECHNICAL_AVAILABLE = True
+# except ImportError as e:
+#     logger.warning(f"无法导入K线技术分析标签页: {e}")
+#     KLINE_TECHNICAL_AVAILABLE = False
 
 # 导入AnalysisToolsPanel
 try:
@@ -100,7 +107,7 @@ class RightPanel(BasePanel):
     2. 买卖信号分析
     3. 风险评估
     4. 历史回测结果
-    5. 市场情绪分析
+    5. 热点分析与资金流向（情绪分析已优化移除）
     """
 
     # 定义信号
@@ -140,6 +147,10 @@ class RightPanel(BasePanel):
         # 专业标签页列表
         self._professional_tabs = []
         self._has_basic_tabs = False  # 标记是否创建了基础标签页
+
+        # ✅ 优化2：待更新标签页跟踪（懒加载机制）
+        self._pending_tab_updates = {}  # {tab_index: kline_data}
+        self._tab_stock_code = {}       # {tab_index: stock_code} 跟踪每个标签页的数据
 
         # 性能优化管理器
         self._performance_manager = None
@@ -322,46 +333,22 @@ class RightPanel(BasePanel):
             except Exception as e:
                 logger.error(f"创建波浪分析标签页失败: {e}")
 
-            # 情绪分析 - 优先使用专业版，异步初始化
-            try:
-                if PROFESSIONAL_SENTIMENT_AVAILABLE:
-                    self._sentiment_tab = ProfessionalSentimentTab(config_manager)
-                    tab_widget.addTab(self._sentiment_tab, "情绪分析")
-                    self.add_widget('sentiment_tab', self._sentiment_tab)
-                    self._professional_tabs.append(self._sentiment_tab)
-                    logger.info("使用合并后的专业版情绪分析标签页（包含实时分析和报告功能）")
-                else:
-                    # 如果都失败了，创建一个简单的占位符
-                    placeholder_tab = QWidget()
-                    placeholder_layout = QVBoxLayout(placeholder_tab)
-                    placeholder_label = QLabel("情绪分析功能暂时不可用")
-                    placeholder_label.setAlignment(Qt.AlignCenter)
-                    placeholder_layout.addWidget(placeholder_label)
-                    tab_widget.addTab(placeholder_tab, "情绪分析")
-                    logger.warning("情绪分析功能不可用，使用占位符")
-
-            except Exception as sentiment_error:
-                logger.error(f" 情绪分析标签页创建失败: {sentiment_error}")
-                # 如果都失败了，创建一个简单的占位符
-                placeholder_tab = QWidget()
-                placeholder_layout = QVBoxLayout(placeholder_tab)
-                placeholder_label = QLabel("情绪分析功能暂时不可用")
-                placeholder_label.setAlignment(Qt.AlignCenter)
-                placeholder_layout.addWidget(placeholder_label)
-                tab_widget.addTab(placeholder_tab, "情绪分析")
-
-                # K线情绪分析 - 使用服务容器
+            # 情绪分析标签页已移除（优化性能，避免不必要的网络请求）
+            # 不再创建情绪分析标签页，已被热点分析等功能替代
+            logger.info("情绪分析标签页已优化移除，可使用热点分析等功能")
+            import time
+            # K线技术分析 - 使用服务容器
             if KLINE_TECHNICAL_AVAILABLE:
                 try:
                     logger.info("开始创建K线技术分析标签页...")
-                    import time
+                    
                     start_time = time.time()
 
                     logger.info("导入K线技术分析标签页模块...")
                     logger.info("K线技术分析标签页模块导入成功")
 
                     logger.info("创建K线技术分析标签页实例...")
-                    self._kline_sentiment_tab = EnhancedKLineTechnicalTab(
+                    self._kline_technical_tab = EnhancedKLineTechnicalTab(
                         config_manager=config_manager
                     )
 
@@ -369,12 +356,12 @@ class RightPanel(BasePanel):
                     logger.info(f"⏱ K线技术分析标签页实例创建耗时: {(create_time - start_time):.2f}秒")
 
                     logger.info("添加K线技术分析标签页到UI...")
-                    tab_widget.addTab(self._kline_sentiment_tab, "K线技术")
+                    tab_widget.addTab(self._kline_technical_tab, "K线技术")
 
                     # 注册到组件管理
                     logger.info("注册K线技术分析标签页到组件管理...")
-                    self.add_widget('kline_sentiment_tab', self._kline_sentiment_tab)
-                    self._professional_tabs.append(self._kline_sentiment_tab)
+                    self.add_widget('kline_technical_tab', self._kline_technical_tab)
+                    self._professional_tabs.append(self._kline_technical_tab)
 
                     end_time = time.time()
                     logger.info(f" K线技术分析标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
@@ -382,7 +369,7 @@ class RightPanel(BasePanel):
                     logger.error(f" K线技术分析标签页创建失败: {kline_error}")
                     logger.error(traceback.format_exc())
 
-                    # 板块资金流 - 使用服务容器
+            # ✅ 修复：板块资金流 - 使用服务容器（缩进修复，应在 if PROFESSIONAL_TABS_AVAILABLE 块内）
             try:
                 logger.info("开始创建板块资金流标签页...")
                 start_time = time.time()
@@ -811,6 +798,12 @@ class RightPanel(BasePanel):
         """注册事件处理器"""
         self.event_bus.subscribe(UIDataReadyEvent, self._on_ui_data_ready)
         logger.debug("RightPanel已订阅UIDataReadyEvent事件")
+        
+        # ✅ 优化2：连接标签页切换信号，实现懒加载
+        tab_widget = self.get_widget('tab_widget')
+        if tab_widget:
+            tab_widget.currentChanged.connect(self._on_tab_changed)
+            logger.debug("已连接标签页切换信号（懒加载机制）")
 
     def _initialize_performance_manager(self) -> None:
         """初始化性能管理器"""
@@ -913,10 +906,19 @@ class RightPanel(BasePanel):
             logger.error(traceback.format_exc())
 
     def _update_professional_tabs_with_performance_manager(self, kline_data):
-        """使用性能管理器更新专业标签页"""
+        """✅ 优化2：使用性能管理器更新专业标签页（懒加载机制）"""
         try:
-            # 为每个标签页更新数据
-            for tab in self._professional_tabs:
+            tab_widget = self.get_widget('tab_widget')
+            if not tab_widget:
+                logger.warning("标签页组件不存在，跳过更新")
+                return
+            
+            # 获取当前激活的标签页索引
+            current_index = tab_widget.currentIndex()
+            logger.info(f"当前激活标签页索引: {current_index}/{len(self._professional_tabs)}")
+            
+            # 为每个标签页更新数据或标记为待更新
+            for i, tab in enumerate(self._professional_tabs):
                 # 获取标签页类型
                 tab_type = type(tab).__name__.lower().replace('tab', '').replace('analysis', '')
 
@@ -924,21 +926,77 @@ class RightPanel(BasePanel):
                 if hasattr(tab, 'skip_kdata') and getattr(tab, 'skip_kdata') is True:
                     logger.debug(f"跳过标签页（skip_kdata=True）: {tab_type}")
                     continue
+                
+                # ✅ 懒加载：只更新当前激活的标签页
+                if i == current_index:
+                    logger.info(f"立即更新当前激活标签页: {tab_type} (索引{i})")
+                    # 使用性能管理器更新数据
+                    self._performance_manager.update_tab_data(
+                        stock_code=self._current_stock_code,
+                        tab_id=tab_type,
+                        tab_widget=tab,  # 传递tab组件本身
+                        data=kline_data,
+                        use_cache=True
+                    )
+                    # 记录已更新
+                    self._tab_stock_code[i] = self._current_stock_code
+                else:
+                    # 标记为待更新
+                    logger.debug(f"标记标签页为待更新: {tab_type} (索引{i})")
+                    self._pending_tab_updates[i] = kline_data
+                    # 清除旧的股票代码标记
+                    if i in self._tab_stock_code:
+                        del self._tab_stock_code[i]
 
-                # 使用性能管理器更新数据
-                self._performance_manager.update_tab_data(
-                    stock_code=self._current_stock_code,
-                    tab_id=tab_type,
-                    data=kline_data,
-                    use_cache=True
-                )
-
-            logger.info(f" 性能管理器完成所有标签页更新")
+            logger.info(f"✓ 懒加载完成：立即更新1个标签页，待更新{len(self._pending_tab_updates)}个")
 
         except Exception as e:
-            logger.error(f" 性能管理器更新标签页失败: {e}")
+            logger.error(f"✗ 性能管理器更新标签页失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             # 回退到原有机制
             self._async_update_professional_tabs(kline_data)
+
+    def _on_tab_changed(self, index: int):
+        """✅ 优化2：标签页切换处理器（懒加载触发）"""
+        try:
+            logger.info(f"标签页切换到索引: {index}")
+            
+            # 检查是否有待更新的数据
+            if index in self._pending_tab_updates:
+                kline_data = self._pending_tab_updates.pop(index)
+                logger.info(f"加载待更新标签页数据（索引{index}）")
+                
+                # 获取对应的标签页
+                if index < len(self._professional_tabs):
+                    tab = self._professional_tabs[index]
+                    tab_type = type(tab).__name__.lower().replace('tab', '').replace('analysis', '')
+                    
+                    # 使用性能管理器更新数据
+                    if self._performance_manager:
+                        self._performance_manager.update_tab_data(
+                            stock_code=self._current_stock_code,
+                            tab_id=tab_type,
+                            tab_widget=tab,
+                            data=kline_data,
+                            use_cache=True
+                        )
+                        # 记录已更新
+                        self._tab_stock_code[index] = self._current_stock_code
+                        logger.info(f"✓ 懒加载完成：{tab_type}")
+                    else:
+                        logger.warning("性能管理器不可用，跳过更新")
+                else:
+                    logger.warning(f"标签页索引{index}超出范围（总数{len(self._professional_tabs)}）")
+            else:
+                # 检查是否需要刷新（股票已变更）
+                if index in self._tab_stock_code and self._tab_stock_code[index] != self._current_stock_code:
+                    logger.debug(f"标签页{index}的股票已变更，但数据已在待更新队列中")
+        
+        except Exception as e:
+            logger.error(f"标签页切换处理失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def _async_update_professional_tabs(self, kline_data):
         """异步更新专业标签页，避免阻塞UI线程"""

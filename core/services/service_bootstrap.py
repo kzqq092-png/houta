@@ -369,72 +369,10 @@ class ServiceBootstrap:
             logger.error(f" 资产服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
-            # 注意：情绪数据服务需要在插件管理器注册后才能初始化
-        # 这里只注册服务，不立即初始化
-        try:
-            from .sentiment_data_service import SentimentDataService, SentimentDataServiceConfig
-
-            # 创建配置
-            sentiment_config = SentimentDataServiceConfig(
-                cache_duration_minutes=5,
-                auto_refresh_interval_minutes=10,
-                enable_auto_refresh=True
-            )
-
-            # 注册服务工厂（延迟初始化）
-            def create_sentiment_service():
-                # 在创建时获取插件管理器
-                plugin_manager = None
-                try:
-                    if self.service_container.is_registered(PluginManager):
-                        plugin_manager = self.service_container.resolve(PluginManager)
-                        logger.info("成功获取插件管理器用于情绪数据服务")
-                    else:
-                        logger.warning("插件管理器未注册，情绪数据服务将使用受限模式")
-                except Exception as e:
-                    logger.warning(f" 获取插件管理器失败: {e}")
-
-                return SentimentDataService(
-                    plugin_manager=plugin_manager,
-                    config=sentiment_config
-                )
-
-            self.service_container.register_factory(
-                SentimentDataService,
-                create_sentiment_service,
-                scope=ServiceScope.SINGLETON
-            )
-
-            logger.info("情绪数据服务注册完成（延迟初始化）")
-
-        except Exception as e:
-            logger.error(f" 情绪数据服务注册失败: {e}")
-            logger.error(traceback.format_exc())
-
-            # K线情绪分析服务
-        try:
-            logger.info("开始注册K线情绪分析服务...")
-            from .kline_sentiment_analyzer import KLineSentimentAnalyzer
-            logger.info("K线情绪分析服务模块导入成功")
-
-            def create_kline_analyzer():
-                logger.info("开始创建K线情绪分析器实例...")
-                start_time = time.time()
-                analyzer = KLineSentimentAnalyzer()
-                end_time = time.time()
-                logger.info(f" K线情绪分析器实例创建完成，耗时: {(end_time - start_time):.2f}秒")
-                return analyzer
-
-            self.service_container.register_factory(
-                KLineSentimentAnalyzer,
-                create_kline_analyzer,
-                scope=ServiceScope.SINGLETON
-            )
-
-            logger.info("K线情绪分析服务注册完成")
-        except Exception as e:
-            logger.error(f" K线情绪分析服务注册失败: {e}")
-            logger.error(traceback.format_exc())
+            # ✅ 情绪数据服务和K线情绪分析服务已删除（被热点分析功能取代）
+            # 相关文件已清理：sentiment_data_service.py、kline_sentiment_analyzer.py
+            # 相关UI组件已删除：enhanced_kline_sentiment_tab.py、sentiment_overview_widget.py
+            logger.debug("情绪数据服务和K线情绪分析服务已移除（功能已整合到热点分析）")
 
             # 板块资金流服务
         try:
@@ -778,15 +716,8 @@ class ServiceBootstrap:
             else:
                 logger.warning("PluginManager未注册，跳过初始化")
 
-            # 现在插件管理器可用，初始化情绪数据服务
-            try:
-                from .sentiment_data_service import SentimentDataService
-                if self.service_container.is_registered(SentimentDataService):
-                    sentiment_service = self.service_container.resolve(SentimentDataService)
-                    sentiment_service.initialize()
-                    logger.info("情绪数据服务初始化完成")
-            except Exception as sentiment_error:
-                logger.error(f" 情绪数据服务初始化失败: {sentiment_error}")
+            # ✅ 情绪数据服务已删除（功能已整合到热点分析）
+            logger.debug("情绪数据服务初始化已跳过（服务已移除）")
 
         except Exception as e:
             logger.error(f" 插件管理器服务注册失败: {e}")

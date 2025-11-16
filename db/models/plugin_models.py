@@ -898,6 +898,131 @@ class DataSourcePluginConfigManager:
             logger.error(f"获取所有数据源路由配置失败: {e}")
             return {}
 
+    def set_pool_config(self, max_pool_size: int = None, pool_timeout: int = None, pool_cleanup_interval: int = None) -> bool:
+        """
+        设置全局数据源实例池配置（更新所有已存在的插件配置）
+        
+        Args:
+            max_pool_size: 最大连接池大小
+            pool_timeout: 连接池超时时间（秒）
+            pool_cleanup_interval: 连接池清理间隔（秒）
+        
+        Returns:
+            bool: 是否成功保存
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                current_time = datetime.now().isoformat()
+                
+                # 构建更新SQL，只更新非None的参数
+                update_fields = []
+                update_values = []
+                
+                if max_pool_size is not None:
+                    update_fields.append('max_pool_size = ?')
+                    update_values.append(max_pool_size)
+                
+                if pool_timeout is not None:
+                    update_fields.append('pool_timeout = ?')
+                    update_values.append(pool_timeout)
+                
+                if pool_cleanup_interval is not None:
+                    update_fields.append('pool_cleanup_interval = ?')
+                    update_values.append(pool_cleanup_interval)
+                
+                if not update_fields:
+                    logger.warning("set_pool_config: 没有提供任何配置参数")
+                    return False
+                
+                # 添加更新时间
+                update_fields.append('updated_at = ?')
+                update_values.append(current_time)
+                
+                # 更新所有已存在的插件配置
+                update_sql = f'''
+                    UPDATE data_source_plugin_configs 
+                    SET {', '.join(update_fields)}
+                    WHERE enabled = 1
+                '''
+                
+                cursor.execute(update_sql, update_values)
+                affected_rows = cursor.rowcount
+                conn.commit()
+                
+                logger.info(f"✅ 数据源实例池配置已更新: max_pool_size={max_pool_size}, "
+                           f"pool_timeout={pool_timeout}, pool_cleanup_interval={pool_cleanup_interval}, "
+                           f"影响 {affected_rows} 个插件配置")
+                return True
+                
+        except Exception as e:
+            logger.error(f"设置数据源实例池配置失败: {e}", exc_info=True)
+            return False
+
+    def update_plugin_pool_config(self, plugin_id: str, max_pool_size: int = None, 
+                                  pool_timeout: int = None, pool_cleanup_interval: int = None) -> bool:
+        """
+        更新指定插件的实例池配置
+        
+        Args:
+            plugin_id: 插件ID
+            max_pool_size: 最大连接池大小
+            pool_timeout: 连接池超时时间（秒）
+            pool_cleanup_interval: 连接池清理间隔（秒）
+        
+        Returns:
+            bool: 是否成功保存
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                current_time = datetime.now().isoformat()
+                
+                # 构建更新SQL，只更新非None的参数
+                update_fields = []
+                update_values = []
+                
+                if max_pool_size is not None:
+                    update_fields.append('max_pool_size = ?')
+                    update_values.append(max_pool_size)
+                
+                if pool_timeout is not None:
+                    update_fields.append('pool_timeout = ?')
+                    update_values.append(pool_timeout)
+                
+                if pool_cleanup_interval is not None:
+                    update_fields.append('pool_cleanup_interval = ?')
+                    update_values.append(pool_cleanup_interval)
+                
+                if not update_fields:
+                    logger.warning(f"update_plugin_pool_config: 没有提供任何配置参数 (plugin_id={plugin_id})")
+                    return False
+                
+                # 添加更新时间
+                update_fields.append('updated_at = ?')
+                update_values.append(current_time)
+                
+                # 添加WHERE条件参数
+                update_values.append(plugin_id)
+                
+                # 更新指定插件的配置
+                update_sql = f'''
+                    UPDATE data_source_plugin_configs 
+                    SET {', '.join(update_fields)}
+                    WHERE plugin_id = ?
+                '''
+                
+                cursor.execute(update_sql, update_values)
+                conn.commit()
+                
+                logger.info(f"插件 {plugin_id} 的实例池配置已更新: max_pool_size={max_pool_size}, "
+                           f"pool_timeout={pool_timeout}, pool_cleanup_interval={pool_cleanup_interval}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"更新插件 {plugin_id} 的实例池配置失败: {e}", exc_info=True)
+            return False
+
 
 # 全局配置管理器实例
 _data_source_config_manager = None

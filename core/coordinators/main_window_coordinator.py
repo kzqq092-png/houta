@@ -128,8 +128,12 @@ class MainWindowCoordinator(BaseCoordinator):
 
     def _do_initialize(self) -> None:
         """初始化协调器"""
+        import time
+        start_time = time.time()
+        
         try:
             # 获取服务
+            service_start = time.time()
             self._stock_service = self.service_container.resolve(StockService)
             self._chart_service = self.service_container.resolve(ChartService)
             self._analysis_service = self.service_container.resolve(
@@ -141,6 +145,8 @@ class MainWindowCoordinator(BaseCoordinator):
                 ConfigService)
             self._data_manager = self.service_container.resolve(
                 UnifiedDataManager)
+            service_time = time.time() - service_start
+            logger.info(f"服务解析耗时: {service_time:.3f}秒")
 
             # 获取资产服务（TET模式）
             try:
@@ -150,38 +156,62 @@ class MainWindowCoordinator(BaseCoordinator):
             except Exception as e:
                 logger.warning(f" AssetService初始化失败: {e}")
 
-            # 初始化增强UI组件
-            self._initialize_enhanced_ui_components()
-
             # 如果AssetService初始化失败，设置为None
             if not hasattr(self, '_asset_service'):
                 self._asset_service = None
 
             # 初始化窗口
+            window_start = time.time()
             self._setup_window()
+            window_time = time.time() - window_start
+            logger.info(f"窗口设置耗时: {window_time:.3f}秒")
 
             # 创建UI面板
+            panels_start = time.time()
             self._create_panels()
+            panels_time = time.time() - panels_start
+            logger.info(f"面板创建耗时: {panels_time:.3f}秒")
 
             # 设置布局
+            layout_start = time.time()
             self._setup_layout()
+            layout_time = time.time() - layout_start
+            logger.info(f"布局设置耗时: {layout_time:.3f}秒")
 
             # 注册事件处理器
+            events_start = time.time()
             self._register_event_handlers()
+            events_time = time.time() - events_start
+            logger.info(f"事件注册耗时: {events_time:.3f}秒")
 
             # 应用主题
+            theme_start = time.time()
             self._apply_theme()
+            theme_time = time.time() - theme_start
+            logger.info(f"主题应用耗时: {theme_time:.3f}秒")
 
             # 加载配置
+            config_start = time.time()
             self._load_window_config()
+            config_time = time.time() - config_start
+            logger.info(f"配置加载耗时: {config_time:.3f}秒")
 
             # 设置所有表格为只读
             # self._set_all_tables_readonly()
 
             # 检查数据使用条款
+            terms_start = time.time()
             self._check_data_usage_terms()
+            terms_time = time.time() - terms_start
+            logger.info(f"条款检查耗时: {terms_time:.3f}秒")
 
-            logger.info("Main window coordinator initialized successfully")
+            # 延迟初始化增强UI组件，避免阻塞主初始化流程
+            # 使用QTimer在事件循环中异步初始化
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(0, self._initialize_enhanced_ui_components_async)
+
+            total_time = time.time() - start_time
+            logger.info(f"Main window coordinator initialized successfully, 总耗时: {total_time:.3f}秒")
 
         except Exception as e:
             logger.error(f"Failed to initialize main window coordinator: {e}")
@@ -300,23 +330,40 @@ class MainWindowCoordinator(BaseCoordinator):
                 parent=self._main_window,
                 coordinator=self
             )
+            # ✅ 修复：设置中间面板的合理尺寸限制，避免图表区域过宽
+            # 由于右侧面板已改为 QDockWidget，中间面板需要设置最小宽度以确保图表正常显示
+            middle_panel._root_frame.setMinimumWidth(400)  # 确保图表有足够的显示空间
             horizontal_splitter.addWidget(middle_panel._root_frame)
             self._panels['middle'] = middle_panel
 
+            # ✅ 修复：将右侧面板改为 QDockWidget，提供灵活的布局调整能力
             # 创建右侧面板（技术分析面板）
             right_panel = RightPanel(
                 parent=self._main_window,
                 coordinator=self,
                 width=self._layout_config['right_panel_width']
             )
-            right_panel._root_frame.setMinimumWidth(
-                self._layout_config['right_panel_width'])
-            right_panel._root_frame.setMaximumWidth(1500)
-            horizontal_splitter.addWidget(right_panel._root_frame)
+            
+            # 创建 QDockWidget 包装右侧面板
+            right_dock = QDockWidget("技术分析", self._main_window)
+            right_dock.setWidget(right_panel._root_frame)
+            right_dock.setAllowedAreas(Qt.RightDockWidgetArea | Qt.LeftDockWidgetArea)
+            
+            # 设置尺寸限制
+            right_dock.setMinimumWidth(self._layout_config['right_panel_width'])
+            right_dock.setMaximumWidth(1500)
+            
+            # 添加到主窗口右侧停靠区域
+            self._main_window.addDockWidget(Qt.RightDockWidgetArea, right_dock)
+            
+            # 保存引用
             self._panels['right'] = right_panel
+            self._panels['right_dock'] = right_dock
+            
+            logger.info("右侧技术分析面板已创建为 QDockWidget")
 
-            # 设置分割器比例
-            horizontal_splitter.setSizes([300, 700, 350])
+            # 设置分割器比例（仅包含左侧和中间面板）
+            horizontal_splitter.setSizes([300, 1000])
 
             # 创建底部面板（日志面板）
             from ..ui.panels import BottomPanel
@@ -338,8 +385,9 @@ class MainWindowCoordinator(BaseCoordinator):
             # 连接面板之间的信号
             self._connect_panel_signals()
 
-            # 集成增强UI组件
-            self._integrate_enhanced_components_to_ui()
+            # ✅ 修复：增强UI组件的集成已移至异步初始化中
+            # 不再在这里同步集成，避免阻塞主初始化流程
+            # 集成将在 _initialize_enhanced_ui_components_async() 中完成
 
             logger.info("UI panels created successfully")
 
@@ -503,17 +551,17 @@ class MainWindowCoordinator(BaseCoordinator):
         except Exception as e:
             logger.error(f"显示底部面板失败: {e}")
 
+    def _register_event_handlers(self) -> None:
+        """注册事件处理器 - 在_setup_layout中实现"""
+        pass  # 实际订阅在_setup_layout中
+
     def _setup_layout(self) -> None:
         """设置布局"""
         # 布局已在_create_panels中设置
-        pass
-
-    def _register_event_handlers(self) -> None:
-        """注册事件处理器"""
         try:
-            # 注册股票选择事件处理器（向后兼容）
-            self.event_bus.subscribe(
-                StockSelectedEvent, self._on_stock_selected)
+            # ✅ 修复：注册股票选择事件处理器
+            # 注意：_on_stock_selected是异步方法，需要用QTimer或其他机制调度
+            self.event_bus.subscribe(StockSelectedEvent, self._handle_stock_selected_sync)
 
             # 注册通用资产选择事件处理器
             self.event_bus.subscribe(
@@ -629,6 +677,29 @@ class MainWindowCoordinator(BaseCoordinator):
         except Exception as e:
             logger.error(f"Failed to save window configuration: {e}")
 
+    def _handle_stock_selected_sync(self, event: StockSelectedEvent) -> None:
+        """同步包装器：处理股票选择事件"""
+        try:
+            from PyQt5.QtCore import QTimer
+            # 使用QTimer.singleShot在主线程中异步执行
+            QTimer.singleShot(0, lambda: self._run_async_handler(self._on_stock_selected(event)))
+        except Exception as e:
+            logger.error(f"调度股票选择事件处理失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    def _run_async_handler(self, coro):
+        """运行异步处理器"""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(coro)
+            else:
+                loop.run_until_complete(coro)
+        except Exception as e:
+            logger.error(f"运行异步处理器失败: {e}")
+
     @measure_performance("MainWindowCoordinator._on_stock_selected")
     async def _on_stock_selected(self, event: StockSelectedEvent) -> None:
         """处理股票选择事件 - 新的统一数据加载流程"""
@@ -657,20 +728,29 @@ class MainWindowCoordinator(BaseCoordinator):
 
             logger.info(f"加载数据，股票：{event.stock_code}，周期：{period}，时间范围：{time_range}，图表类型：{chart_type}")
 
-            # 1. 串行获取数据：先获取K线
-            logger.info(f"开始请求K线数据: {event.stock_code}")
-            kline_data_response = await self._data_manager.request_data(
-                stock_code=event.stock_code,
-                data_type='kdata',
-                period=period,          # 传递周期
-                time_range=time_range   # 传递时间范围
-            )
-
+            # 1. ✅ 优化：优先使用事件中的K线数据，避免重复查询
             kline_data = None
-            if isinstance(kline_data_response, dict):
-                kline_data = kline_data_response.get('kline_data')
+            if hasattr(event, 'kline_data') and event.kline_data is not None:
+                logger.info(f"使用LeftPanel预加载的K线数据: {event.stock_code}")
+                kline_data = event.kline_data
+                logger.debug(f"预加载数据行数: {len(kline_data) if hasattr(kline_data, '__len__') else 'N/A'}")
             else:
-                kline_data = kline_data_response
+                # 降级：重新查询K线数据
+                # ✅ 从事件中获取资产类型（默认为股票）
+                asset_type = getattr(event, 'asset_type', AssetType.STOCK_A)
+                logger.info(f"事件中无K线数据，开始请求K线数据: {event.stock_code} ({asset_type.value})")
+                kline_data_response = await self._data_manager.request_data(
+                    stock_code=event.stock_code,
+                    data_type='kdata',
+                    period=period,          # 传递周期
+                    time_range=time_range,  # 传递时间范围
+                    asset_type=asset_type   # ✅ 传递资产类型
+                )
+
+                if isinstance(kline_data_response, dict):
+                    kline_data = kline_data_response.get('kline_data')
+                else:
+                    kline_data = kline_data_response
 
             # 关键检查点：确认核心数据是否存在
             if kline_data is None or kline_data.empty:
@@ -681,13 +761,18 @@ class MainWindowCoordinator(BaseCoordinator):
 
             logger.info(f"K线数据加载完成: {event.stock_code}, 开始请求分析数据...")
 
-            # 2. 再获取分析数据，传入已获取的K线数据
-            analysis_data = await self._analysis_service.analyze_stock(
-                stock_code=event.stock_code,
-                analysis_type='comprehensive',
-                kline_data=kline_data
-            )
-            logger.info(f"分析数据加载完成: {event.stock_code}")
+            # 2. 再获取分析数据，传入已获取的K线数据（可选，失败不影响K线显示）
+            analysis_data = None
+            try:
+                analysis_data = await self._analysis_service.analyze_stock(
+                    stock_code=event.stock_code,
+                    analysis_type='comprehensive',
+                    kline_data=kline_data
+                )
+                logger.info(f"分析数据加载完成: {event.stock_code}")
+            except Exception as analysis_error:
+                logger.warning(f"分析数据加载失败（继续显示K线）: {analysis_error}")
+                analysis_data = {'data_available': False, 'error': str(analysis_error)}
 
             # 3. 存储到中央数据状态 - 增强数据验证和日志
             logger.info(f"=== 准备中央数据状态 ===")
@@ -819,19 +904,19 @@ class MainWindowCoordinator(BaseCoordinator):
             except Exception as e:
                 logger.warning(f"使用TET模式获取数据失败，尝试传统方式: {e}")
 
-                # 如果是股票类型，降级到传统方式
-                if event.asset_type == AssetType.STOCK_A:
-                    kline_data_response = await self._data_manager.request_data(
-                        stock_code=event.symbol,
-                        data_type='kdata',
-                        period=period,
-                        time_range=time_range
-                    )
+                # ✅ 降级到传统request_data方式（支持所有资产类型）
+                kline_data_response = await self._data_manager.request_data(
+                    stock_code=event.symbol,
+                    data_type='kdata',
+                    period=period,
+                    time_range=time_range,
+                    asset_type=event.asset_type  # ✅ 传递资产类型
+                )
 
-                    if isinstance(kline_data_response, dict):
-                        asset_data = kline_data_response.get('kline_data')
-                    else:
-                        asset_data = kline_data_response
+                if isinstance(kline_data_response, dict):
+                    asset_data = kline_data_response.get('kline_data')
+                else:
+                    asset_data = kline_data_response
 
             # 关键检查点：确认核心数据是否存在
             if asset_data is None or asset_data.empty:
@@ -1406,7 +1491,6 @@ FactorWeave-Quant  2.0 (重构版本)
         try:
             from gui.dialogs.enhanced_plugin_manager_dialog import EnhancedPluginManagerDialog
             from core.plugin_manager import PluginManager
-            from core.services.sentiment_data_service import SentimentDataService
 
             # 智能获取插件管理器实例
             plugin_manager = None
@@ -1480,24 +1564,17 @@ FactorWeave-Quant  2.0 (重构版本)
                     logger.error(traceback.format_exc())
                     # 继续执行，允许dialog处理空的plugin_manager
 
-            # 获取情绪数据服务
+            # ✅ 情绪数据服务已删除（功能已整合到热点分析）
             sentiment_service = None
-            if service_container and service_container.is_registered(SentimentDataService):
-                try:
-                    sentiment_service = service_container.resolve(SentimentDataService)
-                    logger.info("获取情绪数据服务成功")
-                except Exception as e:
-                    logger.warning(f" 获取情绪数据服务失败: {e}")
 
             # 显示插件管理器状态
             plugin_status = "可用" if plugin_manager else "不可用"
-            sentiment_status = "可用" if sentiment_service else "不可用"
-            logger.info(f" 插件管理器状态: {plugin_status}, 情绪数据服务: {sentiment_status}")
+            logger.info(f" 插件管理器状态: {plugin_status}")
 
             # 创建并显示增强版对话框
             self._plugin_manager_dialog = EnhancedPluginManagerDialog(
                 plugin_manager=plugin_manager,
-                sentiment_service=sentiment_service,
+                sentiment_service=sentiment_service,  # 传递None，保持兼容性
                 parent=self._main_window
             )
 
@@ -1892,7 +1969,7 @@ FactorWeave-Quant  2.0 (重构版本)
             self.logger.error(f"性能评估模块导入失败: {e}")
             # 使用备用的策略性能评估器
             try:
-
+                from optimization.algorithm_optimizer import PerformanceEvaluator
                 evaluator = PerformanceEvaluator()
                 dialog = PerformanceEvaluationDialog(self._main_window)
                 dialog.set_evaluator(evaluator)
@@ -3288,57 +3365,85 @@ FactorWeave-Quant  2.0 (重构版本)
         """获取状态栏 - 兼容方法"""
         return self._main_window.statusBar() if self._main_window else None
 
-    def _initialize_enhanced_ui_components(self):
-        """初始化增强UI组件"""
+    def _initialize_enhanced_ui_components_async(self):
+        """异步初始化增强UI组件（在事件循环中执行，避免阻塞主初始化流程）"""
+        import time
+        start_time = time.time()
+        
         try:
-            logger.info("开始初始化增强UI组件...")
+            logger.info("开始异步初始化增强UI组件...")
 
             # 导入增强UI组件
+            import_start = time.time()
             from gui.widgets.enhanced_ui import (
                 Level2DataPanel, OrderBookWidget, FundamentalAnalysisTab,
                 DataQualityMonitorTab, SmartRecommendationPanel
             )
+            import_time = time.time() - import_start
+            logger.info(f"模块导入耗时: {import_time:.3f}秒")
 
             # 存储增强组件引用
             self._enhanced_components = {}
 
             # 创建Level-2数据面板
+            level2_start = time.time()
             self._enhanced_components['level2_panel'] = Level2DataPanel(
                 parent=self._main_window,
                 event_bus=self._event_bus
             )
+            level2_time = time.time() - level2_start
+            logger.info(f"Level2DataPanel创建耗时: {level2_time:.3f}秒")
 
             # 创建订单簿组件
+            orderbook_start = time.time()
             self._enhanced_components['order_book_widget'] = OrderBookWidget(
                 parent=self._main_window,
                 event_bus=self._event_bus
             )
+            orderbook_time = time.time() - orderbook_start
+            logger.info(f"OrderBookWidget创建耗时: {orderbook_time:.3f}秒")
 
             # 创建基本面分析标签页
+            fundamental_start = time.time()
             self._enhanced_components['fundamental_analysis_tab'] = FundamentalAnalysisTab(
                 parent=self._main_window
             )
-
-            # 创建数据质量监控标签页
-            self._enhanced_components['data_quality_monitor_tab'] = DataQualityMonitorTab(
-                parent=self._main_window
-            )
+            fundamental_time = time.time() - fundamental_start
+            logger.info(f"FundamentalAnalysisTab创建耗时: {fundamental_time:.3f}秒")
 
             # 创建智能推荐面板
+            recommendation_start = time.time()
             self._enhanced_components['smart_recommendation_panel'] = SmartRecommendationPanel(
                 parent=self._main_window
             )
+            recommendation_time = time.time() - recommendation_start
+            logger.info(f"SmartRecommendationPanel创建耗时: {recommendation_time:.3f}秒")
 
-            logger.info(f"成功初始化 {len(self._enhanced_components)} 个增强UI组件")
+            # 集成增强组件到UI
+            integration_start = time.time()
+            self._integrate_enhanced_components_to_ui()
+            integration_time = time.time() - integration_start
+            logger.info(f"增强组件UI集成耗时: {integration_time:.3f}秒")
+
+            total_time = time.time() - start_time
+            logger.info(f"成功异步初始化 {len(self._enhanced_components)} 个增强UI组件, 总耗时: {total_time:.3f}秒")
 
         except Exception as e:
-            logger.error(f"初始化增强UI组件失败: {e}")
+            logger.error(f"异步初始化增强UI组件失败: {e}")
             import traceback
             logger.debug(f"详细错误: {traceback.format_exc()}")
             self._enhanced_components = {}
+    
+    def _initialize_enhanced_ui_components(self):
+        """初始化增强UI组件（同步版本，保留用于向后兼容）"""
+        # 重定向到异步版本
+        self._initialize_enhanced_ui_components_async()
 
     def _integrate_enhanced_components_to_ui(self):
         """将增强组件集成到UI中"""
+        import time
+        start_time = time.time()
+        
         try:
             if not hasattr(self, '_enhanced_components') or not self._enhanced_components:
                 logger.warning("增强组件未初始化，跳过UI集成")
@@ -3346,37 +3451,102 @@ FactorWeave-Quant  2.0 (重构版本)
 
             logger.info("开始集成增强UI组件到主界面...")
 
-            # 添加Level-2数据面板作为停靠窗口
+            # ✅ 修复：将技术分析面板与增强组件组合在一起，默认在右侧
+            # 首先创建技术分析面板的 QDockWidget（如果尚未创建）
+            right_dock = None
+            if 'right_dock' in self._panels:
+                right_dock = self._panels['right_dock']
+                logger.info("技术分析面板 QDockWidget 已存在")
+            else:
+                logger.warning("技术分析面板 QDockWidget 未找到，跳过组合")
+
+            # ✅ 修复：存储所有需要组合到右侧的 QDockWidget
+            right_area_docks = []
+            
+            # 将技术分析面板作为第一个（如果存在）
+            if right_dock:
+                right_area_docks.append(right_dock)
+                logger.info("技术分析面板已添加到右侧组合列表")
+
+            # ✅ 修复：将所有增强组件组合到右侧，与技术分析面板形成标签页组
+            # 添加Level-2数据面板作为停靠窗口（组合到右侧）
             if 'level2_panel' in self._enhanced_components:
                 level2_dock = QDockWidget("Level-2 数据", self._main_window)
                 level2_dock.setWidget(self._enhanced_components['level2_panel'])
                 level2_dock.setAllowedAreas(Qt.RightDockWidgetArea | Qt.LeftDockWidgetArea)
-                self._main_window.addDockWidget(Qt.RightDockWidgetArea, level2_dock)
-                logger.info("Level-2数据面板已添加到右侧停靠区域")
+                # ✅ 修复：如果已有技术分析面板，直接组合；否则先添加到右侧
+                if right_area_docks:
+                    # 技术分析面板已存在，直接组合
+                    self._main_window.tabifyDockWidget(right_area_docks[0], level2_dock)
+                    right_area_docks.append(level2_dock)
+                    logger.info("Level-2数据面板已与技术分析面板组合为标签页（右侧）")
+                else:
+                    # 技术分析面板不存在，先添加到右侧
+                    self._main_window.addDockWidget(Qt.RightDockWidgetArea, level2_dock)
+                    right_area_docks.append(level2_dock)
+                    logger.info("Level-2数据面板已添加到右侧停靠区域")
 
-            # 添加订单簿组件作为停靠窗口
+            # 添加订单簿组件作为停靠窗口（组合到右侧）
             if 'order_book_widget' in self._enhanced_components:
                 orderbook_dock = QDockWidget("订单簿深度", self._main_window)
                 orderbook_dock.setWidget(self._enhanced_components['order_book_widget'])
                 orderbook_dock.setAllowedAreas(Qt.RightDockWidgetArea | Qt.LeftDockWidgetArea)
-                self._main_window.addDockWidget(Qt.RightDockWidgetArea, orderbook_dock)
-                logger.info("订单簿组件已添加到右侧停靠区域")
+                # ✅ 修复：组合到右侧（与技术分析面板或Level-2面板组合）
+                if right_area_docks:
+                    # 已有其他面板在右侧，直接组合
+                    self._main_window.tabifyDockWidget(right_area_docks[0], orderbook_dock)
+                    right_area_docks.append(orderbook_dock)
+                    logger.info("订单簿组件已与其他面板组合为标签页（右侧）")
+                else:
+                    # 没有其他面板，先添加到右侧
+                    self._main_window.addDockWidget(Qt.RightDockWidgetArea, orderbook_dock)
+                    right_area_docks.append(orderbook_dock)
+                    logger.info("订单簿组件已添加到右侧停靠区域")
 
-            # 添加数据质量监控作为停靠窗口
-            if 'data_quality_monitor_tab' in self._enhanced_components:
-                quality_dock = QDockWidget("数据质量监控", self._main_window)
-                quality_dock.setWidget(self._enhanced_components['data_quality_monitor_tab'])
-                quality_dock.setAllowedAreas(Qt.BottomDockWidgetArea | Qt.TopDockWidgetArea)
-                self._main_window.addDockWidget(Qt.BottomDockWidgetArea, quality_dock)
-                logger.info("数据质量监控已添加到底部停靠区域")
-
-            # 添加智能推荐面板作为停靠窗口
+            # 添加智能推荐面板作为停靠窗口（组合到右侧）
             if 'smart_recommendation_panel' in self._enhanced_components:
                 recommendation_dock = QDockWidget("智能推荐", self._main_window)
                 recommendation_dock.setWidget(self._enhanced_components['smart_recommendation_panel'])
-                recommendation_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-                self._main_window.addDockWidget(Qt.LeftDockWidgetArea, recommendation_dock)
-                logger.info("智能推荐面板已添加到左侧停靠区域")
+                recommendation_dock.setAllowedAreas(Qt.RightDockWidgetArea | Qt.LeftDockWidgetArea)
+                # ✅ 修复：组合到右侧（与技术分析面板或其他面板组合）
+                if right_area_docks:
+                    # 已有其他面板在右侧，直接组合
+                    self._main_window.tabifyDockWidget(right_area_docks[0], recommendation_dock)
+                    right_area_docks.append(recommendation_dock)
+                    logger.info("智能推荐面板已与其他面板组合为标签页（右侧）")
+                else:
+                    # 没有其他面板，先添加到右侧
+                    self._main_window.addDockWidget(Qt.RightDockWidgetArea, recommendation_dock)
+                    right_area_docks.append(recommendation_dock)
+                    logger.info("智能推荐面板已添加到右侧停靠区域")
+
+            # ✅ 修复：将所有右侧组合的 QDockWidget 的标签页位置设置为顶部
+            if right_area_docks:
+                # 确保第一个 dock（技术分析面板）可见并激活
+                right_area_docks[0].setVisible(True)
+                right_area_docks[0].raise_()
+                logger.info(f"所有右侧 QDockWidget 已组合在一起（共{len(right_area_docks)}个面板）")
+
+            # ✅ 修复：存储底部区域的 QDockWidget（用于标签页位置设置）
+            bottom_area_docks = []
+
+            # ✅ 修复：将所有组合的 QDockWidget 的标签页位置设置为顶部
+            # 注意：对于 QDockWidget 组合后的标签页，需要通过查找 QTabBar 来设置位置
+            all_docks = right_area_docks + bottom_area_docks
+            if all_docks:
+                # 查找所有 QTabBar 并设置标签页位置为顶部
+                from PyQt5.QtWidgets import QTabBar
+                tab_bars = self._main_window.findChildren(QTabBar)
+                for tab_bar in tab_bars:
+                    # QTabBar.RoundedNorth 表示标签页在顶部（圆角，顶部）
+                    # 注意：需要检查 tab_bar 是否属于 QDockWidget 的标签页
+                    try:
+                        tab_bar.setShape(QTabBar.RoundedNorth)
+                        logger.debug(f"已将标签页位置设置为顶部: {tab_bar}")
+                    except Exception as e:
+                        logger.warning(f"设置标签页位置失败: {e}")
+                
+                logger.info(f"所有 QDockWidget 的标签页位置已设置为顶部（右侧{len(right_area_docks)}个，底部{len(bottom_area_docks)}个）")
 
             # 如果存在分析标签页，将基本面分析添加到其中
             if hasattr(self, '_analysis_tabs') and 'fundamental_analysis_tab' in self._enhanced_components:
@@ -3386,7 +3556,8 @@ FactorWeave-Quant  2.0 (重构版本)
                 )
                 logger.info("基本面分析标签页已添加到分析区域")
 
-            logger.info("增强UI组件集成完成")
+            total_time = time.time() - start_time
+            logger.info(f"增强UI组件集成完成, 耗时: {total_time:.3f}秒")
 
         except Exception as e:
             logger.error(f"集成增强UI组件失败: {e}")
@@ -3440,19 +3611,6 @@ FactorWeave-Quant  2.0 (重构版本)
             logger.warning("基本面分析标签页未找到")
         except Exception as e:
             logger.error(f"切换基本面分析面板失败: {e}")
-
-    def _on_toggle_quality_monitor_panel(self):
-        """切换数据质量监控面板显示/隐藏"""
-        try:
-            dock_widgets = self._main_window.findChildren(QDockWidget)
-            for dock in dock_widgets:
-                if dock.windowTitle() == "数据质量监控":
-                    dock.setVisible(not dock.isVisible())
-                    logger.info(f"数据质量监控面板已{'显示' if dock.isVisible() else '隐藏'}")
-                    return
-            logger.warning("数据质量监控面板未找到")
-        except Exception as e:
-            logger.error(f"切换数据质量监控面板失败: {e}")
 
     def _on_toggle_smart_recommendation_panel(self):
         """切换智能推荐面板显示/隐藏"""

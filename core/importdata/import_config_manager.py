@@ -79,30 +79,31 @@ class DataSourceConfig:
 
 @dataclass
 class ImportTaskConfig:
+    import os
     """导入任务配置"""
-    task_id: str                        # 任务ID
-    name: str                          # 任务名称
-    data_source: str                   # 数据源名称
-    asset_type: str                    # 资产类型
-    data_type: str                     # 数据类型
-    symbols: List[str]                 # 股票代码列表
-    frequency: DataFrequency           # 数据频率
-    mode: ImportMode                   # 导入模式
-    start_date: Optional[str] = None   # 开始日期
-    end_date: Optional[str] = None     # 结束日期
-    schedule_cron: Optional[str] = None  # 定时任务表达式
-    enabled: bool = True               # 是否启用
-    max_workers: int = 4               # 最大工作线程数
-    batch_size: int = 1000             # 批处理大小
-    retry_count: int = 3               # 失败重试次数
-    error_strategy: str = "跳过"        # 错误处理策略
-    memory_limit: int = 2048           # 内存限制(MB)
-    timeout: int = 300                 # 超时时间(秒)
-    progress_interval: int = 5         # 进度更新间隔(秒)
-    validate_data: bool = True         # 是否验证数据
+    task_id: str                                # 任务ID
+    name: str                                   # 任务名称
+    data_source: str                            # 数据源名称
+    asset_type: str                             # 资产类型
+    data_type: str                              # 数据类型
+    symbols: List[str]                          # 股票代码列表
+    frequency: DataFrequency                    # 数据频率
+    mode: ImportMode                            # 导入模式
+    start_date: Optional[str] = None            # 开始日期
+    end_date: Optional[str] = None              # 结束日期
+    schedule_cron: Optional[str] = None         # 定时任务表达式
+    enabled: bool = True                        # 是否启用
+    max_workers: int = os.cpu_count() * 2         # 最大工作线程数
+    batch_size: int = 790                      # 批处理大小
+    retry_count: int = 3                        # 失败重试次数
+    error_strategy: str = "重试"                # 错误处理策略
+    memory_limit: int = 2048                    # 内存限制(MB)
+    timeout: int = 300                          # 超时时间(秒)
+    progress_interval: int = 5                  # 进度更新间隔(秒)
+    validate_data: bool = True                  # 是否验证数据
     # 增量更新配置
     enable_incremental: bool = True    # 是否启用增量更新
-    incremental_days_threshold: int = 7 # 增量更新的天数阈值
+    incremental_days_threshold: int = 7  # 增量更新的天数阈值
     force_full_update: bool = False    # 强制全量更新
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -159,6 +160,7 @@ class ImportProgress:
     start_time: Optional[str] = None   # 开始时间
     end_time: Optional[str] = None     # 结束时间
     error_message: Optional[str] = None  # 错误信息
+    processed_symbols_list: List[str] = field(default_factory=list)  # ✅ 修复：已处理的股票列表（用于恢复）
 
     @property
     def progress_percentage(self) -> float:
@@ -188,6 +190,9 @@ class ImportProgress:
     def from_dict(cls, data: Dict[str, Any]) -> 'ImportProgress':
         """从字典创建"""
         data['status'] = ImportStatus(data['status'])
+        # ✅ 修复：处理processed_symbols_list字段（兼容旧数据）
+        if 'processed_symbols_list' not in data:
+            data['processed_symbols_list'] = []
         return cls(**data)
 
 

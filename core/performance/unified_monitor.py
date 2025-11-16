@@ -824,6 +824,99 @@ class UnifiedPerformanceMonitor:
         if self.monitor_thread:
             self.monitor_thread.join(timeout=5)
         logger.info("性能监控已停止")
+    
+    def reset_for_new_stock(self, stock_code: str):
+        """
+        为新股票重置性能监控器状态
+        
+        Args:
+            stock_code: 股票代码
+        """
+        try:
+            logger.info(f"重置性能监控器，新股票: {stock_code}")
+            
+            # 清理性能统计（保留系统级别的，只清理股票相关的）
+            with self.stats_lock:
+                # 只清理非系统类别的统计
+                stock_related_keys = [
+                    k for k, v in self.stats.items() 
+                    if v.category not in [PerformanceCategory.SYSTEM, PerformanceCategory.CACHE]
+                ]
+                for key in stock_related_keys:
+                    del self.stats[key]
+            
+            # 清理缓存中的股票数据（保留系统配置）
+            # 注意：不完全清空缓存，只清理过期的股票数据
+            # 实际的缓存清理由PerformanceCache自己的TTL机制处理
+            
+            # 清理交易结果历史（如果有）
+            self.trade_results.clear()
+            
+            # 重置UI优化器的状态
+            if hasattr(self.ui_optimizer, 'loaded_components'):
+                self.ui_optimizer.loaded_components.clear()
+            if hasattr(self.ui_optimizer, 'pending_data'):
+                self.ui_optimizer.pending_data.clear()
+            
+            logger.info(f"性能监控器已重置，准备处理股票: {stock_code}")
+            
+        except Exception as e:
+            logger.error(f"重置性能监控器失败: {e}")
+
+    def update_tab_data(self, stock_code: str, tab_id: str, tab_widget: Any, data: Any, use_cache: bool = True):
+        """
+        更新标签页数据（通过性能监控器优化）
+        
+        Args:
+            stock_code: 股票代码
+            tab_id: 标签页ID
+            tab_widget: 标签页组件实例
+            data: 要传递给标签页的数据（通常是K线数据）
+            use_cache: 是否使用缓存优化
+        """
+        try:
+            # 生成缓存键
+            cache_key = f"tab_data_{stock_code}_{tab_id}"
+            
+            # 记录性能监控
+            with self.measure_time(f"update_tab_{tab_id}", PerformanceCategory.UI):
+                # 检查标签页是否有set_kdata方法
+                if not hasattr(tab_widget, 'set_kdata'):
+                    logger.warning(f"标签页 {tab_id} 没有set_kdata方法，跳过更新")
+                    return
+                
+                # 检查是否应该使用渐进式加载
+                use_progressive = self.ui_optimizer.should_progressive_load(data)
+                if use_progressive and hasattr(tab_widget, 'append_kdata'):
+                    logger.debug(f"对 {tab_id} 使用渐进式加载")
+                    tab_widget.append_kdata(data)
+                else:
+                    # 标准更新方式
+                    tab_widget.set_kdata(data)
+                
+                # 缓存数据（如果启用）
+                if use_cache:
+                    self.cache.set(cache_key, data, metadata={
+                        'stock_code': stock_code,
+                        'tab_id': tab_id,
+                        'timestamp': time.time()
+                    })
+                
+                # 记录UI更新指标
+                self.record_metric(
+                    f"tab_update_{tab_id}",
+                    1.0,
+                    PerformanceCategory.UI,
+                    MetricType.COUNTER,
+                    tags={'stock_code': stock_code, 'tab_id': tab_id}
+                )
+                
+                logger.debug(f"✓ 标签页数据已更新: {tab_id}, 股票: {stock_code}")
+                
+        except Exception as e:
+            logger.error(f"✗ 更新标签页数据失败 ({tab_id}): {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def _monitor_loop(self):
         """监控主循环"""

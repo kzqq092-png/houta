@@ -46,6 +46,7 @@ class AssetSelectedEvent(BaseEvent):
     period: str = ""                        # 周期：日线、周线、月线等
     time_range: str = ""                    # 时间范围：最近7天、最近30天等
     chart_type: str = ""                    # 图表类型：K线图、分时图等
+    kline_data: Optional[Any] = None        # ✅ 优化：可选的K线数据（避免重复查询）
 
     def __post_init__(self):
         super().__post_init__()
@@ -56,7 +57,9 @@ class AssetSelectedEvent(BaseEvent):
             'market': self.market,
             'period': self.period,
             'time_range': self.time_range,
-            'chart_type': self.chart_type
+            'chart_type': self.chart_type,
+            # 注意：kline_data不序列化到data字典，避免内存问题
+            'has_kline_data': self.kline_data is not None
         })
 
 
@@ -72,7 +75,8 @@ class StockSelectedEvent(AssetSelectedEvent):
 
     def __init__(self, stock_code: str = "", stock_name: str = "",
                  market: str = "", period: str = "", time_range: str = "",
-                 chart_type: str = "", **kwargs):
+                 chart_type: str = "", kline_data: Optional[Any] = None, **kwargs):
+        # ✅ 优化：接受kline_data参数，避免重复查询
         # 使用父类构造函数，映射股票特定字段到通用字段
         super().__init__(
             symbol=stock_code,
@@ -82,6 +86,7 @@ class StockSelectedEvent(AssetSelectedEvent):
             period=period,
             time_range=time_range,
             chart_type=chart_type,
+            kline_data=kline_data,
             **kwargs
         )
 

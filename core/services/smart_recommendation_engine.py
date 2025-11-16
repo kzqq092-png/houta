@@ -309,31 +309,47 @@ class SmartRecommendationEngine:
         """生成推荐结果"""
         try:
             recommendations = []
+            
+            logger.info(f"开始生成推荐 - 用户: {user_id}, 类型: {recommendation_type}, 数量: {count}")
 
             # 获取用户画像
             user_profile = self.user_profiles.get(user_id)
+            logger.info(f"用户画像存在: {user_profile is not None}")
+            
             if not user_profile:
                 # 为新用户生成基于热门内容的推荐
+                logger.info("用户无画像，使用热门推荐策略")
                 return await self._generate_popular_recommendations(user_id, recommendation_type, count)
 
             # 协同过滤推荐
             cf_recommendations = await self._collaborative_filtering_recommendations(user_id, recommendation_type, count // 2)
             recommendations.extend(cf_recommendations)
+            logger.info(f"协同过滤推荐数量: {len(cf_recommendations)}")
 
             # 内容基础推荐
             content_recommendations = await self._content_based_recommendations(user_id, recommendation_type, count // 2)
             recommendations.extend(content_recommendations)
+            logger.info(f"内容基础推荐数量: {len(content_recommendations)}")
+
+            # ✅ 修复：如果协同过滤和内容推荐都没有结果，降级到热门推荐
+            if len(recommendations) == 0:
+                logger.warning("协同过滤和内容推荐均无结果，降级到热门推荐")
+                return await self._generate_popular_recommendations(user_id, recommendation_type, count)
 
             # 去重和排序
             recommendations = self._deduplicate_and_rank_recommendations(recommendations)
+            logger.info(f"去重后推荐数量: {len(recommendations)}")
 
             # 限制数量
             recommendations = recommendations[:count]
+            logger.info(f"最终推荐数量: {len(recommendations)}")
 
             return recommendations
 
         except Exception as e:
             logger.error(f"生成推荐失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
 
     async def _collaborative_filtering_recommendations(self, user_id: str, recommendation_type: RecommendationType = None,
@@ -437,21 +453,32 @@ class SmartRecommendationEngine:
         """生成热门推荐（用于新用户）"""
         try:
             recommendations = []
+            
+            logger.info(f"生成热门推荐 - 用户: {user_id}, 类型: {recommendation_type}, 数量: {count}")
+            logger.info(f"当前内容项总数: {len(self.content_items)}")
 
             # 按热度排序内容
+            # ✅ 修复：如果所有热度都是0，使用创建时间作为次要排序条件
             popular_items = sorted(
                 self.content_items.values(),
-                key=lambda x: x.view_count + x.like_count * 2 + x.share_count * 3,
+                key=lambda x: (x.view_count + x.like_count * 2 + x.share_count * 3, x.created_at),
                 reverse=True
             )
+            
+            logger.info(f"排序后内容项数量: {len(popular_items)}")
 
             for item in popular_items[:count]:
                 if recommendation_type and item.item_type != recommendation_type:
                     continue
 
-                # 计算热度分数
-                popularity_score = (item.view_count + item.like_count * 2 + item.share_count * 3) / 100
-                popularity_score = min(1.0, popularity_score)
+                # ✅ 修复：计算热度分数，如果热度为0则使用基础分数0.5
+                heat_value = item.view_count + item.like_count * 2 + item.share_count * 3
+                if heat_value > 0:
+                    popularity_score = heat_value / 100
+                    popularity_score = min(1.0, popularity_score)
+                else:
+                    # 所有新内容给予基础分数0.5
+                    popularity_score = 0.5
 
                 recommendation = Recommendation(
                     user_id=user_id,
@@ -461,16 +488,20 @@ class SmartRecommendationEngine:
                     reason=RecommendationReason.TRENDING,
                     title=item.title,
                     description=item.description,
-                    explanation="热门内容推荐",
-                    confidence=0.7
+                    explanation="热门内容推荐" if heat_value > 0 else "新内容推荐",
+                    confidence=0.7,
+                    metadata=item.metadata
                 )
 
                 recommendations.append(recommendation)
-
+            
+            logger.info(f"生成了 {len(recommendations)} 个热门推荐")
             return recommendations
 
         except Exception as e:
             logger.error(f"生成热门推荐失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
 
     def _update_user_profile(self, interaction: UserInteraction):
@@ -534,30 +565,43 @@ class SmartRecommendationEngine:
     def _extract_content_features(self, item: ContentItem):
         """提取内容特征"""
         try:
-            # 合并文本特征
-            text_features = f"{item.title} {item.description} {' '.join(item.tags)} {' '.join(item.keywords)}"
+            # 过滤None值并合并文本特征
+            valid_tags = [str(tag) for tag in item.tags if tag is not None and tag != '']
+            valid_keywords = [str(kw) for kw in item.keywords if kw is not None and kw != '']
+            valid_categories = [str(cat) for cat in item.categories if cat is not None and cat != '']
+            
+            text_features = f"{item.title} {item.description} {' '.join(valid_tags)} {' '.join(valid_keywords)}"
 
             # 使用TF-IDF提取特征（这里需要先训练vectorizer）
             # 暂时使用简单的特征表示
             feature_dict = {}
 
             # 标签特征
-            for tag in item.tags:
-                feature_dict[f"tag_{tag}"] = 1
+            for tag in valid_tags:
+                if tag:  # 再次确保非空
+                    feature_dict[f"tag_{tag}"] = 1
 
             # 分类特征
-            for category in item.categories:
-                feature_dict[f"category_{category}"] = 1
+            for category in valid_categories:
+                if category:  # 再次确保非空
+                    feature_dict[f"category_{category}"] = 1
 
             # 关键词特征
-            for keyword in item.keywords:
-                feature_dict[f"keyword_{keyword}"] = 1
+            for keyword in valid_keywords:
+                if keyword:  # 再次确保非空
+                    feature_dict[f"keyword_{keyword}"] = 1
 
             # 转换为向量（简化实现）
-            item.feature_vector = np.array(list(feature_dict.values()))
+            # 如果没有特征，创建一个默认的零向量
+            if feature_dict:
+                item.feature_vector = np.array(list(feature_dict.values()))
+            else:
+                item.feature_vector = np.array([0.0])  # 默认零向量
 
         except Exception as e:
             logger.error(f"提取内容特征失败: {e}")
+            import traceback
+            logger.error(f"详细错误: {traceback.format_exc()}")
 
     def _compute_user_features(self, profile: UserProfile):
         """计算用户特征向量"""

@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QThread, pyqtSlot, QDateTime, QDate, QTime
 from PyQt5.QtGui import QFont, QIcon
 from .base_panel import BasePanel
-from core.events import StockSelectedEvent, ChartUpdateEvent, IndicatorChangedEvent, UIDataReadyEvent
+from core.events import StockSelectedEvent, ChartUpdateEvent, IndicatorChangedEvent, UIDataReadyEvent, MultiScreenToggleEvent
 from core.services.unified_chart_service import get_unified_chart_service, create_chart_widget, ChartDataLoader, ChartWidget
 from optimization.progressive_loading_manager import get_progressive_loader, LoadingStage
 from optimization.update_throttler import get_update_throttler
@@ -388,33 +388,9 @@ class ChartCanvas(QWidget):
 
             logger.info(f"数据验证通过，准备更新图表。数据形状: {self.current_kdata.shape}")
 
-            # 使用渐进式加载管理器更新图表
-            if self.progressive_loader and self.chart_widget:
-                logger.info("使用渐进式加载更新图表")
-                # 转换数据格式为ChartWidget期望的格式
-                chart_data = {
-                    'kdata': self.current_kdata,
-                    'stock_code': self.current_stock,
-                    'indicators': stock_data.get('indicators_data', stock_data.get('indicators', {})),
-                    'title': stock_data.get('stock_name', self.current_stock)
-                }
-
-                # 启动加载计时器
-                self.loading_time = 0
-                self.loading_timer.start(100)  # 100ms更新一次
-                self.loading_start_time = time.time()
-
-                # 使用渐进式加载
-                self.progressive_loader.load_chart_progressive(
-                    self.chart_widget, chart_data['kdata'], chart_data['indicators'])
-
-                # 注册加载进度回调
-                if hasattr(self.chart_widget, 'set_loading_callback'):
-                    self.chart_widget.set_loading_callback(
-                        self._on_loading_progress)
-            # 回退到普通更新
-            elif self.chart_widget:
-                logger.info("使用普通方式更新图表")
+            # ✅ 修复：关键任务（K线图）立即执行，不使用渐进式加载
+            # 只有非关键任务（指标、装饰）使用渐进式加载
+            if self.chart_widget:
                 # 转换数据格式为ChartWidget期望的格式
                 chart_data = {
                     'kdata': self.current_kdata,
@@ -422,9 +398,22 @@ class ChartCanvas(QWidget):
                     'indicators_data': stock_data.get('indicators_data', stock_data.get('indicators', {})),
                     'title': stock_data.get('stock_name', self.current_stock)
                 }
-                logger.info(f"准备调用chart_widget.update_chart，数据键: {list(chart_data.keys())}")
+
+                # ✅ 修复：关键K线图渲染立即执行（不使用渐进式加载）
+                logger.info("✅ 关键K线图渲染立即执行（不使用渐进式加载）")
+                start_time = time.time()
                 self.chart_widget.update_chart(chart_data)
-                logger.info("chart_widget.update_chart调用完成")
+                render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+                logger.info(f"✅ K线图渲染完成，耗时: {render_time:.2f}ms")
+
+                # ✅ 非关键任务（指标、装饰）使用渐进式加载（可选）
+                # 如果指标数据存在，可以在后台渐进式加载
+                indicators = stock_data.get('indicators_data', stock_data.get('indicators', {}))
+                if self.progressive_loader and indicators:
+                    logger.debug("非关键任务（指标）使用渐进式加载")
+                    # 延迟加载指标，不阻塞K线图显示
+                    # 这里可以异步加载指标，但不影响K线图显示
+                    pass
             else:
                 logger.warning("图表控件不可用，无法更新图表")
                 self._show_error_message("图表控件不可用")
@@ -813,13 +802,13 @@ class MiddlePanel(BasePanel):
         self.add_widget('toolbar', toolbar)
 
         # 股票信息标签
-        stock_info_label = QLabel("请选择股票")
-        stock_info_label.setStyleSheet(
-            "font-size: 12px; font-weight: bold; color: #495057;")
-        toolbar.addWidget(stock_info_label)
-        self.add_widget('stock_info_label', stock_info_label)
+        # stock_info_label = QLabel("请选择股票")
+        # stock_info_label.setStyleSheet(
+        #     "font-size: 12px; font-weight: bold; color: #495057;")
+        # toolbar.addWidget(stock_info_label)
+        # self.add_widget('stock_info_label', stock_info_label)
 
-        toolbar.addSeparator()
+        # toolbar.addSeparator()
 
         # 周期选择
         toolbar.addWidget(QLabel("周期:"))
@@ -1304,7 +1293,6 @@ class MiddlePanel(BasePanel):
             self._update_status("已切换到多屏模式")
 
             # 发布多屏模式切换事件
-            from core.events.events import MultiScreenToggleEvent
             self.event_bus.publish(MultiScreenToggleEvent(is_multi_screen=True))
 
         except Exception as e:

@@ -63,6 +63,10 @@ class ProgressiveLoadingManager:
 
         # 加载队列（使用优先级队列）
         self.task_queue = PriorityQueue()
+        
+        # ✅ 修复：使用信号机制实现立即唤醒（替代超时轮询）
+        self.task_available = threading.Event()  # 任务可用信号
+        self.shutdown_event = threading.Event()  # 关闭信号
 
         # 线程池
         self.executor = ThreadPoolExecutor(max_workers=max_workers,
@@ -166,12 +170,17 @@ class ProgressiveLoadingManager:
             return
 
         self.is_running = False
+        
+        # ✅ 修复：使用信号机制唤醒所有工作线程
+        self.shutdown_event.set()
+        self.task_available.set()  # 唤醒所有等待的线程
 
         # 等待所有队列清空
         try:
-            # 等待队列清空或超时
+            # 等待队列清空或超时（最多等待3秒）
             wait_time = 0
-            while not self.task_queue.empty() and wait_time < 3.0:
+            max_wait_time = 3.0
+            while not self.task_queue.empty() and wait_time < max_wait_time:
                 time.sleep(0.1)
                 wait_time += 0.1
 
@@ -185,18 +194,51 @@ class ProgressiveLoadingManager:
         except Exception as e:
             logger.error(f"停止加载管理器时出错: {e}")
 
+        # 等待工作线程退出
+        for thread in self.worker_threads:
+            if thread.is_alive():
+                thread.join(timeout=1.0)  # 最多等待1秒
+        
+        self.worker_threads.clear()
+
         # 关闭线程池
         self.executor.shutdown(wait=False)
+        
+        # 清理信号
+        self.task_available.clear()
+        self.shutdown_event.clear()
 
         logger.info("ProgressiveLoadingManager已停止")
 
     def _worker_loop(self):
-        """工作线程主循环"""
+        """工作线程主循环 - 使用信号机制实现立即唤醒"""
         while self.is_running:
             try:
-                # 获取任务（带超时）
-                task = self.task_queue.get(timeout=1.0)
-
+                # ✅ 修复：使用信号机制替代超时轮询，实现立即唤醒
+                # 等待任务可用信号（无超时，实现真正的立即唤醒）
+                # 使用1.0秒安全超时仅用于定期检查is_running状态，防止线程永远阻塞
+                self.task_available.wait(timeout=1.0)
+                
+                # 检查是否收到关闭信号
+                if self.shutdown_event.is_set() or not self.is_running:
+                    logger.debug("工作线程收到关闭信号，退出循环")
+                    break
+                
+                # 尝试获取任务（可能多个线程被唤醒，但只有一个能获取到任务）
+                task = None
+                try:
+                    # 立即获取任务，不阻塞
+                    task = self.task_queue.get_nowait()
+                except Empty:
+                    # 队列为空，清除信号（防止重复唤醒）
+                    # 这可能发生在多个线程被唤醒但只有一个获取到任务的情况
+                    self.task_available.clear()
+                    continue
+                
+                # 如果队列还有任务，保持信号设置（唤醒其他等待的线程）
+                if self.task_queue.empty():
+                    self.task_available.clear()
+                
                 # 应用阶段延迟
                 if self.enable_delays:
                     delay = task.delay_ms
@@ -211,10 +253,10 @@ class ProgressiveLoadingManager:
 
                 self.task_queue.task_done()
 
-            except Empty:
-                continue
             except Exception as e:
                 logger.error(f"加载管理器工作线程处理任务时出错: {e}")
+                # 发生异常时，短暂休眠避免CPU占用过高
+                time.sleep(0.01)
 
     @measure_performance("ProgressiveLoadingManager._process_loading_task")
     def _process_loading_task(self, task: LoadingTask):
@@ -544,6 +586,9 @@ class ProgressiveLoadingManager:
         try:
             # 添加到队列
             self.task_queue.put(task)
+            
+            # ✅ 修复：使用信号机制立即唤醒工作线程
+            self.task_available.set()
 
             # 更新统计
             with self.stats_lock:
@@ -654,17 +699,25 @@ class ProgressiveLoadingManager:
         """
         if stage is None:
             # 清空整个队列
+            cleared_count = 0
             while not self.task_queue.empty():
                 try:
                     self.task_queue.get_nowait()
                     self.task_queue.task_done()
+                    cleared_count += 1
                 except Empty:
                     break
-            logger.info("已清空所有阶段的任务队列")
+            
+            # ✅ 修复：清空队列后清除信号
+            if cleared_count > 0:
+                self.task_available.clear()
+                logger.info(f"已清空所有阶段的任务队列，清除 {cleared_count} 个任务")
         else:
             # 清空指定阶段的任务
             # 由于PriorityQueue不支持按条件删除，我们需要创建一个新队列
             new_queue = PriorityQueue()
+            cleared_count = 0
+            kept_count = 0
 
             # 移动所有不属于指定阶段的任务到新队列
             while not self.task_queue.empty():
@@ -672,13 +725,23 @@ class ProgressiveLoadingManager:
                     task = self.task_queue.get_nowait()
                     if task.stage != stage:
                         new_queue.put(task)
+                        kept_count += 1
+                    else:
+                        cleared_count += 1
                     self.task_queue.task_done()
                 except Empty:
                     break
 
             # 替换队列
             self.task_queue = new_queue
-            logger.info(f"已清空 {stage.name} 阶段的任务队列")
+            
+            # ✅ 修复：如果新队列有任务，设置信号；否则清除信号
+            if not self.task_queue.empty():
+                self.task_available.set()
+            else:
+                self.task_available.clear()
+            
+            logger.info(f"已清空 {stage.name} 阶段的任务队列，清除 {cleared_count} 个任务，保留 {kept_count} 个任务")
 
     def cancel_all_tasks(self):
         """取消所有任务"""
@@ -756,6 +819,19 @@ def load_progressive(task_id: str, loader_func: Callable, data_params: Dict[str,
     """渐进式加载便捷函数"""
     return get_progressive_loader().submit_loading_task(task_id, loader_func, data_params, stage, callback)
 
-def load_chart_progressive(chart_widget, kdata, indicators) -> bool:
-    """渐进式加载图表便捷函数"""
+def load_chart_progressive(chart_widget, kdata, indicators, stages=None) -> bool:
+    """渐进式加载图表便捷函数
+    
+    Args:
+        chart_widget: 图表控件
+        kdata: K线数据
+        indicators: 指标数据
+        stages: 加载阶段配置（可选，当前版本忽略此参数，保持向后兼容）
+    
+    Returns:
+        是否成功提交任务
+    """
+    # stages参数保留用于向后兼容，但当前实现不使用
+    if stages is not None:
+        logger.debug(f"load_chart_progressive收到stages参数（已忽略，保持向后兼容）: {stages}")
     return get_progressive_loader().load_chart_progressive(chart_widget, kdata, indicators)

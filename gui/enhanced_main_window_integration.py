@@ -32,7 +32,7 @@ from loguru import logger
 # 导入增强UI组件
 from gui.widgets.enhanced_ui import (
     Level2DataPanel, OrderBookWidget, FundamentalAnalysisTab,
-    DataQualityMonitorTab, SmartRecommendationPanel,
+    SmartRecommendationPanel,
     integrate_enhanced_components, get_component_info
 )
 
@@ -101,7 +101,6 @@ class EnhancedMainWindowIntegrator:
             ("level2_panel", self._integrate_level2_panel),
             ("order_book", self._integrate_order_book_widget),
             ("fundamental_analysis", self._integrate_fundamental_analysis),
-            ("quality_monitor", self._integrate_quality_monitor),
             ("smart_recommendation", self._integrate_smart_recommendation),
             ("enhanced_menu", self._integrate_enhanced_menu)
         ]
@@ -223,38 +222,6 @@ class EnhancedMainWindowIntegrator:
             logger.error(f"基本面分析集成失败: {e}")
             return False
 
-    def _integrate_quality_monitor(self) -> bool:
-        """集成数据质量监控"""
-        try:
-            if not self.managers.get('quality_monitor'):
-                logger.warning("数据质量监控集成跳过: 缺少质量监控器")
-                return False
-
-            # 创建数据质量监控标签页
-            quality_tab = DataQualityMonitorTab(
-                parent=self.main_window,
-                quality_monitor=self.managers['quality_monitor'],
-                report_generator=self.managers.get('report_generator')
-            )
-
-            # 创建停靠窗口
-            dock_widget = QDockWidget("数据质量监控", self.main_window)
-            dock_widget.setWidget(quality_tab)
-            dock_widget.setAllowedAreas(Qt.BottomDockWidgetArea | Qt.TopDockWidgetArea)
-
-            # 添加到主窗口
-            self.main_window.addDockWidget(Qt.BottomDockWidgetArea, dock_widget)
-
-            # 存储引用
-            self.enhanced_components['quality_monitor_tab'] = quality_tab
-            self.dock_widgets['quality_monitor'] = dock_widget
-
-            return True
-
-        except Exception as e:
-            logger.error(f"数据质量监控集成失败: {e}")
-            return False
-
     def _integrate_smart_recommendation(self) -> bool:
         """集成智能推荐面板"""
         try:
@@ -315,15 +282,6 @@ class EnhancedMainWindowIntegrator:
                 )
 
             enhanced_menu.addSeparator()
-
-            # 数据质量监控菜单项
-            if 'quality_monitor' in self.dock_widgets:
-                quality_action = enhanced_menu.addAction("数据质量监控")
-                quality_action.setCheckable(True)
-                quality_action.setChecked(True)
-                quality_action.triggered.connect(
-                    lambda checked: self.dock_widgets['quality_monitor'].setVisible(checked)
-                )
 
             # 智能推荐菜单项
             if 'smart_recommendation' in self.dock_widgets:

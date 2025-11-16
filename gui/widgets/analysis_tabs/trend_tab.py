@@ -2022,24 +2022,44 @@ class TrendAnalysisTab(BaseAnalysisTab):
             else:
                 df = kdata
 
+            # ✅ 修复：确保输入数据的数值列为数值类型
+            numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
             # 计算MACD
             macd_data = calculate_macd(df, fastperiod=12, slowperiod=26, signalperiod=9)
 
             if macd_data is not None and len(macd_data) > 0:
-                # 获取最近的MACD值
-                macd_cols = list(macd_data.columns)
-                macd_col = macd_cols[0] if len(macd_cols) > 0 else 'MACD'
-                signal_col = macd_cols[1] if len(macd_cols) > 1 else 'Signal'
-                hist_col = macd_cols[2] if len(macd_cols) > 2 else 'Histogram'
+                # ✅ 修复：使用固定的列名，确保获取正确的数值列
+                # calculate_macd返回的列名是：'MACD', 'MACDSignal', 'MACDHist'
+                macd_col = 'MACD' if 'MACD' in macd_data.columns else None
+                signal_col = 'MACDSignal' if 'MACDSignal' in macd_data.columns else None
+                hist_col = 'MACDHist' if 'MACDHist' in macd_data.columns else None
 
-                recent_macd = macd_data[macd_col].iloc[-min(period, len(macd_data)):]
-                recent_signal = macd_data[signal_col].iloc[-min(period, len(macd_data)):]
-                recent_hist = macd_data[hist_col].iloc[-min(period, len(macd_data)):]
+                if not all([macd_col, signal_col, hist_col]):
+                    logger.warning("MACD计算结果缺少必要的列")
+                    return None
+
+                # ✅ 修复：确保数据类型为数值类型，并处理NaN值
+                recent_macd = pd.to_numeric(macd_data[macd_col], errors='coerce').iloc[-min(period, len(macd_data)):]
+                recent_signal = pd.to_numeric(macd_data[signal_col], errors='coerce').iloc[-min(period, len(macd_data)):]
+                recent_hist = pd.to_numeric(macd_data[hist_col], errors='coerce').iloc[-min(period, len(macd_data)):]
+
+                # ✅ 修复：移除NaN值，确保有有效数据进行计算
+                recent_macd = recent_macd.dropna()
+                recent_signal = recent_signal.dropna()
+                recent_hist = recent_hist.dropna()
+
+                if len(recent_macd) < 2 or len(recent_signal) < 1 or len(recent_hist) < 2:
+                    logger.warning("MACD数据不足，无法计算趋势")
+                    return None
 
                 # 分析趋势方向
-                macd_trend = recent_macd.iloc[-1] - recent_macd.iloc[0] if len(recent_macd) > 1 else 0
-                signal_cross = recent_macd.iloc[-1] - recent_signal.iloc[-1]
-                hist_trend = recent_hist.iloc[-1] - recent_hist.iloc[0] if len(recent_hist) > 1 else 0
+                macd_trend = float(recent_macd.iloc[-1]) - float(recent_macd.iloc[0]) if len(recent_macd) > 1 else 0.0
+                signal_cross = float(recent_macd.iloc[-1]) - float(recent_signal.iloc[-1]) if len(recent_signal) > 0 else 0.0
+                hist_trend = float(recent_hist.iloc[-1]) - float(recent_hist.iloc[0]) if len(recent_hist) > 1 else 0.0
 
                 # 确定方向
                 if macd_trend > 0 and signal_cross > 0:
@@ -2088,16 +2108,34 @@ class TrendAnalysisTab(BaseAnalysisTab):
             else:
                 df = kdata
 
+            # ✅ 修复：确保输入数据的数值列为数值类型
+            numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
             # 计算RSI
             rsi_data = calculate_rsi(df, timeperiod=14)
 
             if rsi_data is not None and len(rsi_data) > 0:
-                # 获取最近的RSI值
-                recent_rsi = rsi_data['RSI'].iloc[-min(period, len(rsi_data)):]
+                # ✅ 修复：使用固定的列名，确保获取正确的数值列
+                if 'RSI' not in rsi_data.columns:
+                    logger.warning("RSI计算结果缺少RSI列")
+                    return None
+
+                # ✅ 修复：确保数据类型为数值类型，并处理NaN值
+                recent_rsi = pd.to_numeric(rsi_data['RSI'], errors='coerce').iloc[-min(period, len(rsi_data)):]
+
+                # ✅ 修复：移除NaN值，确保有有效数据进行计算
+                recent_rsi = recent_rsi.dropna()
+
+                if len(recent_rsi) < 2:
+                    logger.warning("RSI数据不足，无法计算趋势")
+                    return None
 
                 # 分析趋势方向
-                rsi_trend = recent_rsi.iloc[-1] - recent_rsi.iloc[0] if len(recent_rsi) > 1 else 0
-                current_rsi = recent_rsi.iloc[-1]
+                rsi_trend = float(recent_rsi.iloc[-1]) - float(recent_rsi.iloc[0]) if len(recent_rsi) > 1 else 0.0
+                current_rsi = float(recent_rsi.iloc[-1])
 
                 # 确定方向
                 if rsi_trend > 5:
@@ -2146,24 +2184,44 @@ class TrendAnalysisTab(BaseAnalysisTab):
             else:
                 df = kdata
 
+            # ✅ 修复：确保输入数据的数值列为数值类型
+            numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
             # 计算KDJ
             kdj_data = calculate_kdj(df, fastk_period=9, slowk_period=3, slowd_period=3)
 
             if kdj_data is not None and len(kdj_data) > 0:
-                # 获取最近的KDJ值
-                kdj_cols = list(kdj_data.columns)
-                k_col = kdj_cols[0] if len(kdj_cols) > 0 else '%K'
-                d_col = kdj_cols[1] if len(kdj_cols) > 1 else '%D'
-                j_col = kdj_cols[2] if len(kdj_cols) > 2 else '%J'
+                # ✅ 修复：使用固定的列名，确保获取正确的数值列
+                # calculate_kdj返回的列名是：'K', 'D', 'J'
+                k_col = 'K' if 'K' in kdj_data.columns else None
+                d_col = 'D' if 'D' in kdj_data.columns else None
+                j_col = 'J' if 'J' in kdj_data.columns else None
 
-                recent_k = kdj_data[k_col].iloc[-min(period, len(kdj_data)):]
-                recent_d = kdj_data[d_col].iloc[-min(period, len(kdj_data)):]
-                recent_j = kdj_data[j_col].iloc[-min(period, len(kdj_data)):]
+                if not all([k_col, d_col, j_col]):
+                    logger.warning("KDJ计算结果缺少必要的列")
+                    return None
+
+                # ✅ 修复：确保数据类型为数值类型，并处理NaN值
+                recent_k = pd.to_numeric(kdj_data[k_col], errors='coerce').iloc[-min(period, len(kdj_data)):]
+                recent_d = pd.to_numeric(kdj_data[d_col], errors='coerce').iloc[-min(period, len(kdj_data)):]
+                recent_j = pd.to_numeric(kdj_data[j_col], errors='coerce').iloc[-min(period, len(kdj_data)):]
+
+                # ✅ 修复：移除NaN值，确保有有效数据进行计算
+                recent_k = recent_k.dropna()
+                recent_d = recent_d.dropna()
+                recent_j = recent_j.dropna()
+
+                if len(recent_k) < 2 or len(recent_d) < 2 or len(recent_j) < 2:
+                    logger.warning("KDJ数据不足，无法计算趋势")
+                    return None
 
                 # 分析趋势方向
-                k_trend = recent_k.iloc[-1] - recent_k.iloc[0] if len(recent_k) > 1 else 0
-                d_trend = recent_d.iloc[-1] - recent_d.iloc[0] if len(recent_d) > 1 else 0
-                j_trend = recent_j.iloc[-1] - recent_j.iloc[0] if len(recent_j) > 1 else 0
+                k_trend = float(recent_k.iloc[-1]) - float(recent_k.iloc[0]) if len(recent_k) > 1 else 0.0
+                d_trend = float(recent_d.iloc[-1]) - float(recent_d.iloc[0]) if len(recent_d) > 1 else 0.0
+                j_trend = float(recent_j.iloc[-1]) - float(recent_j.iloc[0]) if len(recent_j) > 1 else 0.0
 
                 # 确定方向(综合KDJ三线)
                 overall_trend = (k_trend + d_trend + j_trend) / 3

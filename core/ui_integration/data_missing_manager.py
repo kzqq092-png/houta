@@ -19,7 +19,6 @@ try:
     from core.plugin_types import AssetType, DataType, PluginType
     from core.asset_type_identifier import AssetTypeIdentifier
     from core.data_router import DataRouter, DataRequest
-    from core.services.asset_aware_unified_data_manager import AssetAwareUnifiedDataManager
     from core.asset_database_manager import AssetSeparatedDatabaseManager
     from loguru import logger
 except ImportError as e:
@@ -91,9 +90,10 @@ class DataMissingManager:
     def _initialize_components(self):
         """初始化核心组件"""
         try:
+            from core.services.unified_data_manager import get_unified_data_manager
             self.asset_identifier = AssetTypeIdentifier()
             self.data_router = DataRouter()
-            self.data_manager = AssetAwareget_unified_data_manager()
+            self.data_manager = get_unified_data_manager()
             self.db_manager = AssetSeparatedDatabaseManager()
 
             if logger:

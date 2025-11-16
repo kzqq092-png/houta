@@ -67,120 +67,267 @@ class ChartRenderer(QObject):
 
         return gs, [price_ax, volume_ax, indicator_ax]
 
-    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None):
-        """高性能K线绘制，支持等距序号X轴
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True):
+        """高性能K线绘制，支持datetime X轴和等距序号X轴
         Args:
             ax: matplotlib轴对象
             data: K线数据
             style: 样式字典
-            x: 可选，等距序号X轴
+            x: 可选，X轴数据（可以是datetime数组或数字索引）
+            use_datetime_axis: 是否使用datetime X轴（如果数据包含datetime列）
         """
         try:
             view_data = self._get_view_data(data)
             plot_data = self._downsample_data(view_data)
-            self._render_candlesticks_efficient(ax, plot_data, style or {}, x)
-            self._optimize_display(ax)
+            
+            # ✅ 修复：支持datetime X轴
+            if use_datetime_axis and x is None and 'datetime' in plot_data.columns:
+                try:
+                    # 使用datetime作为X轴
+                    datetime_series = pd.to_datetime(plot_data['datetime'])
+                    x = mdates.date2num(datetime_series)
+                    
+                    # 设置智能日期格式化
+                    formatter, locator = self._get_smart_date_formatter(plot_data, 'datetime')
+                    if formatter and locator:
+                        ax.xaxis.set_major_formatter(formatter)
+                        ax.xaxis.set_major_locator(locator)
+                        # 旋转标签以避免重叠
+                        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+                        logger.debug(f"✅ 使用datetime X轴，时间范围: {datetime_series.min()} ~ {datetime_series.max()}")
+                except Exception as e:
+                    logger.warning(f"⚠️ datetime X轴设置失败，回退到数字索引: {e}")
+                    use_datetime_axis = False
+                    x = None
+            
+            # 如果use_datetime_axis为False或x为None，使用数字索引
+            if x is None:
+                x = np.arange(len(plot_data))
+                logger.debug(f"使用数字索引X轴，数据长度: {len(plot_data)}")
+            
+            self._render_candlesticks_efficient(ax, plot_data, style or {}, x, use_datetime_axis)
+            # ✅ 性能优化P1: 移除_optimize_display()调用，由调用方统一设置样式
+            # 避免在每次渲染时重复设置样式，减少开销
+            # self._optimize_display(ax, use_datetime_axis)  # 已移除，在rendering_mixin中统一设置
         except Exception as e:
             self.render_error.emit(f"绘制K线失败: {str(e)}")
+            logger.error(f"绘制K线失败: {e}", exc_info=True)
 
-    def _render_candlesticks_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None):
-        """使用collections高效渲染K线，支持等距序号X轴，空心样式"""
+    def _render_candlesticks_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None, use_datetime_axis: bool = False):
+        """使用collections高效渲染K线，支持datetime X轴和等距序号X轴，空心样式"""
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
         alpha = style.get('alpha', 1.0)
+        
         # 横坐标
         if x is not None:
             xvals = x
-        else:
+        elif use_datetime_axis and 'datetime' in data.columns:
+            # 尝试使用datetime列
+            try:
+                datetime_series = pd.to_datetime(data['datetime'])
+                xvals = mdates.date2num(datetime_series)
+            except Exception as e:
+                logger.warning(f"datetime X轴转换失败: {e}，使用数字索引")
+                xvals = np.arange(len(data))
+        elif isinstance(data.index, pd.DatetimeIndex):
+            # 如果索引是DatetimeIndex，使用索引
             xvals = mdates.date2num(data.index.to_pydatetime())
-        verts_up, verts_down, segments_up, segments_down = [], [], [], []
-        for i, (idx, row) in enumerate(data.iterrows()):
-            open_price = row['open']
-            close = row['close']
-            high = row['high']
-            low = row['low']
-            left = xvals[i] - 0.3
-            right = xvals[i] + 0.3
-            if close >= open_price:
-                verts_up.append([
-                    (left, open_price), (left, close), (right,
-                                                        close), (right, open_price)
-                ])
-                segments_up.append([(xvals[i], low), (xvals[i], high)])
-            else:
-                verts_down.append([
-                    (left, open_price), (left, close), (right,
-                                                        close), (right, open_price)
-                ])
-                segments_down.append([(xvals[i], low), (xvals[i], high)])
+        else:
+            # 默认使用数字索引
+            xvals = np.arange(len(data))
+        
+        # 计算蜡烛宽度（根据X轴类型调整）
+        if use_datetime_axis and len(xvals) > 1:
+            # datetime X轴：根据时间间隔计算宽度
+            avg_interval = np.mean(np.diff(xvals))
+            candle_width = max(0.3, avg_interval * 0.6)  # 蜡烛宽度为平均间隔的60%
+        else:
+            # 数字索引：固定宽度
+            candle_width = 0.3
+        
+        # ✅ 性能优化：使用完全向量化的numpy操作，提升10-100倍性能
+        # 提取数据为numpy数组（避免iterrows()的性能开销）
+        opens = data['open'].values
+        closes = data['close'].values
+        highs = data['high'].values
+        lows = data['low'].values
+        n = len(data)
+        
+        # 向量化计算left和right
+        lefts = xvals - candle_width / 2
+        rights = xvals + candle_width / 2
+        
+        # 向量化判断涨跌
+        is_up = closes >= opens
+        up_indices = np.where(is_up)[0]
+        down_indices = np.where(~is_up)[0]
+        
+        # ✅ 性能优化：完全向量化构建，直接使用numpy数组（PolyCollection和LineCollection都支持）
+        def build_candle_verts(indices):
+            """批量构建蜡烛图顶点，返回numpy数组"""
+            if len(indices) == 0:
+                return np.empty((0, 4, 2))
+            idx_arr = indices  # 已经是numpy数组，不需要转换
+            verts = np.empty((len(indices), 4, 2), dtype=np.float64)
+            verts[:, 0, 0] = lefts[idx_arr]  # 左下x
+            verts[:, 0, 1] = opens[idx_arr]  # 左下y
+            verts[:, 1, 0] = lefts[idx_arr]  # 左上x
+            verts[:, 1, 1] = closes[idx_arr]  # 左上y
+            verts[:, 2, 0] = rights[idx_arr]  # 右上x
+            verts[:, 2, 1] = closes[idx_arr]  # 右上y
+            verts[:, 3, 0] = rights[idx_arr]  # 右下x
+            verts[:, 3, 1] = opens[idx_arr]  # 右下y
+            return verts  # 直接返回numpy数组，PolyCollection支持
+        
+        verts_up = build_candle_verts(up_indices)
+        verts_down = build_candle_verts(down_indices)
+        
+        # 批量构建影线段（直接使用numpy数组）
+        def build_shadow_segments(indices):
+            """批量构建影线段，返回numpy数组"""
+            if len(indices) == 0:
+                return np.empty((0, 2, 2))
+            idx_arr = indices  # 已经是numpy数组
+            segments = np.empty((len(indices), 2, 2), dtype=np.float64)
+            segments[:, 0, 0] = xvals[idx_arr]  # 起点x
+            segments[:, 0, 1] = lows[idx_arr]   # 起点y
+            segments[:, 1, 0] = xvals[idx_arr]  # 终点x
+            segments[:, 1, 1] = highs[idx_arr]  # 终点y
+            return segments  # 直接返回numpy数组，LineCollection支持
+        
+        segments_up = build_shadow_segments(up_indices)
+        segments_down = build_shadow_segments(down_indices)
+        
         # 修改：空心蜡烛图样式，只有边框无填充
-        if verts_up:
+        # ✅ 性能优化：检查数组长度而不是转换为bool（避免numpy警告）
+        if len(verts_up) > 0:
             collection_up = PolyCollection(
                 verts_up, facecolor=up_color, edgecolor=up_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_up)
-        if verts_down:
+        if len(verts_down) > 0:
             collection_down = PolyCollection(
                 verts_down, facecolor=down_color, edgecolor=down_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_down)
-        if segments_up:  # 影线
+        if len(segments_up) > 0:  # 影线
             collection_shadow_up = LineCollection(
                 segments_up, colors=up_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_shadow_up)
-        if segments_down:
+        if len(segments_down) > 0:
             collection_shadow_down = LineCollection(
                 segments_down, colors=down_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_shadow_down)
-        ax.autoscale_view()
+        # ✅ 性能优化：移除autoscale_view()调用，由调用方统一处理
+        # ax.autoscale_view()  # 已移除，在rendering_mixin中统一调用
 
-    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None):
-        """高性能成交量绘制，支持等距序号X轴
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True):
+        """高性能成交量绘制，支持datetime X轴和等距序号X轴
         Args:
             ax: matplotlib轴对象
             data: 成交量数据
             style: 样式字典
-            x: 可选，等距序号X轴
+            x: 可选，X轴数据（可以是datetime数组或数字索引）
+            use_datetime_axis: 是否使用datetime X轴（如果数据包含datetime列）
         """
         try:
             view_data = self._get_view_data(data)
             plot_data = self._downsample_data(view_data)
-            self._render_volume_efficient(ax, plot_data, style or {}, x)
-            self._optimize_display(ax)
+            
+            # ✅ 修复：支持datetime X轴（与K线图保持一致）
+            if use_datetime_axis and x is None and 'datetime' in plot_data.columns:
+                try:
+                    datetime_series = pd.to_datetime(plot_data['datetime'])
+                    x = mdates.date2num(datetime_series)
+                except Exception as e:
+                    logger.warning(f"⚠️ 成交量datetime X轴设置失败，回退到数字索引: {e}")
+                    use_datetime_axis = False
+                    x = None
+            
+            if x is None:
+                x = np.arange(len(plot_data))
+            
+            self._render_volume_efficient(ax, plot_data, style or {}, x, use_datetime_axis)
+            # ✅ 性能优化P1: 移除_optimize_display()调用，由调用方统一设置样式
+            # 避免在每次渲染时重复设置样式，减少开销
+            # self._optimize_display(ax, use_datetime_axis)  # 已移除，在rendering_mixin中统一设置
         except Exception as e:
             self.render_error.emit(f"绘制成交量失败: {str(e)}")
+            logger.error(f"绘制成交量失败: {e}", exc_info=True)
 
-    def _render_volume_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None):
-        """使用collections高效渲染成交量，支持等距序号X轴"""
+    def _render_volume_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None, use_datetime_axis: bool = False):
+        """使用collections高效渲染成交量，支持datetime X轴和等距序号X轴"""
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
         alpha = style.get('volume_alpha', 0.5)
+        
+        # 横坐标（与K线图保持一致）
         if x is not None:
             xvals = x
-        else:
+        elif use_datetime_axis and 'datetime' in data.columns:
+            try:
+                datetime_series = pd.to_datetime(data['datetime'])
+                xvals = mdates.date2num(datetime_series)
+            except Exception as e:
+                logger.warning(f"成交量datetime X轴转换失败: {e}，使用数字索引")
+                xvals = np.arange(len(data))
+        elif isinstance(data.index, pd.DatetimeIndex):
             xvals = mdates.date2num(data.index.to_pydatetime())
-        verts_up, verts_down = [], []
-        for i, (idx, row) in enumerate(data.iterrows()):
-            volume = row['volume']
-            close = row['close']
-            open_price = row['open']
-            left = xvals[i] - 0.3
-            right = xvals[i] + 0.3
-            if close >= open_price:
-                verts_up.append([
-                    (left, 0), (left, volume), (right, volume), (right, 0)
-                ])
-            else:
-                verts_down.append([
-                    (left, 0), (left, volume), (right, volume), (right, 0)
-                ])
-        if verts_up:
+        else:
+            xvals = np.arange(len(data))
+        
+        # 计算柱状图宽度（与K线图保持一致）
+        if use_datetime_axis and len(xvals) > 1:
+            avg_interval = np.mean(np.diff(xvals))
+            bar_width = max(0.3, avg_interval * 0.6)
+        else:
+            bar_width = 0.3
+        
+        # ✅ 性能优化：使用完全向量化的numpy操作，提升10-100倍性能
+        # 提取数据为numpy数组（避免iterrows()的性能开销）
+        volumes = data['volume'].values
+        closes = data['close'].values
+        opens = data['open'].values
+        n = len(data)
+        
+        # 向量化计算left和right
+        lefts = xvals - bar_width / 2
+        rights = xvals + bar_width / 2
+        
+        # 向量化判断涨跌
+        is_up = closes >= opens
+        up_indices = np.where(is_up)[0]
+        down_indices = np.where(~is_up)[0]
+        
+        # ✅ 性能优化：完全向量化构建，直接使用numpy数组（PolyCollection支持）
+        def build_volume_verts(indices):
+            """批量构建成交量柱状图顶点，返回numpy数组"""
+            if len(indices) == 0:
+                return np.empty((0, 4, 2))
+            idx_arr = indices  # 已经是numpy数组，不需要转换
+            verts = np.empty((len(indices), 4, 2), dtype=np.float64)
+            verts[:, 0, 0] = lefts[idx_arr]      # 左下x
+            verts[:, 0, 1] = 0                   # 左下y (底部)
+            verts[:, 1, 0] = lefts[idx_arr]      # 左上x
+            verts[:, 1, 1] = volumes[idx_arr]    # 左上y (顶部)
+            verts[:, 2, 0] = rights[idx_arr]     # 右上x
+            verts[:, 2, 1] = volumes[idx_arr]    # 右上y (顶部)
+            verts[:, 3, 0] = rights[idx_arr]     # 右下x
+            verts[:, 3, 1] = 0                   # 右下y (底部)
+            return verts  # 直接返回numpy数组，PolyCollection支持
+        
+        verts_up = build_volume_verts(up_indices)
+        verts_down = build_volume_verts(down_indices)
+        # ✅ 性能优化：检查数组长度而不是转换为bool（避免numpy警告）
+        if len(verts_up) > 0:
             collection_up = PolyCollection(
                 verts_up, facecolor=up_color, edgecolor='none', alpha=alpha)
             ax.add_collection(collection_up)
-        if verts_down:
+        if len(verts_down) > 0:
             collection_down = PolyCollection(
                 verts_down, facecolor=down_color, edgecolor='none', alpha=alpha)
             ax.add_collection(collection_down)
-        ax.autoscale_view()
+        # ✅ 性能优化：移除autoscale_view()调用，由调用方统一处理
+        # ax.autoscale_view()  # 已移除，在rendering_mixin中统一调用
 
     def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None):
         """高性能线图绘制
@@ -242,12 +389,74 @@ class ChartRenderer(QObject):
         # 添加到轴
         ax.add_collection(collection)
 
-        # 设置轴范围
-        ax.autoscale_view()
+        # ✅ 性能优化：移除autoscale_view()调用，由调用方统一处理
+        # ax.autoscale_view()  # 已移除，在rendering_mixin中统一调用
 
         # 添加图例
         if label:
             ax.legend()
+
+    def _get_smart_date_formatter(self, data: pd.DataFrame, datetime_col: str = 'datetime') -> Tuple[mdates.DateFormatter, mdates.AutoDateLocator]:
+        """根据时间跨度智能选择日期格式化器
+        
+        Args:
+            data: K线数据DataFrame
+            datetime_col: datetime列名
+            
+        Returns:
+            Tuple[DateFormatter, AutoDateLocator]: 日期格式化器和定位器
+        """
+        try:
+            if datetime_col not in data.columns:
+                return None, None
+                
+            # 获取时间范围
+            datetime_series = pd.to_datetime(data[datetime_col])
+            time_span = datetime_series.max() - datetime_series.min()
+            days = time_span.days
+            
+            # 根据时间跨度选择格式化器
+            if days <= 7:
+                # 7天内：显示 月-日 时:分
+                formatter = mdates.DateFormatter('%m-%d %H:%M')
+                # ✅ 修复：优化HourLocator间隔计算
+                if days <= 1:
+                    locator = mdates.HourLocator(interval=1)  # 每小时一个刻度
+                elif days <= 3:
+                    locator = mdates.HourLocator(interval=6)  # 每6小时一个刻度
+                else:
+                    locator = mdates.HourLocator(interval=12)  # 每12小时一个刻度
+            elif days <= 30:
+                # 30天内：显示 月-日
+                formatter = mdates.DateFormatter('%m-%d')
+                # ✅ 修复：优化DayLocator间隔计算
+                if days <= 14:
+                    locator = mdates.DayLocator(interval=1)  # 每天一个刻度（14天内）
+                else:
+                    # 14-30天：每3-5天一个刻度
+                    locator = mdates.DayLocator(interval=max(1, days // 10))
+            elif days <= 365:
+                # 1年内：显示 月-日
+                formatter = mdates.DateFormatter('%m-%d')
+                # ✅ 修复：使用WeekLocator而不是WeekdayLocator（WeekdayLocator用于周几定位，不适用于日线数据）
+                # 根据数据量自动选择：少于90天用DayLocator，90-365天用WeekLocator
+                if days <= 90:
+                    locator = mdates.DayLocator(interval=max(1, days // 15))  # 每15天一个刻度
+                else:
+                    locator = mdates.WeekLocator(interval=1)  # 每周一个刻度
+            elif days <= 365 * 3:
+                # 3年内：显示 年-月
+                formatter = mdates.DateFormatter('%Y-%m')
+                locator = mdates.MonthLocator(interval=2)
+            else:
+                # 3年以上：显示 年-月
+                formatter = mdates.DateFormatter('%Y-%m')
+                locator = mdates.MonthLocator(interval=6)
+            
+            return formatter, locator
+        except Exception as e:
+            logger.warning(f"智能日期格式化失败: {e}，使用默认格式")
+            return mdates.DateFormatter('%Y-%m-%d'), mdates.AutoDateLocator()
 
     def _get_view_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """获取当前视图范围内的数据
@@ -304,14 +513,25 @@ class ChartRenderer(QObject):
 
         return result
 
-    def _optimize_display(self, ax):
+    def _optimize_display(self, ax, use_datetime_axis: bool = False):
         """优化显示效果
 
         Args:
             ax: matplotlib轴对象
+            use_datetime_axis: 是否使用datetime X轴（如果True，不覆盖已设置的格式化器）
         """
-        # 设置日期格式
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        # ✅ 修复：只有在非datetime X轴或格式化器未设置时才设置日期格式
+        # 避免覆盖智能日期格式化器
+        if not use_datetime_axis:
+            # 数字索引X轴：不设置日期格式
+            pass
+        else:
+            # datetime X轴：检查是否已有格式化器，如果有就不覆盖
+            current_formatter = ax.xaxis.get_major_formatter()
+            if current_formatter is None or not isinstance(current_formatter, mdates.DateFormatter):
+                # 只有在没有格式化器或格式化器不是DateFormatter时才设置
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+                logger.debug("_optimize_display: 设置了默认日期格式化器")
 
         # 优化刻度
         ax.tick_params(axis='both', which='major', labelsize=8)

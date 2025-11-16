@@ -372,6 +372,15 @@ class DuckDBConnectionPool:
     def health_check(self) -> Dict[str, Any]:
         """健康检查"""
         try:
+            # ✅ 修复：先获取统计信息，再获取连接（避免health_check本身占用连接影响统计）
+            with self._lock:
+                available_connections = self._pool.qsize()
+                total_connections = self._total_connections
+                # ✅ 修复：活跃连接数 = 总连接数 - 池中可用连接数
+                # 因为连接要么在池中（可用），要么正在使用（活跃）
+                active_connections = max(0, total_connections - available_connections)
+            
+            # 执行健康检查查询
             with self.get_connection() as conn:
                 # 执行简单查询测试
                 result = conn.execute("SELECT 1 as test").fetchone()
@@ -379,15 +388,19 @@ class DuckDBConnectionPool:
                 # 获取数据库信息
                 db_info = conn.execute("PRAGMA database_list").fetchall()
 
-                # 统计信息
+                # ✅ 修复：健康检查完成后，重新获取统计信息（因为get_connection可能改变了连接状态）
                 with self._lock:
+                    available_connections_after = self._pool.qsize()
+                    total_connections_after = self._total_connections
+                    active_connections_after = max(0, total_connections_after - available_connections_after)
+                    
                     stats = {
                         'status': 'healthy',
                         'database_path': self.database_path,
                         'pool_size': self.pool_size,
-                        'total_connections': self._total_connections,
-                        'active_connections': self._active_connections,
-                        'available_connections': self._pool.qsize(),
+                        'total_connections': total_connections_after,
+                        'active_connections': active_connections_after,
+                        'available_connections': available_connections_after,
                         'database_info': db_info,
                         'test_query_result': result,
                         'config': self.config.to_dict()
@@ -397,11 +410,27 @@ class DuckDBConnectionPool:
 
         except Exception as e:
             logger.error(f"健康检查失败: {e}")
-            return {
-                'status': 'unhealthy',
-                'error': str(e),
-                'database_path': self.database_path
-            }
+            # ✅ 修复：即使健康检查失败，也返回当前的连接池统计信息
+            try:
+                with self._lock:
+                    available_connections = self._pool.qsize()
+                    total_connections = self._total_connections
+                    active_connections = max(0, total_connections - available_connections)
+                    return {
+                        'status': 'unhealthy',
+                        'error': str(e),
+                        'database_path': self.database_path,
+                        'pool_size': self.pool_size,
+                        'total_connections': total_connections,
+                        'active_connections': active_connections,
+                        'available_connections': available_connections
+                    }
+            except Exception:
+                return {
+                    'status': 'unhealthy',
+                    'error': str(e),
+                    'database_path': self.database_path
+                }
 
     def get_connection_stats(self) -> List[Dict[str, Any]]:
         """获取连接统计信息"""

@@ -20,3 +20,6 @@
 *.txt
 *.log
 *.log.*
+*.wal
+*.db
+*.duckdb

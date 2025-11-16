@@ -1083,44 +1083,25 @@ class LeftPanel(BasePanel):
             )
 
     def _update_stock_tree(self, stocks: List[Dict[str, Any]]) -> None:
-        """更新股票列表树，这是更新UI的唯一入口点"""
+        """更新股票列表树（从数据库加载已下载的资产）"""
         try:
             self.stock_tree.clear()
             if not stocks:
                 self.count_label.setText("股票: 0")
                 return
 
-            # 统计数据来源
-            database_count = sum(1 for stock in stocks if stock.get('source') == 'database')
-            service_count = len(stocks) - database_count
-
             items = []
             for stock in stocks:
-                # 创建显示文本，包含数据来源标识
                 code = stock.get('code', '')
                 name = stock.get('name', '')
-                source = stock.get('source', 'unknown')
-                status = stock.get('status', '')
+                update_time = stock.get('update_time', '未知')
 
-                # 根据数据来源添加标识
-                if source == 'database':
-                    name_with_source = f"{name} [DB]"  # 数据库来源标识
-                elif source == 'service':
-                    name_with_source = f"{name} [在线]"  # 在线服务标识
-                else:
-                    name_with_source = name
+                item = QTreeWidgetItem([code, name])
 
-                item = QTreeWidgetItem([code, name_with_source])
-
-                # 设置不同数据来源的显示样式
-                if source == 'database':
-                    # 数据库数据使用绿色标识
-                    item.setToolTip(0, f"数据来源：数据库 (已下载)\n更新时间：{stock.get('update_time', '未知')}")
-                    item.setToolTip(1, f"数据来源：数据库 (已下载)\n更新时间：{stock.get('update_time', '未知')}")
-                elif source == 'service':
-                    # 在线服务数据使用蓝色标识
-                    item.setToolTip(0, "数据来源：在线服务")
-                    item.setToolTip(1, "数据来源：在线服务")
+                # 设置Tooltip显示更新时间
+                tooltip = f"股票代码: {code}\n股票名称: {name}\n更新时间: {update_time}"
+                item.setToolTip(0, tooltip)
+                item.setToolTip(1, tooltip)
 
                 # 将完整的股票信息字典存储在item中
                 item.setData(0, Qt.UserRole, stock)
@@ -1128,49 +1109,43 @@ class LeftPanel(BasePanel):
 
             self.stock_tree.addTopLevelItems(items)
 
-            # 更新状态显示，包含数据来源统计
-            if database_count > 0 and service_count > 0:
-                status_text = f"股票: {len(stocks)} (数据库: {database_count}, 在线: {service_count})"
-            elif database_count > 0:
-                status_text = f"股票: {len(stocks)} (全部来自数据库)"
-            elif service_count > 0:
-                status_text = f"股票: {len(stocks)} (全部来自在线服务)"
-            else:
-                status_text = f"股票: {len(stocks)}"
-
-            self.count_label.setText(status_text)
+            # 更新状态显示
+            self.count_label.setText(f"股票: {len(stocks)}")
 
         except Exception as e:
             logger.error(f"更新股票树失败: {e}", exc_info=True)
             self.show_message(f"更新股票列表失败: {e}", 'error')
 
     def _load_stock_data(self, search_text: str = None) -> None:
-        """加载股票数据 - 优先从数据库获取已下载的资产数据"""
+        """从数据库加载已下载的股票资产数据"""
         self._show_loading(True)
         self.status_label.setText("正在加载股票列表...")
 
         try:
-            # 优先使用TET框架从数据库获取已下载的股票列表
+            # 从数据库获取已下载的股票列表
             stocks = self._get_stocks_from_database(search_text)
 
-            # 如果数据库中没有数据，则使用传统方式获取
-            if not stocks:
-                logger.info("数据库中无股票数据，使用传统方式获取")
-                stocks = self._get_stocks_from_service(search_text)
-            else:
+            if stocks:
                 logger.info(f"从数据库获取到 {len(stocks)} 只股票")
+            else:
+                logger.info("数据库中暂无股票数据")
 
             self._on_data_loaded(stocks)
 
         except Exception as e:
-            logger.error(f"Failed to load stock list: {e}", exc_info=True)
+            logger.error(f"加载股票列表失败: {e}", exc_info=True)
             self._on_data_error(str(e))
 
     def _get_stocks_from_database(self, search_text: str = None) -> List[Dict[str, Any]]:
-        """从数据库获取已下载的股票列表"""
+        """从数据库获取已下载的股票列表（支持资产分离架构）"""
         try:
-            # 优先尝试直接从DuckDB文件读取数据
-            stocks_df = self._direct_query_duckdb_stocks(search_text)
+            # 获取当前选择的资产类型
+            current_asset_type = getattr(self, 'current_asset_type', None)
+            if current_asset_type:
+                logger.debug(f"查询资产数据库: {current_asset_type.value}")
+
+            # 优先尝试直接从DuckDB文件读取数据（传递资产类型）
+            stocks_df = self._direct_query_duckdb_stocks(search_text, current_asset_type)
 
             if not stocks_df.empty:
                 # 转换为标准格式
@@ -1180,10 +1155,8 @@ class LeftPanel(BasePanel):
                         'code': str(row.get('code', '')),
                         'name': str(row.get('name', '')),
                         'market': str(row.get('market', '')),
-                        'asset_type': str(row.get('asset_type', 'STOCK')),
-                        'status': 'downloaded',  # 标记为已下载
-                        'update_time': row.get('update_time', ''),
-                        'source': 'database'  # 标记数据来源
+                        'asset_type': str(row.get('asset_type', 'stock_a')),
+                        'update_time': row.get('update_time', '')
                     }
 
                     # 应用搜索过滤
@@ -1209,7 +1182,7 @@ class LeftPanel(BasePanel):
                     if market_text != "全部":
                         market = market_text
 
-                # 从DuckDB的stock_list表查询数据
+                # 从DuckDB的asset_metadata表查询数据
                 stocks_df = self._query_stocks_from_duckdb(uni_manager, market, search_text)
 
                 if not stocks_df.empty:
@@ -1221,9 +1194,7 @@ class LeftPanel(BasePanel):
                             'name': str(row.get('name', '')),
                             'market': str(row.get('market', '')),
                             'asset_type': str(row.get('asset_type', 'STOCK')),
-                            'status': 'downloaded',  # 标记为已下载
-                            'update_time': row.get('update_time', ''),
-                            'source': 'database'  # 标记数据来源
+                            'update_time': row.get('update_time', '')
                         }
 
                         # 应用搜索过滤
@@ -1245,13 +1216,22 @@ class LeftPanel(BasePanel):
             logger.error(f"从数据库获取股票列表失败: {e}")
             return []
 
-    def _direct_query_duckdb_stocks(self, search_text: str = None) -> pd.DataFrame:
-        """直接查询DuckDB数据库中的股票列表"""
+    def _direct_query_duckdb_stocks(self, search_text: str = None, asset_type: 'AssetType' = None) -> pd.DataFrame:
+        """
+        直接查询DuckDB数据库中的股票列表
+
+        Args:
+            search_text: 搜索关键词
+            asset_type: 资产类型，如果为None则使用当前选择的资产类型
+
+        Returns:
+            pd.DataFrame: 查询结果
+        """
         try:
             import duckdb
 
-            # 获取数据库路径
-            db_path = self._get_stock_database_path()
+            # 获取数据库路径（传递资产类型）
+            db_path = self._get_stock_database_path(asset_type)
 
             # 检查数据库文件是否存在
             if not Path(db_path).exists():
@@ -1267,6 +1247,11 @@ class LeftPanel(BasePanel):
 
             # 构建查询条件
             query_conditions = []
+
+            # ✅ 添加资产类型过滤（确保查询结果与选择的资产类型一致）
+            if asset_type:
+                query_conditions.append(f"asset_type = '{asset_type.value}'")
+
             if market:
                 # 根据市场名称映射到数据库中的market字段
                 market_mapping = {
@@ -1283,14 +1268,18 @@ class LeftPanel(BasePanel):
                 search_condition = f"(code LIKE '%{search_text}%' OR name LIKE '%{search_text}%')"
                 query_conditions.append(search_condition)
 
-            # 构建SQL查询
-            base_query = "SELECT code, name, market, asset_type, update_time FROM stock_list"
+            # ✅ 修复：从asset_metadata表查询（这是数据导入时保存资产元数据的表）
+            # 字段映射：symbol→code（UI使用code字段）
+            base_query = "SELECT symbol as code, name, market, asset_type, updated_at as update_time FROM asset_metadata"
             if query_conditions:
-                query = f"{base_query} WHERE {' AND '.join(query_conditions)}"
+                # 注意：查询条件中的code需要改为symbol
+                adjusted_conditions = []
+                for condition in query_conditions:
+                    adjusted_condition = condition.replace('code', 'symbol')
+                    adjusted_conditions.append(adjusted_condition)
+                query = f"{base_query} WHERE {' AND '.join(adjusted_conditions)}"
             else:
                 query = base_query
-
-            query += " ORDER BY code LIMIT 1000"  # 限制返回数量
 
             # 执行查询
             with duckdb.connect(db_path) as conn:
@@ -1299,13 +1288,13 @@ class LeftPanel(BasePanel):
                 tables_result = conn.execute(table_check).fetchall()
                 table_names = [table[0] for table in tables_result]
 
-                if 'stock_list' not in table_names:
-                    logger.debug("stock_list表不存在")
+                if 'asset_metadata' not in table_names:
+                    logger.debug("asset_metadata表不存在，可能尚未导入数据")
                     return pd.DataFrame()
 
                 # 执行股票查询
                 result = conn.execute(query).df()
-                logger.debug(f"直接查询DuckDB成功，返回 {len(result)} 条记录")
+                logger.info(f"从asset_metadata表查询成功，返回 {len(result)} 条记录")
                 return result
 
         except ImportError:
@@ -1341,6 +1330,12 @@ class LeftPanel(BasePanel):
 
             # 构建查询条件
             query_conditions = []
+
+            # ✅ 添加资产类型过滤
+            current_asset_type = getattr(self, 'current_asset_type', None)
+            if current_asset_type:
+                query_conditions.append(f"asset_type = '{current_asset_type.value}'")
+
             if market:
                 # 根据市场名称映射到数据库中的market字段
                 market_mapping = {
@@ -1354,26 +1349,33 @@ class LeftPanel(BasePanel):
                 query_conditions.append(f"market = '{db_market}'")
 
             if search_text:
-                search_condition = f"(code LIKE '%{search_text}%' OR name LIKE '%{search_text}%')"
+                search_condition = f"(symbol LIKE '%{search_text}%' OR name LIKE '%{search_text}%')"
                 query_conditions.append(search_condition)
 
-            # 构建SQL查询
-            base_query = "SELECT code, name, market, asset_type, update_time FROM stock_list"
+            # ✅ 修复：从asset_metadata表查询，字段映射symbol→code
+            base_query = "SELECT symbol as code, name, market, asset_type, updated_at as update_time FROM asset_metadata"
             if query_conditions:
                 query = f"{base_query} WHERE {' AND '.join(query_conditions)}"
             else:
                 query = base_query
 
-            query += " ORDER BY code"
+            query += " ORDER BY symbol"
 
             # 执行查询
             if hasattr(duckdb_ops, 'query_data'):
                 # 使用 query_data 方法（返回 QueryResult）
+                # 注意：调整查询条件中的字段名
+                adjusted_where = " AND ".join(query_conditions).replace('code', 'symbol') if query_conditions else None
+
+                # ✅ 获取当前资产类型的数据库路径
+                current_asset_type = getattr(self, 'current_asset_type', None)
+                db_path = self._get_stock_database_path(current_asset_type)
+
                 result = duckdb_ops.query_data(
-                    table_name="stock_list",
-                    database_path=self._get_stock_database_path(),
-                    where_clause=" AND ".join(query_conditions) if query_conditions else None,
-                    order_by="code"
+                    table_name="asset_metadata",
+                    database_path=db_path,
+                    where_clause=adjusted_where,
+                    order_by="symbol"
                 )
 
                 # QueryResult 对象有 success 属性和 data 属性
@@ -1383,8 +1385,11 @@ class LeftPanel(BasePanel):
                     logger.debug(f"DuckDB查询返回空结果或失败: {result.error_message if result else 'None'}")
             elif hasattr(duckdb_ops, 'execute_query'):
                 # 备用方法：直接执行SQL
+                current_asset_type = getattr(self, 'current_asset_type', None)
+                db_path = self._get_stock_database_path(current_asset_type)
+
                 result = duckdb_ops.execute_query(
-                    database_path=self._get_stock_database_path(),
+                    database_path=db_path,
                     query=query
                 )
 
@@ -1396,57 +1401,47 @@ class LeftPanel(BasePanel):
                     if result.success and result.data is not None:
                         return result.data
 
-            logger.debug("DuckDB查询执行失败或stock_list表不存在，使用备用数据源")
+            logger.debug("DuckDB查询执行失败或asset_metadata表不存在")
             return pd.DataFrame()
 
         except Exception as e:
             logger.debug(f"DuckDB查询股票数据失败，使用备用数据源: {e}")
             return pd.DataFrame()
 
-    def _get_stock_database_path(self) -> str:
-        """获取股票数据库路径"""
-        try:
-            # 尝试从数据管理器获取数据库路径
-            if hasattr(self.data_manager, 'enhanced_duckdb_downloader'):
-                downloader = self.data_manager.enhanced_duckdb_downloader
-                if hasattr(downloader, 'db_paths') and 'kline' in downloader.db_paths:
-                    return downloader.db_paths['kline']
+    def _get_stock_database_path(self, asset_type: 'AssetType' = None) -> str:
+        """
+        获取资产数据库路径（支持资产分离架构）
 
-            # 使用默认路径
+        Args:
+            asset_type: 资产类型，如果为None则使用当前选择的资产类型
+
+        Returns:
+            str: 数据库文件路径
+        """
+        try:
+            # 确定使用的资产类型
+            if asset_type is None:
+                asset_type = getattr(self, 'current_asset_type', None)
+
+            if asset_type is None:
+                from core.plugin_types import AssetType
+                asset_type = AssetType.STOCK_A  # 默认A股
+
+            # ✅ 使用资产分离数据库管理器获取正确的数据库路径
+            from core.asset_database_manager import get_asset_separated_database_manager
+            asset_db_manager = get_asset_separated_database_manager()
+            db_path = asset_db_manager.get_database_path(asset_type)
+
+            logger.debug(f"获取资产数据库路径: {asset_type.value} → {db_path}")
+            return db_path
+
+        except Exception as e:
+            logger.error(f"获取资产数据库路径失败: {e}，使用默认路径")
+            # 降级：使用默认路径
             from pathlib import Path
-            db_path = Path.cwd() / "cache" / "duckdb" / "kline.duckdb"
+            asset_type_str = asset_type.value.lower() if asset_type else 'stock_a'
+            db_path = Path.cwd() / "cache" / "duckdb" / asset_type_str / f"{asset_type_str}_data.duckdb"
             return str(db_path)
-
-        except Exception as e:
-            logger.error(f"获取股票数据库路径失败: {e}")
-            # 返回默认路径
-            from pathlib import Path
-            return str(Path.cwd() / "cache" / "duckdb" / "kline.duckdb")
-
-    def _get_stocks_from_service(self, search_text: str = None) -> List[Dict[str, Any]]:
-        """使用传统服务方式获取股票列表"""
-        try:
-            # 使用股票服务同步获取股票列表
-            if search_text:
-                stocks = self.stock_service.search_stocks(search_text)
-            else:
-                market = None
-                if hasattr(self, 'market_combo') and self.market_combo:
-                    market_text = self.market_combo.currentText()
-                    if market_text != "全部":
-                        market = market_text
-                stocks = self.stock_service.get_stock_list(market=market)
-
-            # 为每个股票添加来源标记
-            for stock in stocks:
-                stock['source'] = 'service'
-                stock['status'] = 'online'
-
-            return stocks
-
-        except Exception as e:
-            logger.error(f"使用服务获取股票列表失败: {e}")
-            return []
 
     @pyqtSlot(list)
     def _on_data_loaded(self, stocks: List[Dict[str, Any]]) -> None:
@@ -1509,13 +1504,14 @@ class LeftPanel(BasePanel):
 
     async def _async_select_stock(self, stock_code: str, stock_name: str, market: str) -> None:
         """
-        异步执行数据请求和后续处理
+        异步执行数据请求和后续处理（✅ 优化：支持多资产类型）
         """
         try:
-            # 直接等待数据管理器的异步方法
+            # ✅ 直接等待数据管理器的异步方法，传递当前资产类型
             data = await self.data_manager.request_data(
                 stock_code=stock_code,
-                data_type='kdata'
+                data_type='kdata',
+                asset_type=self.current_asset_type  # ✅ 传递当前选择的资产类型
             )
 
             # 安全地将结果处理调度回主线程
@@ -1523,7 +1519,7 @@ class LeftPanel(BasePanel):
                 data, stock_code, stock_name, market))
 
         except Exception as e:
-            logger.error(f"处理股票选择时发生异常: {e}", exc_info=True)
+            logger.error(f"处理资产选择时发生异常: {stock_code} ({self.current_asset_type.value}): {e}", exc_info=True)
             # 同样在主线程中处理错误UI
             QTimer.singleShot(
                 0, lambda e=e: self._handle_data_error(e, stock_name))
@@ -1548,14 +1544,17 @@ class LeftPanel(BasePanel):
                 is_available = is_available and not kline_data.empty
 
             if is_available:
-                logger.info(f"数据加载成功: {stock_code}, 发布StockSelectedEvent")
+                logger.info(f"数据加载成功: {stock_code}, 发布StockSelectedEvent（包含K线数据）")
+                # ✅ 优化：将验证过的K线数据直接传递到事件中，避免Coordinator重复查询
                 event = StockSelectedEvent(
                     stock_code=stock_code,
                     stock_name=stock_name,
-                    market=market
+                    market=market,
+                    kline_data=kline_data  # 传递K线数据
                 )
                 self.event_bus.publish(event)
                 self.status_label.setText(f"已选择: {stock_name}")
+                logger.debug(f"事件已发布，K线数据行数: {len(kline_data) if hasattr(kline_data, '__len__') else 'N/A'}")
             else:
                 logger.warning(f"数据加载成功但无数据: {stock_code}")
                 self.show_message(f"'{stock_name}' 暂无可用K线数据。", 'warning')

@@ -42,6 +42,12 @@ class CrosshairMixin:
     def enable_crosshair(self, force_rebind=False):
         """启用十字光标功能"""
         try:
+            # ✅ 性能优化：检查是否已经启用，避免重复调用
+            if not force_rebind and hasattr(self, '_crosshair_initialized') and self._crosshair_initialized:
+                if hasattr(self, 'crosshair_enabled') and self.crosshair_enabled:
+                    logger.debug("十字光标已启用，跳过重复初始化")
+                    return
+            
             logger.info("启用十字光标功能...")
 
             if not hasattr(self, 'crosshair_enabled') or not self.crosshair_enabled:
@@ -77,8 +83,23 @@ class CrosshairMixin:
         """
         重置十字光标状态 - 在图表数据更新后调用
         确保十字光标在图表更新后仍然正常工作
+        
+        ✅ 性能优化：避免不必要的重置，只在真正需要时重置
         """
         try:
+            # ✅ 性能优化：如果十字光标未启用，直接返回
+            if not hasattr(self, 'crosshair_enabled') or not self.crosshair_enabled:
+                logger.debug("十字光标未启用，跳过重置")
+                return
+            
+            # ✅ 性能优化：如果已经初始化且状态正常，可能不需要完全重置
+            # 只清除元素，不重新绑定事件（减少事件连接开销）
+            if hasattr(self, '_crosshair_initialized') and self._crosshair_initialized:
+                logger.debug("十字光标已初始化，只清除元素")
+                self._clear_crosshair_elements()
+                # 不重置_crosshair_initialized，避免重新绑定事件
+                return
+            
             logger.info("重置十字光标状态...")
 
             # 确保_crosshair_lines是字典类型
@@ -92,7 +113,7 @@ class CrosshairMixin:
             # 重置初始化状态
             self._crosshair_initialized = False
 
-            # 重新启用十字光标
+            # 重新启用十字光标（只在真正需要时）
             if hasattr(self, 'crosshair_enabled') and self.crosshair_enabled:
                 self.enable_crosshair(force_rebind=True)
                 logger.info("十字光标已重置并启用")

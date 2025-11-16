@@ -5,8 +5,9 @@
 """
 
 from .base_tab import BaseAnalysisTab
-# from .professional_sentiment_tab import ProfessionalSentimentTab, SentimentAnalysisTab
-from .enhanced_kline_sentiment_tab import EnhancedKLineTechnicalTab
+# professional_sentiment_tab已删除（性能优化）
+# ✅ 修复：enhanced_kline_technical_tab 模块未实现，暂时注释掉
+# from .enhanced_kline_technical_tab import EnhancedKLineTechnicalTab
 from .technical_tab import TechnicalAnalysisTab
 from .trend_tab import TrendAnalysisTab
 from .wave_tab import WaveAnalysisTab
@@ -19,9 +20,7 @@ from .hotspot_tab import HotspotAnalysisTab
 
 __all__ = [
     'BaseAnalysisTab',
-    # 'ProfessionalSentimentTab',
-    # 'SentimentAnalysisTab',  # 向后兼容别名
-    'EnhancedKLineTechnicalTab',
+    # 'EnhancedKLineTechnicalTab',  # ✅ 修复：模块未实现，暂时移除
     'TechnicalAnalysisTab',
     'TrendAnalysisTab',
     'WaveAnalysisTab',

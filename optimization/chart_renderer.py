@@ -809,13 +809,14 @@ class ChartRenderer(QObject):
             ax = figure.add_subplot(111)
             return None, [ax, ax, ax]
 
-    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None):
-        """高性能K线绘制，支持等距序号X轴
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True):
+        """高性能K线绘制，支持datetime X轴和等距序号X轴
         Args:
             ax: matplotlib轴对象
             data: K线数据
             style: 样式字典
-            x: 可选，等距序号X轴
+            x: 可选，X轴数据（可以是datetime数组或数字索引）
+            use_datetime_axis: 是否使用datetime X轴（如果数据包含datetime列）
         """
         try:
             # 添加数据有效性检查
@@ -841,13 +842,13 @@ class ChartRenderer(QObject):
 
             view_data = self._get_view_data(data)
             plot_data = self._downsample_data(view_data)
-            self._render_candlesticks_efficient(ax, plot_data, style or {}, x)
+            self._render_candlesticks_efficient(ax, plot_data, style or {}, x, use_datetime_axis)
             self._optimize_display(ax)
         except Exception as e:
             self.render_error.emit(f"绘制K线失败: {str(e)}")
 
-    def _render_candlesticks_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None):
-        """使用collections高效渲染K线，支持等距序号X轴，空心样式"""
+    def _render_candlesticks_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None, use_datetime_axis: bool = False):
+        """使用collections高效渲染K线，支持datetime X轴和等距序号X轴，空心样式"""
         try:
             # 添加ax有效性检查
             if ax is None:
@@ -871,9 +872,17 @@ class ChartRenderer(QObject):
             up_color = style.get('up_color', '#ff0000')
             down_color = style.get('down_color', '#00ff00')
             alpha = style.get('alpha', 1.0)
-            # 横坐标
+            # ✅ 修复：横坐标处理（支持datetime X轴）
             if x is not None:
                 xvals = x
+            elif use_datetime_axis and 'datetime' in data.columns:
+                # 使用datetime列
+                try:
+                    datetime_series = pd.to_datetime(data['datetime'])
+                    xvals = mdates.date2num(datetime_series)
+                except Exception as e:
+                    logger.warning(f"datetime X轴转换失败: {e}，使用数字索引")
+                    xvals = np.arange(len(data))
             else:
                 try:
                     # 检查索引类型
@@ -943,13 +952,14 @@ class ChartRenderer(QObject):
         except Exception as e:
             logger.error(f"_render_candlesticks_efficient失败: {e}")
 
-    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None):
-        """高性能成交量绘制
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True):
+        """高性能成交量绘制，支持datetime X轴和等距序号X轴
         Args:
             ax: matplotlib轴对象
             data: K线数据
             style: 样式字典
-            x: 可选，等距序号X轴
+            x: 可选，X轴数据（可以是datetime数组或数字索引）
+            use_datetime_axis: 是否使用datetime X轴（如果数据包含datetime列）
         """
         try:
             # 添加数据有效性检查
@@ -972,13 +982,13 @@ class ChartRenderer(QObject):
 
             view_data = self._get_view_data(data)
             plot_data = self._downsample_data(view_data)
-            self._render_volume_efficient(ax, plot_data, style or {}, x)
+            self._render_volume_efficient(ax, plot_data, style or {}, x, use_datetime_axis)
             self._optimize_display(ax)
         except Exception as e:
             self.render_error.emit(f"绘制成交量失败: {str(e)}")
 
-    def _render_volume_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None):
-        """高效渲染成交量"""
+    def _render_volume_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None, use_datetime_axis: bool = False):
+        """高效渲染成交量，支持datetime X轴和等距序号X轴"""
         try:
             # 添加数据有效性检查
             if data is None or data.empty:
@@ -994,8 +1004,17 @@ class ChartRenderer(QObject):
             down_color = style.get('down_color', '#00ff00')
             alpha = style.get('volume_alpha', 0.5)
 
+            # ✅ 修复：横坐标处理（支持datetime X轴）
             if x is not None:
                 xvals = x
+            elif use_datetime_axis and 'datetime' in data.columns:
+                # 使用datetime列
+                try:
+                    datetime_series = pd.to_datetime(data['datetime'])
+                    xvals = mdates.date2num(datetime_series)
+                except Exception as e:
+                    logger.warning(f"成交量datetime X轴转换失败: {e}，使用数字索引")
+                    xvals = np.arange(len(data))
             else:
                 try:
                     xvals = mdates.date2num(data.index.to_pydatetime())

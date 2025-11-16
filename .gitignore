@@ -27,3 +27,5 @@ logs/*
 .spec-workflow
 .spec-workflow/*
 *.duckdb
+*.wal
+*.db

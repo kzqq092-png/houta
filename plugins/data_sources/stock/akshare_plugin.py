@@ -58,10 +58,14 @@ class AKSharePlugin(IDataSourcePlugin):
         super().__init__()
 
         self.logger = logger.bind(module=__name__)
-        # initialized 和 last_error 已在父类定义
+        
+        # ✅ 修复：显式初始化initialized和last_error属性
+        self.initialized = False  # 插件初始化状态
+        self.last_error = None    # 最后一次错误信息
+        self.plugin_state = PluginState.CREATED  # 插件状态
 
         # 插件基本信息
-        self.plugin_id = "data_sources.akshare_plugin"
+        self.plugin_id = "data_sources.stock.akshare_plugin"  # ✅ 修复：添加stock层级
         self.name = "AKShare数据源插件"
         self.version = "1.0.0"
         self.description = "基于AKShare库的板块资金流数据源插件"
@@ -82,6 +86,11 @@ class AKSharePlugin(IDataSourcePlugin):
         self.cache_duration = 300  # 5分钟缓存
         self.last_cache_time = None
         self.cached_data = None
+        
+        # ✅ 注意：此时只是对象创建完成，真正的初始化（如配置加载）在initialize()方法中
+        # plugin_state 已经在父类 __init__ 中设置为 CREATED（第223行），第65行也设置了（冗余但无害）
+        # initialized 标志在 initialize() 方法中设置为 True
+        # 不需要在这里设置 initialized = True，因为父类已经设置为 False（第227行）
 
     def get_version(self) -> str:
         """获取插件版本"""

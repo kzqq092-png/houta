@@ -132,7 +132,7 @@ class WebGPUChartRenderer(BaseChartRenderer):
         logger.error(f"WebGPU错误: {error_msg}")
         self.webgpu_status_changed.emit("error", {"error": error_msg})
 
-    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None):
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True):
         """
         渲染K线图 - WebGPU加速版本
 
@@ -140,17 +140,19 @@ class WebGPUChartRenderer(BaseChartRenderer):
             ax: matplotlib轴对象  
             data: K线数据
             style: 样式字典
-            x: 可选，等距序号X轴
+            x: 可选，X轴数据（可以是datetime数组或数字索引）
+            use_datetime_axis: 是否使用datetime X轴（如果数据包含datetime列）
         """
         # 临时禁用WebGPU渲染，直接使用matplotlib实现修复K线不显示问题
         # TODO: 完善WebGPU渲染器的matplotlib集成后重新启用
         # if self._should_use_webgpu() and self._try_webgpu_render('candlesticks', data, style):
         #     return
 
+        # ✅ 修复：传递use_datetime_axis参数给父类
         # 直接使用原有matplotlib实现
-        super().render_candlesticks(ax, data, style, x)
+        super().render_candlesticks(ax, data, style, x, use_datetime_axis)
 
-    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None):
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True):
         """
         渲染成交量 - WebGPU加速版本
 
@@ -158,15 +160,17 @@ class WebGPUChartRenderer(BaseChartRenderer):
             ax: matplotlib轴对象
             data: 数据
             style: 样式字典  
-            x: 可选，等距序号X轴
+            x: 可选，X轴数据（可以是datetime数组或数字索引）
+            use_datetime_axis: 是否使用datetime X轴（如果数据包含datetime列）
         """
         # 临时禁用WebGPU渲染，直接使用matplotlib实现
         # TODO: 完善WebGPU渲染器的matplotlib集成后重新启用
         # if self._should_use_webgpu() and self._try_webgpu_render('volume', data, style):
         #     return
 
+        # ✅ 修复：传递use_datetime_axis参数给父类
         # 直接使用原有matplotlib实现
-        super().render_volume(ax, data, style, x)
+        super().render_volume(ax, data, style, x, use_datetime_axis)
 
     def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None):
         """
@@ -373,7 +377,8 @@ class WebGPUChartRenderer(BaseChartRenderer):
             for i in range(iterations):
                 start_time = time.time()
                 # 调用父类方法（matplotlib实现）
-                super().render_candlesticks(temp_ax, data, style, None)
+                # ✅ 修复：传递use_datetime_axis参数（使用默认值True）
+                super().render_candlesticks(temp_ax, data, style, None, use_datetime_axis=True)
                 temp_ax.clear()  # 清除图表内容以便下次测试
                 end_time = time.time()
                 results['matplotlib_times'].append(end_time - start_time)

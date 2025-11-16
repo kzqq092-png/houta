@@ -1879,6 +1879,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 trend_info = ""
                 signal_info = ""
                 strength_info = ""
+                advice = "N/A"  # 初始化advice变量，避免未定义错误
 
                 try:
                     # 处理不同类型的数据

@@ -18,11 +18,36 @@ from .base_tab import BaseAnalysisTab
 from utils.config_manager import ConfigManager
 
 
+class FundFlowWorker(QThread):
+    """资金流数据异步查询Worker"""
+    # 定义信号
+    finished = pyqtSignal(dict)  # 查询完成信号，携带数据
+    error = pyqtSignal(str)  # 错误信号
+    
+    def __init__(self, data_manager, parent=None):
+        super().__init__(parent)
+        self.data_manager = data_manager
+    
+    def run(self):
+        """后台执行资金流查询"""
+        try:
+            logger.info("开始异步查询板块资金流数据...")
+            fund_flow_data = self.data_manager.get_fund_flow()
+            logger.info(f"资金流数据查询完成")
+            self.finished.emit(fund_flow_data if fund_flow_data else {})
+        except Exception as e:
+            logger.error(f"资金流数据查询失败: {e}")
+            self.error.emit(str(e))
+
+
 class HotspotAnalysisTab(BaseAnalysisTab):
     """热点分析标签页"""
 
     # 定义信号
     hotspot_analysis_completed = pyqtSignal(dict)
+    
+    # 跳过K线数据设置（热点分析不需要个股K线数据，资金流查询已改为异步避免阻塞）
+    skip_kdata = True
 
     def __init__(self, config_manager: Optional[ConfigManager] = None, service_container=None):
         self.service_container = service_container
@@ -32,6 +57,10 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         self.sector_rankings = []
         self.leading_stocks = []
         self.theme_opportunities = []
+        
+        # 异步Worker相关
+        self.fund_flow_worker = None
+        self.data_manager = None
 
     def create_ui(self):
         """创建热点分析UI"""
@@ -526,12 +555,12 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             logger.error(f"主题机会分析失败: {str(e)}")
 
     def analyze_capital_flow(self, period: int):
-        """分析资金流向 - 使用真实数据"""
+        """分析资金流向（异步） - 使用真实数据"""
         try:
             self.capital_flow = []
 
             # 确保有数据管理器 - 使用工厂方法获取正确实例
-            if not hasattr(self, 'data_manager') or not self.data_manager:
+            if not self.data_manager:
                 try:
                     from utils.manager_factory import get_manager_factory, get_data_manager
                     factory = get_manager_factory()
@@ -541,9 +570,32 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                     from core.services.unified_data_manager import get_unified_data_manager
                     self.data_manager = get_unified_data_manager()
 
-            # 获取真实的板块资金流数据
-            fund_flow_data = self.data_manager.get_fund_flow()
+            # 停止之前的Worker（如果存在）
+            if self.fund_flow_worker and self.fund_flow_worker.isRunning():
+                logger.info("停止之前的资金流查询...")
+                self.fund_flow_worker.quit()
+                self.fund_flow_worker.wait()
 
+            # 创建并启动异步Worker
+            logger.info("启动异步资金流查询...")
+            self.fund_flow_worker = FundFlowWorker(self.data_manager, self)
+            self.fund_flow_worker.finished.connect(self._on_fund_flow_finished)
+            self.fund_flow_worker.error.connect(self._on_fund_flow_error)
+            self.fund_flow_worker.start()
+            
+            # 显示加载状态
+            self.show_loading("正在异步查询板块资金流数据，请稍候...")
+
+        except Exception as e:
+            logger.error(f"启动资金流向分析失败: {str(e)}")
+            self.hide_loading()
+    
+    def _on_fund_flow_finished(self, fund_flow_data: dict):
+        """资金流数据查询完成回调"""
+        try:
+            logger.info("处理资金流查询结果...")
+            self.hide_loading()
+            
             if fund_flow_data and 'sector_flow_rank' in fund_flow_data:
                 sector_df = fund_flow_data['sector_flow_rank']
 
@@ -598,7 +650,24 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                 self._analyze_capital_flow_from_rankings()
 
         except Exception as e:
-            logger.error(f"资金流向分析失败: {str(e)}")
+            logger.error(f"处理资金流数据失败: {str(e)}")
+            self.hide_loading()
+    
+    def _on_fund_flow_error(self, error_msg: str):
+        """资金流数据查询失败回调"""
+        try:
+            logger.error(f"资金流数据查询失败: {error_msg}")
+            self.hide_loading()
+            
+            # 尝试使用板块排行数据作为降级方案
+            if hasattr(self, 'sector_rankings') and self.sector_rankings:
+                logger.info("使用板块排行数据作为降级方案...")
+                self._analyze_capital_flow_from_rankings()
+            else:
+                QMessageBox.warning(self, "提示", f"资金流数据获取失败：{error_msg}\n建议稍后重试")
+                
+        except Exception as e:
+            logger.error(f"处理资金流错误失败: {str(e)}")
 
     def _parse_flow_value(self, value):
         """解析资金流数值"""

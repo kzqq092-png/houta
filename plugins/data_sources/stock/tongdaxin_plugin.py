@@ -27,7 +27,8 @@ from typing import Dict, List, Optional, Any
 import pandas as pd
 import threading
 import socket
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
+import concurrent.futures
 import random
 import queue
 from contextlib import contextmanager
@@ -59,17 +60,62 @@ except ImportError:
 
 
 class ConnectionPool:
-    """通达信连接池管理器，支持多IP并行数据获取"""
+    """通达信连接池管理器，支持多IP并行数据获取（轮询机制 + 动态IP切换 + 故障检测）"""
 
-    def __init__(self, max_connections: int = 10, timeout: int = 30):
+    def __init__(self, max_connections: int = 20, timeout: int = 15):  # ✅ 优化：默认连接池大小从10增加到20，超时从30秒减少到15秒
         self.max_connections = max_connections
         self.timeout = timeout
-        self.connections = queue.Queue(maxsize=max_connections)
+        # ✅ 改为轮询机制：使用列表存储连接，不再使用FIFO队列
+        self.connections_list: List[Dict[str, Any]] = []  # 连接列表（支持轮询）
         self.active_servers = []  # 活跃服务器列表
         self.server_stats = {}  # 服务器统计信息
         self.lock = threading.RLock()
         self._last_health_check = 0
         self._health_check_interval = 300  # 5分钟检查一次
+
+        # ✅ 轮询机制：当前连接索引
+        self._current_index = 0
+
+        # ✅ IP监控统计
+        self.ip_usage_stats: Dict[str, Dict[str, Any]] = {}  # IP使用统计 {server_key: {use_count, success_count, failure_count, last_used, avg_response_time, status}}
+
+        # ✅ 故障IP管理
+        self.failed_ips: Dict[str, float] = {}  # 故障IP及其恢复时间 {server_key: recovery_time}
+        self.failure_threshold = 3  # 连续失败3次标记为故障
+        self.failure_recovery_time = 60  # 故障IP恢复时间（秒）
+
+        # ✅ 动态IP切换：IP限流检测
+        self.ip_rate_limit: Dict[str, Dict[str, Any]] = {}  # IP限流信息 {server_key: {request_count, window_start, is_limited}}
+        self.rate_limit_window = 60  # 限流检测窗口（秒）
+        self.rate_limit_threshold = 100  # 限流阈值（每分钟请求数）
+
+    def _validate_ip_address(self, ip: str) -> bool:
+        """
+        验证IP地址格式是否正确
+        
+        Args:
+            ip: IP地址字符串
+            
+        Returns:
+            bool: IP地址格式是否有效
+        """
+        try:
+            # 使用socket.inet_aton验证IPv4地址格式
+            socket.inet_aton(ip)
+            # 进一步验证IP地址范围（排除0.0.0.0和255.255.255.255等特殊地址）
+            parts = ip.split('.')
+            if len(parts) != 4:
+                return False
+            for part in parts:
+                num = int(part)
+                if num < 0 or num > 255:
+                    return False
+            # 排除一些明显无效的地址
+            if ip == '0.0.0.0' or ip == '255.255.255.255':
+                return False
+            return True
+        except (socket.error, ValueError):
+            return False
 
     def initialize(self, server_list: List[tuple]):
         """初始化连接池"""
@@ -82,8 +128,19 @@ class ConnectionPool:
                 for server in best_servers:
                     if self._create_connection(server):
                         self.active_servers.append(server)
+                        # ✅ 初始化IP使用统计
+                        server_key = f"{server[0]}:{server[1]}"
+                        self.ip_usage_stats[server_key] = {
+                            'use_count': 0,
+                            'success_count': 0,
+                            'failure_count': 0,
+                            'last_used': None,
+                            'avg_response_time': 0.0,
+                            'status': 'healthy',  # healthy, limited, failed
+                            'response_times': []  # 用于计算平均响应时间
+                        }
 
-                logger.info(f"连接池初始化完成，活跃连接数: {self.connections.qsize()}")
+                logger.info(f"连接池初始化完成，活跃连接数: {len(self.connections_list)}")
 
         except Exception as e:
             logger.error(f"连接池初始化失败: {e}")
@@ -156,9 +213,11 @@ class ConnectionPool:
                     'server': server,
                     'created_time': time.time(),
                     'last_used': time.time(),
-                    'use_count': 0
+                    'use_count': 0,
+                    'server_key': f"{server[0]}:{server[1]}"
                 }
-                self.connections.put(connection_info)
+                # ✅ 改为列表存储，支持轮询
+                self.connections_list.append(connection_info)
                 logger.debug(f"成功创建到 {server} 的连接")
                 return True
             else:
@@ -171,44 +230,215 @@ class ConnectionPool:
 
     @contextmanager
     def get_connection(self):
-        """获取连接的上下文管理器"""
+        """获取连接的上下文管理器（轮询机制 + 动态IP切换 + 故障检测）"""
         connection_info = None
+        request_start_time = time.time()
+        server_key = None
+        request_success = False  # ✅ 标志变量：跟踪请求是否成功
+
         try:
-            # 尝试获取连接，带超时
-            connection_info = self.connections.get(timeout=5)
-            connection_info['last_used'] = time.time()
-            connection_info['use_count'] += 1
+            # ✅ 轮询机制：从连接列表中选择连接
+            connection_info = self._get_connection_round_robin()
 
-            # 检查连接是否还有效
-            if not self._is_connection_valid(connection_info):
-                # 连接无效，尝试重新创建
-                if self._recreate_connection(connection_info):
-                    yield connection_info['client']
-                else:
-                    raise Exception(f"无法重新创建连接到 {connection_info['server']}")
-            else:
+            if connection_info:
+                server_key = connection_info['server_key']
+                connection_info['last_used'] = time.time()
+                connection_info['use_count'] += 1
+
+                # ✅ 更新IP使用统计
+                if server_key in self.ip_usage_stats:
+                    self.ip_usage_stats[server_key]['use_count'] += 1
+                    self.ip_usage_stats[server_key]['last_used'] = time.time()
+
+                # 检查连接是否还有效
+                if not self._is_connection_valid(connection_info):
+                    # 连接无效，尝试重新创建或切换IP
+                    if not self._recreate_connection(connection_info):
+                        # 重新创建失败，标记为故障并尝试切换IP
+                        self._mark_ip_failed(server_key)
+                        connection_info = self._get_connection_round_robin()  # 重新获取连接
+                        if not connection_info:
+                            raise Exception("无法获取任何可用连接")
+                        server_key = connection_info['server_key']
+
                 yield connection_info['client']
-
-        except queue.Empty:
-            # 连接池为空，临时创建连接
-            logger.warning("连接池为空，创建临时连接")
-            temp_connection = self._create_temporary_connection()
-            if temp_connection:
-                try:
-                    yield temp_connection
-                finally:
-                    temp_connection.disconnect()
+                request_success = True  # ✅ 请求成功
             else:
-                raise Exception("无法获取任何可用连接")
+                # 连接池为空，临时创建连接
+                logger.warning("连接池为空，创建临时连接")
+                temp_connection, temp_server = self._create_temporary_connection()
+                if temp_connection:
+                    try:
+                        yield temp_connection
+                        request_success = True  # ✅ 请求成功
+                    finally:
+                        temp_connection.disconnect()
+                else:
+                    raise Exception("无法获取任何可用连接")
+
+        except Exception as e:
+            # ✅ 记录失败统计
+            if server_key and server_key in self.ip_usage_stats:
+                self.ip_usage_stats[server_key]['failure_count'] += 1
+                # 检查是否需要标记为故障
+                if self.ip_usage_stats[server_key]['failure_count'] >= self.failure_threshold:
+                    self._mark_ip_failed(server_key)
+            raise e
 
         finally:
-            # 归还连接到池中
-            if connection_info:
-                try:
-                    self.connections.put(connection_info, timeout=1)
-                except queue.Full:
-                    # 连接池满了，关闭这个连接
-                    connection_info['client'].disconnect()
+            # ✅ 更新响应时间统计（仅在成功时）
+            if connection_info and server_key:
+                if request_success:
+                    # 请求成功：更新响应时间和成功计数
+                    response_time = time.time() - request_start_time
+                    if server_key in self.ip_usage_stats:
+                        stats = self.ip_usage_stats[server_key]
+                        stats['response_times'].append(response_time)
+                        # 只保留最近100次响应时间
+                        if len(stats['response_times']) > 100:
+                            stats['response_times'] = stats['response_times'][-100:]
+                        # 计算平均响应时间
+                        if stats['response_times']:
+                            stats['avg_response_time'] = sum(stats['response_times']) / len(stats['response_times'])
+                        stats['success_count'] += 1
+
+                        # ✅ 检查IP限流
+                        self._check_ip_rate_limit(server_key)
+                else:
+                    # ✅ 修复：请求失败但use_count已增加，需要增加failure_count
+                    # 注意：如果异常在except块中已经处理并增加了failure_count，这里不会重复增加
+                    # 但如果请求在yield之后失败（调用者代码中失败），这里会补充统计
+                    if server_key in self.ip_usage_stats:
+                        stats = self.ip_usage_stats[server_key]
+                        # 检查use_count是否已增加（说明请求已经开始）
+                        # 如果use_count > success_count + failure_count，说明有未统计的失败
+                        current_use_count = stats.get('use_count', 0)
+                        current_success_count = stats.get('success_count', 0)
+                        current_failure_count = stats.get('failure_count', 0)
+                        expected_total = current_success_count + current_failure_count
+                        if current_use_count > expected_total:
+                            # 有未统计的失败，补充统计
+                            missing_failures = current_use_count - expected_total
+                            stats['failure_count'] = current_failure_count + missing_failures
+                            logger.debug(f"IP {server_key} 补充统计失败数: {missing_failures} (use_count={current_use_count}, success={current_success_count}, failure={current_failure_count})")
+
+    def _get_connection_round_robin(self) -> Optional[Dict[str, Any]]:
+        """
+        轮询获取连接（替代FIFO队列）
+
+        策略：
+        1. 跳过故障IP
+        2. 跳过限流IP
+        3. 轮询选择健康IP
+        4. 如果所有IP都故障/限流，尝试使用故障IP（可能已恢复）
+        """
+        with self.lock:
+            if not self.connections_list:
+                return None
+
+            current_time = time.time()
+            available_connections = []
+
+            # 第一轮：查找健康且未限流的连接
+            for conn in self.connections_list:
+                server_key = conn['server_key']
+                stats = self.ip_usage_stats.get(server_key, {})
+                status = stats.get('status', 'healthy')
+
+                # 跳过故障IP（除非已过恢复时间）
+                if status == 'failed':
+                    recovery_time = self.failed_ips.get(server_key, 0)
+                    if current_time < recovery_time:
+                        continue  # 仍在故障期
+                    else:
+                        # ✅ 故障期已过，尝试恢复（但不重置failure_count，保留历史记录）
+                        stats['status'] = 'healthy'
+                        # 注意：不重置failure_count，保留历史记录用于分析
+                        # 如果IP再次失败，会基于新的失败计数重新标记
+                        if server_key in self.failed_ips:
+                            del self.failed_ips[server_key]
+                        logger.info(f"IP {server_key} 故障期已过，尝试恢复使用（历史失败次数: {stats.get('failure_count', 0)}）")
+
+                # 跳过限流IP
+                if status == 'limited':
+                    continue
+
+                available_connections.append(conn)
+
+            # 如果有可用连接，使用轮询选择
+            if available_connections:
+                # ✅ 修复：从当前索引开始，在原始连接列表中查找对应的可用连接
+                # 这样可以确保轮询顺序的一致性
+                for attempt in range(len(self.connections_list)):
+                    # 从当前索引开始查找
+                    idx = (self._current_index + attempt) % len(self.connections_list)
+                    conn = self.connections_list[idx]
+
+                    # ✅ 使用server_key比较，更明确可靠
+                    if conn['server_key'] in {c['server_key'] for c in available_connections}:
+                        # 更新轮询索引（指向下一个连接）
+                        self._current_index = (self._current_index + 1) % len(self.connections_list)
+                        return conn
+
+                # 如果找不到（理论上不应该发生），使用第一个可用连接
+                conn = available_connections[0]
+                self._current_index = (self._current_index + 1) % len(self.connections_list)
+                return conn
+
+            # 如果没有健康连接，尝试使用故障IP（可能已恢复）
+            if self.connections_list:
+                conn = self.connections_list[self._current_index % len(self.connections_list)]
+                self._current_index = (self._current_index + 1) % len(self.connections_list)
+                logger.warning(f"所有IP都故障/限流，尝试使用 {conn['server_key']}")
+                return conn
+
+            return None
+
+    def _mark_ip_failed(self, server_key: str):
+        """标记IP为故障"""
+        with self.lock:
+            if server_key in self.ip_usage_stats:
+                self.ip_usage_stats[server_key]['status'] = 'failed'
+                # 设置恢复时间
+                recovery_time = time.time() + self.failure_recovery_time
+                self.failed_ips[server_key] = recovery_time
+                logger.warning(f"IP {server_key} 标记为故障，将在 {self.failure_recovery_time} 秒后尝试恢复")
+
+    def _check_ip_rate_limit(self, server_key: str):
+        """检查IP是否被限流"""
+        current_time = time.time()
+
+        if server_key not in self.ip_rate_limit:
+            self.ip_rate_limit[server_key] = {
+                'request_count': 0,
+                'window_start': current_time,
+                'is_limited': False
+            }
+
+        rate_info = self.ip_rate_limit[server_key]
+
+        # 检查时间窗口
+        if current_time - rate_info['window_start'] > self.rate_limit_window:
+            # 新窗口，重置计数
+            rate_info['request_count'] = 0
+            rate_info['window_start'] = current_time
+            rate_info['is_limited'] = False
+
+        # 增加请求计数
+        rate_info['request_count'] += 1
+
+        # 检查是否超过限流阈值
+        if rate_info['request_count'] > self.rate_limit_threshold:
+            rate_info['is_limited'] = True
+            if server_key in self.ip_usage_stats:
+                self.ip_usage_stats[server_key]['status'] = 'limited'
+                logger.warning(f"IP {server_key} 触发限流（{rate_info['request_count']} 请求/{self.rate_limit_window}秒）")
+        else:
+            # 未限流，确保状态为健康
+            if server_key in self.ip_usage_stats:
+                if self.ip_usage_stats[server_key]['status'] == 'limited':
+                    self.ip_usage_stats[server_key]['status'] = 'healthy'
+                    logger.info(f"IP {server_key} 限流已解除")
 
     def _is_connection_valid(self, connection_info: dict) -> bool:
         """检查连接是否有效"""
@@ -237,16 +467,43 @@ class ConnectionPool:
         return False
 
     def _create_temporary_connection(self):
-        """创建临时连接"""
+        """创建临时连接（轮询选择服务器）"""
+        current_time = time.time()
+        available_servers = []
+
+        # 优先选择健康且未限流的服务器
         for server in self.active_servers:
+            server_key = f"{server[0]}:{server[1]}"
+            stats = self.ip_usage_stats.get(server_key, {})
+            status = stats.get('status', 'healthy')
+
+            # 跳过故障IP（除非已过恢复时间）
+            if status == 'failed':
+                recovery_time = self.failed_ips.get(server_key, 0)
+                if current_time < recovery_time:
+                    continue
+
+            # 跳过限流IP
+            if status == 'limited':
+                continue
+
+            available_servers.append(server)
+
+        # 如果没有健康服务器，使用所有服务器
+        if not available_servers:
+            available_servers = self.active_servers
+
+        # 轮询选择服务器
+        for i, server in enumerate(available_servers):
             try:
                 temp_client = TdxHq_API()
                 if temp_client.connect(*server):
-                    logger.debug(f"创建临时连接到 {server}")
-                    return temp_client
+                    server_key = f"{server[0]}:{server[1]}"
+                    logger.debug(f"创建临时连接到 {server_key}")
+                    return temp_client, server
             except Exception:
                 continue
-        return None
+        return None, None
 
     def health_check(self):
         """健康检查和连接维护"""
@@ -263,13 +520,89 @@ class ConnectionPool:
     def close_all(self):
         """关闭所有连接"""
         with self.lock:
-            while not self.connections.empty():
+            for connection_info in self.connections_list:
                 try:
-                    connection_info = self.connections.get_nowait()
                     connection_info['client'].disconnect()
-                except queue.Empty:
-                    break
+                except Exception:
+                    pass
+            self.connections_list.clear()
             logger.info("连接池已关闭所有连接")
+
+    def get_ip_usage_stats(self) -> Dict[str, Dict[str, Any]]:
+        """
+        获取IP使用统计信息（用于监控）
+
+        Returns:
+            Dict[server_key, stats]: IP使用统计字典
+        """
+        with self.lock:
+            # ✅ 修复：安全解析server_key，避免IndexError导致数据不完整
+            result = {}
+            for server_key, stats in self.ip_usage_stats.items():
+                if not isinstance(stats, dict):
+                    continue
+                
+                # 安全解析IP和端口
+                try:
+                    if ':' in server_key:
+                        ip, port = server_key.split(':', 1)
+                        ip = ip.strip()
+                        port = port.strip()
+                    else:
+                        # 如果server_key格式不对，尝试从stats中获取
+                        ip = stats.get('ip', server_key)
+                        port = stats.get('port', '')
+                        logger.debug(f"server_key格式异常，无法解析: {server_key}")
+                except Exception as e:
+                    logger.warning(f"解析server_key失败: {server_key}, 错误: {e}")
+                    ip = server_key
+                    port = ''
+                
+                # 确保stats字典存在且有效
+                use_count = stats.get('use_count', 0) or 0
+                success_count = stats.get('success_count', 0) or 0
+                failure_count = stats.get('failure_count', 0) or 0
+                
+                # ✅ 修复：确保failure_count = use_count - success_count（数据一致性检查）
+                # 如果failure_count小于use_count - success_count，说明有未统计的失败
+                expected_failure_count = max(0, use_count - success_count)
+                if failure_count < expected_failure_count:
+                    failure_count = expected_failure_count
+                    logger.debug(f"IP {server_key} 修正失败数: {failure_count} (use_count={use_count}, success_count={success_count})")
+                
+                result[server_key] = {
+                    'ip': ip or '',
+                    'port': port or '',
+                    'use_count': use_count,
+                    'success_count': success_count,
+                    'failure_count': failure_count,
+                    'last_used': stats.get('last_used'),
+                    'avg_response_time': stats.get('avg_response_time', 0.0) or 0.0,
+                    'status': stats.get('status', 'healthy') or 'healthy',
+                    'success_rate': success_count / max(use_count, 1) if use_count > 0 else 0.0
+                }
+            return result
+
+    def get_connection_pool_info(self) -> Dict[str, Any]:
+        """
+        获取连接池信息（用于监控）
+
+        Returns:
+            连接池信息字典
+        """
+        with self.lock:
+            healthy_count = sum(1 for stats in self.ip_usage_stats.values() if stats.get('status') == 'healthy')
+            limited_count = sum(1 for stats in self.ip_usage_stats.values() if stats.get('status') == 'limited')
+            failed_count = sum(1 for stats in self.ip_usage_stats.values() if stats.get('status') == 'failed')
+
+            return {
+                'total_connections': len(self.connections_list),
+                'active_servers': len(self.active_servers),
+                'healthy_ips': healthy_count,
+                'limited_ips': limited_count,
+                'failed_ips': failed_count,
+                'ip_stats': self.get_ip_usage_stats()
+            }
 
 
 class TongdaxinStockPlugin(IDataSourcePlugin):
@@ -286,14 +619,17 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         self.DEFAULT_CONFIG = {
             'host': '119.147.212.81',  # 通达信服务器地址
             'port': 7709,              # 通达信服务器端口
-            'timeout': 30,             # 连接超时时间
-            'max_retries': 3,          # 最大重试次数
+            'timeout': 15,             # ✅ 优化：连接超时时间从30秒减少到15秒，快速失败
+            'max_retries': 2,          # ✅ 优化：最大重试次数从3减少到2，减少延迟累积
             'cache_duration': 300,     # 缓存持续时间（秒）
             'use_local_data': False,   # 是否使用本地数据文件
             'local_data_path': '',     # 本地数据文件路径
             'auto_select_server': True,  # 是否自动选择最快服务器
             'use_connection_pool': True,  # 是否使用连接池模式
-            'connection_pool_size': 10   # 连接池大小
+            'connection_pool_size': 20,  # ✅ 优化：连接池大小从10增加到20，支持更多并发批次
+            'enable_batch_fetch': True,  # 是否启用分批获取（用于超过800条记录的请求）
+            'max_batch_count': 10000,    # 分批获取的最大记录数限制（避免无限制请求）
+            'enable_parallel_fetch': True,  # 是否启用并发分批获取（显著提升批量下载速度）
         }
 
         # 联网查询地址配置（endpointhost字段）
@@ -302,6 +638,12 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             "https://raw.githubusercontent.com/rainx/pytdx/master/pytdx/config/hosts.py"
         ]
         self.config = self.DEFAULT_CONFIG.copy()
+
+        # ✅ 修复：在__init__中初始化max_retries和timeout，确保在initialize()调用前也可用
+        # 这些属性可能在_test_connection()等方法中被调用，而_test_connection()可能在initialize()之前被调用
+        self.timeout = int(self.DEFAULT_CONFIG.get('timeout', 15))
+        self.max_retries = int(self.DEFAULT_CONFIG.get('max_retries', 2))
+        self.cache_duration = int(self.DEFAULT_CONFIG.get('cache_duration', 300))
 
         # 插件基本信息
         self.plugin_id = "data_sources.tongdaxin_plugin"  # 修正plugin_id属性
@@ -327,6 +669,8 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         # 连接池
         self.connection_pool = None
         self.use_connection_pool = self.DEFAULT_CONFIG['use_connection_pool']  # 从配置读取
+        # 确保在未调用 initialize() 前也有安全的连接池大小默认值
+        self.connection_pool_size = self.DEFAULT_CONFIG.get('connection_pool_size', 10)
 
         # 数据缓存
         self._stock_list_cache = None
@@ -355,7 +699,9 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         self.last_activity = None
         self.last_error = None
         self.last_successful_server = None  # 记住上次成功的服务器
-        self.config = {}
+        # 连接池就绪标志（供决策与UI监控使用）
+        self.pool_ready = False
+        # 注意：self.config 已经在上面设置为 self.DEFAULT_CONFIG.copy()，不需要再次设置为空字典
 
     @property
     def plugin_info(self) -> PluginInfo:
@@ -442,7 +788,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             last_activity=self.last_activity,
             connection_params={
                 "server_info": f"{self.current_server[0]}:{self.current_server[1]}" if self.current_server else "未连接",
-                "timeout": self.config.get('timeout', 30)
+                "timeout": self.timeout  # ✅ 修复：使用实例变量，确保配置一致性
             },
             error_message=self.last_error
         )
@@ -598,6 +944,8 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                 self.connection_pool = ConnectionPool(max_connections=self.connection_pool_size)
                 self.connection_pool.initialize(self.server_list)
                 logger.info(f"✅ 连接池初始化完成，池大小: {self.connection_pool_size}")
+                # 标记连接池就绪
+                self.pool_ready = True
 
                 # 设置成功状态
                 self.last_success_time = datetime.now()
@@ -606,6 +954,8 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                 return True
             else:
                 # 传统单连接模式
+                # 标记连接池未就绪
+                self.pool_ready = False
                 if self.config.get('auto_select_server', True):
                     self._select_best_server()
 
@@ -649,6 +999,8 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                         logger.info("连接池已关闭")
                     except Exception as e:
                         logger.error(f"关闭连接池失败: {e}")
+                # 重置连接池就绪标志
+                self.pool_ready = False
 
                 # 关闭传统单连接
                 if self.api_client:
@@ -664,6 +1016,52 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
 
         except Exception as e:
             logger.error(f"通达信股票数据源插件关闭失败: {e}")
+
+    def ensure_pool_populated(self) -> bool:
+        """
+        确保连接池中存在可用健康连接（用于任务启动前预检/预热）
+
+        Returns:
+            bool: 是否确保成功（连接池存在且有>=1条连接）
+        """
+        try:
+            if not self.use_connection_pool:
+                logger.debug("未启用连接池模式，跳过ensure_pool_populated")
+                self.pool_ready = False
+                return False
+
+            # 确保服务器列表存在
+            if not getattr(self, 'server_list', None) or len(self.server_list) == 0:
+                logger.info("预检：服务器列表为空，重新初始化服务器列表...")
+                self._initialize_servers()
+
+            # 如已有连接池，检查是否有连接
+            if self.connection_pool:
+                try:
+                    info = self.connection_pool.get_connection_pool_info()
+                    total = int(info.get('total_connections', 0))
+                    if total > 0:
+                        logger.info(f"预检：连接池已有可用连接（{total}）")
+                        self.pool_ready = True
+                        return True
+                except Exception:
+                    pass
+
+            # 构建或重建连接池
+            if not hasattr(self, 'connection_pool_size') or not isinstance(self.connection_pool_size, int):
+                self.connection_pool_size = self.DEFAULT_CONFIG.get('connection_pool_size', 20)
+
+            logger.info("预检：连接池为空，开始服务器健康检测与池初始化...")
+            self.connection_pool = ConnectionPool(max_connections=self.connection_pool_size)
+            self.connection_pool.initialize(self.server_list)
+            self.pool_ready = True
+            logger.info(f"预检：连接池初始化完成，池大小: {self.connection_pool_size}")
+            return True
+
+        except Exception as e:
+            self.pool_ready = False
+            logger.warning(f"预检：连接池填充失败，回退单连接模式：{e}")
+            return False
 
     def _test_single_server(self, server):
         """测试单个服务器的连接性能
@@ -778,8 +1176,8 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
 
                 logger.debug(f"尝试连接服务器: {self.current_server}")
 
-                # 尝试连接，增加重试机制
-                max_retries = 3
+                # ✅ 修复：使用配置的重试次数，而不是硬编码
+                max_retries = self.max_retries
                 for attempt in range(max_retries):
                     try:
                         if self.api_client.connect(*self.current_server):
@@ -953,7 +1351,8 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
 
     def _connect_with_traditional_retry(self) -> bool:
         """传统重试连接机制"""
-        max_retries = 2  # 进一步减少重试次数
+        # ✅ 修复：使用配置的重试次数，而不是硬编码
+        max_retries = self.max_retries
         retry_delays = [0.5, 1]  # 更短的重试间隔
 
         for attempt in range(max_retries):
@@ -1415,8 +1814,10 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         4. 异常数据过滤
         5. 更详细的日志记录
         6. 增强的错误处理和重试机制
+        7. 修复日期过滤逻辑，避免过度过滤导致数据为空
         """
-        max_retries = 3
+        # ✅ 修复：使用配置的重试次数，而不是硬编码
+        max_retries = self.max_retries
         retry_delay = 1.0
 
         for attempt in range(max_retries):
@@ -1437,7 +1838,108 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
 
                 frequency = period_mapping.get(period, 9)  # 默认日线
 
-                # 使用连接池或传统连接方式获取数据
+                # ✅ 关键修复：pytdx不支持日期范围查询，只支持count
+                # 当提供了日期范围时，不在API层面传递，而是在返回后过滤
+                logger.debug(f"请求参数: symbol={symbol}, start_date={start_date}, end_date={end_date}, count={count}")
+
+                # 必须走连接池模式：若启用连接池则确保连接池已准备
+                if self.use_connection_pool:
+                    if not self.connection_pool or not self.pool_ready:
+                        # 尝试预热与填充连接池
+                        ok = False
+                        try:
+                            if hasattr(self, 'ensure_pool_populated'):
+                                ok = bool(self.ensure_pool_populated())
+                        except Exception as pool_err:
+                            logger.warning(f"确保连接池可用失败: {pool_err}")
+                            ok = False
+                        if not ok and self.server_list:
+                            # 兜底一次直接初始化
+                            try:
+                                if not hasattr(self, 'connection_pool_size') or not isinstance(self.connection_pool_size, int):
+                                    self.connection_pool_size = self.DEFAULT_CONFIG.get('connection_pool_size', 10)
+                                logger.info("直接初始化连接池作为兜底...")
+                                self.connection_pool = ConnectionPool(max_connections=self.connection_pool_size)
+                                self.connection_pool.initialize(self.server_list)
+                                self.pool_ready = True
+                                logger.info(f"✅ 兜底初始化连接池完成，池大小: {self.connection_pool_size}")
+                            except Exception as pool_err2:
+                                self.pool_ready = False
+                                logger.warning(f"兜底初始化连接池失败，将回退单连接: {pool_err2}")
+
+                # 基于日期范围估算需求量，作为策略决策的参考
+                effective_count = count
+                try:
+                    if start_date and end_date:
+                        sd = pd.to_datetime(start_date)
+                        ed = pd.to_datetime(end_date)
+                        if pd.notna(sd) and pd.notna(ed) and ed > sd:
+                            days = (ed - sd).days + 1
+                            if period == 'daily':
+                                est = days
+                            elif period == 'weekly':
+                                est = max(1, days // 5)
+                            elif period == 'monthly':
+                                est = max(1, days // 22)
+                            elif period in ('60min', '30min', '15min', '5min', '1min'):
+                                minute_map = {'60min': 4, '30min': 8, '15min': 16, '5min': 48, '1min': 240}
+                                est = max(1, (days * minute_map.get(period, 4)))
+                            else:
+                                est = days
+                            max_batch_count = self.config.get('max_batch_count', 10000)
+                            effective_count = max(count, min(est, max_batch_count))
+                            logger.debug(f"估算条数: {est} → 决策用有效count={effective_count}")
+                except Exception as est_err:
+                    logger.debug(f"估算条数失败，使用原始count: {est_err}")
+
+                # ✅ 重要限制：pytdx API单次请求最多返回800条记录
+                # 如果请求的count超过800，使用分批获取
+                MAX_COUNT_PER_REQUEST = 800
+                enable_batch_fetch = self.config.get('enable_batch_fetch', True)
+                max_batch_count = self.config.get('max_batch_count', 10000)
+
+                # 限制最大请求数量
+                if effective_count > max_batch_count:
+                    logger.warning(f"请求count={effective_count}超过最大限制({max_batch_count})，自动调整为{max_batch_count}")
+                    effective_count = max_batch_count
+
+                if effective_count > MAX_COUNT_PER_REQUEST and enable_batch_fetch:
+                    # 检查是否启用并发分批获取
+                    enable_parallel = self.config.get('enable_parallel_fetch', True)
+
+                    if enable_parallel and self.use_connection_pool and self.connection_pool:
+                        logger.info(f"请求count={effective_count}超过pytdx单次限制({MAX_COUNT_PER_REQUEST})，启用并发分批获取模式")
+                        # 使用并发分批获取方法（多IP同时工作）
+                        df = self._fetch_kline_data_in_batches_parallel(
+                            symbol=symbol,
+                            market=market,
+                            code=code,
+                            frequency=frequency,
+                            period=period,
+                            total_count=effective_count,
+                            start_date=start_date,
+                            end_date=end_date
+                        )
+                        return df
+                    else:
+                        logger.info(f"请求count={effective_count}超过pytdx单次限制({MAX_COUNT_PER_REQUEST})，启用串行分批获取模式")
+                        # 使用串行分批获取方法
+                        df = self._fetch_kline_data_in_batches(
+                            symbol=symbol,
+                            market=market,
+                            code=code,
+                            frequency=frequency,
+                            period=period,
+                            total_count=effective_count,
+                            start_date=start_date,
+                            end_date=end_date
+                        )
+                        return df
+                elif effective_count > MAX_COUNT_PER_REQUEST:
+                    logger.warning(f"请求count={effective_count}超过pytdx单次限制({MAX_COUNT_PER_REQUEST})，分批获取已禁用，自动调整为{MAX_COUNT_PER_REQUEST}")
+                    effective_count = MAX_COUNT_PER_REQUEST
+
+                # 使用连接池（强制优先）或退化单连接
                 if self.use_connection_pool and self.connection_pool:
                     # 连接池模式
                     with self.connection_pool.get_connection() as api_client:
@@ -1446,7 +1948,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                             market=market,
                             code=code,
                             start=0,
-                            count=count
+                            count=effective_count
                         )
                 else:
                     # 传统单连接模式
@@ -1460,7 +1962,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                             market=market,
                             code=code,
                             start=0,
-                            count=count
+                            count=effective_count
                         )
                         self.api_client.disconnect()
 
@@ -1472,6 +1974,12 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                     df = self._process_and_validate_kline_data(df, symbol, period)
 
                     if not df.empty:
+                        # ✅ 修复：智能日期过滤逻辑
+                        # 只有当明确指定了日期范围且该范围是历史范围时才进行过滤
+                        # 如果日期范围跨越"今天"或未来，则不过滤（因为pytdx只返回历史数据）
+                        if start_date or end_date:
+                            df = self._smart_filter_by_date_range(df, start_date, end_date, symbol)
+
                         self.request_count += 1
                         logger.info(f"获取 {symbol} K线数据成功，周期: {period}, 共 {len(df)} 条记录")
                         return df
@@ -1498,6 +2006,297 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         # 如果所有重试都失败，返回空DataFrame
         logger.error(f"获取K线数据失败 {symbol}: 所有重试尝试均失败")
         return pd.DataFrame()
+
+    def _fetch_single_batch(self, symbol: str, market: int, code: str,
+                            frequency: int, start_pos: int, batch_size: int,
+                            batch_num: int) -> tuple:
+        """
+        获取单批数据（用于并发调用）
+
+        Args:
+            symbol: 股票代码
+            market: 市场代码
+            code: 通达信格式代码
+            frequency: 数据频率
+            start_pos: 起始位置
+            batch_size: 批次大小
+            batch_num: 批次编号
+
+        Returns:
+            (batch_num, batch_data, actual_count) 元组
+        """
+        try:
+            if self.use_connection_pool and self.connection_pool:
+                with self.connection_pool.get_connection() as api_client:
+                    batch_data = api_client.get_security_bars(
+                        category=frequency,
+                        market=market,
+                        code=code,
+                        start=start_pos,
+                        count=batch_size
+                    )
+            else:
+                if not self._ensure_connection():
+                    logger.error(f"[并发批次{batch_num}] {symbol} 连接失败")
+                    return (batch_num, None, 0)
+
+                with self.connection_lock:
+                    batch_data = self.api_client.get_security_bars(
+                        category=frequency,
+                        market=market,
+                        code=code,
+                        start=start_pos,
+                        count=batch_size
+                    )
+
+            actual_count = len(batch_data) if batch_data else 0
+            return (batch_num, batch_data, actual_count)
+
+        except Exception as e:
+            logger.error(f"[并发批次{batch_num}] {symbol} 获取失败: {e}")
+            return (batch_num, None, 0)
+
+    def _fetch_kline_data_in_batches_parallel(self, symbol: str, market: int, code: str,
+                                              frequency: int, period: str, total_count: int,
+                                              start_date: str = None, end_date: str = None) -> pd.DataFrame:
+        """
+        并发分批获取K线数据（多IP同时工作，显著提升速度）
+
+        通过ThreadPoolExecutor实现真正的并发，充分利用IP池的多个连接
+
+        Args:
+            symbol: 股票代码
+            market: 市场代码
+            code: 通达信格式代码
+            frequency: 数据频率
+            period: 周期
+            total_count: 总共需要的记录数
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            合并后的DataFrame
+        """
+        MAX_COUNT_PER_REQUEST = 790
+
+        # 并发模式必须确保连接池可用
+        if self.use_connection_pool and (not self.connection_pool or not self.pool_ready):
+            try:
+                if hasattr(self, 'ensure_pool_populated'):
+                    ok = bool(self.ensure_pool_populated())
+                else:
+                    ok = False
+                if not ok:
+                    logger.warning("[并发分批] 连接池未就绪且预热失败，将无法使用多IP连接池")
+            except Exception as e:
+                logger.warning(f"[并发分批] 连接池预热异常: {e}")
+        if self.use_connection_pool and not self.connection_pool:
+            logger.warning("[并发分批] 无连接池实例，回退空结果以避免误判")
+            return pd.DataFrame()
+
+        # 计算需要多少批次
+        num_batches = (total_count + MAX_COUNT_PER_REQUEST - 1) // MAX_COUNT_PER_REQUEST
+
+        logger.info(f"[并发分批] {symbol} 开始并发分批获取K线数据，目标: {total_count}条，分{num_batches}批")
+
+        try:
+            # ✅ 优化：增加并发工作线程数，充分利用连接池
+            # 如果连接池大小足够，使用连接池大小；否则使用min(连接池大小, 批次数)
+            base_workers = self.connection_pool_size if self.use_connection_pool else 3
+            # 如果批次数很多，允许超过连接池大小（连接池会自动创建临时连接）
+            max_workers = min(base_workers * 2 if num_batches > base_workers else base_workers, num_batches, 30)  # 最多30个并发
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 提交所有批次任务
+                futures = []
+                for batch_num in range(num_batches):
+                    start_pos = batch_num * MAX_COUNT_PER_REQUEST
+                    batch_size = min(MAX_COUNT_PER_REQUEST, total_count - start_pos)
+
+                    future = executor.submit(
+                        self._fetch_single_batch,
+                        symbol, market, code, frequency,
+                        start_pos, batch_size, batch_num + 1
+                    )
+                    futures.append(future)
+
+                # ✅ 优化：使用as_completed异步处理结果，避免顺序等待，提升并发效率
+                # 创建future到batch_num的映射，以便在失败时也能知道是哪个批次
+                future_to_batch = {futures[i]: i + 1 for i in range(len(futures))}
+                batch_results_dict = {}  # 使用字典存储结果，key为batch_num
+                completed_count = 0
+                total_batches = len(futures)
+
+                # 使用as_completed异步处理，完成一个处理一个
+                try:
+                    for future in as_completed(futures, timeout=60):  # ✅ 优化：总体超时从30秒增加到60秒，但使用异步处理
+                        batch_num = future_to_batch.get(future, completed_count + 1)
+                        try:
+                            result = future.result()  # 不再需要单独的超时，因为as_completed已有超时
+                            batch_results_dict[batch_num] = result
+                            completed_count += 1
+                            logger.debug(f"[并发分批] {symbol} 第{batch_num}批完成 ({completed_count}/{total_batches})")
+                        except Exception as e:
+                            logger.error(f"[并发分批] {symbol} 第{batch_num}批次执行失败: {e}")
+                            # 记录失败批次
+                            batch_results_dict[batch_num] = (batch_num, None, 0)
+                            completed_count += 1
+                except concurrent.futures.TimeoutError:
+                    logger.warning(f"[并发分批] {symbol} 并发批次处理超时（60秒），已完成 {completed_count}/{total_batches} 批次")
+
+                # 按batch_num排序，转换为列表
+                batch_results = [batch_results_dict.get(i, (i, None, 0)) for i in range(1, total_batches + 1)]
+
+            # 合并所有数据
+            all_data = []
+            total_fetched = 0
+            for batch_num, batch_data, actual_count in batch_results:
+                if batch_data and actual_count > 0:
+                    all_data.extend(batch_data)
+                    total_fetched += actual_count
+                elif batch_num > 0:  # 批次编号>0表示是有效批次
+                    # 某批次返回空数据，可能已达历史边界
+                    logger.info(f"[并发分批] {symbol} 第{batch_num}批返回空数据，可能已达历史数据边界")
+                    break
+
+            logger.info(f"[并发分批] {symbol} 并发获取完成，共{total_fetched}条记录（{len(batch_results)}批）")
+
+            if all_data:
+                df = pd.DataFrame(all_data)
+
+                # 数据处理和验证
+                df = self._process_and_validate_kline_data(df, symbol, period)
+
+                if not df.empty:
+                    # 应用日期过滤
+                    if start_date or end_date:
+                        df = self._smart_filter_by_date_range(df, start_date, end_date, symbol)
+
+                    self.request_count += len(batch_results)
+                    logger.info(f"[并发分批] {symbol} 处理后共{len(df)}条有效记录")
+                    return df
+                else:
+                    logger.warning(f"[并发分批] {symbol} 数据处理后为空")
+                    return pd.DataFrame()
+            else:
+                logger.warning(f"[并发分批] {symbol} 未获取到任何数据")
+                return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"[并发分批] {symbol} 发生错误: {e}")
+            logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def _fetch_kline_data_in_batches(self, symbol: str, market: int, code: str,
+                                     frequency: int, period: str, total_count: int,
+                                     start_date: str = None, end_date: str = None) -> pd.DataFrame:
+        """
+        分批获取K线数据（串行模式，用于超过800条记录的请求）
+
+        pytdx API限制：单次请求最多返回800条记录
+        通过多次请求（修改start参数）来获取更多历史数据
+
+        注意：这是串行版本，如果需要更快的速度，使用 _fetch_kline_data_in_batches_parallel
+
+        Args:
+            symbol: 股票代码
+            market: 市场代码
+            code: 通达信格式代码
+            frequency: 数据频率
+            period: 周期
+            total_count: 总共需要的记录数
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            合并后的DataFrame
+        """
+        MAX_COUNT_PER_REQUEST = 800
+        all_data = []
+        fetched_count = 0
+        batch_num = 0
+
+        logger.info(f"[串行分批] {symbol} 开始串行分批获取K线数据，目标总数: {total_count}")
+
+        try:
+            while fetched_count < total_count:
+                batch_num += 1
+                # 计算本次要获取的数量
+                current_batch_size = min(MAX_COUNT_PER_REQUEST, total_count - fetched_count)
+
+                logger.debug(f"[串行分批] {symbol} 第{batch_num}批，start={fetched_count}, count={current_batch_size}")
+
+                # 获取数据
+                if self.use_connection_pool and self.connection_pool:
+                    with self.connection_pool.get_connection() as api_client:
+                        batch_data = api_client.get_security_bars(
+                            category=frequency,
+                            market=market,
+                            code=code,
+                            start=fetched_count,  # pytdx的start参数表示跳过的记录数
+                            count=current_batch_size
+                        )
+                else:
+                    if not self._ensure_connection():
+                        logger.error(f"[串行分批] {symbol} 第{batch_num}批连接失败")
+                        break
+
+                    with self.connection_lock:
+                        batch_data = self.api_client.get_security_bars(
+                            category=frequency,
+                            market=market,
+                            code=code,
+                            start=fetched_count,
+                            count=current_batch_size
+                        )
+
+                # 检查返回数据
+                if not batch_data or len(batch_data) == 0:
+                    logger.info(f"[串行分批] {symbol} 第{batch_num}批返回空数据，可能已达到历史数据边界，停止获取")
+                    break
+
+                actual_count = len(batch_data)
+                all_data.extend(batch_data)
+                fetched_count += actual_count
+
+                logger.info(f"[串行分批] {symbol} 第{batch_num}批获取成功: {actual_count}条，累计: {fetched_count}/{total_count}")
+
+                # 如果返回的数据少于请求的数量，说明已经到达历史数据的尽头
+                if actual_count < current_batch_size:
+                    logger.info(f"[串行分批] {symbol} 已获取所有可用历史数据，停止获取")
+                    break
+
+                # IP池模式延迟更短
+                delay = 0.01 if self.use_connection_pool else 0.1
+                time.sleep(delay)
+
+            # 合并所有数据
+            if all_data:
+                df = pd.DataFrame(all_data)
+                logger.info(f"[分批获取] {symbol} 完成，共获取{len(df)}条记录（{batch_num}批）")
+
+                # 数据处理和验证
+                df = self._process_and_validate_kline_data(df, symbol, period)
+
+                if not df.empty:
+                    # 应用日期过滤
+                    if start_date or end_date:
+                        df = self._smart_filter_by_date_range(df, start_date, end_date, symbol)
+
+                    self.request_count += batch_num
+                    logger.info(f"[分批获取] {symbol} 处理后共{len(df)}条有效记录")
+                    return df
+                else:
+                    logger.warning(f"[分批获取] {symbol} 数据处理后为空")
+                    return pd.DataFrame()
+            else:
+                logger.warning(f"[分批获取] {symbol} 未获取到任何数据")
+                return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"[分批获取] {symbol} 发生错误: {e}")
+            logger.error(traceback.format_exc())
+            return pd.DataFrame()
 
     def _process_and_validate_kline_data(self, df: pd.DataFrame, symbol: str, period: str) -> pd.DataFrame:
         """
@@ -1765,6 +2564,171 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         except Exception as e:
             logger.error(f"数据完整性验证失败: {e}")
             return pd.DataFrame()
+
+    def _smart_filter_by_date_range(self, df: pd.DataFrame, start_date: str = None, end_date: str = None, symbol: str = "") -> pd.DataFrame:
+        """
+        智能日期过滤 - pytdx专用版本
+
+        关键逻辑：
+        1. pytdx只返回历史数据，不支持日期范围查询
+        2. 如果end_date是未来日期或今天，不进行过滤（返回所有数据）
+        3. 如果start_date晚于最新数据日期，返回空（避免误判）
+        4. 只有当日期范围明确在历史区间时才进行过滤
+
+        Args:
+            df: 输入DataFrame
+            start_date: 开始日期（格式：YYYYMMDD 或 YYYY-MM-DD）
+            end_date: 结束日期（格式：YYYYMMDD 或 YYYY-MM-DD）
+            symbol: 股票代码（用于日志）
+
+        Returns:
+            过滤后的DataFrame
+        """
+        try:
+            if df.empty or 'datetime' not in df.columns:
+                return df
+
+            original_len = len(df)
+
+            # 确保datetime列是datetime类型
+            if not pd.api.types.is_datetime64_any_dtype(df['datetime']):
+                df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+                df = df.dropna(subset=['datetime'])
+
+            # 获取当前日期（今天）
+            from datetime import datetime as dt
+            today = dt.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # 转换日期参数为datetime对象
+            def parse_date(date_str):
+                if date_str is None:
+                    return None
+                try:
+                    import re
+                    # 移除所有非数字字符
+                    date_clean = re.sub(r'[^0-9]', '', str(date_str))
+                    if len(date_clean) >= 8:
+                        date_clean = date_clean[:8]  # YYYYMMDD
+                        return pd.to_datetime(date_clean, format='%Y%m%d')
+                    else:
+                        return pd.to_datetime(date_str)
+                except Exception as e:
+                    logger.warning(f"日期解析失败: {date_str}, 错误: {e}")
+                    return None
+
+            start_dt = parse_date(start_date)
+            end_dt = parse_date(end_date)
+
+            # ✅ 关键修复：智能处理end_date
+            # 如果end_date是今天或未来，将其调整为None（不过滤），因为pytdx只返回历史数据
+            if end_dt is not None and end_dt >= pd.Timestamp(today):
+                logger.info(f"[智能过滤] {symbol} end_date({end_date})是今天或未来，调整为不限制end_date（pytdx只返回历史数据）")
+                end_dt = None  # 不限制end_date
+
+            # ✅ 关键修复：如果start_date明显晚于数据中的最新日期，说明请求的是未来数据
+            # 允许3天的容差（考虑周末、节假日等情况）
+            if start_dt is not None:
+                max_data_date = df['datetime'].max()
+                # 如果start_date比最新数据日期晚超过3天，才认为是无效的未来查询
+                days_diff = (start_dt - max_data_date).days
+                if days_diff > 3:
+                    logger.warning(f"[智能过滤] {symbol} start_date({start_date})比最新数据日期({max_data_date})晚{days_diff}天, "
+                                   f"可能是未来日期查询或该股票已停牌，返回空")
+                    return pd.DataFrame()
+                elif days_diff > 0:
+                    logger.info(f"[智能过滤] {symbol} start_date({start_date})比最新数据日期({max_data_date})晚{days_diff}天，"
+                                f"可能是交易日差异，调整start_date为最新数据日期")
+                    start_dt = max_data_date  # 调整为最新数据日期
+
+            # 应用日期过滤
+            filter_applied = False
+            if start_dt is not None:
+                df = df[df['datetime'] >= start_dt]
+                filter_applied = True
+                logger.debug(f"应用start_date过滤: {start_date}, 保留 {len(df)}/{original_len} 条记录")
+
+            if end_dt is not None:
+                df = df[df['datetime'] <= end_dt]
+                filter_applied = True
+                logger.debug(f"应用end_date过滤: {end_date}, 保留 {len(df)}/{original_len} 条记录")
+
+            filtered_count = original_len - len(df)
+            if filter_applied:
+                if filtered_count > 0:
+                    logger.info(f"[智能过滤] {symbol} 日期范围过滤: 过滤掉 {filtered_count} 条记录, 保留 {len(df)} 条")
+                else:
+                    logger.info(f"[智能过滤] {symbol} 日期范围过滤: 所有 {len(df)} 条记录均在范围内")
+            else:
+                logger.info(f"[智能过滤] {symbol} 未应用日期过滤，保留全部 {len(df)} 条数据")
+
+            return df
+
+        except Exception as e:
+            logger.error(f"智能日期过滤失败: {e}")
+            return df
+
+    def _filter_by_date_range(self, df: pd.DataFrame, start_date: str = None, end_date: str = None, symbol: str = "") -> pd.DataFrame:
+        """
+        根据日期范围过滤数据
+
+        Args:
+            df: 输入DataFrame
+            start_date: 开始日期（格式：YYYYMMDD 或 YYYY-MM-DD）
+            end_date: 结束日期（格式：YYYYMMDD 或 YYYY-MM-DD）
+            symbol: 股票代码（用于日志）
+
+        Returns:
+            过滤后的DataFrame
+        """
+        try:
+            if df.empty or 'datetime' not in df.columns:
+                return df
+
+            original_len = len(df)
+
+            # 确保datetime列是datetime类型
+            if not pd.api.types.is_datetime64_any_dtype(df['datetime']):
+                df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+                df = df.dropna(subset=['datetime'])
+
+            # 转换日期参数为datetime对象
+            def parse_date(date_str):
+                if date_str is None:
+                    return None
+                try:
+                    import re
+                    # 移除所有非数字字符
+                    date_clean = re.sub(r'[^\d]', '', str(date_str))
+                    if len(date_clean) >= 8:
+                        date_clean = date_clean[:8]  # YYYYMMDD
+                        return pd.to_datetime(date_clean, format='%Y%m%d')
+                    else:
+                        return pd.to_datetime(date_str)
+                except Exception as e:
+                    logger.warning(f"日期解析失败: {date_str}, 错误: {e}")
+                    return None
+
+            start_dt = parse_date(start_date)
+            end_dt = parse_date(end_date)
+
+            # 应用日期过滤
+            if start_dt is not None:
+                df = df[df['datetime'] >= start_dt]
+                logger.debug(f"应用start_date过滤: {start_date}, 保留 {len(df)}/{original_len} 条记录")
+
+            if end_dt is not None:
+                df = df[df['datetime'] <= end_dt]
+                logger.debug(f"应用end_date过滤: {end_date}, 保留 {len(df)}/{original_len} 条记录")
+
+            filtered_count = original_len - len(df)
+            if filtered_count > 0:
+                logger.info(f"日期范围过滤: {symbol}, 过滤掉 {filtered_count} 条记录, 保留 {len(df)} 条")
+
+            return df
+
+        except Exception as e:
+            logger.error(f"日期过滤失败: {e}")
+            return df
 
     def _finalize_dataframe_format(self, df: pd.DataFrame) -> pd.DataFrame:
         """最终格式化DataFrame"""
@@ -2320,22 +3284,26 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             return 0.5  # 默认中等质量
 
     def _initialize_servers(self):
-        """初始化服务器列表，优先从数据库加载"""
+        """初始化服务器列表：优先从配置的端点URL获取 → 失败时使用内置清单"""
         try:
-            # 尝试从数据库加载服务器
-            from core.database.tdx_server_manager import get_tdx_db_manager
-
-            db_manager = get_tdx_db_manager()
-            available_servers = db_manager.get_available_servers(limit=20)
-
-            if available_servers:
-                # 从数据库加载服务器
-                self.server_list = [(server['host'], server['port']) for server in available_servers]
-                logger.info(f"从数据库加载了 {len(self.server_list)} 个服务器")
+            # ✅ 修复：快速初始化，避免阻塞
+            # 1) 优先从配置端点获取（例如GitHub/自定义URL提供的hosts）
+            # 设置快速超时，避免长时间阻塞插件加载
+            import time
+            start_time = time.time()
+            fetched = self._load_servers_from_endpoints()
+            elapsed = time.time() - start_time
+            
+            if fetched:
+                self.server_list = fetched
+                logger.info(f"从配置端点获取了 {len(self.server_list)} 个服务器（耗时 {elapsed:.2f}秒）")
             else:
-                # 使用默认服务器列表
+                # 2) 回退到内置默认清单
                 self._load_default_servers()
-                logger.info("使用默认服务器列表")
+                if elapsed > 5:
+                    logger.warning(f"从端点获取服务器失败，使用默认服务器列表（耗时 {elapsed:.2f}秒，可能网络较慢）")
+                else:
+                    logger.info("使用默认服务器列表")
 
             # 设置当前服务器
             if self.server_list:
@@ -2348,6 +3316,182 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             logger.error(f"初始化服务器列表失败: {e}")
             # 出错时使用默认服务器
             self._load_default_servers()
+
+    def _load_servers_from_endpoints(self) -> list:
+        """
+        从配置的端点URL列表获取服务器清单，进行基础解析与去重
+        Returns:
+            List[Tuple[str, int]]: 服务器 (host, port) 列表
+        """
+        servers: list = []
+        try:
+            import re
+            import requests
+            import json
+
+            endpoints = []
+            # 优先从配置读取端点列表
+            if hasattr(self, 'config'):
+                endpoints = self.config.get('server_endpoints', []) or []
+            # 兼容旧字段：self.endpointhost（若存在）
+            if not endpoints and hasattr(self, 'endpointhost'):
+                endpoints = self.endpointhost or []
+
+            if not endpoints:
+                return []
+
+            # ✅ 修复：大幅减少超时时间，避免阻塞插件加载
+            # 从60秒减少到5秒，快速失败，避免卡顿
+            fetch_timeout = int(self.config.get('endpoint_fetch_timeout', 5)) if hasattr(self, 'config') else 5
+            max_results = int(self.config.get('endpoint_max_results', 200)) if hasattr(self, 'config') else 200
+            
+            # ✅ 修复：使用并发请求，而不是串行，提高速度
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import time
+            
+            ip_port_pattern = re.compile(r"(?:^|[^0-9])(\d{1,3}(?:\.\d{1,3}){3})[:：]\s*(\d{2,5})")
+            # 修正 tuple_pattern 以匹配实际数据结构
+            tuple_pattern = re.compile(r"$\s*['\"][^'\"]*['\"]\s*,\s*['\"](\d{1,3}(?:\.\d{1,3}){3})['\"]\s*,\s*(\d{2,5})\s*$")
+
+            # ✅ 修复：并发请求所有endpoint，设置总体超时，快速失败
+            start_time = time.time()
+            max_total_timeout = 10  # 总体超时10秒，避免长时间阻塞
+            
+            def fetch_url(url):
+                """获取单个URL的内容"""
+                try:
+                    resp = requests.get(url, timeout=fetch_timeout)
+                    if resp.status_code == 200 and resp.text:
+                        return resp.text
+                    return None
+                except Exception as e:
+                    logger.debug(f"获取endpoint失败 {url}: {e}")
+                    return None
+            
+            # 并发请求所有endpoint
+            url_texts = {}
+            with ThreadPoolExecutor(max_workers=min(len(endpoints), 5)) as executor:
+                future_to_url = {executor.submit(fetch_url, url): url for url in endpoints}
+                for future in as_completed(future_to_url, timeout=max_total_timeout):
+                    if time.time() - start_time > max_total_timeout:
+                        logger.debug(f"endpoint请求总体超时（{max_total_timeout}秒），停止等待")
+                        break
+                    url = future_to_url[future]
+                    try:
+                        text = future.result()
+                        if text:
+                            url_texts[url] = text
+                    except Exception as e:
+                        logger.debug(f"处理endpoint结果失败 {url}: {e}")
+            
+            # 处理获取到的内容
+            for url, text in url_texts.items():
+                try:
+                    if not text:
+                        continue
+
+                    # 1) 尝试作为JSON解析
+                    parsed_json = None
+                    try:
+                        parsed_json = json.loads(text)
+                    except Exception:
+                        parsed_json = None
+
+                    if isinstance(parsed_json, list):
+                        # 支持多种JSON结构：[{ip,port}], [{"host": "...", "port": 7709}], [{"server":"1.2.3.4:7709"}]
+                        for item in parsed_json:
+                            try:
+                                if isinstance(item, dict):
+                                    if 'ip' in item and 'port' in item:
+                                        host = str(item['ip']).strip()
+                                        port = int(item['port'])
+                                        if 0 < port <= 65535:
+                                            servers.append((host, port))
+                                    elif 'host' in item and 'port' in item:
+                                        host = str(item['host']).strip()
+                                        port = int(item['port'])
+                                        if 0 < port <= 65535:
+                                            servers.append((host, port))
+                                    elif 'server' in item and isinstance(item['server'], str) and ':' in item['server']:
+                                        host_part, port_part = item['server'].split(':', 1)
+                                        host = host_part.strip()
+                                        port = int(port_part.strip())
+                                        if 0 < port <= 65535:
+                                            servers.append((host, port))
+                                elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                                    host = str(item[0]).strip()
+                                    port = int(item[1])
+                                    if 0 < port <= 65535:
+                                        servers.append((host, port))
+                            except Exception:
+                                continue
+
+                    # 2) 解析Python hosts.py风格的('ip', port)元组
+                    for m in tuple_pattern.finditer(text):
+                        host = m.group(1)
+                        port = int(m.group(2))
+                        if 0 < port <= 65535:
+                            servers.append((host, port))
+
+                    # 3) 再用通用 ip:port 模式兜底
+                    for m in ip_port_pattern.finditer(text):
+                        host = m.group(1)
+                        port = int(m.group(2))
+                        # 基础合法性过滤
+                        if 0 < port <= 65535:
+                            servers.append((host, port))
+                except Exception:
+                    continue
+
+            # 去重与截断（最多保留前max_results个）
+            seen = set()
+            deduped = []
+            for host, port in servers:
+                key = f"{host}:{port}"
+                if key in seen:
+                    continue
+                # ✅ 验证IP地址格式
+                if not self._validate_ip_address(host):
+                    logger.debug(f"跳过无效IP地址: {host}:{port}")
+                    continue
+                seen.add(key)
+                deduped.append((host, port))
+                if len(deduped) >= max_results:
+                    break
+
+            logger.info(f"从端点共解析到 {len(servers)} 个候选地址，去重并验证后 {len(deduped)} 个（最大返回 {max_results}）")
+            return deduped
+        except Exception:
+            return []
+
+    def _validate_ip_address(self, ip: str) -> bool:
+        """
+        验证IP地址格式是否正确
+        
+        Args:
+            ip: IP地址字符串
+            
+        Returns:
+            bool: IP地址格式是否有效
+        """
+        try:
+            import socket
+            # 使用socket.inet_aton验证IPv4地址格式
+            socket.inet_aton(ip)
+            # 进一步验证IP地址范围（排除0.0.0.0和255.255.255.255等特殊地址）
+            parts = ip.split('.')
+            if len(parts) != 4:
+                return False
+            for part in parts:
+                num = int(part)
+                if num < 0 or num > 255:
+                    return False
+            # 排除一些明显无效的地址
+            if ip == '0.0.0.0' or ip == '255.255.255.255':
+                return False
+            return True
+        except (socket.error, ValueError):
+            return False
 
     def _load_default_servers(self):
         """加载默认服务器列表 - 优化顺序，最快服务器优先"""
@@ -2375,6 +3519,29 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             # 特殊端口服务器（通常较慢，放在最后）
             ('202.108.253.139', 80),   # 北京联通主站Z80 - 端口80
             ('180.153.18.172', 80),    # 上海电信主站Z80 - 端口80
+            ("218.85.139.19", 7709),
+
+            ("218.85.139.20", 7709),
+            ("58.23.131.163", 7709),
+            ("218.6.170.47", 7709),
+            ("123.125.108.14", 7709),
+            ("180.153.18.170", 7709),
+            ("180.153.18.171", 7709),
+            ("180.153.18.172", 80),
+            ("202.108.253.130", 7709),
+            ("202.108.253.131", 7709),
+            ("202.108.253.139", 80),
+            ("60.191.117.167", 7709),
+            ("115.238.56.198", 7709),
+            ("218.75.126.9", 7709),
+            ("115.238.90.165", 7709),
+            ("124.160.88.183", 7709),
+            ("60.12.136.250", 7709),
+            ("218.108.98.244", 7709),
+            ("218.108.47.69", 7709),
+            ("223.94.89.115", 7709),
+            ("218.57.11.101", 7709),
+            ("58.58.33.123", 7709)
         ]
 
         # 将默认服务器保存到数据库

@@ -18,6 +18,7 @@
 
 import sys
 import json
+import time
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -38,11 +39,11 @@ from PyQt5.QtWidgets import (
     QDateEdit, QSpinBox, QCheckBox, QListWidget, QListWidgetItem,
     QMessageBox, QMenu, QToolBar, QAction, QStatusBar,
     QDialog, QDialogButtonBox, QFormLayout, QAbstractItemView,
-    QSlider, QDoubleSpinBox, QLCDNumber
+    QSlider, QDoubleSpinBox, QLCDNumber, QTableWidgetSelectionRange
 )
 from PyQt5.QtCore import (
     Qt, QTimer, QThread, pyqtSignal, QDate, QSize,
-    QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
+    QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QObject
 )
 from PyQt5.QtGui import (
     QFont, QPalette, QColor, QIcon, QPixmap, QPainter,
@@ -88,6 +89,48 @@ except ImportError as e:
     CORE_AVAILABLE = False
 
 logger = logger.bind(module=__name__) if logger else None
+
+try:
+    from gui.widgets.task_dependency_visualizer import TaskDependencyVisualizer
+    DEPENDENCY_VISUALIZER_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"任务依赖可视化器导入失败: {e}") if logger else None
+    DEPENDENCY_VISUALIZER_AVAILABLE = False
+
+# 导入实时写入UI组件（仅监控面板，配置和控制已融入左侧面板）
+try:
+    from gui.widgets.realtime_write_ui_components import RealtimeWriteMonitoringWidget, IPMonitorWidget
+    REALTIME_WRITE_UI_AVAILABLE = True
+    logger.info("实时写入监控组件已加载") if logger else None
+except ImportError as e:
+    logger.warning(f"实时写入监控组件导入失败: {e}") if logger else None
+    REALTIME_WRITE_UI_AVAILABLE = False
+    RealtimeWriteMonitoringWidget = None
+    IPMonitorWidget = None
+
+
+class IPStatsWorker(QObject):
+    """IP统计信息获取工作线程（避免阻塞UI）"""
+    finished = pyqtSignal(dict)  # 获取完成信号
+    error = pyqtSignal(str)  # 错误信号
+
+    def __init__(self, import_engine):
+        super().__init__()
+        self.import_engine = import_engine
+
+    def fetch_ip_stats(self):
+        """在后台线程获取IP统计信息"""
+        try:
+            if not self.import_engine:
+                self.error.emit("导入引擎不可用")
+                return
+
+            # 获取IP统计信息（可能耗时）
+            ip_stats = self.import_engine.get_tongdaxin_ip_stats()
+            self.finished.emit(ip_stats if ip_stats else {})
+        except Exception as e:
+            logger.error(f"获取IP统计信息失败: {e}", exc_info=True)
+            self.error.emit(str(e))
 
 
 class DataLoadWorker(QThread):
@@ -171,14 +214,20 @@ class BatchSelectionDialog(QDialog):
         # 列表区域
         self.item_list = QTableWidget()
         self.item_list.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.item_list.setColumnCount(3)
-        self.item_list.setHorizontalHeaderLabels(["", "代码", "名称"])
+        self.item_list.setColumnCount(2)  # 只需要代码和名称两列
+        self.item_list.setHorizontalHeaderLabels(["代码", "名称"])
+
+        # 设置选择模式为多选整行
+        self.item_list.setSelectionBehavior(QTableWidget.SelectRows)
+        self.item_list.setSelectionMode(QTableWidget.MultiSelection)
+
+        # 连接行点击事件
+        self.item_list.itemClicked.connect(self.on_row_clicked)
 
         # 设置列宽
         header = self.item_list.horizontalHeader()
         header.setStretchLastSection(True)
-        self.item_list.setColumnWidth(0, 10)
-        self.item_list.setColumnWidth(1, 100)
+        self.item_list.setColumnWidth(0, 100)
 
         layout.addWidget(self.item_list)
 
@@ -303,21 +352,21 @@ class BatchSelectionDialog(QDialog):
             selected_data_source = None
             selected_plugin_name = None
 
-            logger.info("🔍 [DEBUG] 开始获取股票数据...") if logger else None
+            logger.info("开始获取股票数据...") if logger else None
 
             if hasattr(self.parent(), 'data_source_combo') and hasattr(self.parent(), 'data_source_mapping'):
                 selected_display_name = self.parent().data_source_combo.currentText()
                 selected_plugin_name = self.parent().data_source_mapping.get(selected_display_name)
-                logger.info(f"🔍 [DEBUG] 父窗口数据源信息: combo={hasattr(self.parent(), 'data_source_combo')}, mapping={hasattr(self.parent(), 'data_source_mapping')}") if logger else None
-                logger.info(f"🔍 [DEBUG] 选择的显示名称: {selected_display_name}") if logger else None
-                logger.info(f"🔍 [DEBUG] 映射的插件名称: {selected_plugin_name}") if logger else None
-                logger.info(f"🔍 [DEBUG] 完整映射表: {self.parent().data_source_mapping}") if logger else None
+                logger.info(f"父窗口数据源信息: combo={hasattr(self.parent(), 'data_source_combo')}, mapping={hasattr(self.parent(), 'data_source_mapping')}") if logger else None
+                logger.info(f"选择的显示名称: {selected_display_name}") if logger else None
+                logger.info(f"映射的插件名称: {selected_plugin_name}") if logger else None
+                logger.info(f"完整映射表: {self.parent().data_source_mapping}") if logger else None
             else:
-                logger.warning("🔍 [DEBUG] 父窗口缺少必要属性") if logger else None
+                logger.warning("父窗口缺少必要属性") if logger else None
 
             # 方案1: 优先通过选定的插件获取（符合业务逻辑）
             if selected_plugin_name:
-                logger.info(f"🔍 [DEBUG] 尝试直接从插件 {selected_plugin_name} 获取数据...") if logger else None
+                logger.info(f"尝试直接从插件 {selected_plugin_name} 获取数据...") if logger else None
 
                 from core.plugin_manager import PluginManager
 
@@ -326,21 +375,21 @@ class BatchSelectionDialog(QDialog):
                     from core.containers import get_service_container
                     container = get_service_container()
                     plugin_manager = container.resolve(PluginManager) if container else None
-                    logger.info(f"🔍 [DEBUG] PluginManager实例: {plugin_manager is not None}") if logger else None
+                    logger.info(f"PluginManager实例: {plugin_manager is not None}") if logger else None
 
                     if plugin_manager:
                         plugin = plugin_manager.get_plugin(selected_plugin_name)
-                        logger.info(f"🔍 [DEBUG] 插件实例: {plugin is not None}, 类型: {type(plugin)}") if logger else None
+                        logger.info(f"插件实例: {plugin is not None}, 类型: {type(plugin)}") if logger else None
 
                         if plugin:
                             # 尝试调用插件的股票列表获取方法
                             if hasattr(plugin, 'get_stock_list'):
-                                logger.info("🔍 [DEBUG] 插件有get_stock_list方法") if logger else None
+                                logger.info("插件有get_stock_list方法") if logger else None
                                 stock_list_data = plugin.get_stock_list()
 
                                 # 处理DataFrame和列表两种格式
                                 if hasattr(stock_list_data, 'empty'):  # DataFrame
-                                    logger.info(f"🔍 [DEBUG] get_stock_list返回DataFrame: {len(stock_list_data) if not stock_list_data.empty else 0} 条数据") if logger else None
+                                    logger.info(f"get_stock_list返回DataFrame: {len(stock_list_data) if not stock_list_data.empty else 0} 条数据") if logger else None
                                     if not stock_list_data.empty:
                                         # 将DataFrame转换为标准格式
                                         stock_list = []
@@ -354,33 +403,33 @@ class BatchSelectionDialog(QDialog):
                                         logger.info(f"✅ 从插件DataFrame获取股票数据: {len(stock_list)} 只") if logger else None
                                         return stock_list
                                 else:  # 列表格式
-                                    logger.info(f"🔍 [DEBUG] get_stock_list返回列表: {len(stock_list_data) if stock_list_data else 0} 条数据") if logger else None
+                                    logger.info(f"get_stock_list返回列表: {len(stock_list_data) if stock_list_data else 0} 条数据") if logger else None
                                     if stock_list_data:
                                         logger.info(f"✅ 直接从插件获取股票数据: {len(stock_list_data)} 只") if logger else None
                                         return stock_list_data
                             elif hasattr(plugin, 'get_asset_list'):
-                                logger.info("🔍 [DEBUG] 插件有get_asset_list方法") if logger else None
+                                logger.info("插件有get_asset_list方法") if logger else None
                                 from core.plugin_types import AssetType
                                 asset_list_data = plugin.get_asset_list(AssetType.STOCK_A)
-                                logger.info(f"🔍 [DEBUG] get_asset_list返回: {len(asset_list_data) if asset_list_data else 0} 条数据") if logger else None
+                                logger.info(f"get_asset_list返回: {len(asset_list_data) if asset_list_data else 0} 条数据") if logger else None
                                 if asset_list_data:
                                     logger.info(f"✅ 从插件获取资产数据: {len(asset_list_data)} 只") if logger else None
                                     return asset_list_data
                             else:
-                                logger.warning("🔍 [DEBUG] 插件没有get_stock_list或get_asset_list方法") if logger else None
+                                logger.warning("插件没有get_stock_list或get_asset_list方法") if logger else None
                         else:
-                            logger.warning("🔍 [DEBUG] 无法获取插件实例") if logger else None
+                            logger.warning("无法获取插件实例") if logger else None
                     else:
-                        logger.warning("🔍 [DEBUG] PluginManager实例为空") if logger else None
+                        logger.warning("PluginManager实例为空") if logger else None
                 except Exception as e:
-                    logger.error(f"🔍 [DEBUG] 从插件获取数据失败: {e}") if logger else None
+                    logger.error(f"从插件获取数据失败: {e}") if logger else None
                     import traceback
-                    logger.error(f"🔍 [DEBUG] 详细错误: {traceback.format_exc()}") if logger else None
+                    logger.error(f"详细错误: {traceback.format_exc()}") if logger else None
             else:
-                logger.warning("🔍 [DEBUG] selected_plugin_name为空，无法从插件获取数据") if logger else None
+                logger.warning("selected_plugin_name为空，无法从插件获取数据") if logger else None
 
             # 方案2: 备用方案 - 通过 UnifiedDataManager 获取（当插件获取失败时）
-            logger.info("🔍 [DEBUG] 插件获取失败，尝试备用方案...") if logger else None
+            logger.info("插件获取失败，尝试备用方案...") if logger else None
             from core.services.unified_data_manager import get_unified_data_manager
             from core.containers import get_service_container
             from core.services.unified_data_manager import UnifiedDataManager
@@ -665,34 +714,36 @@ class BatchSelectionDialog(QDialog):
             return []
 
     def populate_table(self, items):
-        """填充表格"""
-        logger.info(f"🔍 [DEBUG] populate_table被调用，数据量: {len(items) if items else 0}") if logger else None
+        """填充表格（优化版 - 无复选框，性能提升）"""
+        logger.info(f"populate_table被调用，数据量: {len(items) if items else 0}") if logger else None
 
         if not items:
-            logger.warning("🔍 [DEBUG] items为空，设置表格行数为0") if logger else None
+            logger.warning("items为空，设置表格行数为0") if logger else None
             self.item_list.setRowCount(0)
             self.update_stats()
             return
 
-        logger.info(f"🔍 [DEBUG] 设置表格行数: {len(items)}") if logger else None
-        self.item_list.setRowCount(len(items))
+        logger.info(f"设置表格行数: {len(items)}") if logger else None
 
-        for row, item in enumerate(items):
-            # logger.debug(f"🔍 [DEBUG] 处理第{row}行数据: {item}") if logger else None
+        # 性能优化：暂停UI更新
+        self.item_list.setUpdatesEnabled(False)
+        try:
+            self.item_list.setRowCount(len(items))
 
-            # 选择
-            checkbox = QCheckBox()
-            checkbox.stateChanged.connect(self.update_selection)
-            self.item_list.setCellWidget(row, 0, checkbox)
+            for row, item in enumerate(items):
+                # 代码列
+                code_item = QTableWidgetItem(item["code"])
+                self.item_list.setItem(row, 0, code_item)
 
-            # 代码
-            self.item_list.setItem(row, 1, QTableWidgetItem(item["code"]))
+                # 名称列
+                name_item = QTableWidgetItem(item["name"])
+                self.item_list.setItem(row, 1, name_item)
 
-            # 名称
-            self.item_list.setItem(row, 2, QTableWidgetItem(item["name"]))
-
-        logger.info("🔍 [INFO] 表格填充完成，调用update_stats") if logger else None
-        self.update_stats()
+            logger.info("🔍 [INFO] 表格填充完成，调用update_stats") if logger else None
+            self.update_stats()
+        finally:
+            # 恢复UI更新
+            self.item_list.setUpdatesEnabled(True)
 
     def filter_items(self, text):
         """过滤项目"""
@@ -707,47 +758,54 @@ class BatchSelectionDialog(QDialog):
 
         self.populate_table(filtered_items)
 
+    def on_row_clicked(self, item):
+        """行点击事件 - 切换选中状态"""
+        row = item.row()
+        # 如果行已选中，则取消选中；否则选中
+        if self.item_list.item(row, 0).isSelected():
+            self.item_list.setRangeSelected(
+                QTableWidgetSelectionRange(row, 0, row, self.item_list.columnCount() - 1),
+                False
+            )
+        else:
+            self.item_list.setRangeSelected(
+                QTableWidgetSelectionRange(row, 0, row, self.item_list.columnCount() - 1),
+                True
+            )
+        self.update_stats()
+
     def select_all(self):
-        """全化"""
-        for row in range(self.item_list.rowCount()):
-            checkbox = self.item_list.cellWidget(row, 0)
-            if checkbox:
-                checkbox.setChecked(True)
+        """全选"""
+        self.item_list.selectAll()
+        self.update_stats()
 
     def clear_all(self):
         """清空选择"""
-        for row in range(self.item_list.rowCount()):
-            checkbox = self.item_list.cellWidget(row, 0)
-            if checkbox:
-                checkbox.setChecked(False)
-
-    def update_selection(self):
-        """更新选择状态"""
+        self.item_list.clearSelection()
         self.update_stats()
 
     def update_stats(self):
-        """更新统计信息"""
+        """更新统计信息（优化版）"""
         total = self.item_list.rowCount()
-        selected = 0
-        for row in range(total):
-            checkbox = self.item_list.cellWidget(row, 0)
-            if checkbox and checkbox.isChecked():
-                selected += 1
+        selected = len(self.item_list.selectedItems()) // self.item_list.columnCount()  # 每行有2列，所以除以列数
 
         stats_text = f"共 {total} 项，已选择 {selected} 项"
-        # logger.info(f"🔍 [DEBUG] 更新统计信息: {stats_text}") if logger else None
         self.stats_label.setText(stats_text)
 
     def get_selected_codes(self):
-        """获取选中的代码"""
+        """获取选中的代码（优化版）"""
         selected_codes = []
+        selected_rows = set()
 
-        for row in range(self.item_list.rowCount()):
-            checkbox = self.item_list.cellWidget(row, 0)
-            if checkbox and checkbox.isChecked():
-                code_item = self.item_list.item(row, 1)
-                if code_item:
-                    selected_codes.append(code_item.text())
+        # 收集所有选中的行号
+        for item in self.item_list.selectedItems():
+            selected_rows.add(item.row())
+
+        # 按行号排序后获取代码
+        for row in sorted(selected_rows):
+            code_item = self.item_list.item(row, 0)  # 第0列是代码
+            if code_item:
+                selected_codes.append(code_item.text())
 
         return selected_codes
 
@@ -805,7 +863,7 @@ class EnhancedDataImportWidget(QWidget):
             self.config_manager = ImportConfigManager()
             self.import_engine = DataImportExecutionEngine(
                 config_manager=self.config_manager,
-                max_workers=4,
+                max_workers=8,  # ✅ 优化：默认工作线程数从4增加到8，提升并行性能
                 enable_ai_optimization=True
             )
 
@@ -819,6 +877,7 @@ class EnhancedDataImportWidget(QWidget):
 
         self.setup_ui()
         self.setup_responsive_layout()
+        self._register_write_event_handlers()
         self.setup_connections()
         self.setup_timers()
 
@@ -908,7 +967,7 @@ class EnhancedDataImportWidget(QWidget):
             if not hasattr(self, 'workers_spin'):
                 self.workers_spin = QSpinBox()
                 self.workers_spin.setRange(1, 32)
-                self.workers_spin.setValue(4)
+                self.workers_spin.setValue(8)  # ✅ 优化：默认工作线程数从4增加到8
                 logger.debug("预创建了workers_spin组件") if logger else None
 
             # 确保日志文本框存在
@@ -1013,7 +1072,7 @@ class EnhancedDataImportWidget(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setMinimumHeight(700)  # 设置合理的最小高度
+        scroll.setMinimumHeight(740)  # 设置合理的最小高度
         scroll.setMinimumWidth(450)
         scroll.setAlignment(Qt.AlignCenter)
         # 内容widget
@@ -1036,6 +1095,24 @@ class EnhancedDataImportWidget(QWidget):
         self.task_desc_edit.setPlaceholderText("输入任务描述（可选）...")
         basic_layout.addRow("任务描述:", self.task_desc_edit)
 
+        # 🎯 数据用途（新增）- 用于智能权重配置
+        self.data_usage_combo = QComboBox()
+        self.data_usage_combo.addItems([
+            "通用场景",      # general - 默认
+            "历史数据分析",  # historical
+            "回测验证",      # backtest
+            "实时行情",      # realtime
+            "实盘交易"       # live_trading
+        ])
+        self.data_usage_combo.setToolTip(
+            "选择数据用途后，系统会自动调整质量评分权重：\n"
+            "• 历史数据分析：注重准确性和完整性\n"
+            "• 回测验证：注重一致性和准确性\n"
+            "• 实时行情：提高及时性权重\n"
+            "• 实盘交易：最高及时性和准确性权重"
+        )
+        basic_layout.addRow("🎯 数据用途:", self.data_usage_combo)
+
         # 资产类型
         from core.ui_asset_type_utils import get_asset_type_combo_items
         self.asset_type_combo = QComboBox()
@@ -1055,7 +1132,35 @@ class EnhancedDataImportWidget(QWidget):
 
         content_layout.addWidget(basic_info_group)
 
-        # ==================== 第二部分：代码选择 ====================
+        # ==================== 第二部分：数据源配置 ====================
+        datasource_group = QGroupBox("🔌 数据源配置")
+        datasource_layout = QFormLayout(datasource_group)
+
+        # 数据源选择 - 动态加载已注册的数据源插件
+        self.data_source_combo = QComboBox()
+        self._load_available_data_sources()
+        datasource_layout.addRow("数据源:", self.data_source_combo)
+
+        # 数据时间范围
+        date_range_layout = QHBoxLayout()
+
+        date_range_layout.addWidget(QLabel("开始日期:"))
+        self.start_date = QDateEdit()
+        self.start_date.setDate(QDate.currentDate().addMonths(-12))
+        self.start_date.setCalendarPopup(True)
+        date_range_layout.addWidget(self.start_date)
+
+        date_range_layout.addWidget(QLabel("结束日期:"))
+        self.end_date = QDateEdit()
+        self.end_date.setDate(QDate.currentDate())
+        self.end_date.setCalendarPopup(True)
+        date_range_layout.addWidget(self.end_date)
+
+        datasource_layout.addRow("📅 时间范围:", date_range_layout)
+
+        content_layout.addWidget(datasource_group)
+
+        # ==================== 第三部分：代码选择 ====================
         symbols_group = QGroupBox("🏷️ 股票选择")
         symbols_layout = QVBoxLayout(symbols_group)
 
@@ -1086,34 +1191,6 @@ class EnhancedDataImportWidget(QWidget):
 
         content_layout.addWidget(symbols_group)
 
-        # ==================== 第三部分：数据源配置 ====================
-        datasource_group = QGroupBox("🔌 数据源配置")
-        datasource_layout = QFormLayout(datasource_group)
-
-        # 数据源选择 - 动态加载已注册的数据源插件
-        self.data_source_combo = QComboBox()
-        self._load_available_data_sources()
-        datasource_layout.addRow("数据源:", self.data_source_combo)
-
-        # 数据时间范围
-        date_range_layout = QHBoxLayout()
-
-        date_range_layout.addWidget(QLabel("开始日期:"))
-        self.start_date = QDateEdit()
-        self.start_date.setDate(QDate.currentDate().addMonths(-12))
-        self.start_date.setCalendarPopup(True)
-        date_range_layout.addWidget(self.start_date)
-
-        date_range_layout.addWidget(QLabel("结束日期:"))
-        self.end_date = QDateEdit()
-        self.end_date.setDate(QDate.currentDate())
-        self.end_date.setCalendarPopup(True)
-        date_range_layout.addWidget(self.end_date)
-
-        datasource_layout.addRow("📅 时间范围:", date_range_layout)
-
-        content_layout.addWidget(datasource_group)
-
         # ==================== 第四部分：执行配置 ====================
         execution_group = QGroupBox("")
         execution_layout = QHBoxLayout(execution_group)
@@ -1130,8 +1207,8 @@ class EnhancedDataImportWidget(QWidget):
 
         self.workers_spin = QSpinBox()
         self.workers_spin.setRange(1, 32)
-        self.workers_spin.setValue(4)
-        self.workers_spin.setToolTip("并行处理的线程数")
+        self.workers_spin.setValue(8)  # ✅ 优化：默认工作线程数从4增加到8，提升并行性能
+        self.workers_spin.setToolTip("并行处理的线程数（建议8-16，可根据CPU核心数调整）")
         resource_layout.addRow("工作线程数:", self.workers_spin)
 
         self.memory_limit_spin = QSpinBox()
@@ -1143,9 +1220,9 @@ class EnhancedDataImportWidget(QWidget):
 
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(60, 3600)
-        self.timeout_spin.setValue(300)
+        self.timeout_spin.setValue(60)  # ✅ 优化：默认超时从300秒减少到60秒，快速失败避免长时间等待
         self.timeout_spin.setSuffix("秒")
-        self.timeout_spin.setToolTip("单个请求超时时间")
+        self.timeout_spin.setToolTip("单个请求超时时间（建议60-120秒，快速失败提升响应速度）")
         resource_layout.addRow("超时设置:", self.timeout_spin)
 
         execution_layout.addWidget(resource_config)
@@ -1153,6 +1230,8 @@ class EnhancedDataImportWidget(QWidget):
         # 右侧：错误处理配置
         error_config = QGroupBox("⚠️ 错误处理")
         error_layout = QFormLayout(error_config)
+        error_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        error_layout.setHorizontalSpacing(10)
 
         self.retry_count_spin = QSpinBox()
         self.retry_count_spin.setRange(0, 10)
@@ -1171,17 +1250,19 @@ class EnhancedDataImportWidget(QWidget):
         self.progress_interval_spin.setValue(5)
         self.progress_interval_spin.setSuffix("秒")
         self.progress_interval_spin.setToolTip("进度更新间隔")
+        self.progress_interval_spin.setMinimumWidth(100)
+        self.progress_interval_spin.setMaximumWidth(200)
         error_layout.addRow("进度间隔:", self.progress_interval_spin)
 
         execution_layout.addWidget(error_config)
 
         content_layout.addWidget(execution_group)
 
-        # ==================== 第五部分：智能化功能 ====================
+        # ==================== 第五部分：智能化功能与实时写入 ====================
         ai_features_group = QGroupBox("🤖 智能化功能")
         ai_layout = QVBoxLayout(ai_features_group)
 
-        # 创建两列布局
+        # 创建三列布局
         ai_row1 = QHBoxLayout()
         ai_row2 = QHBoxLayout()
         ai_row3 = QHBoxLayout()
@@ -1220,6 +1301,44 @@ class EnhancedDataImportWidget(QWidget):
         ai_layout.addLayout(ai_row1)
         ai_layout.addLayout(ai_row2)
         ai_layout.addLayout(ai_row3)
+
+        # ==================== 实时写入配置（融入智能化功能组）====================
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        ai_layout.addWidget(separator)
+
+        realtime_label = QLabel("⚡ 实时写入配置")
+        realtime_label.setStyleSheet("font-weight: bold; color: #0066cc;")
+        ai_layout.addWidget(realtime_label)
+
+        realtime_row = QHBoxLayout()
+
+        # 启用性能监控
+        self.enable_perf_monitor_cb = QCheckBox("性能监控")
+        self.enable_perf_monitor_cb.setChecked(True)
+        self.enable_perf_monitor_cb.setToolTip("启用性能监控，实时显示写入速度和资源使用情况")
+        realtime_row.addWidget(self.enable_perf_monitor_cb)
+
+        # 启用内存监控
+        self.enable_memory_monitor_cb = QCheckBox("内存监控")
+        self.enable_memory_monitor_cb.setChecked(True)
+        self.enable_memory_monitor_cb.setToolTip("启用内存使用监控")
+        realtime_row.addWidget(self.enable_memory_monitor_cb)
+
+        ai_layout.addLayout(realtime_row)
+
+        # 写入策略选择
+        strategy_layout = QHBoxLayout()
+        strategy_layout.addWidget(QLabel("写入策略:"))
+        self.write_strategy_combo = QComboBox()
+        self.write_strategy_combo.addItems(["禁用写入", "批量写入", "实时写入", "自适应"])
+        self.write_strategy_combo.setCurrentText("禁用写入")
+        self.write_strategy_combo.setToolTip("禁用写入：不执行数据写入\n批量写入：累积到批量大小后写入\n实时写入：单条数据立即写入\n自适应：根据系统负载自动选择")
+        self.write_strategy_combo.currentTextChanged.connect(self.on_write_strategy_changed)
+        strategy_layout.addWidget(self.write_strategy_combo)
+        strategy_layout.addStretch()
+        ai_layout.addLayout(strategy_layout)
 
         content_layout.addWidget(ai_features_group)
 
@@ -1369,8 +1488,8 @@ class EnhancedDataImportWidget(QWidget):
         # 工作线程数
         self.workers_spin = QSpinBox()
         self.workers_spin.setRange(1, 32)
-        self.workers_spin.setValue(4)
-        self.workers_spin.setToolTip("并行处理的线程数")
+        self.workers_spin.setValue(8)  # ✅ 优化：默认工作线程数从4增加到8，提升并行性能
+        self.workers_spin.setToolTip("并行处理的线程数（建议8-16，可根据CPU核心数调整）")
         resource_layout.addRow("工作线程数:", self.workers_spin)
 
         # 内存限制
@@ -1384,9 +1503,9 @@ class EnhancedDataImportWidget(QWidget):
         # 超时设置
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(60, 3600)
-        self.timeout_spin.setValue(300)
+        self.timeout_spin.setValue(60)  # ✅ 优化：默认超时从300秒减少到60秒，快速失败避免长时间等待
         self.timeout_spin.setSuffix("秒")
-        self.timeout_spin.setToolTip("单个请求超时时间")
+        self.timeout_spin.setToolTip("单个请求超时时间（建议60-120秒，快速失败提升响应速度）")
         resource_layout.addRow("超时设置:", self.timeout_spin)
 
         execution_layout.addWidget(resource_config)
@@ -1408,14 +1527,6 @@ class EnhancedDataImportWidget(QWidget):
         self.error_strategy_combo.setCurrentText("跳过")
         self.error_strategy_combo.setToolTip("遇到错误时的处理策略")
         error_layout.addRow("错误处理:", self.error_strategy_combo)
-
-        # 进度报告间隔
-        self.progress_interval_spin = QSpinBox()
-        self.progress_interval_spin.setRange(1, 60)
-        self.progress_interval_spin.setValue(5)
-        self.progress_interval_spin.setSuffix("秒")
-        self.progress_interval_spin.setToolTip("进度更新间隔")
-        error_layout.addRow("进度间隔:", self.progress_interval_spin)
 
         execution_layout.addWidget(error_config)
         content_layout.addWidget(execution_group)
@@ -1519,7 +1630,7 @@ class EnhancedDataImportWidget(QWidget):
         return widget
 
     def create_task_operations_group(self) -> QGroupBox:
-        """创建任务操作组"""
+        """创建任务操作组（融入实时写入控制）"""
         group = QGroupBox("任务操作")
         group.setFont(QFont("Arial", 10, QFont.Bold))
         layout = QVBoxLayout(group)
@@ -1542,6 +1653,10 @@ class EnhancedDataImportWidget(QWidget):
         """)
         self.new_task_btn.clicked.connect(self.create_new_task_from_config)
         layout.addWidget(self.new_task_btn)
+
+        # 初始化当前任务ID（用于跟踪下载任务）
+        if REALTIME_WRITE_UI_AVAILABLE:
+            self.current_task_id = None
 
         # 添加提示文本
         hint_label = QLabel("[INFO] 提示：任务的启动/停止可通过右侧任务列表的右键菜单操作")
@@ -2139,6 +2254,232 @@ class EnhancedDataImportWidget(QWidget):
         self.task_refresh_timer.timeout.connect(self.refresh_task_list)
         self.task_refresh_timer.start(5000)  # 5秒刷新一次任务列表
 
+        # ✅ 数据库写入队列监控定时器（新增）
+        self.queue_monitor_timer = QTimer()
+        self.queue_monitor_timer.timeout.connect(self.update_queue_stats)
+        # 延迟启动，避免UI刚打开时立即执行耗时操作
+        self._queue_monitor_initialized = False
+        self._queue_monitor_start_time = None
+        self.queue_monitor_timer.start(1000)  # 1秒更新一次队列统计
+
+        # IP监控更新计数器，用于降低更新频率
+        self._ip_monitor_update_counter = 0
+        self._ip_monitor_update_interval = 3  # 每3秒更新一次IP监控（降低频率）
+        # ✅ 修复：初始化IP监控缓存相关变量
+        self._ip_stats_cache = None
+        self._ip_stats_cache_time = 0  # 初始化为0，确保第一次会触发更新
+        self._ip_stats_cache_ttl = 5.0  # 缓存有效期5秒
+        self._ip_stats_thread = None
+        self._ip_stats_worker = None
+
+    def update_queue_stats(self):
+        """
+        更新数据库写入队列统计（新增方法）
+
+        定时从执行引擎获取队列统计信息并更新到监控面板
+        """
+        try:
+            # 延迟初始化：UI刚打开时等待3秒再开始更新，避免卡顿
+            if not self._queue_monitor_initialized:
+                if self._queue_monitor_start_time is None:
+                    self._queue_monitor_start_time = time.time()
+                    logger.debug("队列监控: 开始延迟初始化计时")
+                    return
+                elif time.time() - self._queue_monitor_start_time < 3.0:
+                    # 等待3秒后再开始更新
+                    return
+                else:
+                    self._queue_monitor_initialized = True
+                    logger.debug("队列监控: 延迟初始化完成，开始正常更新")
+
+            # 检查引擎和监控面板是否可用
+            if not hasattr(self, 'import_engine') or not self.import_engine:
+                return
+            if not hasattr(self, 'download_monitoring') or not self.download_monitoring:
+                return
+
+            # 从引擎获取统计信息
+            queue_stats = self.import_engine.get_database_writer_stats()
+
+            # 更新到监控面板
+            self.download_monitoring.update_queue_stats(queue_stats)
+
+            # ✅ 更新IP监控信息（使用后台线程，避免阻塞UI）
+            if hasattr(self, 'ip_monitor') and self.ip_monitor is not None:
+                self._ip_monitor_update_counter += 1
+                # 每3秒更新一次IP监控（降低频率）
+                if self._ip_monitor_update_counter >= self._ip_monitor_update_interval:
+                    self._ip_monitor_update_counter = 0
+                    # ✅ 修复：检查缓存是否已初始化
+                    if not hasattr(self, '_ip_stats_cache_time') or self._ip_stats_cache_time == 0:
+                        # 缓存未初始化，直接获取新数据
+                        self._update_ip_stats_in_background()
+                    else:
+                        # 检查缓存是否有效
+                        current_time = time.time()
+                        if current_time - self._ip_stats_cache_time < self._ip_stats_cache_ttl:
+                            # 使用缓存数据
+                            if self._ip_stats_cache:
+                                self.ip_monitor.update_ip_stats(self._ip_stats_cache)
+                        else:
+                            # 缓存过期，使用后台线程获取新数据
+                            self._update_ip_stats_in_background()
+
+            # ✅ 更新数据源实例池状态（RealDataProvider）
+            try:
+                from core.real_data_provider import get_real_data_provider
+                provider = get_real_data_provider()
+                pool_stats = provider.get_pool_status()
+                if hasattr(self, 'download_monitoring') and hasattr(self.download_monitoring, 'update_instance_pool_stats'):
+                    self.download_monitoring.update_instance_pool_stats(pool_stats)
+            except Exception:
+                pass
+
+            # ✅ 新增：更新数据库连接池使用统计
+            try:
+                from core.asset_database_manager import AssetSeparatedDatabaseManager
+                manager = AssetSeparatedDatabaseManager.get_instance()
+                if hasattr(manager, 'get_database_pool_status'):
+                    db_pool_status = manager.get_database_pool_status()
+                    if hasattr(self, 'download_monitoring') and hasattr(self.download_monitoring, 'db_pool_usage_label'):
+                        active_connections = db_pool_status.get('active_connections', 0)
+                        total_connections = db_pool_status.get('total_connections', 0)
+                        max_pool_size = db_pool_status.get('max_pool_size', manager.config.pool_size if hasattr(manager, 'config') else 10)
+                        
+                        # ✅ 修复：使用实际创建的连接数（total_connections）而不是最大池大小作为分母
+                        # 如果total_connections为0，则使用max_pool_size（连接池还未创建任何连接）
+                        denominator = total_connections if total_connections > 0 else max_pool_size
+                        usage_text = f"{active_connections}/{denominator}"
+                        if total_connections > 0:
+                            usage_text += f" (最大:{max_pool_size})"
+                        self.download_monitoring.db_pool_usage_label.setText(usage_text)
+                        
+                        # 根据使用率调整颜色
+                        if denominator > 0:
+                            usage_rate = active_connections / denominator
+                            if usage_rate > 0.8:
+                                self.download_monitoring.db_pool_usage_label.setStyleSheet("color: red; font-weight: bold;")
+                            elif usage_rate > 0.5:
+                                self.download_monitoring.db_pool_usage_label.setStyleSheet("color: orange;")
+                            else:
+                                self.download_monitoring.db_pool_usage_label.setStyleSheet("color: green;")
+            except Exception as e:
+                logger.debug(f"更新数据库连接池使用统计失败: {e}")
+                pass  # 静默失败
+
+        except Exception as e:
+            # 静默错误，避免过多日志
+            pass
+
+    def _update_ip_stats_in_background(self):
+        """
+        在后台线程更新IP监控信息（真正异步，避免阻塞UI线程）
+        """
+        try:
+            if not hasattr(self, 'import_engine') or not self.import_engine:
+                return
+            if not hasattr(self, 'ip_monitor') or self.ip_monitor is None:
+                return
+
+            # ✅ 修复：安全检查线程状态，避免访问已删除的对象
+            if self._ip_stats_thread is not None:
+                try:
+                    if self._ip_stats_thread.isRunning():
+                        return  # 线程正在运行，跳过本次更新
+                except RuntimeError:
+                    # QThread对象已被删除，清空引用
+                    logger.debug("IP监控: QThread对象已被删除，清空引用")
+                    self._ip_stats_thread = None
+                    self._ip_stats_worker = None
+
+            # 创建后台线程和工作对象
+            self._ip_stats_thread = QThread()
+            self._ip_stats_worker = IPStatsWorker(self.import_engine)
+            self._ip_stats_worker.moveToThread(self._ip_stats_thread)
+
+            # 连接信号
+            self._ip_stats_thread.started.connect(self._ip_stats_worker.fetch_ip_stats)
+            self._ip_stats_worker.finished.connect(self._on_ip_stats_received)
+            self._ip_stats_worker.finished.connect(self._ip_stats_thread.quit)
+            self._ip_stats_worker.error.connect(self._on_ip_stats_error)
+            self._ip_stats_worker.error.connect(self._ip_stats_thread.quit)
+            # ✅ 修复：线程完成后清空引用，避免访问已删除的对象
+            self._ip_stats_thread.finished.connect(self._on_ip_stats_thread_finished)
+
+            # 启动线程
+            self._ip_stats_thread.start()
+
+        except Exception as e:
+            logger.error(f"启动IP监控后台线程失败: {e}", exc_info=True)
+            # 即使失败也更新UI，显示错误状态
+            if hasattr(self, 'ip_monitor') and self.ip_monitor is not None:
+                self.ip_monitor.update_ip_stats({
+                    'total_connections': 0,
+                    'active_servers': 0,
+                    'healthy_ips': 0,
+                    'limited_ips': 0,
+                    'failed_ips': 0,
+                    'ip_stats': [],
+                    'error_message': f'更新失败: {str(e)}'
+                })
+
+    def _on_ip_stats_received(self, ip_stats: dict):
+        """IP统计信息接收回调（在主线程执行）"""
+        try:
+            # 更新缓存
+            self._ip_stats_cache = ip_stats
+            self._ip_stats_cache_time = time.time()
+
+            # 更新UI
+            if hasattr(self, 'ip_monitor') and self.ip_monitor is not None:
+                if ip_stats:
+                    self.ip_monitor.update_ip_stats(ip_stats)
+                else:
+                    logger.debug("IP监控: 获取到的IP统计为空")
+                    # 显示空状态
+                    self.ip_monitor.update_ip_stats({
+                        'total_connections': 0,
+                        'active_servers': 0,
+                        'healthy_ips': 0,
+                        'limited_ips': 0,
+                        'failed_ips': 0,
+                        'ip_stats': [],
+                        'error_message': '数据为空'
+                    })
+        except Exception as e:
+            logger.error(f"处理IP统计信息失败: {e}", exc_info=True)
+
+    def _on_ip_stats_error(self, error_msg: str):
+        """IP统计信息错误回调（在主线程执行）"""
+        try:
+            logger.error(f"IP监控: {error_msg}")
+            # 即使失败也更新UI，显示错误状态
+            if hasattr(self, 'ip_monitor') and self.ip_monitor is not None:
+                self.ip_monitor.update_ip_stats({
+                    'total_connections': 0,
+                    'active_servers': 0,
+                    'healthy_ips': 0,
+                    'limited_ips': 0,
+                    'failed_ips': 0,
+                    'ip_stats': [],
+                    'error_message': f'更新失败: {error_msg}'
+                })
+        except Exception as e:
+            logger.error(f"处理IP统计错误失败: {e}", exc_info=True)
+
+    def _on_ip_stats_thread_finished(self):
+        """IP统计线程完成回调（在主线程执行）- 线程完成后的清理工作"""
+        try:
+            # ✅ 修复：清空引用，避免访问已删除的对象
+            if self._ip_stats_thread:
+                self._ip_stats_thread.deleteLater()
+                self._ip_stats_thread = None
+            if self._ip_stats_worker:
+                self._ip_stats_worker = None
+            logger.debug("IP监控: 线程清理完成")
+        except Exception as e:
+            logger.debug(f"IP监控: 线程清理失败: {e}")
+
     def start_import(self):
         """开始导入"""
         if not CORE_AVAILABLE or not self.import_engine:
@@ -2172,7 +2513,7 @@ class EnhancedDataImportWidget(QWidget):
                 name=task_name,
                 symbols=symbols,
                 data_source=self.data_source_combo.currentText(),
-                asset_type=self.asset_type_combo.currentText(),
+                asset_type=self._get_asset_type_value(),  # ✅ 修复：使用转换后的asset_type值
                 data_type=self.data_type_combo.currentText() if hasattr(self, 'data_type_combo') else "K线数据",  # 从UI读取数据类型
                 frequency=freq_map.get(self.frequency_combo.currentText(), DataFrequency.DAILY),
                 mode=ImportMode.MANUAL,  # 默认手动模式
@@ -2183,7 +2524,7 @@ class EnhancedDataImportWidget(QWidget):
                 retry_count=self.retry_count_spin.value() if hasattr(self, 'retry_count_spin') else 3,
                 error_strategy=self.error_strategy_combo.currentText() if hasattr(self, 'error_strategy_combo') else "跳过",
                 memory_limit=self.memory_limit_spin.value() if hasattr(self, 'memory_limit_spin') else 2048,
-                timeout=self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 300,
+                timeout=self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 60,  # ✅ 优化：默认超时从300秒减少到60秒
                 progress_interval=self.progress_interval_spin.value() if hasattr(self, 'progress_interval_spin') else 5,
                 validate_data=self.validate_data_cb.isChecked() if hasattr(self, 'validate_data_cb') else True
             )
@@ -2200,6 +2541,20 @@ class EnhancedDataImportWidget(QWidget):
 
             if self.import_engine.start_task(task_config.task_id):
                 self.log_message(f"任务启动成功: {task_name}")
+
+                # 保存当前任务ID
+                self.current_task_id = task_config.task_id
+
+                # 通知监控面板任务已启动
+                if hasattr(self, 'download_monitoring'):
+                    # ✅ 设置当前任务配置（用于重新下载功能）
+                    self.download_monitoring.set_current_task_config(task_config)
+                    self.download_monitoring.update_progress({
+                        'progress': 0.0,
+                        'message': '任务已启动',
+                        'task_id': task_config.task_id,
+                        'task_name': task_config.name
+                    })
             else:
                 self.log_message(f"任务启动失败: {task_name}")
 
@@ -2229,7 +2584,81 @@ class EnhancedDataImportWidget(QWidget):
             self.progress_bar.setValue(int(progress * 100))
         if hasattr(self, 'progress_label'):
             self.progress_label.setText(message)
-        self.log_message(f"进度更新: {progress:.1} - {message}")
+        self.log_message(f"进度更新: {progress:.1%} - {message}")
+
+        # ✅ 修复：检测并记录符号级错误到错误日志表，成功时清除错误记录
+        if hasattr(self, 'download_monitoring') and self.download_monitoring:
+            try:
+                # ✅ 修复：从message中提取错误信息（格式：导入股票数据: SYMBOL (成功数/总数) 或包含错误信息）
+                import re
+                from datetime import datetime
+
+                # ✅ 修复：检查message是否包含错误信息（匹配格式：导入股票数据: SYMBOL (x/y) | SYMBOL失败: 错误信息）
+                error_patterns = [
+                    r'(\d{6})失败[:：]\s*(.+)',  # 匹配"SYMBOL失败: 错误信息"格式（新格式）
+                    r'(\d{6}).*?失败[:：]\s*(.+)',  # 匹配"SYMBOL...失败: 错误信息"格式
+                    r'失败.*?(\d{6})',  # 匹配"失败"后跟股票代码（旧格式，兼容）
+                ]
+
+                symbol = None
+                error_msg = None
+                error_type = "导入失败"
+                is_error = False
+
+                # 检查是否包含错误信息
+                for pattern in error_patterns:
+                    match = re.search(pattern, message)
+                    if match:
+                        is_error = True
+                        if len(match.groups()) >= 1:
+                            symbol = match.group(1)
+                        if len(match.groups()) >= 2:
+                            error_msg = match.group(2).strip()
+                        else:
+                            # 如果没有提取到错误信息，使用默认值
+                            error_msg = "导入失败"
+                        break
+
+                # ✅ 新增：如果检测到错误，添加到错误日志表
+                if is_error and symbol and error_msg:
+                    timestamp = datetime.now().strftime('%H:%M:%S')
+                    self.download_monitoring.add_error(
+                        timestamp=timestamp,
+                        symbol=symbol,
+                        error_type=error_type,
+                        error_msg=error_msg
+                    )
+                    logger.debug(f"✅ [错误日志] 已记录符号级错误: {symbol} - {error_msg}")
+                # ✅ 新增：如果检测到成功导入（不包含"失败"关键字），清除对应的错误记录
+                elif not is_error:
+                    # 尝试从message中提取symbol（格式：导入股票数据: SYMBOL (x/y)）
+                    success_patterns = [
+                        r'导入.*?[:：]\s*(\d{6})\s*\(',  # 匹配"导入...: SYMBOL ("
+                        r'(\d{6})\s*\([^)]*\)',  # 匹配"SYMBOL (x/y)"
+                        r'正在导入\s+(\d{6})',  # 匹配"正在导入 SYMBOL"
+                    ]
+                    
+                    for pattern in success_patterns:
+                        match = re.search(pattern, message)
+                        if match:
+                            symbol = match.group(1)
+                            # ✅ 清除该symbol的错误记录（如果存在）
+                            if hasattr(self.download_monitoring, 'remove_error'):
+                                removed = self.download_monitoring.remove_error(symbol)
+                                if removed:
+                                    logger.debug(f"✅ [错误日志] 已清除符号错误记录: {symbol}（导入成功）")
+                            break
+
+                # 解析message获取详细信息
+                progress_data = {
+                    'progress': progress,
+                    'message': message,
+                    'task_id': task_id,
+                    'task_name': self.task_name_edit.text() if hasattr(self, 'task_name_edit') else ''
+                }
+                self.download_monitoring.update_progress(progress_data)
+            except Exception as e:
+                logger.error(f"更新下载监控失败: {e}") if logger else None
 
     def on_task_completed(self, task_id: str, result):
         """任务完成回调"""
@@ -2237,7 +2666,21 @@ class EnhancedDataImportWidget(QWidget):
             self.progress_bar.setValue(100)
         if hasattr(self, 'progress_label'):
             self.progress_label.setText("任务完成!")
-        self.log_message(f"任务完成: {task_id}")
+        self.log_message(f"✅ 任务完成: {task_id}")
+
+        # 通知监控面板任务已完成
+        if hasattr(self, 'download_monitoring'):
+            self.download_monitoring.update_progress({
+                'progress': 1.0,
+                'message': '任务已完成',
+                'task_id': task_id,
+                'task_name': self.task_name_edit.text()
+            })
+
+        # 清除当前任务ID
+        if hasattr(self, 'current_task_id') and self.current_task_id == task_id:
+            self.current_task_id = None
+
         # 刷新任务列表以更新状态
         self.refresh_task_list()
 
@@ -2245,7 +2688,21 @@ class EnhancedDataImportWidget(QWidget):
         """任务失败回调"""
         if hasattr(self, 'progress_label'):
             self.progress_label.setText("任务失败!")
-        self.log_message(f"任务失败: {task_id} - {error_message}")
+        self.log_message(f"❌ 任务失败: {task_id} - {error_message}")
+
+        # 通知监控面板任务已失败
+        if hasattr(self, 'download_monitoring'):
+            self.download_monitoring.update_progress({
+                'progress': 0.0,
+                'message': f'任务失败: {error_message}',
+                'task_id': task_id,
+                'task_name': self.task_name_edit.text()
+            })
+
+        # 清除当前任务ID
+        if hasattr(self, 'current_task_id') and self.current_task_id == task_id:
+            self.current_task_id = None
+
         # 刷新任务列表以更新状态
         self.refresh_task_list()
 
@@ -2436,6 +2893,7 @@ class EnhancedDataImportWidget(QWidget):
 
         # 任务列表表格
         self.task_table = QTableWidget()
+        self.task_table.setMinimumHeight(200)
         self.task_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.task_table.setSelectionMode(QTableWidget.ExtendedSelection)
         self.task_table.setAlternatingRowColors(True)
@@ -2462,27 +2920,43 @@ class EnhancedDataImportWidget(QWidget):
         for i, width in enumerate(column_widths[1:], 1):  # 跳过第一列（自动拉伸）
             self.task_table.setColumnWidth(i, width)
 
-        layout.addWidget(self.task_table)
+        # 🔧 使用拉伸因子：任务表格占主要空间
+        layout.addWidget(self.task_table, stretch=30)
 
-        # 任务详情面板
-        details_group = QGroupBox("任务详情")
-        details_layout = QVBoxLayout(details_group)
+        # ✅ 删除：任务详情面板已移除
 
-        self.task_details_text = QTextEdit()
-        self.task_details_text.setMaximumHeight(120)
-        self.task_details_text.setReadOnly(True)
-        self.task_details_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #f8f9fa;
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-                padding: 8px;
-                font-family: 'Consolas', 'Monaco', monospace;
-            }
-        """)
-        details_layout.addWidget(self.task_details_text)
+        # K线下载情况监控面板
+        if REALTIME_WRITE_UI_AVAILABLE:
+            download_monitoring_group = QGroupBox("📊 K线下载情况")
+            # 🔧 设置最小高度确保内容可见
+            download_monitoring_group.setMinimumHeight(350)
+            download_monitoring_layout = QVBoxLayout(download_monitoring_group)
 
-        layout.addWidget(details_group)
+            # 创建监控组件
+            self.download_monitoring = RealtimeWriteMonitoringWidget()
+            # ✅ 设置父组件引用和当前任务配置（用于重新下载功能）
+            self.download_monitoring.set_parent_widget(self)
+            download_monitoring_layout.addWidget(self.download_monitoring)
+
+            # 🔧 给予一定的拉伸权重，确保可见
+            layout.addWidget(download_monitoring_group, stretch=3)
+            logger.info("K线下载情况监控面板已添加到任务详情区域") if logger else None
+
+        # IP使用监控（通达信）- 独立组件
+        if REALTIME_WRITE_UI_AVAILABLE and IPMonitorWidget is not None:
+            ip_monitor_group = QGroupBox("🌐 IP使用监控（通达信）")
+            ip_monitor_group.setMinimumHeight(300)
+            ip_monitor_layout = QVBoxLayout(ip_monitor_group)
+
+            # 创建IP监控组件
+            self.ip_monitor = IPMonitorWidget()
+            ip_monitor_layout.addWidget(self.ip_monitor)
+
+            # 添加到布局，与K线下载情况平级
+            layout.addWidget(ip_monitor_group, stretch=1)
+            logger.info("IP使用监控面板已添加到任务详情区域") if logger else None
+        else:
+            self.ip_monitor = None
 
         # 连接表格选择信号
         self.task_table.itemSelectionChanged.connect(self.on_task_selection_changed)
@@ -2543,21 +3017,33 @@ class EnhancedDataImportWidget(QWidget):
                 "60分钟": "60m"
             }
 
+            # 🎯 构建任务名称（自动追加数据用途标记）
+            base_task_name = self.task_name_edit.text().strip() if hasattr(self, 'task_name_edit') and self.task_name_edit.text().strip() else f"导入任务_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            usage_tag = self._get_data_usage_tag() if hasattr(self, '_get_data_usage_tag') else "[通用]"
+
+            # 如果任务名已经包含标记，先移除旧标记
+            import re
+            base_task_name = re.sub(r'\[(通用|历史|回测|实时|实盘)\]$', '', base_task_name).strip()
+
+            # 追加新标记
+            final_task_name = f"{base_task_name}{usage_tag}"
+
             # 构建配置字典，包含合并后的高级配置
             config = {
                 'task_id': f"task_{int(datetime.now().timestamp())}",
-                'name': f"导入任务_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                'name': final_task_name,  # ✅ 使用带标记的任务名
+                'data_usage': self._get_data_usage_value() if hasattr(self, '_get_data_usage_value') else "general",  # 🆕 添加数据用途字段
                 'symbols': symbols,
-                'asset_type': self.asset_type_combo.currentText() if hasattr(self, 'asset_type_combo') else "股票",
+                'asset_type': self._get_asset_type_value() if hasattr(self, '_get_asset_type_value') else (self.asset_type_combo.currentText() if hasattr(self, 'asset_type_combo') else "股票"),
                 'data_type': self.data_type_combo.currentText() if hasattr(self, 'data_type_combo') else "K线数据",
                 'frequency': freq_map.get(self.frequency_combo.currentText() if hasattr(self, 'frequency_combo') else "日线", "1d"),
                 'data_source': self.data_source_combo.currentText() if hasattr(self, 'data_source_combo') else "通达信",
 
                 # 从合并的配置tab中读取高级配置
                 'batch_size': self.batch_size_spin.value() if hasattr(self, 'batch_size_spin') else 1000,
-                'max_workers': self.workers_spin.value() if hasattr(self, 'workers_spin') else 4,
+                'max_workers': self.workers_spin.value() if hasattr(self, 'workers_spin') else 8,  # ✅ 优化：默认工作线程数从4增加到8
                 'memory_limit': self.memory_limit_spin.value() if hasattr(self, 'memory_limit_spin') else 2048,
-                'timeout': self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 300,
+                'timeout': self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 60,  # ✅ 优化：默认超时从300秒减少到60秒
                 'retry_count': self.retry_count_spin.value() if hasattr(self, 'retry_count_spin') else 3,
                 'error_strategy': self.error_strategy_combo.currentText() if hasattr(self, 'error_strategy_combo') else "跳过",
                 'progress_interval': self.progress_interval_spin.value() if hasattr(self, 'progress_interval_spin') else 5,
@@ -2572,7 +3058,12 @@ class EnhancedDataImportWidget(QWidget):
 
                 # 时间范围配置
                 'start_date': self.start_date.date().toString("yyyy-MM-dd") if hasattr(self, 'start_date') else None,
-                'end_date': self.end_date.date().toString("yyyy-MM-dd") if hasattr(self, 'end_date') else None
+                'end_date': self.end_date.date().toString("yyyy-MM-dd") if hasattr(self, 'end_date') else None,
+
+                # 实时写入配置
+                'write_strategy': self.write_strategy_combo.currentText() if hasattr(self, 'write_strategy_combo') else "禁用写入",
+                'enable_perf_monitor': self.enable_perf_monitor_cb.isChecked() if hasattr(self, 'enable_perf_monitor_cb') else True,
+                'enable_memory_monitor': self.enable_memory_monitor_cb.isChecked() if hasattr(self, 'enable_memory_monitor_cb') else True
             }
 
             return config
@@ -2626,7 +3117,7 @@ class EnhancedDataImportWidget(QWidget):
                 retry_count=task_config_dict.get('retry_count', 3),
                 error_strategy=task_config_dict.get('error_strategy', '跳过'),
                 memory_limit=task_config_dict.get('memory_limit', 2048),
-                timeout=task_config_dict.get('timeout', 300),
+                timeout=task_config_dict.get('timeout', 60),  # ✅ 优化：默认超时从300秒减少到60秒
                 progress_interval=task_config_dict.get('progress_interval', 5),
                 validate_data=task_config_dict.get('validate_data', True)
             )
@@ -2645,7 +3136,7 @@ class EnhancedDataImportWidget(QWidget):
             QMessageBox.critical(self, "错误", f"创建任务失败: {e}")
 
     def refresh_task_list(self):
-        """刷新任务列表"""
+        """刷新任务列表（优化版：增量更新，减少闪烁）"""
         try:
             if not self.config_manager:
                 logger.warning("配置管理器未初始化，无法刷新任务列表") if logger else None
@@ -2653,108 +3144,163 @@ class EnhancedDataImportWidget(QWidget):
 
             # 获取所有任务
             tasks = self.config_manager.get_import_tasks()
-            logger.info(f"从配置管理器加载了 {len(tasks)} 个任务") if logger else None
 
-            # 清空表格
-            self.task_table.setRowCount(0)
+            # 🔧 优化：禁用排序和更新信号，减少闪烁
+            self.task_table.setSortingEnabled(False)
+            self.task_table.blockSignals(True)
 
-            # 填充任务数据
-            for task in tasks:
-                logger.debug(f"正在添加任务到表格: {task.task_id} - {task.name}") if logger else None
-                row = self.task_table.rowCount()
-                self.task_table.insertRow(row)
+            try:
+                # 构建任务ID到任务对象的映射
+                task_map = {task.task_id: task for task in tasks}
 
-                # 获取任务状态
-                task_status = None
-                if self.import_engine:
-                    task_status = self.import_engine.get_task_status(task.task_id)
+                # 构建当前表格中的任务ID集合
+                existing_task_ids = set()
+                for row in range(self.task_table.rowCount()):
+                    item = self.task_table.item(row, 0)
+                    if item:
+                        task_id = item.data(Qt.UserRole)
+                        if task_id:
+                            existing_task_ids.add(task_id)
 
-                # 填充列数据 - 匹配13列表头：任务名称, 状态, 进度, 数据源, 资产类型, 数据类型, 频率, 符号数量, 开始时间, 结束时间, 运行时间, 成功数, 失败数
-                start_time = task_status.start_time.strftime("%Y-%m-%d %H:%M:%S") if task_status and hasattr(task_status, 'start_time') and task_status.start_time else "未开始"
-                end_time = task_status.end_time.strftime("%Y-%m-%d %H:%M:%S") if task_status and hasattr(task_status, 'end_time') and task_status.end_time else "未结束"
+                # 🔧 删除不存在的任务行（从后往前删除避免索引错乱）
+                for row in range(self.task_table.rowCount() - 1, -1, -1):
+                    item = self.task_table.item(row, 0)
+                    if item:
+                        task_id = item.data(Qt.UserRole)
+                        if task_id and task_id not in task_map:
+                            self.task_table.removeRow(row)
 
-                # 计算运行时间
-                runtime = "未开始"
-                if task_status and hasattr(task_status, 'start_time') and task_status.start_time:
-                    if hasattr(task_status, 'end_time') and task_status.end_time:
-                        delta = task_status.end_time - task_status.start_time
-                        runtime = str(delta).split('.')[0]  # 去除微秒
+                # 🔧 增量更新：更新已存在的任务，添加新任务
+                for task in tasks:
+                    task_id = task.task_id
+
+                    # 查找任务所在行
+                    row_index = -1
+                    for row in range(self.task_table.rowCount()):
+                        item = self.task_table.item(row, 0)
+                        if item and item.data(Qt.UserRole) == task_id:
+                            row_index = row
+                            break
+
+                    # 获取任务状态
+                    task_status = None
+                    if self.import_engine:
+                        task_status = self.import_engine.get_task_status(task_id)
+
+                    # 准备任务数据
+                    start_time = task_status.start_time.strftime("%Y-%m-%d %H:%M:%S") if task_status and hasattr(task_status, 'start_time') and task_status.start_time else "未开始"
+                    end_time = task_status.end_time.strftime("%Y-%m-%d %H:%M:%S") if task_status and hasattr(task_status, 'end_time') and task_status.end_time else "未结束"
+
+                    # 计算运行时间
+                    runtime = "未开始"
+                    if task_status and hasattr(task_status, 'start_time') and task_status.start_time:
+                        if hasattr(task_status, 'end_time') and task_status.end_time:
+                            delta = task_status.end_time - task_status.start_time
+                            runtime = str(delta).split('.')[0]
+                        else:
+                            from datetime import datetime
+                            delta = datetime.now() - task_status.start_time
+                            runtime = str(delta).split('.')[0]
+
+                    # 状态中文映射
+                    status_map = {
+                        'pending': '待执行',
+                        'running': '运行中',
+                        'completed': '已完成',
+                        'failed': '失败',
+                        'cancelled': '已取消',
+                        'paused': '已暂停'
+                    }
+
+                    if task_status:
+                        status_value = task_status.status.value if hasattr(task_status.status, 'value') else str(task_status.status)
+                        status_text = status_map.get(status_value.lower(), status_value)
                     else:
-                        from datetime import datetime
-                        delta = datetime.now() - task_status.start_time
-                        runtime = str(delta).split('.')[0]  # 去除微秒
+                        status_text = "未开始"
 
-                # 状态中文映射
-                status_map = {
-                    'pending': '待执行',
-                    'running': '运行中',
-                    'completed': '已完成',
-                    'failed': '失败',
-                    'cancelled': '已取消',
-                    'paused': '已暂停'
-                }
+                    # 计算成功数和失败数
+                    success_count = 0
+                    failure_count = 0
+                    if task_status:
+                        if hasattr(task_status, 'processed_records'):
+                            total_processed = task_status.processed_records
+                            failed = getattr(task_status, 'failed_records', 0)
+                            success_count = total_processed - failed
+                            failure_count = failed
+                        elif hasattr(task_status, 'success_count'):
+                            success_count = task_status.success_count
+                            failure_count = getattr(task_status, 'failure_count', 0)
 
-                # 获取状态（优先使用中文映射）
-                if task_status:
-                    status_value = task_status.status.value if hasattr(task_status.status, 'value') else str(task_status.status)
-                    status_text = status_map.get(status_value.lower(), status_value)
-                else:
-                    status_text = "未开始"
+                    items = [
+                        task.name,
+                        status_text,
+                        f"{task_status.progress:.1f}%" if task_status and hasattr(task_status, 'progress') else "0%",
+                        task.data_source,
+                        task.asset_type,
+                        task.data_type,
+                        task.frequency.value if hasattr(task.frequency, 'value') else str(task.frequency),
+                        str(len(task.symbols)),
+                        start_time,
+                        end_time,
+                        runtime,
+                        str(success_count),
+                        str(failure_count)
+                    ]
 
-                # 计算成功数和失败数（使用TaskExecutionResult的实际字段）
-                success_count = 0
-                failure_count = 0
-                if task_status:
-                    # TaskExecutionResult 有 processed_records 和 failed_records
-                    if hasattr(task_status, 'processed_records'):
-                        total_processed = task_status.processed_records
-                        failed = getattr(task_status, 'failed_records', 0)
-                        success_count = total_processed - failed
-                        failure_count = failed
-                    # 兼容旧版本可能有 success_count 和 failure_count
-                    elif hasattr(task_status, 'success_count'):
-                        success_count = task_status.success_count
-                        failure_count = getattr(task_status, 'failure_count', 0)
+                    # 🔧 如果任务存在，更新单元格内容而非重建整行
+                    if row_index >= 0:
+                        for col, item_text in enumerate(items):
+                            item = self.task_table.item(row_index, col)
+                            if item:
+                                # 只在内容变化时更新
+                                if item.text() != str(item_text):
+                                    item.setText(str(item_text))
 
-                items = [
-                    task.name,
-                    status_text,
-                    f"{task_status.progress:.1f}%" if task_status and hasattr(task_status, 'progress') else "0%",
-                    task.data_source,
-                    task.asset_type,
-                    task.data_type,
-                    task.frequency.value if hasattr(task.frequency, 'value') else str(task.frequency),
-                    str(len(task.symbols)),
-                    start_time,
-                    end_time,
-                    runtime,
-                    str(success_count),
-                    str(failure_count)
-                ]
+                                    # 根据状态设置颜色
+                                    if col == 1:  # 状态列
+                                        if "运行中" in item_text:
+                                            item.setBackground(QColor("#d4edda"))
+                                        elif "完成" in item_text:
+                                            item.setBackground(QColor("#cce5ff"))
+                                        elif "失败" in item_text or "错误" in item_text:
+                                            item.setBackground(QColor("#f8d7da"))
+                                        elif "暂停" in item_text:
+                                            item.setBackground(QColor("#fff3cd"))
+                                        else:
+                                            item.setBackground(QColor("#ffffff"))
+                    else:
+                        # 🔧 新任务：添加新行
+                        row = self.task_table.rowCount()
+                        self.task_table.insertRow(row)
 
-                for col, item_text in enumerate(items):
-                    item = QTableWidgetItem(str(item_text))
+                        for col, item_text in enumerate(items):
+                            item = QTableWidgetItem(str(item_text))
 
-                    # 根据状态设置颜色
-                    if col == 1:  # 状态列
-                        if "运行中" in item_text:
-                            item.setBackground(QColor("#d4edda"))
-                        elif "完成" in item_text:
-                            item.setBackground(QColor("#cce5ff"))
-                        elif "失败" in item_text or "错误" in item_text:
-                            item.setBackground(QColor("#f8d7da"))
-                        elif "暂停" in item_text:
-                            item.setBackground(QColor("#fff3cd"))
+                            # 根据状态设置颜色
+                            if col == 1:  # 状态列
+                                if "运行中" in item_text:
+                                    item.setBackground(QColor("#d4edda"))
+                                elif "完成" in item_text:
+                                    item.setBackground(QColor("#cce5ff"))
+                                elif "失败" in item_text or "错误" in item_text:
+                                    item.setBackground(QColor("#f8d7da"))
+                                elif "暂停" in item_text:
+                                    item.setBackground(QColor("#fff3cd"))
 
-                    self.task_table.setItem(row, col, item)
+                            self.task_table.setItem(row, col, item)
 
-                # 存储任务ID到第一列的数据化
-                self.task_table.item(row, 0).setData(Qt.UserRole, task.task_id)
+                        # 存储任务ID
+                        self.task_table.item(row, 0).setData(Qt.UserRole, task_id)
 
-            # logger.info(f"刷新任务列表完成，共 {len(tasks)} 个任化") if logger else None
+            finally:
+                # 🔧 恢复信号和排序
+                self.task_table.blockSignals(False)
+                self.task_table.setSortingEnabled(True)
 
         except Exception as e:
             logger.error(f"刷新任务列表失败: {e}") if logger else None
+            import traceback
+            logger.error(traceback.format_exc()) if logger else None
 
     def filter_task_list(self):
         """过滤任务列表"""
@@ -2777,39 +3323,17 @@ class EnhancedDataImportWidget(QWidget):
             logger.error(f"过滤任务列表失败: {e}") if logger else None
 
     def on_task_selection_changed(self):
-        """任务选择变化处理"""
+        """任务选择变化处理（任务详情UI已删除，此方法保留用于未来扩展）"""
         try:
             selected_items = self.task_table.selectedItems()
             if not selected_items:
-                self.task_details_text.clear()
                 return
 
-            # 获取选中的第一化
-            row = selected_items[0].row()
-            task_id = self.task_table.item(row, 0).data(Qt.UserRole)
-
-            if not task_id or not self.import_engine:
-                return
-
-            # 获取任务详细信息
-            task_status = self.import_engine.get_task_status(task_id)
-            if task_status:
-                details = f"""任务ID: {task_id}
-                状化 {task_status.status.value}
-                进度: {task_status.progress: .1f}({task_status.processed_count}/{task_status.total_count})
-                开始时化 {task_status.start_time.strftime('Y-m-d H:M:S') if task_status.start_time else '未开化'}
-                结束时间: {task_status.end_time.strftime('Y-m-d H:M:S') if task_status.end_time else '未完化'}
-                运行时间: {self.format_duration(task_status.execution_time) if hasattr(task_status, 'execution_time') else '0s'}
-                成功数量: {task_status.success_count if hasattr(task_status, 'success_count') else 0}
-                失败数量: {task_status.error_count if hasattr(task_status, 'error_count') else 0}
-                最后错化 {task_status.last_error if hasattr(task_status, 'last_error') and task_status.last_error else '化'}"""
-            else:
-                details = f"任务ID: {task_id}\n状化 未开始\n详细信息暂不可用"
-
-            self.task_details_text.setPlainText(details)
+            # ✅ 删除：任务详情UI已移除，此方法保留用于未来扩展
+            # 可以在这里添加其他选择变化时的处理逻辑
 
         except Exception as e:
-            logger.error(f"更新任务详情失败: {e}") if logger else None
+            logger.error(f"处理任务选择变化失败: {e}") if logger else None
 
     def show_task_context_menu(self, position):
         """显示任务右键菜单"""
@@ -2857,7 +3381,7 @@ class EnhancedDataImportWidget(QWidget):
                     if not task_id:
                         task_id = task_name
 
-                    start_action = QAction("开始导入", self)
+                    start_action = QAction("▶️ 开始导入", self)
                     start_action.triggered.connect(lambda: self.start_single_task(task_id))
                     start_action.setEnabled("运行中" not in status and "完成" not in status)
                     menu.addAction(start_action)
@@ -2926,15 +3450,52 @@ class EnhancedDataImportWidget(QWidget):
             QMessageBox.critical(self, "错误", f"启动任务失败: {e}")
 
     def stop_single_task(self, task_id: str):
-        """停止单个任务"""
+        """停止单个任务（异步执行避免UI卡顿）"""
         try:
-            if self.import_engine:
-                success = self.import_engine.stop_task(task_id)
+            if not self.import_engine:
+                QMessageBox.warning(self, "错误", "导入引擎未初始化")
+                return
+
+            # 使用QThread异步执行停止操作
+            from PyQt5.QtCore import QThread, pyqtSignal
+
+            class SingleStopWorker(QThread):
+                """停止单个任务的后台工作线程"""
+                finished = pyqtSignal(bool)  # success
+
+                def __init__(self, task_id, import_engine):
+                    super().__init__()
+                    self.task_id = task_id
+                    self.import_engine = import_engine
+
+                def run(self):
+                    try:
+                        success = self.import_engine.stop_task(self.task_id)
+                        self.finished.emit(success)
+                    except Exception as e:
+                        logger.error(f"停止任务失败: {e}") if logger else None
+                        self.finished.emit(False)
+
+            # 创建并启动工作线程
+            worker = SingleStopWorker(task_id, self.import_engine)
+
+            def on_finished(success):
                 if success:
                     QMessageBox.information(self, "成功", "任务停止成功")
-                    self.refresh_task_list()
                 else:
                     QMessageBox.warning(self, "失败", "任务停止失败")
+                self.refresh_task_list()
+
+            worker.finished.connect(on_finished)
+            worker.start()
+
+            # 保持worker引用避免被垃圾回收
+            self._stop_worker = worker
+
+            # 显示提示
+            if hasattr(self, 'status_bar') and self.status_bar:
+                self.status_bar.showMessage("正在停止任务...", 2000)
+
         except Exception as e:
             logger.error(f"停止任务失败: {e}") if logger else None
             QMessageBox.critical(self, "错误", f"停止任务失败: {e}")
@@ -3437,23 +3998,67 @@ class EnhancedDataImportWidget(QWidget):
             event.accept()
 
     def batch_stop_tasks(self):
-        """批量停止任务"""
+        """批量停止任务（异步执行避免UI卡顿）"""
         try:
             selected_task_ids = self.get_selected_task_ids()
             if not selected_task_ids:
                 QMessageBox.warning(self, "警告", "请选择要停止的任务")
                 return
 
-            success_count = 0
-            for task_id in selected_task_ids:
-                if self.import_engine and self.import_engine.stop_task(task_id):
-                    success_count += 1
-
-            QMessageBox.information(
-                self, "批量停止结果",
-                f"成功停止 {success_count}/{len(selected_task_ids)} 个任务"
+            reply = QMessageBox.question(
+                self, "确认批量停止",
+                f"确定要停止选中的 {len(selected_task_ids)} 个任务吗？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
             )
-            self.refresh_task_list()
+
+            if reply == QMessageBox.Yes:
+                # 使用QThread异步执行停止操作，避免阻塞UI
+                from PyQt5.QtCore import QThread, pyqtSignal
+
+                class StopTasksWorker(QThread):
+                    """停止任务的后台工作线程"""
+                    finished = pyqtSignal(int, int)  # success_count, total_count
+                    progress = pyqtSignal(str)  # status_message
+
+                    def __init__(self, task_ids, import_engine):
+                        super().__init__()
+                        self.task_ids = task_ids
+                        self.import_engine = import_engine
+
+                    def run(self):
+                        success_count = 0
+                        for i, task_id in enumerate(self.task_ids, 1):
+                            try:
+                                self.progress.emit(f"正在停止任务 {i}/{len(self.task_ids)}...")
+                                if self.import_engine and self.import_engine.stop_task(task_id):
+                                    success_count += 1
+                            except Exception as e:
+                                logger.warning(f"停止任务 {task_id} 失败: {e}") if logger else None
+
+                        self.finished.emit(success_count, len(self.task_ids))
+
+                # 创建并启动工作线程
+                self.stop_worker = StopTasksWorker(selected_task_ids, self.import_engine)
+
+                def on_stop_finished(success_count, total_count):
+                    QMessageBox.information(
+                        self, "批量停止结果",
+                        f"成功停止 {success_count}/{total_count} 个任务"
+                    )
+                    self.refresh_task_list()
+
+                def on_stop_progress(message):
+                    if hasattr(self, 'status_bar') and self.status_bar:
+                        self.status_bar.showMessage(message, 2000)
+
+                self.stop_worker.finished.connect(on_stop_finished)
+                self.stop_worker.progress.connect(on_stop_progress)
+                self.stop_worker.start()
+
+                # 显示提示
+                if hasattr(self, 'status_bar') and self.status_bar:
+                    self.status_bar.showMessage("正在停止任务，请稍候...", 3000)
 
         except Exception as e:
             logger.error(f"批量停止任务失败: {e}") if logger else None
@@ -3534,11 +4139,289 @@ class EnhancedDataImportWidget(QWidget):
     def edit_task(self, task_id: str):
         """编辑任务"""
         try:
-            # 这里可以打开任务编辑对话框
-            # 暂时显示提示信息
-            QMessageBox.information(self, "编辑任务", f"任务编辑功能开发中...\n任务ID: {task_id}")
+            if not self.config_manager:
+                QMessageBox.warning(self, "错误", "配置管理器未初始化")
+                return
+
+            # 获取任务配置
+            task = self.config_manager.get_import_task(task_id)
+            if not task:
+                QMessageBox.warning(self, "错误", f"未找到任务: {task_id}")
+                return
+
+            # 创建编辑对话框
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"编辑任务 - {task.name}")
+            dialog.setMinimumWidth(600)
+            dialog.setMinimumHeight(400)
+
+            layout = QVBoxLayout(dialog)
+
+            # 创建表单布局
+            form_layout = QFormLayout()
+
+            # 任务名称（只读，由用途自动生成）
+            name_edit = QLineEdit()
+            # 移除任务名中的用途标记，显示基础名称
+            import re
+            base_name = re.sub(r'\[(通用|历史|回测|实时|实盘)\]$', '', task.name).strip()
+            name_edit.setText(base_name)
+            name_edit.setToolTip("任务名称将自动添加用途标记，如：任务名[回测]")
+            form_layout.addRow("任务名称:", name_edit)
+
+            # 🎯 数据用途（新增）- 从任务名中提取或使用默认值
+            data_usage_edit_combo = QComboBox()
+            data_usage_edit_combo.addItems([
+                "通用场景",      # general
+                "历史数据分析",  # historical
+                "回测验证",      # backtest
+                "实时行情",      # realtime
+                "实盘交易"       # live_trading
+            ])
+            # 从任务名中提取用途标记
+            usage_from_name = None
+            if '[通用]' in task.name:
+                usage_from_name = "通用场景"
+            elif '[历史]' in task.name:
+                usage_from_name = "历史数据分析"
+            elif '[回测]' in task.name:
+                usage_from_name = "回测验证"
+            elif '[实时]' in task.name:
+                usage_from_name = "实时行情"
+            elif '[实盘]' in task.name:
+                usage_from_name = "实盘交易"
+
+            if usage_from_name:
+                index = data_usage_edit_combo.findText(usage_from_name)
+                if index >= 0:
+                    data_usage_edit_combo.setCurrentIndex(index)
+
+            data_usage_edit_combo.setToolTip(
+                "选择数据用途后，任务名将自动添加对应标记\n"
+                "系统会根据用途调整质量评分权重"
+            )
+            form_layout.addRow("🎯 数据用途:", data_usage_edit_combo)
+
+            # 数据源
+            data_source_combo = QComboBox()
+            if hasattr(self, 'data_source_combo') and self.data_source_combo:
+                for i in range(self.data_source_combo.count()):
+                    data_source_combo.addItem(self.data_source_combo.itemText(i))
+                # 设置当前值
+                index = data_source_combo.findText(task.data_source)
+                if index >= 0:
+                    data_source_combo.setCurrentIndex(index)
+            else:
+                data_source_combo.addItem(task.data_source)
+                data_source_combo.setCurrentIndex(0)
+            form_layout.addRow("数据源:", data_source_combo)
+
+            # 资产类型
+            asset_type_combo = QComboBox()
+            if hasattr(self, 'asset_type_combo') and self.asset_type_combo:
+                for i in range(self.asset_type_combo.count()):
+                    asset_type_combo.addItem(self.asset_type_combo.itemText(i))
+                # 设置当前值
+                index = asset_type_combo.findText(task.asset_type)
+                if index >= 0:
+                    asset_type_combo.setCurrentIndex(index)
+            else:
+                asset_type_combo.addItem(task.asset_type)
+                asset_type_combo.setCurrentIndex(0)
+            form_layout.addRow("资产类型:", asset_type_combo)
+
+            # 数据类型
+            data_type_combo = QComboBox()
+            data_type_combo.addItems(["K线数据", "实时行情", "基本面数据"])
+            index = data_type_combo.findText(task.data_type)
+            if index >= 0:
+                data_type_combo.setCurrentIndex(index)
+            form_layout.addRow("数据类型:", data_type_combo)
+
+            # 频率
+            frequency_combo = QComboBox()
+            frequency_items = ["日线", "周线", "月线", "5分钟", "15分钟", "30分钟", "60分钟"]
+            frequency_combo.addItems(frequency_items)
+            # 尝试匹配当前频率
+            freq_value = task.frequency.value if hasattr(task.frequency, 'value') else str(task.frequency)
+            freq_map_reverse = {
+                "daily": "日线", "weekly": "周线", "monthly": "月线",
+                "5min": "5分钟", "15min": "15分钟", "30min": "30分钟", "60min": "60分钟"
+            }
+            freq_display = freq_map_reverse.get(freq_value, "日线")
+            index = frequency_combo.findText(freq_display)
+            if index >= 0:
+                frequency_combo.setCurrentIndex(index)
+            form_layout.addRow("频率:", frequency_combo)
+
+            # 日期范围
+            from PyQt5.QtCore import QDate
+            from datetime import datetime as dt
+
+            date_layout = QHBoxLayout()
+            start_date_edit = QDateEdit()
+            start_date_edit.setCalendarPopup(True)
+            start_date_edit.setDisplayFormat("yyyy-MM-dd")
+            try:
+                start_dt = dt.strptime(task.start_date, "%Y-%m-%d")
+                start_date_edit.setDate(QDate(start_dt.year, start_dt.month, start_dt.day))
+            except:
+                start_date_edit.setDate(QDate.currentDate().addMonths(-3))
+            date_layout.addWidget(start_date_edit)
+
+            date_layout.addWidget(QLabel("至"))
+
+            end_date_edit = QDateEdit()
+            end_date_edit.setCalendarPopup(True)
+            end_date_edit.setDisplayFormat("yyyy-MM-dd")
+            try:
+                end_dt = dt.strptime(task.end_date, "%Y-%m-%d")
+                end_date_edit.setDate(QDate(end_dt.year, end_dt.month, end_dt.day))
+            except:
+                end_date_edit.setDate(QDate.currentDate())
+            date_layout.addWidget(end_date_edit)
+
+            form_layout.addRow("日期范围:", date_layout)
+
+            # 股票代码列表（每行一个代码，方便编辑）
+            symbols_text = QTextEdit()
+            symbols_text.setPlainText("\n".join(task.symbols))  # ✅ 使用换行符分隔，更清晰
+            symbols_text.setMaximumHeight(100)
+            symbols_text.setPlaceholderText("每行一个股票代码，如：\n000001\n000002\n...")
+            form_layout.addRow("股票代码:", symbols_text)
+
+            # 批量大小
+            batch_size_spin = QSpinBox()
+            batch_size_spin.setRange(1, 1000)
+            batch_size_spin.setValue(task.batch_size)
+            form_layout.addRow("批量大小:", batch_size_spin)
+
+            # 并发数
+            workers_spin = QSpinBox()
+            workers_spin.setRange(1, 32)
+            workers_spin.setValue(task.max_workers)
+            form_layout.addRow("并发数:", workers_spin)
+
+            layout.addLayout(form_layout)
+
+            # 按钮
+            button_layout = QHBoxLayout()
+            save_btn = QPushButton("保存")
+            cancel_btn = QPushButton("取消")
+
+            def save_changes():
+                try:
+                    # 🎯 构建任务名称（自动追加数据用途标记）
+                    base_name = name_edit.text().strip()
+
+                    # 获取数据用途标记
+                    usage_display = data_usage_edit_combo.currentText()
+                    tag_mapping = {
+                        "通用场景": "[通用]",
+                        "历史数据分析": "[历史]",
+                        "回测验证": "[回测]",
+                        "实时行情": "[实时]",
+                        "实盘交易": "[实盘]"
+                    }
+                    usage_tag = tag_mapping.get(usage_display, "[通用]")
+
+                    # 组合最终任务名
+                    final_task_name = f"{base_name}{usage_tag}"
+
+                    # 获取数据用途英文值
+                    usage_mapping = {
+                        "通用场景": "general",
+                        "历史数据分析": "historical",
+                        "回测验证": "backtest",
+                        "实时行情": "realtime",
+                        "实盘交易": "live_trading"
+                    }
+                    data_usage_value = usage_mapping.get(usage_display, "general")
+
+                    # 更新任务配置
+                    task.name = final_task_name  # ✅ 使用带标记的任务名
+                    task.data_source = data_source_combo.currentText()
+                    task.asset_type = asset_type_combo.currentText()
+                    task.data_type = data_type_combo.currentText()
+
+                    # 频率映射
+                    freq_map = {
+                        "日线": "daily", "周线": "weekly", "月线": "monthly",
+                        "5分钟": "5min", "15分钟": "15min", "30分钟": "30min", "60分钟": "60min"
+                    }
+                    from core.importdata.import_config_manager import DataFrequency
+                    freq_value = freq_map.get(frequency_combo.currentText(), "daily")
+                    task.frequency = DataFrequency(freq_value) if hasattr(DataFrequency, freq_value.upper()) else DataFrequency.DAILY
+
+                    # 日期
+                    task.start_date = start_date_edit.date().toString("yyyy-MM-dd")
+                    task.end_date = end_date_edit.date().toString("yyyy-MM-dd")
+
+                    # 股票代码（支持换行或逗号分隔）
+                    symbols_str = symbols_text.toPlainText().strip()
+                    if symbols_str:
+                        # ✅ 修复：先按换行分割，再按逗号分割，支持两种格式
+                        symbols = []
+                        for line in symbols_str.split('\n'):
+                            line = line.strip()
+                            if ',' in line:
+                                # 如果包含逗号，按逗号分割
+                                symbols.extend([s.strip() for s in line.split(',') if s.strip()])
+                            elif line:
+                                # 否则作为单个代码
+                                symbols.append(line)
+                        task.symbols = symbols
+                    else:
+                        task.symbols = []
+
+                    # 批量参数
+                    task.batch_size = batch_size_spin.value()
+                    task.max_workers = workers_spin.value()
+
+                    # 保存到配置管理器 (使用**kwargs方式)
+                    success = self.config_manager.update_import_task(
+                        task_id,
+                        name=task.name,
+                        data_usage=data_usage_value,  # 🆕 添加数据用途
+                        data_source=task.data_source,
+                        asset_type=task.asset_type,
+                        data_type=task.data_type,
+                        frequency=task.frequency,
+                        start_date=task.start_date,
+                        end_date=task.end_date,
+                        symbols=task.symbols,
+                        batch_size=task.batch_size,
+                        max_workers=task.max_workers
+                    )
+
+                    if success:
+                        QMessageBox.information(dialog, "成功", "任务更新成功")
+                        # 刷新任务列表
+                        self.refresh_task_list()
+                        dialog.accept()
+                    else:
+                        QMessageBox.warning(dialog, "失败", "任务更新失败")
+
+                except Exception as e:
+                    logger.error(f"保存任务更改失败: {e}") if logger else None
+                    QMessageBox.critical(dialog, "错误", f"保存失败: {e}")
+
+            save_btn.clicked.connect(save_changes)
+            cancel_btn.clicked.connect(dialog.reject)
+
+            button_layout.addStretch()
+            button_layout.addWidget(save_btn)
+            button_layout.addWidget(cancel_btn)
+
+            layout.addLayout(button_layout)
+
+            # 显示对话框
+            dialog.exec_()
+
         except Exception as e:
             logger.error(f"编辑任务失败: {e}") if logger else None
+            import traceback
+            logger.error(traceback.format_exc()) if logger else None
             QMessageBox.critical(self, "错误", f"编辑任务失败: {e}")
 
     def format_duration(self, seconds: float) -> str:
@@ -3729,13 +4612,15 @@ class EnhancedDataImportWidget(QWidget):
         self.error_strategy_combo.setToolTip("遇到错误时的处理策略")
         layout.addRow("错误处理:", self.error_strategy_combo)
 
-        # 进度报告间隔
-        self.progress_interval_spin = QSpinBox()
-        self.progress_interval_spin.setRange(1, 60)
-        self.progress_interval_spin.setValue(5)
-        self.progress_interval_spin.setSuffix("秒")
-        self.progress_interval_spin.setToolTip("进度更新间隔")
-        layout.addRow("进度间隔:", self.progress_interval_spin)
+        # 进度报告间隔（仅在高级配置中创建独立副本）
+        # 如果主副本已存在，使用主副本的值；否则创建新副本
+        if not hasattr(self, '_advanced_progress_interval_spin'):
+            self._advanced_progress_interval_spin = QSpinBox()
+            self._advanced_progress_interval_spin.setRange(1, 60)
+            self._advanced_progress_interval_spin.setValue(5)
+            self._advanced_progress_interval_spin.setSuffix("秒")
+            self._advanced_progress_interval_spin.setToolTip("进度更新间隔")
+        layout.addRow("进度间隔:", self._advanced_progress_interval_spin)
 
         return widget
 
@@ -3798,6 +4683,11 @@ class EnhancedDataImportWidget(QWidget):
     - 分布式执行: {'启用' if self.distributed_cb.isChecked() else '[ERROR] 禁用'}
     - 智能缓存: {'启用' if self.caching_cb.isChecked() else '[ERROR] 禁用'}
     - 数据质量监控: {'启用' if self.quality_monitoring_cb.isChecked() else '[ERROR] 禁用'}
+
+    实时写入:
+    - 写入策略: {self.write_strategy_combo.currentText() if hasattr(self, 'write_strategy_combo') else '禁用写入'}
+    - 性能监控: {'启用' if (hasattr(self, 'enable_perf_monitor_cb') and self.enable_perf_monitor_cb.isChecked()) else '禁用'}
+    - 内存监控: {'启用' if (hasattr(self, 'enable_memory_monitor_cb') and self.enable_memory_monitor_cb.isChecked()) else '禁用'}
     """
             QMessageBox.information(self, "配置验证", result_text)
 
@@ -3833,11 +4723,11 @@ class EnhancedDataImportWidget(QWidget):
                 if hasattr(self, 'batch_size_spin'):
                     self.batch_size_spin.setValue(1000)
                 if hasattr(self, 'workers_spin'):
-                    self.workers_spin.setValue(4)
+                    self.workers_spin.setValue(8)  # ✅ 优化：默认工作线程数从4增加到8
                 if hasattr(self, 'memory_limit_spin'):
                     self.memory_limit_spin.setValue(2048)
                 if hasattr(self, 'timeout_spin'):
-                    self.timeout_spin.setValue(300)
+                    self.timeout_spin.setValue(60)  # ✅ 优化：默认超时从300秒减少到60秒
 
                 # 错误处理配置
                 if hasattr(self, 'retry_count_spin'):
@@ -3860,6 +4750,14 @@ class EnhancedDataImportWidget(QWidget):
                     self.caching_cb.setChecked(True)
                 if hasattr(self, 'quality_monitoring_cb'):
                     self.quality_monitoring_cb.setChecked(True)
+
+                # 重置实时写入配置
+                if hasattr(self, 'write_strategy_combo'):
+                    self.write_strategy_combo.setCurrentText("禁用写入")
+                if hasattr(self, 'enable_perf_monitor_cb'):
+                    self.enable_perf_monitor_cb.setChecked(True)
+                if hasattr(self, 'enable_memory_monitor_cb'):
+                    self.enable_memory_monitor_cb.setChecked(True)
 
                 QMessageBox.information(self, "重置成功", "配置已重置到默认值")
 
@@ -4204,10 +5102,10 @@ class EnhancedDataImportWidget(QWidget):
     def _load_default_data_sources(self):
         """加载默认数据源列表（备用）"""
         default_sources = {
-            "AKShare": "data_sources.akshare_plugin",
-            "东方财富": "data_sources.eastmoney_plugin",
-            "新浪财经": "data_sources.sina_plugin",
-            "通达信": "data_sources.tongdaxin_plugin"
+            "AKShare数据源插件": "data_sources.stock.akshare_plugin",  # ✅ 修复：添加stock层级并使用完整名称
+            "东方财富股票数据源插件": "data_sources.stock.eastmoney_plugin",  # ✅ 修复：添加stock层级并使用完整名称
+            "新浪股票数据源": "data_sources.stock.sina_plugin",  # ✅ 修复：添加stock层级
+            "通达信股票数据源": "data_sources.stock.tongdaxin_plugin"  # ✅ 修复：添加stock层级
         }
 
         self.data_source_combo.clear()
@@ -4239,6 +5137,266 @@ class EnhancedDataImportWidget(QWidget):
             pass
         except Exception as e:
             logger.error(f"初始化批量按钮失败: {e}") if logger else None
+
+    # ==================== 实时写入事件处理方法 ====================
+
+    def on_realtime_config_changed(self, config: Dict[str, Any]):
+        """实时写入配置变更"""
+        try:
+            logger.info(f"实时写入配置已变更: {config}") if logger else None
+            self.current_realtime_config = config
+        except Exception as e:
+            logger.error(f"处理配置变更失败: {e}") if logger else None
+
+    def on_stop_download(self):
+        """停止下载"""
+        try:
+            # ✅ 根因修复：优先检查import_engine是否可用
+            if not CORE_AVAILABLE or not self.import_engine:
+                QMessageBox.warning(
+                    self, "功能不可用",
+                    "数据导入引擎未初始化，无法停止任务。\n请检查核心组件是否正确加载。"
+                )
+                logger.error("停止下载失败: import_engine未初始化") if logger else None
+                return
+
+            if not hasattr(self, 'current_task_id') or not self.current_task_id:
+                QMessageBox.warning(self, "提示", "没有正在运行的任务")
+                return
+
+            # 确认对话框
+            reply = QMessageBox.question(
+                self, '确认',
+                f'确定要停止当前下载任务吗？\n任务ID: {self.current_task_id}',
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if reply == QMessageBox.Yes:
+                # 调用后台停止方法
+                try:
+                    success = self.import_engine.stop_task(self.current_task_id)
+                    if success:
+                        self.log_message(f"✅ 任务 {self.current_task_id} 已停止")
+                        logger.info(f"K线下载任务已停止: {self.current_task_id}") if logger else None
+
+                        # 通知监控面板任务已停止
+                        if hasattr(self, 'download_monitoring'):
+                            self.download_monitoring.update_progress({
+                                'progress': 0.0,
+                                'message': '任务已停止',
+                                'task_id': self.current_task_id,
+                                'task_name': self.task_name_edit.text()
+                            })
+
+                        # 清除当前任务ID
+                        self.current_task_id = None
+                    else:
+                        QMessageBox.warning(self, "错误", "停止任务失败，任务可能已完成或不存在")
+                        logger.warning(f"停止任务失败: {self.current_task_id}") if logger else None
+                except AttributeError as ae:
+                    error_msg = f"导入引擎缺少stop_task方法: {ae}"
+                    logger.error(error_msg) if logger else None
+                    QMessageBox.critical(self, "错误", error_msg)
+                except Exception as te:
+                    error_msg = f"调用stop_task时发生异常: {te}"
+                    logger.error(error_msg) if logger else None
+                    QMessageBox.critical(self, "错误", error_msg)
+        except Exception as e:
+            logger.error(f"停止下载失败: {e}") if logger else None
+            QMessageBox.critical(self, "错误", f"停止失败: {str(e)}")
+
+    def on_write_strategy_changed(self, strategy):
+        """写入策略变更处理"""
+        try:
+            logger.info(f"写入策略已变更: {strategy}") if logger else None
+
+            # 根据策略启用/禁用相关控制
+            if strategy == "禁用写入":
+                # 禁用所有写入相关控制
+                if hasattr(self, 'realtime_pause_btn'):
+                    self.realtime_pause_btn.setEnabled(False)
+                if hasattr(self, 'realtime_resume_btn'):
+                    self.realtime_resume_btn.setEnabled(False)
+                if hasattr(self, 'realtime_cancel_btn'):
+                    self.realtime_cancel_btn.setEnabled(False)
+                if hasattr(self, 'enable_perf_monitor_cb'):
+                    self.enable_perf_monitor_cb.setEnabled(False)
+                if hasattr(self, 'enable_memory_monitor_cb'):
+                    self.enable_memory_monitor_cb.setEnabled(False)
+                if hasattr(self, 'realtime_status_label'):
+                    self.realtime_status_label.setText("状态: 禁用")
+                    self.realtime_status_label.setStyleSheet("color: gray; font-weight: bold;")
+            else:
+                # 启用写入相关控制（在未运行时仍然禁用按钮，但启用监控选项）
+                if hasattr(self, 'enable_perf_monitor_cb'):
+                    self.enable_perf_monitor_cb.setEnabled(True)
+                if hasattr(self, 'enable_memory_monitor_cb'):
+                    self.enable_memory_monitor_cb.setEnabled(True)
+                if hasattr(self, 'realtime_status_label'):
+                    if strategy == "实时写入":
+                        self.realtime_status_label.setText("状态: 实时模式（未运行）")
+                        self.realtime_status_label.setStyleSheet("color: navy; font-weight: bold;")
+                    elif strategy == "批量写入":
+                        self.realtime_status_label.setText("状态: 批量模式（未运行）")
+                        self.realtime_status_label.setStyleSheet("color: navy; font-weight: bold;")
+                    elif strategy == "自适应":
+                        self.realtime_status_label.setText("状态: 自适应模式（未运行）")
+                        self.realtime_status_label.setStyleSheet("color: navy; font-weight: bold;")
+        except Exception as e:
+            logger.error(f"处理写入策略变更失败: {e}") if logger else None
+
+    def _register_write_event_handlers(self):
+        """注册实时写入事件处理器【修复】"""
+        try:
+            from core.events import get_event_bus
+            from core.events.realtime_write_events import (
+                WriteStartedEvent, WriteProgressEvent, WriteCompletedEvent, WriteErrorEvent
+            )
+            from core.services.realtime_write_event_handlers import get_write_event_handlers
+            from datetime import datetime
+
+            event_bus = get_event_bus()
+            write_handlers = get_write_event_handlers()
+
+            if not event_bus or not write_handlers:
+                return
+
+            def on_ui_update(event_type, event):
+                """【修复】实现实时UI更新回调（使用融合后的按钮）"""
+                try:
+                    if event_type == 'write_started':
+                        logger.info(f"[UI] 写入开始") if logger else None
+                        # 更新左侧控制按钮状态
+                        if hasattr(self, 'realtime_pause_btn'):
+                            self.realtime_pause_btn.setEnabled(True)
+                        if hasattr(self, 'realtime_cancel_btn'):
+                            self.realtime_cancel_btn.setEnabled(True)
+                        if hasattr(self, 'realtime_status_label'):
+                            self.realtime_status_label.setText("状态: 运行中")
+                            self.realtime_status_label.setStyleSheet("color: blue; font-weight: bold;")
+
+                    elif event_type == 'write_progress':
+                        # 【修复】更新监控面板的进度信息
+                        if hasattr(self, 'realtime_monitoring') and self.realtime_monitoring:
+                            # 更新进度条
+                            self.realtime_monitoring.progress_bar.setValue(int(event.progress))
+
+                            # 更新速度标签
+                            self.realtime_monitoring.speed_label.setText(f"{event.write_speed:.0f} 条/秒")
+
+                            # 更新成功计数
+                            self.realtime_monitoring.success_label.setText(str(event.success_count))
+
+                            # 更新失败计数
+                            self.realtime_monitoring.failure_label.setText(str(event.failure_count))
+
+                            logger.debug(f"[UI] 更新进度: {event.progress:.1f}%, 速度: {event.write_speed:.0f}条/秒") if logger else None
+
+                    elif event_type == 'write_completed':
+                        logger.info(f"[UI] 写入完成") if logger else None
+                        # 更新左侧控制按钮状态
+                        if hasattr(self, 'realtime_pause_btn'):
+                            self.realtime_pause_btn.setEnabled(False)
+                        if hasattr(self, 'realtime_resume_btn'):
+                            self.realtime_resume_btn.setEnabled(False)
+                        if hasattr(self, 'realtime_cancel_btn'):
+                            self.realtime_cancel_btn.setEnabled(False)
+                        if hasattr(self, 'realtime_status_label'):
+                            self.realtime_status_label.setText("状态: 已完成")
+                            self.realtime_status_label.setStyleSheet("color: green; font-weight: bold;")
+
+                    elif event_type == 'write_error':
+                        # 【修复】添加错误到错误日志表
+                        if hasattr(self, 'realtime_monitoring') and self.realtime_monitoring:
+                            timestamp = datetime.now().strftime('%H:%M:%S')
+                            self.realtime_monitoring.add_error(
+                                timestamp=timestamp,
+                                symbol=event.symbol,
+                                error_type=event.error_type,
+                                error_msg=event.error
+                            )
+                            logger.warning(f"[UI] 错误已添加: {event.symbol} - {event.error_type}") if logger else None
+
+                except Exception as e:
+                    logger.error(f"[UI] 回调处理失败: {e}") if logger else None
+
+            write_handlers.ui_callback = on_ui_update
+            event_bus.subscribe(WriteStartedEvent, write_handlers.on_write_started)
+            event_bus.subscribe(WriteProgressEvent, write_handlers.on_write_progress)
+            event_bus.subscribe(WriteCompletedEvent, write_handlers.on_write_completed)
+            event_bus.subscribe(WriteErrorEvent, write_handlers.on_write_error)
+
+            logger.info("实时写入事件处理器已注册") if logger else None
+        except Exception as e:
+            logger.warning(f"注册实时写入事件处理器失败: {e}") if logger else None
+
+    def _get_asset_type_value(self):
+        """获取资产类型值"""
+        try:
+            # 获取UI中选中的资产类型中文名称
+            display_name = self.asset_type_combo.currentText()
+
+            # ✅ 使用工具函数将中文名称转换为AssetType枚举
+            from core.ui_asset_type_utils import parse_asset_type_from_combo
+            asset_type_enum = parse_asset_type_from_combo(display_name)
+
+            # 返回枚举值字符串（如"stock_a"）而不是枚举对象
+            # 这样ImportTaskConfig可以直接存储字符串
+            return asset_type_enum.value
+
+        except Exception as e:
+            logger.error(f"获取资产类型值失败: {e}，使用默认值 stock_a") if logger else None
+            return "stock_a"  # 默认值
+
+    def _get_data_usage_value(self):
+        """
+        获取数据用途值（将中文显示名称转换为英文枚举值）
+
+        Returns:
+            str: 数据用途枚举值 ('general', 'historical', 'backtest', 'realtime', 'live_trading')
+        """
+        try:
+            display_name = self.data_usage_combo.currentText()
+
+            # 中文显示名称 → 英文枚举值映射
+            usage_mapping = {
+                "通用场景": "general",
+                "历史数据分析": "historical",
+                "回测验证": "backtest",
+                "实时行情": "realtime",
+                "实盘交易": "live_trading"
+            }
+
+            return usage_mapping.get(display_name, "general")
+
+        except Exception as e:
+            logger.error(f"获取数据用途值失败: {e}，使用默认值 general") if logger else None
+            return "general"
+
+    def _get_data_usage_tag(self):
+        """
+        获取数据用途的中文标记（用于追加到任务名）
+
+        Returns:
+            str: 用途标记，如 "[通用]", "[回测]", "[实盘]"
+        """
+        try:
+            display_name = self.data_usage_combo.currentText()
+
+            # 提取简短的中文标记
+            tag_mapping = {
+                "通用场景": "[通用]",
+                "历史数据分析": "[历史]",
+                "回测验证": "[回测]",
+                "实时行情": "[实时]",
+                "实盘交易": "[实盘]"
+            }
+
+            return tag_mapping.get(display_name, "[通用]")
+
+        except Exception as e:
+            logger.error(f"获取数据用途标记失败: {e}") if logger else None
+            return "[通用]"
 
 
 if __name__ == "__main__":

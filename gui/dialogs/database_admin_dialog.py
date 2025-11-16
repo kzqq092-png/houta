@@ -434,7 +434,7 @@ class DatabaseAdminDialog(QDialog):
         self.db = QSqlDatabase.addDatabase("QSQLITE", self.connection_name)
         self.db.setDatabaseName(self.db_path)
         self.db.open()
-        tables = self.db.tables()
+        tables = sorted(self.db.tables())
         self.table_list.addItems(tables)
 
         # 自动选择第一个表并显示描述

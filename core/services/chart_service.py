@@ -740,14 +740,16 @@ class ChartService(CacheableService, ConfigurableService):
         self._chart_themes.clear()
         super()._do_dispose()
 
-    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365, 
+                  asset_type: 'AssetType' = None) -> pd.DataFrame:
         """
-        获取K线数据（兼容性方法，委托给股票服务）
+        获取K线数据（✅ 优化：支持多资产类型，委托给股票服务）
 
         Args:
-            stock_code: 股票代码
+            stock_code: 股票代码（或其他资产代码）
             period: 周期
             count: 数据条数
+            asset_type: 资产类型（可选，如果不提供则使用默认值）
 
         Returns:
             K线数据DataFrame
@@ -755,18 +757,23 @@ class ChartService(CacheableService, ConfigurableService):
         self._ensure_initialized()
 
         try:
+            # 如果没有提供asset_type，导入默认值
+            if asset_type is None:
+                from core.plugin_types import AssetType
+                asset_type = AssetType.STOCK_A
+            
             # 获取股票服务
             stock_service = self._get_stock_service()
             if not stock_service:
                 logger.error("Stock service not available for get_kdata")
                 return pd.DataFrame()
 
-            # 委托给股票服务获取数据
-            kdata = stock_service.get_kdata(stock_code, period, count)
+            # ✅ 委托给股票服务获取数据（传递asset_type）
+            kdata = stock_service.get_kdata(stock_code, period, count, asset_type=asset_type)
             if kdata is not None:
                 return kdata
             else:
-                logger.warning(f"No kdata available for {stock_code}")
+                logger.warning(f"No kdata available for {stock_code} ({asset_type.value if asset_type else 'unknown'})")
                 return pd.DataFrame()
 
         except Exception as e:

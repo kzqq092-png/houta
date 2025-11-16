@@ -34,7 +34,6 @@ try:
     from core.plugin_types import AssetType, DataType, PluginType
     from core.asset_type_identifier import AssetTypeIdentifier
     from core.data_router import DataRouter
-    from core.services.asset_aware_unified_data_manager import AssetAwareUnifiedDataManager
     from loguru import logger
 except ImportError as e:
     print(f"导入核心组件失败: {e}")
@@ -279,9 +278,10 @@ class DataMissingPromptWidget(QWidget):
     def init_core_components(self):
         """初始化核心组件"""
         try:
+            from core.services.unified_data_manager import get_unified_data_manager
             self.asset_identifier = AssetTypeIdentifier()
             self.data_router = DataRouter()
-            self.data_manager = AssetAwareget_unified_data_manager()
+            self.data_manager = get_unified_data_manager()
 
             if logger:
                 logger.info("数据缺失处理组件初始化完成")

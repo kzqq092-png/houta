@@ -387,18 +387,23 @@ class KlineRepository(BaseRepository):
             self.data_manager = MinimalDataManager()
 
     def get_kline_data(self, params: QueryParams) -> Optional[KlineData]:
-        """获取K线数据"""
+        """获取K线数据（✅ 优化：支持多资产类型）"""
         try:
             # 验证参数
             if not params.validate():
                 self.logger.error(f"Invalid query params: {params}")
                 return None
 
-            # 生成缓存键
-            cache_key = f"{params.stock_code}_{params.period}_{params.start_date}_{params.end_date}_{params.count}"
+            # ✅ 确定资产类型（默认为股票）
+            from ..plugin_types import AssetType
+            asset_type = params.asset_type if params.asset_type is not None else AssetType.STOCK_A
+
+            # ✅ 生成缓存键（包含资产类型）
+            cache_key = f"{asset_type.value}_{params.stock_code}_{params.period}_{params.start_date}_{params.end_date}_{params.count}"
 
             # 检查缓存
             if cache_key in self._cache:
+                self.logger.debug(f"✅ 缓存命中: {params.stock_code} ({asset_type.value})")
                 return self._cache[cache_key]
 
             if not self.is_connected():
@@ -408,27 +413,37 @@ class KlineRepository(BaseRepository):
             kline_df = None
             if self.asset_service is not None:
                 try:
-                    from ..plugin_types import AssetType
-                    self.logger.info(f" KlineRepository使用TET模式获取数据: {params.stock_code}")
+                    self.logger.info(f"✅ KlineRepository使用TET模式获取数据: {params.stock_code} ({asset_type.value})")
 
+                    # ✅ 使用动态资产类型
                     kline_df = self.asset_service.get_historical_data(
                         symbol=params.stock_code,
-                        asset_type=AssetType.STOCK_A,
+                        asset_type=asset_type,  # ✅ 不再硬编码
                         period=params.period
                     )
 
                     if kline_df is not None and not kline_df.empty:
-                        self.logger.info(f" TET模式获取成功: {params.stock_code} | 数据源: AssetService | 记录数: {len(kline_df)}")
+                        self.logger.info(f"✅ TET模式获取成功: {params.stock_code} ({asset_type.value}) | 数据源: AssetService | 记录数: {len(kline_df)}")
                     else:
-                        self.logger.warning(f" TET模式返回空数据: {params.stock_code}")
+                        self.logger.warning(f"⚠️  TET模式返回空数据: {params.stock_code} ({asset_type.value})")
 
                 except Exception as e:
-                    self.logger.warning(f" TET模式获取失败: {params.stock_code} - {e}")
+                    self.logger.warning(f"⚠️  TET模式获取失败: {params.stock_code} ({asset_type.value}) - {e}")
                     kline_df = None
 
             # 如果TET模式失败，降级到传统DataManager
             if kline_df is None or (hasattr(kline_df, 'empty') and kline_df.empty):
-                self.logger.info(f" 降级到传统模式: {params.stock_code}")
+                self.logger.info(f"✅ 降级到传统模式: {params.stock_code} ({asset_type.value})")
+
+                # 🔧 修复：懒初始化data_manager
+                if self.data_manager is None:
+                    try:
+                        from core.services.unified_data_manager import get_unified_data_manager
+                        self.data_manager = get_unified_data_manager()
+                        self.logger.info(f"✅ 懒初始化UnifiedDataManager成功")
+                    except Exception as init_error:
+                        self.logger.error(f"✗ 无法初始化UnifiedDataManager: {init_error}")
+                        return None
 
                 # 兼容不同DataManager实现的命名：get_kdata 与 get_k_data
                 dm_get_kdata = getattr(self.data_manager, 'get_kdata', None)
@@ -437,30 +452,36 @@ class KlineRepository(BaseRepository):
 
                 if dm_get_kdata is None:
                     available_methods = [method for method in dir(self.data_manager) if not method.startswith('_')]
-                    self.logger.error(f" DataManager缺少get_kdata/get_k_data方法，无法获取K线数据。"
+                    self.logger.error(f"✗ DataManager缺少get_kdata/get_k_data方法，无法获取K线数据。"
                                       f"DataManager类型: {type(self.data_manager)}, "
                                       f"可用方法: {available_methods[:10] if available_methods else '无公开方法'}...")
                     return None
 
-                # 从数据管理器获取K线数据
+                # ✅ 从数据管理器获取K线数据（传递asset_type）
                 try:
                     # 优先使用count，若DataManager实现支持start/end也能兼容
+                    # ✅ 尝试传递asset_type参数（新版DataManager支持）
                     kline_df = dm_get_kdata(
                         params.stock_code,
                         params.period,
-                        params.count or 365
+                        params.count or 365,
+                        asset_type=asset_type  # ✅ 传递资产类型
                     )
                     if kline_df is not None:
-                        self.logger.info(f" 传统模式获取成功: {params.stock_code} | 数据源: DataManager | 记录数: {len(kline_df)}")
+                        self.logger.info(f"✅ 传统模式获取成功: {params.stock_code} ({asset_type.value}) | 数据源: DataManager | 记录数: {len(kline_df)}")
                 except TypeError:
-                    # 某些实现可能要求命名参数
-                    kline_df = dm_get_kdata(
-                        stock_code=params.stock_code,
-                        period=params.period,
-                        count=params.count or 365
-                    )
-                    if kline_df is not None:
-                        self.logger.info(f" 传统模式获取成功: {params.stock_code} | 数据源: DataManager | 记录数: {len(kline_df)}")
+                    # 某些旧实现可能不支持asset_type参数，降级到仅传递基本参数
+                    try:
+                        kline_df = dm_get_kdata(
+                            stock_code=params.stock_code,
+                            period=params.period,
+                            count=params.count or 365
+                        )
+                        if kline_df is not None:
+                            self.logger.info(f"✅ 传统模式获取成功（不支持asset_type）: {params.stock_code} | 数据源: DataManager | 记录数: {len(kline_df)}")
+                    except Exception as fallback_e:
+                        self.logger.error(f"✗ 传统模式降级也失败: {params.stock_code} - {fallback_e}")
+                        kline_df = None
 
             if kline_df is None or getattr(kline_df, 'empty', True):
                 return None
@@ -481,6 +502,8 @@ class KlineRepository(BaseRepository):
 
         except Exception as e:
             self.logger.error(f"Failed to get kline data: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
             return None
 
     def get_latest_price(self, stock_code: str) -> Optional[float]:

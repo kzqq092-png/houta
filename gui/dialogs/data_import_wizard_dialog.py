@@ -411,10 +411,10 @@ class DataImportWizardDialog(QDialog):
         # 预览信息
         info_layout = QHBoxLayout()
 
-        self.preview_info = QLabel("点击"刷新预览"获取数据样本")
+        self.preview_info = QLabel("点击\"▶️刷新预览\"获取数据样本")
         info_layout.addWidget(self.preview_info)
 
-        refresh_button = QPushButton("刷新预览")
+        refresh_button = QPushButton("▶️刷新预览")
         refresh_button.clicked.connect(self._refresh_preview)
         info_layout.addWidget(refresh_button)
 

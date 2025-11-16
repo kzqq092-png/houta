@@ -4,29 +4,32 @@ from loguru import logger
 """
 多屏幕图表面板
 
-支持单屏和多屏模式切换，提供多股票同时分析功能
+固定为多屏模式，提供多股票同时分析功能
 """
 
 import sys
-import os
 import traceback
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QPushButton, QLabel, QComboBox, QSplitter,
-    QFrame, QScrollArea, QMessageBox
+    QPushButton, QLabel, QComboBox,
+    QFrame, QScrollArea
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import pyqtSignal
 
 from gui.widgets.chart_widget import ChartWidget as ChartCanvas
 
 class MultiChartPanel(QWidget):
-    """多屏幕图表面板"""
+    """
+    多屏幕图表面板
+    
+    固定为多屏模式，提供多股票同时分析功能。
+    支持网格布局（2x2, 2x3, 3x2, 3x3等），可同时显示多只股票的K线图。
+    """
 
     # 信号定义
     chart_updated = pyqtSignal(str, dict)  # 股票代码, 图表数据
-    mode_changed = pyqtSignal(bool)  # 是否为多屏模式
+    mode_changed = pyqtSignal(bool)  # 模式变更信号（固定为多屏模式，始终为True）
     stock_selected = pyqtSignal(str)  # 选中的股票代码
 
     def __init__(self, parent=None):
@@ -40,13 +43,11 @@ class MultiChartPanel(QWidget):
         self.logger = logger.bind(module=__name__)
 
         # 状态变量
-        self.is_multi = False  # 是否为多屏模式
         self.stock_list = []  # 股票列表
         self.data_manager = None  # 数据管理器
         self.current_indicators = []  # 当前指标
 
         # 图表组件
-        self.single_chart = None  # 单屏图表
         self.chart_widgets = []  # 多屏图表网格 [[chart, chart], [chart, chart]]
         self.grid_size = (2, 2)  # 默认2x2网格
 
@@ -54,11 +55,13 @@ class MultiChartPanel(QWidget):
         self.main_layout = None
         self.control_panel = None
         self.chart_container = None
-        self.single_container = None
         self.multi_container = None
 
         self.init_ui()
-        self.setup_single_mode()
+        self.setup_multi_mode()
+        
+        # 发出模式变更信号（固定为多屏模式）
+        self.mode_changed.emit(True)
 
         self.logger.info("多屏幕图表面板初始化完成")
 
@@ -89,10 +92,7 @@ class MultiChartPanel(QWidget):
             layout = QHBoxLayout(self.control_panel)
             layout.setContentsMargins(10, 5, 10, 5)
 
-            # 模式切换按钮
-            self.mode_btn = QPushButton("切换到多屏模式")
-            self.mode_btn.clicked.connect(self.toggle_mode)
-            layout.addWidget(self.mode_btn)
+            # 模式切换按钮已移除（仅支持多屏模式，无需切换）
 
             # 网格大小选择
             layout.addWidget(QLabel("网格大小:"))
@@ -106,20 +106,20 @@ class MultiChartPanel(QWidget):
             # 自动填充按钮
             self.auto_fill_btn = QPushButton("自动填充")
             self.auto_fill_btn.clicked.connect(self.auto_fill_multi_charts)
-            self.auto_fill_btn.setEnabled(False)
+            self.auto_fill_btn.setEnabled(True)  # 默认启用
             layout.addWidget(self.auto_fill_btn)
 
             # 清空按钮
             self.clear_btn = QPushButton("清空图表")
             self.clear_btn.clicked.connect(self.clear_all_charts)
-            self.clear_btn.setEnabled(False)
+            self.clear_btn.setEnabled(True)  # 默认启用
             layout.addWidget(self.clear_btn)
 
             layout.addStretch()
 
-            # 状态标签
-            self.status_label = QLabel("单屏模式")
-            self.status_label.setStyleSheet("color: blue; font-weight: bold;")
+            # 状态标签（固定显示多屏模式）
+            self.status_label = QLabel("多屏模式")
+            self.status_label.setStyleSheet("color: green; font-weight: bold;")
             layout.addWidget(self.status_label)
 
             self.main_layout.addWidget(self.control_panel)
@@ -135,55 +135,15 @@ class MultiChartPanel(QWidget):
             container_layout = QVBoxLayout(self.chart_container)
             container_layout.setContentsMargins(0, 0, 0, 0)
 
-            # 单屏容器
-            self.single_container = QWidget()
-            single_layout = QVBoxLayout(self.single_container)
-            single_layout.setContentsMargins(0, 0, 0, 0)
-            container_layout.addWidget(self.single_container)
-
             # 多屏容器
             self.multi_container = QScrollArea()
             self.multi_container.setWidgetResizable(True)
-            self.multi_container.setVisible(False)
             container_layout.addWidget(self.multi_container)
 
             self.main_layout.addWidget(self.chart_container)
 
         except Exception as e:
             self.logger.error(f"创建图表容器失败: {e}")
-
-    def setup_single_mode(self):
-        """设置单屏模式"""
-        try:
-            if self.single_chart is None:
-                self.single_chart = ChartCanvas(self)
-                # 移除对不存在的stock_selected信号的连接
-                # 如果需要这个功能，可以在单击事件中手动发出信号
-                self.single_chart.figure.canvas.mpl_connect('button_press_event',
-                                                            lambda event: self._on_chart_clicked(event))
-
-                # 确保单屏图表也能接收拖拽
-                self.single_chart.setAcceptDrops(True)
-
-            # 清空单屏容器并添加图表
-            layout = self.single_container.layout()
-            self.clear_layout(layout)
-            layout.addWidget(self.single_chart)
-
-            self.logger.debug("单屏模式设置完成")
-
-        except Exception as e:
-            self.logger.error(f"设置单屏模式失败: {e}")
-
-    def _on_chart_clicked(self, event):
-        """处理图表点击事件，模拟stock_selected信号"""
-        try:
-            if self.single_chart and hasattr(self.single_chart, 'current_kdata') and self.single_chart.current_kdata is not None:
-                # 获取当前显示的股票代码
-                if hasattr(self, 'current_stock_code') and self.current_stock_code:
-                    self.stock_selected.emit(self.current_stock_code)
-        except Exception as e:
-            self.logger.error(f"处理图表点击事件失败: {e}")
 
     def setup_multi_mode(self):
         """设置多屏模式"""
@@ -338,53 +298,18 @@ class MultiChartPanel(QWidget):
             if hasattr(chart, '_original_dropEvent'):
                 chart._original_dropEvent(event)
 
-    def toggle_mode(self):
-        """切换显示模式"""
-        try:
-            self.is_multi = not self.is_multi
-
-            if self.is_multi:
-                # 切换到多屏模式
-                self.setup_multi_mode()
-                self.single_container.setVisible(False)
-                self.multi_container.setVisible(True)
-                self.mode_btn.setText("切换到单屏模式")
-                self.status_label.setText("多屏模式")
-                self.status_label.setStyleSheet(
-                    "color: green; font-weight: bold;")
-                self.auto_fill_btn.setEnabled(True)
-                self.clear_btn.setEnabled(True)
-            else:
-                # 切换到单屏模式
-                self.single_container.setVisible(True)
-                self.multi_container.setVisible(False)
-                self.mode_btn.setText("切换到多屏模式")
-                self.status_label.setText("单屏模式")
-                self.status_label.setStyleSheet(
-                    "color: blue; font-weight: bold;")
-                self.auto_fill_btn.setEnabled(False)
-                self.clear_btn.setEnabled(False)
-
-            self.mode_changed.emit(self.is_multi)
-            self.logger.info(f"已切换到{'多屏' if self.is_multi else '单屏'}模式")
-
-        except Exception as e:
-            self.logger.error(f"切换模式失败: {e}")
-
     def on_grid_size_changed(self, grid_text: str):
         """网格大小改变事件"""
         try:
-            if self.is_multi:
-                # 重新设置多屏模式
-                self.setup_multi_mode()
-                self.logger.debug(f"网格大小已更改为: {grid_text}")
+            self.setup_multi_mode()
+            self.logger.debug(f"网格大小已更改为: {grid_text}")
         except Exception as e:
             self.logger.error(f"更改网格大小失败: {e}")
 
     def auto_fill_multi_charts(self):
         """自动填充多屏图表"""
         try:
-            if not self.is_multi or not self.stock_list:
+            if not self.stock_list:
                 return
 
             stock_index = 0
@@ -426,20 +351,16 @@ class MultiChartPanel(QWidget):
     def clear_all_charts(self):
         """清空所有图表"""
         try:
-            if self.is_multi:
-                for row in range(len(self.chart_widgets)):
-                    for col in range(len(self.chart_widgets[row])):
-                        chart_info = self.chart_widgets[row][col]
-                        chart_info['chart'].clear()
-                        chart_info['title'].setText(f"图表 {row+1}-{col+1}")
-                        chart_info['stock_code'] = None
+            for row in range(len(self.chart_widgets)):
+                for col in range(len(self.chart_widgets[row])):
+                    chart_info = self.chart_widgets[row][col]
+                    chart_info['chart'].clear()
+                    chart_info['title'].setText(f"图表 {row+1}-{col+1}")
+                    chart_info['stock_code'] = None
 
-                        # 显示拖拽提示
-                        if 'drag_hint' in chart_info:
-                            chart_info['drag_hint'].setVisible(True)
-            else:
-                if self.single_chart:
-                    self.single_chart.clear()
+                    # 显示拖拽提示
+                    if 'drag_hint' in chart_info:
+                        chart_info['drag_hint'].setVisible(True)
 
             self.logger.info("所有图表已清空")
 
@@ -468,16 +389,12 @@ class MultiChartPanel(QWidget):
             self.current_indicators = indicators or []
 
             # 更新所有图表的指标
-            if self.is_multi:
-                for row in range(len(self.chart_widgets)):
-                    for col in range(len(self.chart_widgets[row])):
-                        chart_info = self.chart_widgets[row][col]
-                        if chart_info['stock_code']:
-                            self.update_chart_data(
-                                row, col, chart_info['stock_code'])
-            else:
-                if self.single_chart and hasattr(self.single_chart, 'update_indicators'):
-                    self.single_chart.update_indicators(indicators)
+            for row in range(len(self.chart_widgets)):
+                for col in range(len(self.chart_widgets[row])):
+                    chart_info = self.chart_widgets[row][col]
+                    if chart_info['stock_code']:
+                        self.update_chart_data(
+                            row, col, chart_info['stock_code'])
 
             self.logger.debug(f"技术指标已更新，共 {len(indicators)} 个指标")
 
@@ -579,42 +496,23 @@ class MultiChartPanel(QWidget):
         except:
             return (2, 2)
 
-    def clear_layout(self, layout):
-        """清空布局中的所有组件"""
-        try:
-            if layout is not None:
-                while layout.count():
-                    child = layout.takeAt(0)
-                    if child.widget():
-                        child.widget().deleteLater()
-        except Exception as e:
-            self.logger.error(f"清空布局失败: {e}")
-
     def get_current_chart(self):
         """获取当前活动的图表"""
-        if self.is_multi:
-            # 多屏模式下返回第一个有数据的图表
-            for row in range(len(self.chart_widgets)):
-                for col in range(len(self.chart_widgets[row])):
-                    chart_info = self.chart_widgets[row][col]
-                    if chart_info['stock_code']:
-                        return chart_info['chart']
-            return None
-        else:
-            return self.single_chart
+        for row in range(len(self.chart_widgets)):
+            for col in range(len(self.chart_widgets[row])):
+                chart_info = self.chart_widgets[row][col]
+                if chart_info['stock_code']:
+                    return chart_info['chart']
+        return None
 
     def broadcast_data(self, data: Dict[str, Any]):
         """广播数据到所有图表"""
         try:
-            if self.is_multi:
-                for row in range(len(self.chart_widgets)):
-                    for col in range(len(self.chart_widgets[row])):
-                        chart = self.chart_widgets[row][col]['chart']
-                        if hasattr(chart, 'update_data'):
-                            chart.update_data(data)
-            else:
-                if self.single_chart and hasattr(self.single_chart, 'update_data'):
-                    self.single_chart.update_data(data)
+            for row in range(len(self.chart_widgets)):
+                for col in range(len(self.chart_widgets[row])):
+                    chart = self.chart_widgets[row][col]['chart']
+                    if hasattr(chart, 'update_data'):
+                        chart.update_data(data)
 
         except Exception as e:
             self.logger.error(f"广播数据失败: {e}")
@@ -633,23 +531,13 @@ class MultiChartPanel(QWidget):
                 self.logger.warning(f"没有提供图表数据: {stock_code}")
                 return
 
-            # 如果是单屏模式，直接加载到单屏图表
-            if not self.is_multi:
-                if self.single_chart and hasattr(self.single_chart, 'update_chart'):
-                    self.single_chart.update_chart(chart_data)
-                elif self.single_chart and hasattr(self.single_chart, 'update_chart_data'):
-                    self.single_chart.update_chart_data(chart_data)
-                else:
-                    self.logger.warning(
-                        "单屏图表没有update_chart或update_chart_data方法")
-            else:
-                # 多屏模式，加载到第一个图表
-                if self.chart_widgets and len(self.chart_widgets) > 0 and len(self.chart_widgets[0]) > 0:
-                    chart = self.chart_widgets[0][0]['chart']
-                    if chart and hasattr(chart, 'update_chart'):
-                        chart.update_chart(chart_data)
-                    elif chart and hasattr(chart, 'update_chart_data'):
-                        chart.update_chart_data(chart_data)
+            # 加载到第一个图表
+            if self.chart_widgets and len(self.chart_widgets) > 0 and len(self.chart_widgets[0]) > 0:
+                chart = self.chart_widgets[0][0]['chart']
+                if chart and hasattr(chart, 'update_chart'):
+                    chart.update_chart(chart_data)
+                elif chart and hasattr(chart, 'update_chart_data'):
+                    chart.update_chart_data(chart_data)
 
             self.logger.info(f"成功加载股票数据: {stock_code} - {stock_name}")
 
