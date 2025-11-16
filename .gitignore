@@ -29,3 +29,5 @@ logs/*
 *.duckdb
 *.wal
 *.db
+*.sqlite
+*.sqlite-journal
