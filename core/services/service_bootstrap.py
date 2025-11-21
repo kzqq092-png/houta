@@ -27,6 +27,12 @@ from core.services.ai_prediction_service import AIPredictionService
 from core.services.unified_data_manager import UnifiedDataManager
 from core.plugin_manager import PluginManager
 from core.services.uni_plugin_data_manager import UniPluginDataManager
+
+# 增量下载相关服务
+from core.services.data_completeness_checker import DataCompletenessChecker
+from core.services.incremental_data_analyzer import IncrementalDataAnalyzer
+from core.services.incremental_update_recorder import IncrementalUpdateRecorder
+from core.services.enhanced_duckdb_data_downloader import EnhancedDuckDBDataDownloader
 # # from core.services.error_service import LoguruErrorService  # 暂时注释，让系统先启动
 
 # 最后导入监控服务
@@ -160,6 +166,9 @@ class ServiceBootstrap:
 
             # 2. 注册业务服务（包含UnifiedDataManager）
             self._register_business_services()
+
+            # 2.5. 注册增量下载服务（在业务服务之后，插件服务之前）
+            self._register_incremental_services()
 
             # 3. 注册插件服务（在UnifiedDataManager之后）
             self._register_plugin_services()
@@ -701,6 +710,101 @@ class ServiceBootstrap:
 
         except Exception as e:
             logger.error(f" 监控服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _register_incremental_services(self) -> None:
+        """注册增量下载相关服务"""
+        logger.info("注册增量下载服务...")
+
+        try:
+            # 获取必要的依赖服务
+            uni_plugin_manager = self.service_container.resolve(UniPluginDataManager)
+            unified_data_manager = self.service_container.resolve(UnifiedDataManager)
+            event_bus = self.event_bus
+
+            # 1. 注册数据完整性检查器
+            logger.info("注册数据完整性检查器...")
+            from ..services.data_completeness_checker import DataCompletenessChecker
+            completeness_checker = DataCompletenessChecker(
+                db_manager=unified_data_manager.duckdb_manager,
+                event_bus=event_bus,
+                db_path="data/factorweave_system.sqlite"
+            )
+            self.service_container.register_instance(
+                DataCompletenessChecker,
+                completeness_checker
+            )
+            logger.info("数据完整性检查器注册完成")
+
+            # 2. 注册增量数据分析仪
+            logger.info("注册增量数据分析仪...")
+            from ..services.incremental_data_analyzer import IncrementalDataAnalyzer
+            incremental_analyzer = IncrementalDataAnalyzer(
+                db_manager=unified_data_manager.duckdb_manager,
+                event_bus=event_bus,
+                completeness_checker=completeness_checker
+            )
+            self.service_container.register_instance(
+                IncrementalDataAnalyzer,
+                incremental_analyzer
+            )
+            logger.info("增量数据分析仪注册完成")
+
+            # 3. 注册增量更新记录器
+            logger.info("注册增量更新记录器...")
+            from ..services.incremental_update_recorder import IncrementalUpdateRecorder
+            update_recorder = IncrementalUpdateRecorder(
+                db_manager=unified_data_manager.duckdb_manager,
+                event_bus=event_bus,
+                db_path="data/factorweave_system.sqlite"
+            )
+            self.service_container.register_instance(
+                IncrementalUpdateRecorder,
+                update_recorder
+            )
+            logger.info("增量更新记录器注册完成")
+
+            # 4. 注册增强的DuckDB数据下载器
+            logger.info("注册增强的DuckDB数据下载器...")
+            from ..services.enhanced_duckdb_data_downloader import EnhancedDuckDBDataDownloader
+            enhanced_downloader = EnhancedDuckDBDataDownloader(
+                uni_plugin_manager=uni_plugin_manager,
+                tet_pipeline=unified_data_manager.tet_pipeline,
+                data_source_router=unified_data_manager.data_source_router,
+                incremental_analyzer=incremental_analyzer,
+                completeness_checker=completeness_checker,
+                update_recorder=update_recorder
+            )
+            self.service_container.register_instance(
+                EnhancedDuckDBDataDownloader,
+                enhanced_downloader
+            )
+            logger.info("增强的DuckDB数据下载器注册完成")
+
+            logger.info("所有增量下载服务注册完成")
+
+            # 5. 注册增量更新调度器
+            logger.info("注册增量更新调度器...")
+            from ..services.incremental_update_scheduler import IncrementalUpdateScheduler
+            scheduler = IncrementalUpdateScheduler()
+            self.service_container.register_instance(
+                IncrementalUpdateScheduler,
+                scheduler
+            )
+            logger.info("增量更新调度器注册完成")
+
+            # 6. 注册断点续传管理器
+            logger.info("注册断点续传管理器...")
+            from ..services.breakpoint_resume_manager import BreakpointResumeManager
+            resume_manager = BreakpointResumeManager()
+            self.service_container.register_instance(
+                BreakpointResumeManager,
+                resume_manager
+            )
+            logger.info("断点续传管理器注册完成")
+
+        except Exception as e:
+            logger.error(f" 增量下载服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
     def _register_plugin_services(self) -> None:

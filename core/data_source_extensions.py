@@ -11,32 +11,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
 
+# Import AssetType and DataType from plugin_types instead of redefining them
+from .plugin_types import AssetType, DataType
+
 logger = logger
-
-
-class AssetType(Enum):
-    """资产类型"""
-    STOCK = "stock"
-    INDEX = "index"
-    FUND = "fund"
-    BOND = "bond"
-    FUTURES = "futures"
-    OPTIONS = "options"
-    CRYPTO = "crypto"
-    FOREX = "forex"
-    SECTOR = "sector"  # 板块资产类型
-
-
-class DataType(Enum):
-    """数据类型"""
-    HISTORICAL_KLINE = "historical_kline"
-    REAL_TIME_QUOTE = "real_time_quote"
-    TICK_DATA = "tick_data"
-    ORDER_BOOK = "order_book"
-    FUNDAMENTAL = "fundamental"
-    NEWS = "news"
-    FINANCIAL_REPORT = "financial_report"
-    SECTOR_FUND_FLOW = "sector_fund_flow"  # 板块资金流数据类型
 
 
 @dataclass

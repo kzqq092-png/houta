@@ -443,12 +443,32 @@ class UnifiedDataImportEngine(QObject):
             # 增强异步管理器
             self.enhanced_async_manager = get_enhanced_async_manager()
 
+            # 断点续传管理器
+            try:
+                from core.services.breakpoint_resume_manager import get_breakpoint_resume_manager
+                self.breakpoint_resume_manager = get_breakpoint_resume_manager()
+                logger.info("断点续传管理器已启用")
+            except Exception as e:
+                logger.warning(f"断点续传管理器初始化失败: {e}")
+                self.breakpoint_resume_manager = None
+
+            # 增量更新调度器
+            try:
+                from core.services.incremental_update_scheduler import get_incremental_update_scheduler
+                self.incremental_scheduler = get_incremental_update_scheduler()
+                logger.info("增量更新调度器已启用")
+            except Exception as e:
+                logger.warning(f"增量更新调度器初始化失败: {e}")
+                self.incremental_scheduler = None
+
             logger.info("分布式和并发组件初始化完成")
 
         except Exception as e:
             logger.error(f"分布式组件初始化失败: {e}")
             self.distributed_service = None
             self.node_discovery = None
+            self.breakpoint_resume_manager = None
+            self.incremental_scheduler = None
 
     def _init_quality_components(self):
         """初始化数据质量组件"""
@@ -586,6 +606,22 @@ class UnifiedDataImportEngine(QObject):
 
                 task_config = self._task_configs[task_id]
 
+            # 创建断点记录（如果管理器可用）
+            if self.breakpoint_resume_manager:
+                try:
+                    from core.services.breakpoint_resume_manager import ResumeStrategy
+                    self.breakpoint_resume_manager.create_breakpoint(
+                        task_id=task_id,
+                        task_name=task_config.task_name,
+                        data_type=task_config.data_type,
+                        frequency=task_config.frequency.value if hasattr(task_config.frequency, 'value') else str(task_config.frequency),
+                        symbols=task_config.symbols,
+                        strategy=ResumeStrategy.RESUME_FROM_FAILURE
+                    )
+                    logger.info(f"已为任务 {task_id} 创建断点")
+                except Exception as e:
+                    logger.warning(f"创建断点失败: {e}")
+
             # 创建任务结果对象
             result = UnifiedImportResult(
                 task_id=task_id,
@@ -687,6 +723,14 @@ class UnifiedDataImportEngine(QObject):
                 result = self._task_results[task_id]
                 if result.status == UnifiedTaskStatus.RUNNING:
                     result.status = UnifiedTaskStatus.PAUSED
+
+                    # 使用断点管理器记录暂停
+                    if self.breakpoint_resume_manager:
+                        try:
+                            self.breakpoint_resume_manager.pause_task(task_id, reason)
+                        except Exception as e:
+                            logger.warning(f"记录暂停到断点管理器失败: {e}")
+
                     self.task_paused.emit(task_id, reason)
                     logger.info(f"暂停导入任务: {task_id} - {reason}")
                     return True
@@ -707,6 +751,14 @@ class UnifiedDataImportEngine(QObject):
                 result = self._task_results[task_id]
                 if result.status == UnifiedTaskStatus.PAUSED:
                     result.status = UnifiedTaskStatus.RESUMING
+
+                    # 使用断点管理器恢复任务
+                    if self.breakpoint_resume_manager:
+                        try:
+                            self.breakpoint_resume_manager.resume_task(task_id)
+                        except Exception as e:
+                            logger.warning(f"从断点管理器恢复失败: {e}")
+
                     self.task_resumed.emit(task_id)
                     logger.info(f"恢复导入任务: {task_id}")
                     return True
@@ -750,6 +802,13 @@ class UnifiedDataImportEngine(QObject):
                             result.execution_time = (result.end_time - result.start_time).total_seconds()
 
                         self._task_stats['total_cancelled'] += 1
+
+                # 使用断点管理器停止任务
+                if self.breakpoint_resume_manager:
+                    try:
+                        self.breakpoint_resume_manager.stop_task(task_id, reason)
+                    except Exception as e:
+                        logger.warning(f"停止断点管理器中的任务失败: {e}")
 
                 self.task_cancelled.emit(task_id, reason)
                 logger.info(f"取消导入任务: {task_id} - {reason}")
@@ -897,7 +956,8 @@ class UnifiedDataImportEngine(QObject):
 
     def _convert_to_unified_task(self, task_config: ImportTaskConfig) -> UnifiedImportTask:
         """将ImportTaskConfig转换为UnifiedImportTask"""
-        return UnifiedImportTask(
+        # 创建UnifiedImportTask
+        unified_task = UnifiedImportTask(
             task_id=task_config.task_id,
             task_name=task_config.task_name,
             symbols=task_config.symbols,
@@ -909,6 +969,29 @@ class UnifiedDataImportEngine(QObject):
             end_date=task_config.end_date,
             mode=ImportMode(getattr(task_config, 'mode', 'manual'))
         )
+
+        # 保留新的配置参数
+        if hasattr(task_config, 'gap_fill_mode') and task_config.gap_fill_mode:
+            unified_task.config['gap_fill_mode'] = True
+            unified_task.config['gap_threshold_days'] = getattr(task_config, 'gap_threshold_days', 30)
+            unified_task.config['gap_fill_threshold'] = getattr(task_config, 'gap_fill_threshold', 30)
+            unified_task.config['auto_fill_gaps'] = getattr(task_config, 'auto_fill_gaps', True)
+            unified_task.config['skip_weekends'] = getattr(task_config, 'skip_weekends', True)
+            unified_task.config['skip_holidays'] = getattr(task_config, 'skip_holidays', True)
+
+        if hasattr(task_config, 'smart_fill_mode') and task_config.smart_fill_mode:
+            unified_task.config['smart_fill_mode'] = True
+            unified_task.config['recent_days_only'] = getattr(task_config, 'recent_days_only', 30)
+            unified_task.config['auto_fill_gaps'] = getattr(task_config, 'auto_fill_gaps', True)
+            unified_task.config['skip_weekends'] = getattr(task_config, 'skip_weekends', True)
+            unified_task.config['skip_holidays'] = getattr(task_config, 'skip_holidays', True)
+
+        if hasattr(task_config, 'incremental_days'):
+            unified_task.config['incremental_days'] = task_config.incremental_days
+            unified_task.config['skip_weekends'] = getattr(task_config, 'skip_weekends', True)
+            unified_task.config['skip_holidays'] = getattr(task_config, 'skip_holidays', True)
+
+        return unified_task
 
     def _generate_task_id(self, task_config: UnifiedImportTask) -> str:
         """生成任务ID"""
@@ -1391,11 +1474,36 @@ class UnifiedDataImportEngine(QObject):
         """同步导入K线数据（用于异步工作线程）"""
         try:
             logger.info(f"开始同步导入K线数据: {len(task_config.symbols)}个股票")
-            
+
             from core.asset_database_manager import get_asset_separated_database_manager
             from core.plugin_types import DataType, AssetType
             from datetime import datetime
-            
+
+            # 检查是否启用了间隙填充模式
+            gap_fill_mode = getattr(task_config, 'gap_fill_mode', False)
+            smart_fill_mode = getattr(task_config, 'smart_fill_mode', False)
+
+            # 检查是否启用了增量下载模式
+            incremental_mode = task_config.mode.value == 'incremental'
+
+            if gap_fill_mode:
+                logger.info(f"启用间隙填充模式，阈值: {getattr(task_config, 'gap_threshold_days', 30)}天")
+                self._execute_gap_fill_sync(task_config, result)
+                return
+
+            if smart_fill_mode:
+                logger.info(f"启用智能补全模式，仅补全最近{getattr(task_config, 'recent_days_only', 30)}天数据")
+                self._execute_smart_fill_sync(task_config, result)
+                return
+
+            if incremental_mode:
+                logger.info(f"启用增量下载模式，最近{getattr(task_config, 'incremental_days', 7)}天")
+                self._execute_incremental_sync(task_config, result)
+                return
+
+            # 标准全量下载模式
+            logger.info("使用标准全量下载模式")
+
             result.total_records = len(task_config.symbols)
             asset_db_manager = get_asset_separated_database_manager()
 
@@ -1572,6 +1680,239 @@ class UnifiedDataImportEngine(QObject):
         except Exception as e:
             logger.debug(f"健康检查失败: {e}")
 
+    def _execute_gap_fill_sync(self, task_config: ImportTaskConfig, result: UnifiedImportResult):
+        """执行间隙填充模式导入"""
+        try:
+            from core.services.enhanced_duckdb_data_downloader import get_enhanced_duckdb_data_downloader
 
+            logger.info(f"开始间隙填充导入: {len(task_config.symbols)}个股票")
+
+            # 获取增强数据下载器
+            downloader = get_enhanced_duckdb_data_downloader()
+            if not downloader:
+                raise Exception("无法获取增强数据下载器")
+
+            gap_threshold_days = getattr(task_config, 'gap_threshold_days', 30)
+            auto_fill_gaps = getattr(task_config, 'auto_fill_gaps', True)
+            skip_weekends = getattr(task_config, 'skip_weekends', True)
+            skip_holidays = getattr(task_config, 'skip_holidays', True)
+            check_completeness = getattr(task_config, 'check_completeness', True)
+            skip_latest_data = getattr(task_config, 'skip_latest_data', True)
+
+            # 执行间隙填充下载
+            import asyncio
+            from datetime import datetime
+
+            end_date = datetime.strptime(task_config.end_date, '%Y-%m-%d')
+
+            async def _gap_fill_wrapper():
+                symbols_to_check = task_config.symbols
+                # 如果启用了skip_latest_data，先检查最新数据状态
+                if skip_latest_data:
+                    try:
+                        latest_check = await downloader.check_latest_data_status(symbols_to_check)
+                        symbols_to_check = [s for s in symbols_to_check if not latest_check.get(s, True)]
+                        logger.info(f"跳过最新数据后，需要检查的股票数: {len(symbols_to_check)}/{len(task_config.symbols)}")
+                    except Exception as e:
+                        logger.warning(f"检查最新数据状态失败: {e}，继续使用所有符号")
+
+                return await downloader.check_and_fill_data_gaps(
+                    symbols_to_check,
+                    end_date,
+                    gap_threshold_days,
+                    auto_fill_gaps,
+                    skip_weekends,
+                    skip_holidays
+                )
+
+            # 在新的事件循环中执行异步函数
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                success_stats = loop.run_until_complete(_gap_fill_wrapper())
+
+                # 更新结果统计
+                result.processed_records = success_stats.get('total_symbols', 0)
+                result.success_count = success_stats.get('success_count', 0)
+                result.failed_count = success_stats.get('failed_count', 0)
+                result.skipped_count = success_stats.get('skipped_count', 0)
+
+                logger.info(f"间隙填充导入完成: 成功={result.success_count}, 失败={result.failed_count}, 跳过={result.skipped_count}")
+
+            finally:
+                loop.close()
+
+        except Exception as e:
+            logger.error(f"间隙填充导入失败: {e}")
+            result.failed_records = len(task_config.symbols)
+            result.error_message = str(e)
+            raise
+
+    def _execute_smart_fill_sync(self, task_config: ImportTaskConfig, result: UnifiedImportResult):
+        """执行智能补全模式导入"""
+        try:
+            from core.services.enhanced_duckdb_data_downloader import get_enhanced_duckdb_data_downloader
+            from core.services.incremental_data_analyzer import get_incremental_data_analyzer
+            from datetime import datetime
+
+            logger.info(f"开始智能补全导入: {len(task_config.symbols)}个股票")
+
+            # 获取服务
+            downloader = get_enhanced_duckdb_data_downloader()
+            analyzer = get_incremental_data_analyzer()
+            if not downloader or not analyzer:
+                raise Exception("无法获取必要的服务")
+
+            recent_days_only = getattr(task_config, 'recent_days_only', 30)
+            auto_fill_gaps = getattr(task_config, 'auto_fill_gaps', True)
+            skip_weekends = getattr(task_config, 'skip_weekends', True)
+            skip_holidays = getattr(task_config, 'skip_holidays', True)
+            check_completeness = getattr(task_config, 'check_completeness', True)
+            skip_latest_data = getattr(task_config, 'skip_latest_data', True)
+
+            end_date = datetime.strptime(task_config.end_date, '%Y-%m-%d')
+            start_date = end_date - datetime.timedelta(days=recent_days_only)
+
+            # 智能补全分析
+            import asyncio
+
+            async def _smart_fill_wrapper():
+                # 生成下载计划
+                download_plan = await analyzer.analyze_incremental_requirements(
+                    task_config.symbols,
+                    end_date,
+                    strategy='smart_fill',
+                    skip_weekends=skip_weekends,
+                    skip_holidays=skip_holidays,
+                    check_completeness=check_completeness
+                )
+
+                # 如果启用了skip_latest_data，过滤掉已经是最新的符号
+                symbols_to_download = download_plan.symbols_to_download
+                if skip_latest_data:
+                    try:
+                        latest_check = await downloader.check_latest_data_status(task_config.symbols)
+                        symbols_to_download = [s for s in symbols_to_download if not latest_check.get(s, True)]
+                        logger.info(f"跳过最新数据后，需要补全的股票数: {len(symbols_to_download)}/{len(download_plan.symbols_to_download)}")
+                    except Exception as e:
+                        logger.warning(f"检查最新数据状态失败: {e}，继续使用计划中的符号")
+
+                # 执行智能补全下载
+                success_stats = await downloader.check_and_fill_data_gaps(
+                    symbols_to_download,
+                    end_date,
+                    recent_days_only,
+                    auto_fill_gaps,
+                    skip_weekends,
+                    skip_holidays
+                )
+
+                return success_stats
+
+            # 在新的事件循环中执行异步函数
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                success_stats = loop.run_until_complete(_smart_fill_wrapper())
+
+                # 更新结果统计
+                result.processed_records = success_stats.get('total_symbols', 0)
+                result.success_count = success_stats.get('success_count', 0)
+                result.failed_count = success_stats.get('failed_count', 0)
+                result.skipped_count = success_stats.get('skipped_count', 0)
+
+                logger.info(f"智能补全导入完成: 成功={result.success_count}, 失败={result.failed_count}, 跳过={result.skipped_count}")
+
+            finally:
+                loop.close()
+
+        except Exception as e:
+            logger.error(f"智能补全导入失败: {e}")
+            result.failed_records = len(task_config.symbols)
+            result.error_message = str(e)
+            raise
+
+    def _execute_incremental_sync(self, task_config: ImportTaskConfig, result: UnifiedImportResult):
+        """执行增量下载模式导入"""
+        try:
+            from core.services.enhanced_duckdb_data_downloader import get_enhanced_duckdb_data_downloader
+            from core.services.incremental_data_analyzer import get_incremental_data_analyzer
+            from datetime import datetime
+
+            logger.info(f"开始增量下载导入: {len(task_config.symbols)}个股票")
+
+            # 获取服务
+            downloader = get_enhanced_duckdb_data_downloader()
+            analyzer = get_incremental_data_analyzer()
+            if not downloader or not analyzer:
+                raise Exception("无法获取必要的服务")
+
+            incremental_days = getattr(task_config, 'incremental_days', 7)
+            skip_weekends = getattr(task_config, 'skip_weekends', True)
+            skip_holidays = getattr(task_config, 'skip_holidays', True)
+            check_completeness = getattr(task_config, 'check_completeness', True)
+            skip_latest_data = getattr(task_config, 'skip_latest_data', True)
+
+            end_date = datetime.strptime(task_config.end_date, '%Y-%m-%d')
+
+            # 增量分析
+            import asyncio
+
+            async def _incremental_wrapper():
+                # 分析增量需求
+                download_plan = await analyzer.analyze_incremental_requirements(
+                    task_config.symbols,
+                    end_date,
+                    strategy='latest_only',
+                    skip_weekends=skip_weekends,
+                    skip_holidays=skip_holidays,
+                    check_completeness=check_completeness
+                )
+
+                # 如果启用了skip_latest_data，过滤掉已经是最新的符号
+                symbols_to_download = download_plan.symbols_to_download
+                if skip_latest_data:
+                    logger.info(f"启用跳过最新数据选项，正在过滤已有最新数据的股票...")
+                    try:
+                        # 检查哪些符号的数据已是最新
+                        latest_check = await downloader.check_latest_data_status(task_config.symbols)
+                        symbols_to_download = [s for s in symbols_to_download if not latest_check.get(s, True)]
+                        logger.info(f"过滤后需要下载的股票数: {len(symbols_to_download)}/{len(task_config.symbols)}")
+                    except Exception as e:
+                        logger.warning(f"检查最新数据状态失败: {e}，继续使用所有符号进行下载")
+
+                # 执行增量下载
+                success_stats = await downloader.download_incremental_update_all_data(
+                    symbols_to_download,
+                    end_date,
+                    incremental_days,
+                    skip_weekends,
+                    skip_holidays
+                )
+
+                return success_stats
+
+            # 在新的事件循环中执行异步函数
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                success_stats = loop.run_until_complete(_incremental_wrapper())
+
+                # 更新结果统计
+                result.processed_records = success_stats.get('total_symbols', 0)
+                result.success_count = success_stats.get('success_count', 0)
+                result.failed_count = success_stats.get('failed_count', 0)
+                result.skipped_count = success_stats.get('skipped_count', 0)
+
+                logger.info(f"增量下载完成: 成功={result.success_count}, 失败={result.failed_count}, 跳过={result.skipped_count}")
+
+            finally:
+                loop.close()
+
+        except Exception as e:
+            logger.error(f"增量下载失败: {e}")
+            result.failed_records = len(task_config.symbols)
+            result.error_message = str(e)
+            raise
 # 兼容性别名
 DataImportExecutionEngine = UnifiedDataImportEngine

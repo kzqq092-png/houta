@@ -827,6 +827,7 @@ class EnhancedDataImportWidget(QWidget):
         self.ui_adapter = None
         self.ui_synchronizer = None
         self.plugin_manager = plugin_manager  # ✅ 直接保存plugin_manager
+        self.db_manager = None  # ✅ 初始化db_manager以避免AttributeError
 
         # 初始化数据源映射（用于动态加载数据源插件）
         self.data_source_mapping = {}
@@ -1064,6 +1065,7 @@ class EnhancedDataImportWidget(QWidget):
     def create_task_config_group(self) -> QGroupBox:
         """创建扩展任务配置组（合并所有配置，无Tab标签）"""
         group = QGroupBox("任务配置")
+        group.setMinimumHeight(1000)
         group.setFont(QFont("Arial", 10, QFont.Bold))
         main_layout = QVBoxLayout(group)
 
@@ -1159,6 +1161,109 @@ class EnhancedDataImportWidget(QWidget):
         datasource_layout.addRow("📅 时间范围:", date_range_layout)
 
         content_layout.addWidget(datasource_group)
+
+        # ==================== 新增：增量下载配置 ====================
+        incremental_group = QGroupBox("增量下载配置")
+        incremental_layout = QVBoxLayout(incremental_group)
+
+        # 下载模式选择 - 水平排列的单选按钮
+        mode_label = QLabel("下载模式:")
+        mode_label.setStyleSheet("font-weight: bold;")
+        incremental_layout.addWidget(mode_label)
+
+        mode_buttons_layout = QHBoxLayout()
+
+        # 创建单选按钮组
+        from PyQt5.QtWidgets import QRadioButton, QButtonGroup
+        self.mode_button_group = QButtonGroup()
+
+        modes = [
+            ("全量下载", "full", "下载指定时间范围内的所有数据"),
+            ("增量下载", "incremental", "仅下载最新数据（默认7天）"),
+            ("智能补全", "smart_fill", "自动识别并补全缺失数据"),
+            ("间隙填充", "gap_fill", "填充特定范围内的数据间隙")
+        ]
+
+        for i, (label, value, tooltip) in enumerate(modes):
+            radio_btn = QRadioButton(label)
+            radio_btn.setToolTip(tooltip)
+            radio_btn.setProperty("mode_value", value)
+            self.mode_button_group.addButton(radio_btn, i)
+            mode_buttons_layout.addWidget(radio_btn)
+
+            # 第一个按钮默认选中
+            if i == 0:
+                radio_btn.setChecked(True)
+                self.current_download_mode = "full"
+
+        # 连接信号
+        self.mode_button_group.buttonClicked.connect(self._on_mode_button_clicked)
+
+        mode_buttons_layout.addStretch()
+        incremental_layout.addLayout(mode_buttons_layout)
+
+        # 添加分割线
+        from PyQt5.QtWidgets import QFrame
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        incremental_layout.addWidget(separator)
+
+        # 配置区域
+        config_label = QLabel("模式配置:")
+        config_label.setStyleSheet("font-weight: bold;")
+        incremental_layout.addWidget(config_label)
+
+        incremental_config_layout = QGridLayout()
+        incremental_config_layout.setSpacing(10)
+
+        # 回溯天数（增量下载模式）
+        self.incremental_days_label = QLabel("回溯天数:")
+        self.incremental_days_spin = QSpinBox()
+        self.incremental_days_spin.setRange(1, 365)
+        self.incremental_days_spin.setValue(7)
+        self.incremental_days_spin.setToolTip("增量下载的回溯天数（默认：7天）")
+        self.incremental_days_spin.setVisible(False)  # 默认隐藏
+        self.incremental_days_label.setVisible(False)
+        incremental_config_layout.addWidget(self.incremental_days_label, 0, 0)
+        incremental_config_layout.addWidget(self.incremental_days_spin, 0, 1)
+
+        # 补全策略（智能补全模式）
+        self.completion_strategy_label = QLabel("补全策略:")
+        self.completion_strategy_combo = QComboBox()
+        self.completion_strategy_combo.addItems(["全部补全", "仅最近30天", "仅重要数据"])
+        self.completion_strategy_combo.setToolTip("选择数据补全的策略")
+        self.completion_strategy_combo.setVisible(False)  # 默认隐藏
+        self.completion_strategy_label.setVisible(False)
+        incremental_config_layout.addWidget(self.completion_strategy_label, 1, 0)
+        incremental_config_layout.addWidget(self.completion_strategy_combo, 1, 1)
+
+        # 间隙阈值（间隙填充模式）
+        self.gap_threshold_label = QLabel("间隙阈值（天）:")
+        self.gap_threshold_spin = QSpinBox()
+        self.gap_threshold_spin.setRange(1, 365)
+        self.gap_threshold_spin.setValue(30)
+        self.gap_threshold_spin.setToolTip("最大间隙填充天数（默认：30天）")
+        self.gap_threshold_spin.setVisible(False)  # 默认隐藏
+        self.gap_threshold_label.setVisible(False)
+        incremental_config_layout.addWidget(self.gap_threshold_label, 2, 0)
+        incremental_config_layout.addWidget(self.gap_threshold_spin, 2, 1)
+
+        incremental_layout.addLayout(incremental_config_layout)
+
+        # 数据完整性检查选项
+        self.check_completeness_cb = QCheckBox("启用数据完整性检查")
+        self.check_completeness_cb.setChecked(True)
+        self.check_completeness_cb.setToolTip("检查数据连续性，识别缺失日期")
+        incremental_layout.addWidget(self.check_completeness_cb)
+
+        # 自动跳过最新数据选项
+        self.skip_latest_data_cb = QCheckBox("自动跳过已有最新数据")
+        self.skip_latest_data_cb.setChecked(True)
+        self.skip_latest_data_cb.setToolTip("如果数据已是最新，自动跳过下载")
+        incremental_layout.addWidget(self.skip_latest_data_cb)
+
+        content_layout.addWidget(incremental_group)
 
         # ==================== 第三部分：代码选择 ====================
         symbols_group = QGroupBox("🏷️ 股票选择")
@@ -1671,28 +1776,91 @@ class EnhancedDataImportWidget(QWidget):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        # 创建选项化
+        # 创建选项卡
         self.monitor_tabs = QTabWidget()
 
-        # 任务管理选项卡（集成增强功能化
+        # 任务管理选项卡（集成增强功能）
         task_management_tab = self.create_enhanced_task_management_tab()
         self.monitor_tabs.addTab(task_management_tab, "任务管理")
 
-        # AI功能控制面板选项卡化
+        # 增量更新历史选项卡
+        history_tab = self.create_incremental_update_history_tab()
+        self.monitor_tabs.addTab(history_tab, "更新历史")
+
+        # AI功能控制面板选项卡
         ai_control_tab = self.create_ai_control_panel_tab()
         self.monitor_tabs.addTab(ai_control_tab, "AI控制面板")
 
-        # 分布式状态选项卡化
+        # 分布式状态选项卡
         distributed_tab = self.create_distributed_status_tab()
-        self.monitor_tabs.addTab(distributed_tab, "分布式状化")
+        self.monitor_tabs.addTab(distributed_tab, "分布式状态")
 
-        # 数据质量选项化
+        # 数据质量选项卡
         quality_tab = self.create_quality_status_tab()
         self.monitor_tabs.addTab(quality_tab, "数据质量")
+
+        # 新增：数据状态显示选项卡
+        data_status_tab = self.create_data_status_tab()
+        self.monitor_tabs.addTab(data_status_tab, "数据状态")
 
         layout.addWidget(self.monitor_tabs)
 
         return widget
+
+    def create_incremental_update_history_tab(self) -> QWidget:
+        """创建增量更新历史选项卡"""
+        try:
+            # 导入UpdateHistoryWidget
+            from gui.widgets.incremental_update_history_widget import UpdateHistoryWidget
+
+            # 创建历史组件
+            history_widget = UpdateHistoryWidget()
+
+            # 保存引用以便后续使用
+            self.incremental_update_history = history_widget
+
+            # 如果有导入引擎，连接信号
+            if self.import_engine:
+                try:
+                    self.import_engine.task_completed.connect(
+                        lambda task_id, result: self._on_task_completed_update_history(task_id, result)
+                    )
+                except Exception as e:
+                    logger.warning(f"连接导入引擎信号失败: {e}") if logger else None
+
+            return history_widget
+
+        except ImportError as e:
+            logger.warning(f"UpdateHistoryWidget导入失败: {e}") if logger else None
+            return self._create_basic_history_tab()
+
+    def _create_basic_history_tab(self) -> QWidget:
+        """创建基础历史选项卡（回退版本）"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # 提示信息
+        info_label = QLabel("增量更新历史")
+        info_label.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
+        layout.addWidget(info_label)
+
+        # 历史显示区域
+        history_text = QTextEdit()
+        history_text.setPlainText("增量更新历史组件暂不可用，请检查相关依赖")
+        history_text.setReadOnly(True)
+        layout.addWidget(history_text)
+
+        return widget
+
+    def _on_task_completed_update_history(self, task_id: str, result: object):
+        """当任务完成时更新历史记录"""
+        try:
+            if hasattr(self, 'incremental_update_history'):
+                # 刷新历史组件数据
+                self.incremental_update_history.refresh_history()
+                logger.info(f"已更新增量更新历史记录") if logger else None
+        except Exception as e:
+            logger.warning(f"更新历史记录失败: {e}") if logger else None
 
     def create_enhanced_task_management_tab(self) -> QWidget:
         """创建增强任务管理选项化"""
@@ -2025,6 +2193,997 @@ class EnhancedDataImportWidget(QWidget):
             logger.error(f"设置响应式布局失败: {e}")
             self.responsive_manager = None
 
+    def create_data_status_tab(self) -> QWidget:
+        """创建数据状态显示选项卡 - 支持多资产类型"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # 资产类型选择
+        asset_type_layout = QHBoxLayout()
+        asset_type_layout.addWidget(QLabel("选择资产类型:"))
+        self.status_asset_type_combo = QComboBox()
+        from core.ui_asset_type_utils import get_asset_type_combo_items
+        self.status_asset_type_combo.addItems(get_asset_type_combo_items())
+        self.status_asset_type_combo.currentTextChanged.connect(self._on_status_asset_type_changed)
+        asset_type_layout.addWidget(self.status_asset_type_combo)
+        asset_type_layout.addStretch()
+        layout.addLayout(asset_type_layout)
+
+        # 数据状态总览
+        overview_group = QGroupBox("数据状态总览")
+        overview_layout = QGridLayout(overview_group)
+
+        overview_layout.addWidget(QLabel("资产总数:"), 0, 0)
+        self.total_stocks_label = QLabel("0")
+        overview_layout.addWidget(self.total_stocks_label, 0, 1)
+
+        overview_layout.addWidget(QLabel("已下载:"), 1, 0)
+        self.downloaded_stocks_label = QLabel("0")
+        overview_layout.addWidget(self.downloaded_stocks_label, 1, 1)
+
+        overview_layout.addWidget(QLabel("待更新:"), 2, 0)
+        self.pending_update_label = QLabel("0")
+        overview_layout.addWidget(self.pending_update_label, 2, 1)
+
+        overview_layout.addWidget(QLabel("有数据缺口:"), 3, 0)
+        self.data_gaps_label = QLabel("0")
+        overview_layout.addWidget(self.data_gaps_label, 3, 1)
+
+        layout.addWidget(overview_group)
+
+        # 增量下载配置
+        incremental_group = QGroupBox("增量下载配置")
+        incremental_layout = QFormLayout(incremental_group)
+
+        # 增量下载模式
+        self.incremental_mode_combo = QComboBox()
+        self.incremental_mode_combo.addItems([
+            "最新数据",  # LATEST_ONLY
+            "缺失数据",  # MISSING_ONLY
+            "间隙填充",  # GAP_FILL
+            "智能补全"   # SMART_FILL
+        ])
+        self.incremental_mode_combo.setToolTip("选择增量下载策略")
+        incremental_layout.addRow("下载模式:", self.incremental_mode_combo)
+
+        # 回溯天数
+        self.lookback_days_spin = QSpinBox()
+        self.lookback_days_spin.setRange(1, 365)
+        self.lookback_days_spin.setValue(7)
+        self.lookback_days_spin.setToolTip("回溯的天数（仅最新数据模式有效）")
+        incremental_layout.addRow("回溯天数:", self.lookback_days_spin)
+
+        # 最小记录数阈值
+        self.min_records_spin = QSpinBox()
+        self.min_records_spin.setRange(1, 1000)
+        self.min_records_spin.setValue(10)
+        self.min_records_spin.setToolTip("最少记录数，低于此数量则跳过下载")
+        incremental_layout.addRow("最小记录数:", self.min_records_spin)
+
+        layout.addWidget(incremental_group)
+
+        # 数据状态详情
+        details_group = QGroupBox("数据状态详情")
+        details_layout = QVBoxLayout(details_group)
+
+        # 创建表格
+        self.data_status_table = QTableWidget()
+        self.data_status_table.setColumnCount(7)
+        self.data_status_table.setHorizontalHeaderLabels([
+            "代码", "名称", "最新日期", "完整性", "状态", "缺口数", "操作"
+        ])
+
+        # 设置列宽
+        self.data_status_table.setColumnWidth(0, 80)   # 代码
+        self.data_status_table.setColumnWidth(1, 120)  # 名称
+        self.data_status_table.setColumnWidth(2, 120)  # 最新日期
+        self.data_status_table.setColumnWidth(3, 80)   # 完整性
+        self.data_status_table.setColumnWidth(4, 80)   # 状态
+        self.data_status_table.setColumnWidth(5, 60)   # 缺口数
+        self.data_status_table.setColumnWidth(6, 100)  # 操作
+
+        # 设置表头不可编辑
+        self.data_status_table.horizontalHeader().setStretchLastSection(True)
+
+        details_layout.addWidget(self.data_status_table)
+
+        layout.addWidget(details_group)
+
+        # 控制按钮
+        control_group = QGroupBox("数据状态操作")
+        control_layout = QHBoxLayout(control_group)
+
+        self.refresh_status_btn = QPushButton("刷新状态")
+        self.refresh_status_btn.clicked.connect(self.refresh_data_status)
+        control_layout.addWidget(self.refresh_status_btn)
+
+        self.analyze_gaps_btn = QPushButton("分析缺口")
+        self.analyze_gaps_btn.clicked.connect(self.analyze_data_gaps)
+        control_layout.addWidget(self.analyze_gaps_btn)
+
+        self.fix_gaps_btn = QPushButton("修复缺口")
+        self.fix_gaps_btn.clicked.connect(self.fix_data_gaps)
+        control_layout.addWidget(self.fix_gaps_btn)
+
+        layout.addWidget(control_group)
+
+        # 状态信息
+        self.data_status_info = QTextEdit()
+        self.data_status_info.setMaximumHeight(150)
+        self.data_status_info.setReadOnly(True)
+        layout.addWidget(self.data_status_info)
+
+        layout.addStretch()
+        return widget
+
+    def _on_status_asset_type_changed(self, asset_type: str):
+        """数据状态页面的资产类型变化事件"""
+        try:
+            logger.info(f"数据状态页面资产类型已切换至: {asset_type}")
+            # 清空表格
+            self.data_status_table.setRowCount(0)
+            # 重置统计标签
+            self.total_stocks_label.setText("0")
+            self.downloaded_stocks_label.setText("0")
+            self.pending_update_label.setText("0")
+            self.data_gaps_label.setText("0")
+            self.data_status_info.clear()
+            self.data_status_info.append(f'已切换至 {asset_type}，请点击"刷新状态"按钮查看数据')
+        except Exception as e:
+            logger.error(f"资产类型切换失败: {e}")
+
+    def refresh_data_status(self):
+        """刷新数据状态 - 支持所有资产类型"""
+        try:
+            self.data_status_info.clear()
+            self.data_status_info.append("正在刷新数据状态...")
+
+            # 获取当前选择的资产类型
+            asset_type = self.status_asset_type_combo.currentText() if hasattr(self, 'status_asset_type_combo') else "股票"
+
+            # 获取该资产类型的所有符号
+            symbols = self.get_all_symbols(asset_type)
+            if not symbols:
+                self.data_status_info.append(f"未找到 {asset_type} 数据")
+                return
+
+            self.total_stocks_label.setText(str(len(symbols)))
+
+            # 初始化计数器
+            downloaded_count = 0
+            pending_count = 0
+            gaps_count = 0
+
+            # 清空表格
+            self.data_status_table.setRowCount(0)
+
+            # 获取当前日期
+            from datetime import datetime, timedelta
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=30)
+
+            # 获取UnifiedDataManager用于查询数据
+            from core.services.unified_data_manager import get_unified_data_manager
+            data_manager = get_unified_data_manager()
+
+            if not data_manager:
+                self.data_status_info.append("错误: 无法获取数据管理器")
+                return
+
+            # 检查每个符号的状态
+            for symbol in symbols[:100]:  # 限制前100个避免界面卡顿
+                try:
+                    # 方案1: 尝试直接从DuckDB查询获取最新日期和数据完整性
+                    latest_date = self._get_latest_date_from_db(symbol, asset_type)
+
+                    # 计算数据完整性和状态
+                    completeness_percentage = self._calculate_completeness(symbol, asset_type, start_date, end_date)
+
+                    # 确定状态
+                    if latest_date is None:
+                        status = "未下载"
+                        pending_count += 1
+                    elif (end_date - latest_date).days > 7:
+                        status = "需更新"
+                        pending_count += 1
+                    elif completeness_percentage < 95:
+                        status = "有缺口"
+                        gaps_count += 1
+                        pending_count += 1
+                    else:
+                        status = "正常"
+                        downloaded_count += 1
+
+                    # 添加到表格
+                    row = self.data_status_table.rowCount()
+                    self.data_status_table.insertRow(row)
+
+                    self.data_status_table.setItem(row, 0, QTableWidgetItem(symbol))
+                    self.data_status_table.setItem(row, 1, QTableWidgetItem(""))  # 名称待填充
+
+                    # 格式化最新日期
+                    latest_date_str = latest_date.strftime("%Y-%m-%d") if latest_date else "无"
+                    self.data_status_table.setItem(row, 2, QTableWidgetItem(latest_date_str))
+
+                    # 完整性百分比
+                    completeness_str = f"{completeness_percentage:.1f}%"
+                    self.data_status_table.setItem(row, 3, QTableWidgetItem(completeness_str))
+
+                    # 状态
+                    status_item = QTableWidgetItem(status)
+                    # 根据状态设置颜色
+                    if status == "正常":
+                        status_item.setBackground(QColor(144, 238, 144))  # 浅绿色
+                    elif status == "需更新":
+                        status_item.setBackground(QColor(255, 255, 144))  # 浅黄色
+                    elif status == "有缺口":
+                        status_item.setBackground(QColor(255, 144, 144))  # 浅红色
+                    else:
+                        status_item.setBackground(QColor(200, 200, 200))  # 浅灰色
+
+                    self.data_status_table.setItem(row, 4, status_item)
+
+                    # 缺口数 (简化计算)
+                    missing_count = max(0, int(30 * (1 - completeness_percentage / 100)))
+                    self.data_status_table.setItem(row, 5, QTableWidgetItem(str(missing_count)))
+
+                    # 操作按钮
+                    action_widget = QWidget()
+                    action_layout = QHBoxLayout(action_widget)
+                    action_layout.setContentsMargins(2, 2, 2, 2)
+
+                    details_btn = QPushButton("详情")
+                    details_btn.setMaximumWidth(40)
+                    details_btn.clicked.connect(lambda checked, s=symbol: self.show_symbol_details(s))
+
+                    update_btn = QPushButton("更新")
+                    update_btn.setMaximumWidth(40)
+                    update_btn.clicked.connect(lambda checked, s=symbol: self.update_single_symbol(s))
+
+                    action_layout.addWidget(details_btn)
+                    action_layout.addWidget(update_btn)
+                    action_layout.addStretch()
+
+                    self.data_status_table.setCellWidget(row, 6, action_widget)
+
+                except Exception as e:
+                    logger.warning(f"检查 {symbol} 状态失败: {e}")
+                    continue
+
+            # 更新统计标签
+            self.downloaded_stocks_label.setText(str(downloaded_count))
+            self.pending_update_label.setText(str(pending_count))
+            self.data_gaps_label.setText(str(gaps_count))
+
+            self.data_status_info.append(f"状态刷新完成！共检查 {len(symbols[:100])} 个资产")
+            self.data_status_info.append(f"正常: {downloaded_count}, 需更新: {pending_count}, 有缺口: {gaps_count}")
+
+        except Exception as e:
+            logger.error(f"刷新数据状态失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            self.data_status_info.append(f"刷新失败: {str(e)}")
+
+    def _get_latest_date_from_db(self, symbol: str, asset_type: str) -> Optional:
+        """
+        从数据库获取符号的最新日期
+
+        Args:
+            symbol: 资产符号
+            asset_type: 资产类型（UI显示名称）
+
+        Returns:
+            最新日期或None
+        """
+        try:
+            # 资产类型映射到表名
+            table_mappings = {
+                "股票": "daily_kline_data",
+                "指数": "index_kline_data",
+                "期货": "futures_kline_data",
+                "基金": "fund_kline_data",
+                "债券": "bond_kline_data",
+                "加密货币": "crypto_kline_data",
+                "外汇": "forex_kline_data"
+            }
+
+            table_name = table_mappings.get(asset_type, "daily_kline_data")
+
+            # 直接SQL查询获取最新日期
+            from core.database.duckdb_manager import get_connection_manager
+            conn_manager = get_connection_manager()
+
+            if conn_manager:
+                conn = conn_manager.get_connection()
+                try:
+                    result = conn.execute(
+                        f"SELECT MAX(datetime) as latest_date FROM {table_name} WHERE symbol = '{symbol}'"
+                    ).fetchall()
+
+                    if result and result[0][0]:
+                        from datetime import datetime
+                        date_str = result[0][0]
+                        # 处理可能的日期格式
+                        if isinstance(date_str, str):
+                            return datetime.fromisoformat(date_str)
+                        else:
+                            return date_str
+                    return None
+                except Exception as e:
+                    logger.debug(f"从{table_name}查询{symbol}最新日期失败: {e}")
+                    return None
+            return None
+
+        except Exception as e:
+            logger.debug(f"获取{symbol}最新日期异常: {e}")
+            return None
+
+    def _calculate_completeness(self, symbol: str, asset_type: str, start_date, end_date) -> float:
+        """
+        计算数据完整性百分比
+
+        Args:
+            symbol: 资产符号
+            asset_type: 资产类型
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            完整性百分比 (0-100)
+        """
+        try:
+            table_mappings = {
+                "股票": "daily_kline_data",
+                "指数": "index_kline_data",
+                "期货": "futures_kline_data",
+                "基金": "fund_kline_data",
+                "债券": "bond_kline_data",
+                "加密货币": "crypto_kline_data",
+                "外汇": "forex_kline_data"
+            }
+
+            table_name = table_mappings.get(asset_type, "daily_kline_data")
+
+            from core.database.duckdb_manager import get_connection_manager
+            conn_manager = get_connection_manager()
+
+            if conn_manager:
+                conn = conn_manager.get_connection()
+                try:
+                    # 计算指定日期范围内的数据记录数
+                    result = conn.execute(f"""
+                        SELECT COUNT(*) as count FROM {table_name}
+                        WHERE symbol = '{symbol}'
+                        AND datetime >= '{start_date.strftime('%Y-%m-%d')}'
+                        AND datetime <= '{end_date.strftime('%Y-%m-%d')}'
+                    """).fetchall()
+
+                    if result:
+                        actual_records = result[0][0]
+                        # 估算的交易天数 (假设每个月20个交易日)
+                        days_diff = (end_date - start_date).days
+                        expected_records = max(1, int(days_diff * 0.67))  # 约67%的天数是交易日
+
+                        completeness = min(100, (actual_records / expected_records) * 100) if expected_records > 0 else 0
+                        return completeness
+                    return 0
+                except Exception as e:
+                    logger.debug(f"计算{symbol}完整性失败: {e}")
+                    return 0
+            return 0
+
+        except Exception as e:
+            logger.debug(f"计算完整性异常: {e}")
+            return 0
+
+    def get_all_symbols(self, asset_type: str = "股票") -> List[str]:
+        """
+        获取指定资产类型的所有符号
+
+        支持多种资产类型：股票、指数、期货、基金、债券、加密货币等
+        从UnifiedDataManager获取符号列表，支持多种数据源。
+
+        Args:
+            asset_type: 资产类型，默认为"股票"
+
+        Returns:
+            所有符号的列表，如果获取失败则返回空列表
+        """
+        try:
+            # 资产类型映射
+            asset_type_mapping = {
+                "股票": "stock",
+                "指数": "index",
+                "期货": "futures",
+                "基金": "fund",
+                "债券": "bond",
+                "加密货币": "crypto",
+                "外汇": "forex"
+            }
+
+            asset_type_value = asset_type_mapping.get(asset_type, "stock")
+
+            # 方案1: 优先从UnifiedDataManager获取
+            from core.services.unified_data_manager import get_unified_data_manager
+            data_manager = get_unified_data_manager()
+
+            if data_manager:
+                try:
+                    # 获取资产列表（包含所有市场）
+                    asset_df = data_manager.get_asset_list(asset_type=asset_type_value, market='all')
+                    if asset_df is not None and not asset_df.empty:
+                        # 提取symbol或code列
+                        if 'code' in asset_df.columns:
+                            symbols = asset_df['code'].tolist()
+                        elif 'symbol' in asset_df.columns:
+                            symbols = asset_df['symbol'].tolist()
+                        else:
+                            logger.warning(f"数据框中找不到code或symbol列: {asset_df.columns.tolist()}")
+                            return []
+
+                        logger.info(f"✅ 成功获取 {len(symbols)} 个{asset_type}符号")
+                        return symbols
+                except Exception as e:
+                    logger.warning(f"从UnifiedDataManager获取{asset_type}列表失败: {e}")
+
+            # 方案2: 备用方案 - 直接从DuckDB查询
+            try:
+                from core.database.duckdb_manager import get_connection_manager
+                conn_manager = get_connection_manager()
+
+                if conn_manager:
+                    conn = conn_manager.get_connection()
+
+                    # 尝试从asset_metadata表查询
+                    try:
+                        # 资产类型在数据库中的表示形式
+                        asset_type_db_mapping = {
+                            "stock": "stock_a",
+                            "index": "index",
+                            "futures": "futures",
+                            "fund": "fund",
+                            "bond": "bond",
+                            "crypto": "crypto",
+                            "forex": "forex"
+                        }
+                        asset_type_db_value = asset_type_db_mapping.get(asset_type_value, "stock_a")
+
+                        query = f"""
+                        SELECT DISTINCT symbol FROM asset_metadata
+                        WHERE asset_type = '{asset_type_db_value}'
+                        ORDER BY symbol
+                        """
+                        result = conn.execute(query).fetchall()
+
+                        if result:
+                            symbols = [row[0] for row in result]
+                            logger.info(f"✅ 从数据库成功获取 {len(symbols)} 个{asset_type}符号")
+                            return symbols
+                    except Exception as e:
+                        logger.debug(f"从asset_metadata查询失败: {e}")
+
+                    # 尝试从各类型数据表查询（备用方案）
+                    table_mappings = {
+                        "stock": "daily_kline_data",
+                        "index": "index_kline_data",
+                        "futures": "futures_kline_data",
+                        "fund": "fund_kline_data",
+                        "bond": "bond_kline_data",
+                        "crypto": "crypto_kline_data",
+                        "forex": "forex_kline_data"
+                    }
+
+                    table_name = table_mappings.get(asset_type_value, "daily_kline_data")
+
+                    try:
+                        result = conn.execute(
+                            f"SELECT DISTINCT symbol FROM {table_name} ORDER BY symbol LIMIT 10000"
+                        ).fetchall()
+
+                        if result:
+                            symbols = [row[0] for row in result]
+                            logger.info(f"✅ 从 {table_name} 表成功获取 {len(symbols)} 个{asset_type}符号")
+                            return symbols
+                    except Exception as e:
+                        logger.debug(f"从{table_name}查询失败: {e}")
+
+            except Exception as e:
+                logger.warning(f"从数据库获取{asset_type}列表失败: {e}")
+
+            # 如果所有方案都失败，返回空列表
+            logger.error(f"无法获取 {asset_type} 符号，请检查数据库配置和数据源")
+            return []
+
+        except Exception as e:
+            logger.error(f"get_all_symbols执行异常: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+
+    def _ensure_db_manager(self) -> bool:
+        """
+        确保db_manager已初始化
+
+        Returns:
+            是否成功初始化db_manager
+        """
+        if self.db_manager:
+            return True
+
+        try:
+            from core.database.duckdb_manager import get_connection_manager
+            self.db_manager = get_connection_manager()
+            if self.db_manager:
+                logger.info("✅ db_manager初始化成功")
+                return True
+            else:
+                logger.error("❌ db_manager初始化失败: get_connection_manager返回None")
+                return False
+        except Exception as e:
+            logger.error(f"❌ db_manager初始化异常: {e}")
+            return False
+
+    def analyze_data_gaps(self):
+        """分析数据缺口"""
+        try:
+            self.data_status_info.clear()
+            self.data_status_info.append("开始分析数据缺口...")
+
+            # 获取需要分析的资产
+            symbols = []
+            for row in range(self.data_status_table.rowCount()):
+                status_item = self.data_status_table.item(row, 4)
+                if status_item and status_item.text() in ["需更新", "有缺口"]:
+                    symbol = self.data_status_table.item(row, 0).text()
+                    symbols.append(symbol)
+
+            if not symbols:
+                self.data_status_info.append("没有需要分析缺口的资产")
+                return
+
+            # 获取当前选择的资产类型
+            asset_type = self.status_asset_type_combo.currentText() if hasattr(self, 'status_asset_type_combo') else "股票"
+
+            # 获取当前日期
+            from datetime import datetime, timedelta
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=90)
+
+            # 分析缺口
+            gap_count = 0
+            for symbol in symbols:
+                try:
+                    completeness = self._calculate_completeness(symbol, asset_type, start_date, end_date)
+                    if completeness < 95:
+                        gap_count += 1
+                        self.data_status_info.append(f"{symbol}: 完整性 {completeness:.1f}%")
+                except Exception as e:
+                    logger.debug(f"分析{symbol}缺口失败: {e}")
+
+            self.data_status_info.append(f"\n分析完成：共发现 {gap_count} 个资产存在数据缺口")
+
+        except Exception as e:
+            logger.error(f"分析数据缺口失败: {e}")
+            self.data_status_info.append(f"分析失败: {str(e)}")
+
+    def fix_data_gaps(self):
+        """修复数据缺口"""
+        try:
+            self.data_status_info.clear()
+            self.data_status_info.append("开始修复数据缺口...")
+
+            # 获取需要修复的股票
+            symbols_to_fix = []
+            for row in range(self.data_status_table.rowCount()):
+                status_item = self.data_status_table.item(row, 4)
+                if status_item and status_item.text() == "有缺口":
+                    symbol = self.data_status_table.item(row, 0).text()
+                    symbols_to_fix.append(symbol)
+
+            if not symbols_to_fix:
+                self.data_status_info.append("没有需要修复缺口的股票")
+                return
+
+            self.data_status_info.append(f"准备修复 {len(symbols_to_fix)} 只股票的数据缺口...")
+
+            # 创建增量下载器并设置间隙填充模式
+            from datetime import datetime
+            from core.services.incremental_data_analyzer import DownloadStrategy
+
+            if hasattr(self, 'download_service'):
+                # 设置间隙填充策略
+                self.download_service.set_download_strategy(DownloadStrategy.GAP_FILL)
+
+                # 开始下载
+                future = asyncio.get_event_loop().run_until_complete(
+                    self.download_service.download_incremental_data(
+                        symbols=symbols_to_fix,
+                        end_date=datetime.now(),
+                        strategy=DownloadStrategy.GAP_FILL,
+                        skip_weekends=True,
+                        skip_holidays=True
+                    )
+                )
+
+                self.data_status_info.append("缺口修复任务已启动，请查看进度监控标签页")
+            else:
+                self.data_status_info.append("下载服务未初始化，无法修复缺口")
+
+        except Exception as e:
+            logger.error(f"修复数据缺口失败: {e}")
+            self.data_status_info.append(f"修复失败: {str(e)}")
+
+    def show_symbol_details(self, symbol: str):
+        """显示资产详情"""
+        try:
+            from datetime import datetime, timedelta
+
+            # 获取当前选择的资产类型
+            asset_type = self.status_asset_type_combo.currentText() if hasattr(self, 'status_asset_type_combo') else "股票"
+
+            # 获取当前日期
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=30)
+
+            # 获取最新日期
+            latest_date = self._get_latest_date_from_db(symbol, asset_type)
+
+            # 计算完整性
+            completeness = self._calculate_completeness(symbol, asset_type, start_date, end_date)
+
+            # 显示详情
+            details = f"\n资产 {symbol} 数据详情:\n"
+            details += f"资产类型: {asset_type}\n"
+            details += f"最新日期: {latest_date.strftime('%Y-%m-%d') if latest_date else '无'}\n"
+            details += f"完整性: {completeness:.1f}%\n"
+            details += f"查询区间: {start_date.strftime('%Y-%m-%d')} 至 {end_date.strftime('%Y-%m-%d')}\n"
+
+            self.data_status_info.append(details)
+
+        except Exception as e:
+            logger.error(f"显示{symbol}详情失败: {e}")
+            self.data_status_info.append(f"详情获取失败: {str(e)}")
+
+    def update_single_symbol(self, symbol: str):
+        """更新单个股票"""
+        try:
+            from datetime import datetime
+            from core.services.incremental_data_analyzer import DownloadStrategy
+
+            if hasattr(self, 'download_service'):
+                # 设置最新数据策略
+                self.download_service.set_download_strategy(DownloadStrategy.LATEST_ONLY)
+
+                # 开始下载
+                future = asyncio.get_event_loop().run_until_complete(
+                    self.download_service.download_incremental_data(
+                        symbols=[symbol],
+                        end_date=datetime.now(),
+                        strategy=DownloadStrategy.LATEST_ONLY,
+                        skip_weekends=True,
+                        skip_holidays=True
+                    )
+                )
+
+                self.data_status_info.append(f"已启动 {symbol} 的增量更新任务")
+            else:
+                self.data_status_info.append("下载服务未初始化，无法更新股票")
+
+        except Exception as e:
+            logger.error(f"更新股票失败: {e}")
+            self.data_status_info.append(f"更新失败: {str(e)}")
+
+    def create_detailed_progress_display(self):
+        """创建详细进度显示"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # 进度总览
+        overview_group = QGroupBox("任务总览")
+        overview_layout = QGridLayout(overview_group)
+
+        overview_layout.addWidget(QLabel("任务ID:"), 0, 0)
+        self.task_id_label = QLabel("无")
+        overview_layout.addWidget(self.task_id_label, 0, 1)
+
+        overview_layout.addWidget(QLabel("任务名称:"), 1, 0)
+        self.task_name_label = QLabel("无")
+        overview_layout.addWidget(self.task_name_label, 1, 1)
+
+        overview_layout.addWidget(QLabel("开始时间:"), 2, 0)
+        self.start_time_label = QLabel("无")
+        overview_layout.addWidget(self.start_time_label, 2, 1)
+
+        overview_layout.addWidget(QLabel("运行时间:"), 3, 0)
+        self.elapsed_time_label = QLabel("00:00:00")
+        overview_layout.addWidget(self.elapsed_time_label, 3, 1)
+
+        layout.addWidget(overview_group)
+
+        # 进度条和统计
+        progress_group = QGroupBox("下载进度")
+        progress_layout = QVBoxLayout(progress_group)
+
+        # 总进度条
+        progress_layout.addWidget(QLabel("总体进度:"))
+        self.total_progress_bar = QProgressBar()
+        self.total_progress_bar.setRange(0, 100)
+        self.total_progress_bar.setValue(0)
+        progress_layout.addWidget(self.total_progress_bar)
+
+        # 详细统计
+        stats_layout = QHBoxLayout()
+
+        # 左侧统计
+        left_stats = QVBoxLayout()
+        left_stats.addWidget(QLabel("成功:"))
+        self.success_count_label = QLabel("0")
+        left_stats.addWidget(self.success_count_label)
+
+        left_stats.addWidget(QLabel("失败:"))
+        self.failed_count_label = QLabel("0")
+        left_stats.addWidget(self.failed_count_label)
+
+        left_stats.addWidget(QLabel("跳过:"))
+        self.skipped_count_label = QLabel("0")
+        left_stats.addWidget(self.skipped_count_label)
+
+        progress_layout.addLayout(left_stats)
+
+        # 右侧统计
+        right_stats = QVBoxLayout()
+        right_stats.addWidget(QLabel("总记录:"))
+        self.total_records_label = QLabel("0")
+        right_stats.addWidget(self.total_records_label)
+
+        right_stats.addWidget(QLabel("当前批次:"))
+        self.current_batch_label = QLabel("0/0")
+        right_stats.addWidget(self.current_batch_label)
+
+        right_stats.addWidget(QLabel("速度:"))
+        self.speed_label = QLabel("0 记录/秒")
+        right_stats.addWidget(self.speed_label)
+
+        progress_layout.addLayout(right_stats)
+
+        layout.addWidget(progress_group)
+
+        # 实时日志
+        log_group = QGroupBox("实时日志")
+        log_layout = QVBoxLayout(log_group)
+
+        self.progress_log = QTextEdit()
+        self.progress_log.setMaximumHeight(200)
+        self.progress_log.setReadOnly(True)
+        log_layout.addWidget(self.progress_log)
+
+        layout.addWidget(log_group)
+
+        # 控制按钮
+        control_group = QGroupBox("任务控制")
+        control_layout = QHBoxLayout(control_group)
+
+        self.pause_btn = QPushButton("暂停")
+        self.pause_btn.clicked.connect(self.toggle_pause_task)
+        self.pause_btn.setEnabled(False)
+        control_layout.addWidget(self.pause_btn)
+
+        self.cancel_btn = QPushButton("取消")
+        self.cancel_btn.clicked.connect(self.cancel_task)
+        self.cancel_btn.setEnabled(False)
+        control_layout.addWidget(self.cancel_btn)
+
+        self.reset_btn = QPushButton("重置")
+        self.reset_btn.clicked.connect(self.reset_progress_display)
+        control_layout.addWidget(self.reset_btn)
+
+        layout.addWidget(control_group)
+
+        # 符号详情表格
+        details_group = QGroupBox("符号下载详情")
+        details_layout = QVBoxLayout(details_group)
+
+        self.symbol_progress_table = QTableWidget()
+        self.symbol_progress_table.setColumnCount(6)
+        self.symbol_progress_table.setHorizontalHeaderLabels([
+            "代码", "状态", "已下载", "总记录", "进度", "错误"
+        ])
+
+        # 设置列宽
+        self.symbol_progress_table.setColumnWidth(0, 80)   # 代码
+        self.symbol_progress_table.setColumnWidth(1, 80)   # 状态
+        self.symbol_progress_table.setColumnWidth(2, 80)   # 已下载
+        self.symbol_progress_table.setColumnWidth(3, 80)   # 总记录
+        self.symbol_progress_table.setColumnWidth(4, 100)  # 进度
+        self.symbol_progress_table.setColumnWidth(5, 200)  # 错误
+
+        details_layout.addWidget(self.symbol_progress_table)
+        layout.addWidget(details_group)
+
+        return widget
+
+    def toggle_pause_task(self):
+        """切换任务暂停状态"""
+        try:
+            if hasattr(self, 'current_task_id'):
+                # 实现暂停/恢复逻辑
+                self.progress_log.append("暂停/恢复功能待实现")
+            else:
+                self.progress_log.append("没有运行中的任务")
+        except Exception as e:
+            logger.error(f"切换任务状态失败: {e}")
+            self.progress_log.append(f"操作失败: {str(e)}")
+
+    def cancel_task(self):
+        """取消当前任务"""
+        try:
+            if hasattr(self, 'current_task_id'):
+                # 实现取消逻辑
+                self.progress_log.append("取消功能待实现")
+            else:
+                self.progress_log.append("没有运行中的任务")
+        except Exception as e:
+            logger.error(f"取消任务失败: {e}")
+            self.progress_log.append(f"操作失败: {str(e)}")
+
+    def reset_progress_display(self):
+        """重置进度显示"""
+        self.task_id_label.setText("无")
+        self.task_name_label.setText("无")
+        self.start_time_label.setText("无")
+        self.elapsed_time_label.setText("00:00:00")
+
+        self.total_progress_bar.setValue(0)
+        self.success_count_label.setText("0")
+        self.failed_count_label.setText("0")
+        self.skipped_count_label.setText("0")
+        self.total_records_label.setText("0")
+        self.current_batch_label.setText("0/0")
+        self.speed_label.setText("0 记录/秒")
+
+        self.progress_log.clear()
+        self.symbol_progress_table.setRowCount(0)
+
+        self.pause_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(False)
+
+        if hasattr(self, 'current_task_id'):
+            delattr(self, 'current_task_id')
+
+    def update_task_progress(self, task_id: str, progress: float, success_count: int,
+                             failed_count: int, skipped_count: int, total_records: int,
+                             batch_info: str = "", errors: dict = None):
+        """更新任务进度"""
+        try:
+            # 保存任务ID
+            self.current_task_id = task_id
+
+            # 更新基本进度信息
+            self.total_progress_bar.setValue(int(progress))
+            self.success_count_label.setText(str(success_count))
+            self.failed_count_label.setText(str(failed_count))
+            self.skipped_count_label.setText(str(skipped_count))
+            self.total_records_label.setText(str(total_records))
+
+            if batch_info:
+                self.current_batch_label.setText(batch_info)
+
+            # 更新运行时间
+            if hasattr(self, 'start_time'):
+                elapsed = datetime.now() - self.start_time
+                self.elapsed_time_label.setText(str(elapsed).split('.')[0])
+
+                # 计算速度
+                if elapsed.total_seconds() > 0 and total_records > 0:
+                    speed = total_records / elapsed.total_seconds()
+                    self.speed_label.setText(f"{speed:.1f} 记录/秒")
+
+            # 更新日志
+            self.progress_log.append(f"进度更新: {progress:.1f}% | 成功: {success_count} | 失败: {failed_count}")
+
+            # 更新符号详情表格
+            if errors:
+                for symbol, error in errors.items():
+                    self.add_symbol_progress_row(symbol, "失败", 0, 0, 0, error)
+            elif hasattr(self, 'last_updated_symbols'):
+                for symbol in self.last_updated_symbols:
+                    self.add_symbol_progress_row(symbol, "成功", 1, 1, 100, "")
+
+        except Exception as e:
+            logger.error(f"更新任务进度失败: {e}")
+
+    def add_symbol_progress_row(self, symbol: str, status: str, downloaded: int,
+                                total: int, progress: int, error: str):
+        """添加符号进度行"""
+        try:
+            row = self.symbol_progress_table.rowCount()
+
+            # 检查是否已存在该符号的行
+            existing_row = -1
+            for i in range(self.symbol_progress_table.rowCount()):
+                if self.symbol_progress_table.item(i, 0).text() == symbol:
+                    existing_row = i
+                    break
+
+            if existing_row >= 0:
+                # 更新现有行
+                row = existing_row
+            else:
+                # 插入新行
+                self.symbol_progress_table.insertRow(row)
+
+            # 设置单元格内容
+            self.symbol_progress_table.setItem(row, 0, QTableWidgetItem(symbol))
+
+            status_item = QTableWidgetItem(status)
+            # 根据状态设置颜色
+            if status == "成功":
+                status_item.setBackground(QColor(144, 238, 144))  # 浅绿色
+            elif status == "失败":
+                status_item.setBackground(QColor(255, 144, 144))  # 浅红色
+            else:
+                status_item.setBackground(QColor(255, 255, 144))  # 浅黄色
+
+            self.symbol_progress_table.setItem(row, 1, status_item)
+            self.symbol_progress_table.setItem(row, 2, QTableWidgetItem(str(downloaded)))
+            self.symbol_progress_table.setItem(row, 3, QTableWidgetItem(str(total)))
+
+            progress_item = QTableWidgetItem(f"{progress}%")
+            self.symbol_progress_table.setItem(row, 4, progress_item)
+
+            error_item = QTableWidgetItem(error)
+            self.symbol_progress_table.setItem(row, 5, error_item)
+
+        except Exception as e:
+            logger.error(f"添加符号进度行失败: {e}")
+
+    def start_detailed_progress_monitoring(self, task_name: str):
+        """开始详细进度监控"""
+        try:
+            import time
+
+            # 记录开始时间
+            self.start_time = datetime.now()
+
+            # 设置任务信息
+            self.task_name_label.setText(task_name)
+            self.task_id_label.setText(f"TASK_{int(time.time())}")
+            self.start_time_label.setText(self.start_time.strftime("%Y-%m-%d %H:%M:%S"))
+
+            # 启用控制按钮
+            self.pause_btn.setEnabled(True)
+            self.cancel_btn.setEnabled(True)
+
+            # 清空日志
+            self.progress_log.clear()
+            self.progress_log.append(f"任务 '{task_name}' 开始执行...")
+
+            # 开始监控循环（在实际实现中，这应该通过事件或定时器实现）
+            self.monitor_task_progress()
+
+        except Exception as e:
+            logger.error(f"开始进度监控失败: {e}")
+            self.progress_log.append(f"启动失败: {str(e)}")
+
+    def monitor_task_progress(self):
+        """监控任务进度（模拟实现）"""
+        try:
+            # 这里应该是实际的任务进度监控逻辑
+            # 可以通过定时器或事件监听来实现
+
+            # 模拟进度更新
+            if hasattr(self, 'current_task_id'):
+                # 在实际实现中，这里应该从IncrementalUpdateRecorder获取真实进度
+                self.progress_log.append("监控任务进度...")
+
+                # 可以设置定时器定期调用此方法
+            else:
+                # 任务已结束，停止监控
+                self.progress_log.append("任务结束")
+
+        except Exception as e:
+            logger.error(f"监控任务进度失败: {e}")
+
     def _setup_component_responsive_rules(self):
         """设置组件响应式规化"""
         try:
@@ -2345,7 +3504,7 @@ class EnhancedDataImportWidget(QWidget):
                         active_connections = db_pool_status.get('active_connections', 0)
                         total_connections = db_pool_status.get('total_connections', 0)
                         max_pool_size = db_pool_status.get('max_pool_size', manager.config.pool_size if hasattr(manager, 'config') else 10)
-                        
+
                         # ✅ 修复：使用实际创建的连接数（total_connections）而不是最大池大小作为分母
                         # 如果total_connections为0，则使用max_pool_size（连接池还未创建任何连接）
                         denominator = total_connections if total_connections > 0 else max_pool_size
@@ -2353,7 +3512,7 @@ class EnhancedDataImportWidget(QWidget):
                         if total_connections > 0:
                             usage_text += f" (最大:{max_pool_size})"
                         self.download_monitoring.db_pool_usage_label.setText(usage_text)
-                        
+
                         # 根据使用率调整颜色
                         if denominator > 0:
                             usage_rate = active_connections / denominator
@@ -2497,8 +3656,10 @@ class EnhancedDataImportWidget(QWidget):
 
             symbols = [s.strip() for s in symbols_text.split('\n') if s.strip()]
 
-            # 创建任务配置
-            # 频率映射
+            # 获取当前选择的下载模式
+            download_mode = getattr(self, 'current_download_mode', 'full')
+
+            # 创建基础配置
             freq_map = {
                 "日线": DataFrequency.DAILY,
                 "周线": DataFrequency.WEEKLY,
@@ -2506,28 +3667,138 @@ class EnhancedDataImportWidget(QWidget):
                 "5分钟": DataFrequency.MINUTE_5,
                 "15分钟": DataFrequency.MINUTE_15,
                 "30分钟": DataFrequency.MINUTE_30,
-                "60分钟": DataFrequency.HOUR_1}
+                "60分钟": DataFrequency.HOUR_1
+            }
 
-            task_config = ImportTaskConfig(
-                task_id=f"task_{int(datetime.now().timestamp())}",
-                name=task_name,
-                symbols=symbols,
-                data_source=self.data_source_combo.currentText(),
-                asset_type=self._get_asset_type_value(),  # ✅ 修复：使用转换后的asset_type值
-                data_type=self.data_type_combo.currentText() if hasattr(self, 'data_type_combo') else "K线数据",  # 从UI读取数据类型
-                frequency=freq_map.get(self.frequency_combo.currentText(), DataFrequency.DAILY),
-                mode=ImportMode.MANUAL,  # 默认手动模式
-                batch_size=self.batch_size_spin.value(),
-                max_workers=self.workers_spin.value(),
-                start_date=self.start_date.date().toString("yyyy-MM-dd"),
-                end_date=self.end_date.date().toString("yyyy-MM-dd"),
-                retry_count=self.retry_count_spin.value() if hasattr(self, 'retry_count_spin') else 3,
-                error_strategy=self.error_strategy_combo.currentText() if hasattr(self, 'error_strategy_combo') else "跳过",
-                memory_limit=self.memory_limit_spin.value() if hasattr(self, 'memory_limit_spin') else 2048,
-                timeout=self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 60,  # ✅ 优化：默认超时从300秒减少到60秒
-                progress_interval=self.progress_interval_spin.value() if hasattr(self, 'progress_interval_spin') else 5,
-                validate_data=self.validate_data_cb.isChecked() if hasattr(self, 'validate_data_cb') else True
-            )
+            # 获取复选框状态
+            check_completeness = self.check_completeness_cb.isChecked() if hasattr(self, 'check_completeness_cb') else True
+            skip_latest_data = self.skip_latest_data_cb.isChecked() if hasattr(self, 'skip_latest_data_cb') else True
+
+            # 根据下载模式创建不同的任务配置
+            if download_mode == "gap_fill":
+                # 间隙填充模式配置
+                gap_threshold = self.gap_threshold_spin.value() if hasattr(self, 'gap_threshold_spin') else 30
+
+                task_config = ImportTaskConfig(
+                    task_id=f"task_{int(datetime.now().timestamp())}",
+                    name=task_name,
+                    symbols=symbols,
+                    data_source=self.data_source_combo.currentText(),
+                    asset_type=self._get_asset_type_value(),
+                    data_type=self.data_type_combo.currentText() if hasattr(self, 'data_type_combo') else "K线数据",
+                    frequency=freq_map.get(self.frequency_combo.currentText(), DataFrequency.DAILY),
+                    mode=ImportMode.MANUAL,  # 使用MANUAL模式，通过config区分功能
+                    batch_size=self.batch_size_spin.value(),
+                    max_workers=self.workers_spin.value(),
+                    start_date=self.start_date.date().toString("yyyy-MM-dd"),
+                    end_date=self.end_date.date().toString("yyyy-MM-dd"),
+                    retry_count=self.retry_count_spin.value() if hasattr(self, 'retry_count_spin') else 3,
+                    error_strategy=self.error_strategy_combo.currentText() if hasattr(self, 'error_strategy_combo') else "跳过",
+                    memory_limit=self.memory_limit_spin.value() if hasattr(self, 'memory_limit_spin') else 2048,
+                    timeout=self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 60,
+                    progress_interval=self.progress_interval_spin.value() if hasattr(self, 'progress_interval_spin') else 5,
+                    validate_data=self.validate_data_cb.isChecked() if hasattr(self, 'validate_data_cb') else True,
+                    # 间隙填充专用配置
+                    gap_fill_mode=True,
+                    gap_threshold_days=gap_threshold,
+                    gap_fill_threshold=gap_threshold,
+                    auto_fill_gaps=True,
+                    skip_weekends=True,
+                    skip_holidays=True,
+                    # 复选框配置
+                    check_completeness=check_completeness,
+                    skip_latest_data=skip_latest_data
+                )
+
+            elif download_mode == "smart_fill":
+                # 智能补全模式配置
+                strategy = self.completion_strategy_combo.currentText() if hasattr(self, 'completion_strategy_combo') else "全部补全"
+
+                task_config = ImportTaskConfig(
+                    task_id=f"task_{int(datetime.now().timestamp())}",
+                    name=task_name,
+                    symbols=symbols,
+                    data_source=self.data_source_combo.currentText(),
+                    asset_type=self._get_asset_type_value(),
+                    data_type=self.data_type_combo.currentText() if hasattr(self, 'data_type_combo') else "K线数据",
+                    frequency=freq_map.get(self.frequency_combo.currentText(), DataFrequency.DAILY),
+                    mode=ImportMode.MANUAL,  # 使用MANUAL模式，通过config区分功能
+                    batch_size=self.batch_size_spin.value(),
+                    max_workers=self.workers_spin.value(),
+                    start_date=self.start_date.date().toString("yyyy-MM-dd"),
+                    end_date=self.end_date.date().toString("yyyy-MM-dd"),
+                    retry_count=self.retry_count_spin.value() if hasattr(self, 'retry_count_spin') else 3,
+                    error_strategy=self.error_strategy_combo.currentText() if hasattr(self, 'error_strategy_combo') else "跳过",
+                    memory_limit=self.memory_limit_spin.value() if hasattr(self, 'memory_limit_spin') else 2048,
+                    timeout=self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 60,
+                    progress_interval=self.progress_interval_spin.value() if hasattr(self, 'progress_interval_spin') else 5,
+                    validate_data=self.validate_data_cb.isChecked() if hasattr(self, 'validate_data_cb') else True,
+                    # 智能补全专用配置
+                    smart_fill_mode=True,
+                    completion_strategy=strategy,
+                    recent_days_only=30,
+                    auto_fill_gaps=True,
+                    skip_weekends=True,
+                    skip_holidays=True,
+                    # 复选框配置
+                    check_completeness=check_completeness,
+                    skip_latest_data=skip_latest_data
+                )
+
+            elif download_mode == "incremental":
+                # 增量下载模式配置
+                incremental_days = self.incremental_days_spin.value() if hasattr(self, 'incremental_days_spin') else 7
+
+                task_config = ImportTaskConfig(
+                    task_id=f"task_{int(datetime.now().timestamp())}",
+                    name=task_name,
+                    symbols=symbols,
+                    data_source=self.data_source_combo.currentText(),
+                    asset_type=self._get_asset_type_value(),
+                    data_type=self.data_type_combo.currentText() if hasattr(self, 'data_type_combo') else "K线数据",
+                    frequency=freq_map.get(self.frequency_combo.currentText(), DataFrequency.DAILY),
+                    mode=ImportMode.INCREMENTAL,  # 使用INCREMENTAL模式
+                    batch_size=self.batch_size_spin.value(),
+                    max_workers=self.workers_spin.value(),
+                    start_date=self.start_date.date().toString("yyyy-MM-dd"),
+                    end_date=self.end_date.date().toString("yyyy-MM-dd"),
+                    retry_count=self.retry_count_spin.value() if hasattr(self, 'retry_count_spin') else 3,
+                    error_strategy=self.error_strategy_combo.currentText() if hasattr(self, 'error_strategy_combo') else "跳过",
+                    memory_limit=self.memory_limit_spin.value() if hasattr(self, 'memory_limit_spin') else 2048,
+                    timeout=self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 60,
+                    progress_interval=self.progress_interval_spin.value() if hasattr(self, 'progress_interval_spin') else 5,
+                    validate_data=self.validate_data_cb.isChecked() if hasattr(self, 'validate_data_cb') else True,
+                    # 增量下载专用配置
+                    incremental_days=incremental_days,
+                    skip_weekends=True,
+                    skip_holidays=True,
+                    # 复选框配置
+                    check_completeness=check_completeness,
+                    skip_latest_data=skip_latest_data
+                )
+
+            else:
+                # 全量下载模式配置
+                task_config = ImportTaskConfig(
+                    task_id=f"task_{int(datetime.now().timestamp())}",
+                    name=task_name,
+                    symbols=symbols,
+                    data_source=self.data_source_combo.currentText(),
+                    asset_type=self._get_asset_type_value(),
+                    data_type=self.data_type_combo.currentText() if hasattr(self, 'data_type_combo') else "K线数据",
+                    frequency=freq_map.get(self.frequency_combo.currentText(), DataFrequency.DAILY),
+                    mode=ImportMode.MANUAL,  # 全量下载使用MANUAL模式
+                    batch_size=self.batch_size_spin.value(),
+                    max_workers=self.workers_spin.value(),
+                    start_date=self.start_date.date().toString("yyyy-MM-dd"),
+                    end_date=self.end_date.date().toString("yyyy-MM-dd"),
+                    retry_count=self.retry_count_spin.value() if hasattr(self, 'retry_count_spin') else 3,
+                    error_strategy=self.error_strategy_combo.currentText() if hasattr(self, 'error_strategy_combo') else "跳过",
+                    memory_limit=self.memory_limit_spin.value() if hasattr(self, 'memory_limit_spin') else 2048,
+                    timeout=self.timeout_spin.value() if hasattr(self, 'timeout_spin') else 60,
+                    progress_interval=self.progress_interval_spin.value() if hasattr(self, 'progress_interval_spin') else 5,
+                    validate_data=self.validate_data_cb.isChecked() if hasattr(self, 'validate_data_cb') else True
+                )
 
             # 更新引擎配置
             self.import_engine.enable_ai_optimization = self.ai_optimization_cb.isChecked()
@@ -2637,7 +3908,7 @@ class EnhancedDataImportWidget(QWidget):
                         r'(\d{6})\s*\([^)]*\)',  # 匹配"SYMBOL (x/y)"
                         r'正在导入\s+(\d{6})',  # 匹配"正在导入 SYMBOL"
                     ]
-                    
+
                     for pattern in success_patterns:
                         match = re.search(pattern, message)
                         if match:
@@ -5244,6 +6515,102 @@ class EnhancedDataImportWidget(QWidget):
                         self.realtime_status_label.setStyleSheet("color: navy; font-weight: bold;")
         except Exception as e:
             logger.error(f"处理写入策略变更失败: {e}") if logger else None
+
+    def _on_mode_button_clicked(self, button):
+        """处理下载模式单选按钮点击"""
+        try:
+            mode_value = button.property("mode_value")
+            mode_text = button.text()
+
+            self.current_download_mode = mode_value
+            logger.info(f"下载模式已变更: {mode_text} ({mode_value})") if logger else None
+
+            # 根据模式显示/隐藏相应的配置选项
+            if mode_value == "incremental":  # 增量下载
+                self.incremental_days_label.setVisible(True)
+                self.incremental_days_spin.setVisible(True)
+                self.completion_strategy_label.setVisible(False)
+                self.completion_strategy_combo.setVisible(False)
+                self.gap_threshold_label.setVisible(False)
+                self.gap_threshold_spin.setVisible(False)
+            elif mode_value == "smart_fill":  # 智能补全
+                self.incremental_days_label.setVisible(False)
+                self.incremental_days_spin.setVisible(False)
+                self.completion_strategy_label.setVisible(True)
+                self.completion_strategy_combo.setVisible(True)
+                self.gap_threshold_label.setVisible(False)
+                self.gap_threshold_spin.setVisible(False)
+            elif mode_value == "gap_fill":  # 间隙填充
+                self.incremental_days_label.setVisible(False)
+                self.incremental_days_spin.setVisible(False)
+                self.completion_strategy_label.setVisible(False)
+                self.completion_strategy_combo.setVisible(False)
+                self.gap_threshold_label.setVisible(True)
+                self.gap_threshold_spin.setVisible(True)
+            else:  # 全量下载
+                self.incremental_days_label.setVisible(False)
+                self.incremental_days_spin.setVisible(False)
+                self.completion_strategy_label.setVisible(False)
+                self.completion_strategy_combo.setVisible(False)
+                self.gap_threshold_label.setVisible(False)
+                self.gap_threshold_spin.setVisible(False)
+
+            # 更新日期范围的提示信息
+            if mode_value == "incremental":
+                tooltip_text = "建议设置为当前日期前N天，仅下载缺失数据"
+            elif mode_value == "smart_fill":
+                tooltip_text = "建议设置为较长时间范围，以便检测数据间隙"
+            elif mode_value == "gap_fill":
+                tooltip_text = "建议设置包含预期数据缺失的日期范围"
+            else:  # 全量下载
+                tooltip_text = "设置需要下载的完整时间范围"
+
+            # 更新日期选择器的提示
+            self.start_date.setToolTip(f"开始日期（{mode_text}模式）\n{tooltip_text}")
+            self.end_date.setToolTip(f"结束日期（{mode_text}模式）\n{tooltip_text}")
+
+        except Exception as e:
+            logger.error(f"处理下载模式变更失败: {e}") if logger else None
+
+    def on_download_mode_changed(self, mode: str):
+        """下载模式变更处理"""
+        try:
+            logger.info(f"下载模式已变更: {mode}") if logger else None
+
+            # 根据模式显示/隐藏相应的配置选项
+            if mode == "增量下载":
+                self.incremental_days_spin.setVisible(True)
+                self.completion_strategy_combo.setVisible(False)
+                self.gap_threshold_spin.setVisible(False)
+            elif mode == "智能补全":
+                self.incremental_days_spin.setVisible(False)
+                self.completion_strategy_combo.setVisible(True)
+                self.gap_threshold_spin.setVisible(False)
+            elif mode == "间隙填充":
+                self.incremental_days_spin.setVisible(False)
+                self.completion_strategy_combo.setVisible(False)
+                self.gap_threshold_spin.setVisible(True)
+            else:  # 全量下载
+                self.incremental_days_spin.setVisible(False)
+                self.completion_strategy_combo.setVisible(False)
+                self.gap_threshold_spin.setVisible(False)
+
+            # 更新日期范围的提示信息
+            if mode == "增量下载":
+                tooltip_text = "建议设置为当前日期前N天，仅下载缺失数据"
+            elif mode == "智能补全":
+                tooltip_text = "建议设置为较长时间范围，以便检测数据间隙"
+            elif mode == "间隙填充":
+                tooltip_text = "建议设置包含预期数据缺失的日期范围"
+            else:  # 全量下载
+                tooltip_text = "设置需要下载的完整时间范围"
+
+            # 更新日期选择器的提示
+            self.start_date.setToolTip(f"开始日期（{mode}模式）\n{tooltip_text}")
+            self.end_date.setToolTip(f"结束日期（{mode}模式）\n{tooltip_text}")
+
+        except Exception as e:
+            logger.error(f"处理下载模式变更失败: {e}") if logger else None
 
     def _register_write_event_handlers(self):
         """注册实时写入事件处理器【修复】"""

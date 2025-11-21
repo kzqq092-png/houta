@@ -557,3 +557,91 @@ class ComputedIndicatorEvent(BaseEvent):
             'computed_indicators': self.computed_indicators,
             'symbol': self.symbol
         })
+
+
+# ==================== 增量下载相关事件 ====================
+
+@dataclass
+class DataIntegrityEvent(BaseEvent):
+    """
+    数据完整性事件
+
+    当数据完整性检查完成时触发
+    """
+    symbol: str = ""
+    completeness: float = 0.0
+    missing_count: int = 0
+    total_count: int = 0
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'symbol': self.symbol,
+            'completeness': self.completeness,
+            'missing_count': self.missing_count,
+            'total_count': self.total_count
+        })
+
+
+@dataclass
+class DataAnalysisEvent(BaseEvent):
+    """
+    数据分析事件
+
+    当数据分析操作完成时触发
+    """
+    symbol: str = ""
+    analysis_type: str = ""
+    total_symbols: int = 0
+    symbols_to_download: int = 0
+    symbols_to_skip: int = 0
+    estimated_records: int = 0
+    strategy: str = ""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'symbol': self.symbol,
+            'analysis_type': self.analysis_type,
+            'total_symbols': self.total_symbols,
+            'symbols_to_download': self.symbols_to_download,
+            'symbols_to_skip': self.symbols_to_skip,
+            'estimated_records': self.estimated_records,
+            'strategy': self.strategy
+        })
+
+
+@dataclass
+class UpdateHistoryEvent(BaseEvent):
+    """
+    更新历史事件
+
+    当更新任务状态发生变化时触发
+    """
+    task_id: str = ""
+    task_name: str = ""
+    update_type: str = ""
+    action: str = ""  # created, started, progress, completed, failed
+    progress: float = 0.0
+    success_count: int = 0
+    failed_count: int = 0
+    skipped_count: int = 0
+    actual_records: int = 0
+    estimated_time: Optional[float] = None
+    error_message: Optional[str] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'task_id': self.task_id,
+            'task_name': self.task_name,
+            'update_type': self.update_type,
+            'action': self.action,
+            'progress': self.progress,
+            'success_count': self.success_count,
+            'failed_count': self.failed_count,
+            'skipped_count': self.skipped_count,
+            'actual_records': self.actual_records,
+            'estimated_time': self.estimated_time,
+            'error_message': self.error_message
+        })

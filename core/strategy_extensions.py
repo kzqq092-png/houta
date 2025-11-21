@@ -14,6 +14,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
 
+# Import AssetType from plugin_types instead of redefining it
+from .plugin_types import AssetType
+
 logger = logger
 
 class StrategyType(Enum):
@@ -71,18 +74,6 @@ class RiskLevel(Enum):
     MEDIUM = "medium"
     HIGH = "high"
     EXTREME = "extreme"
-
-class AssetType(Enum):
-    """资产类型"""
-    STOCK = "stock"
-    INDEX = "index"
-    FUND = "fund"
-    BOND = "bond"
-    COMMODITY = "commodity"
-    CURRENCY = "currency"
-    CRYPTO = "crypto"
-    FUTURES = "futures"
-    OPTIONS = "options"
 
 class TimeFrame(Enum):
     """时间周期"""
