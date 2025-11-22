@@ -517,6 +517,13 @@ class CrosshairMixin:
                 self.canvas.draw_idle()
 
             def on_mouse_move(event):
+                # ✅ 性能优化P3：延迟初始化十字光标到用户首次交互时
+                if hasattr(self, '_crosshair_needs_init') and self._crosshair_needs_init:
+                    if not hasattr(self, '_crosshair_initialized') or not self._crosshair_initialized:
+                        logger.debug("用户首次交互，初始化十字光标")
+                        self.enable_crosshair(force_rebind=False)
+                    self._crosshair_needs_init = False
+                
                 # [最终诊断] 添加日志，检查事件是否被接收
                 logger.debug(f"Crosshair event: x={event.x}, y={event.y}, inaxes={event.inaxes}")
 

@@ -297,16 +297,17 @@ class ChartCanvas(QWidget):
     def update_chart(self, stock_data: Dict[str, Any]):
         """更新图表数据 - 使用统一图表服务"""
         try:
-            logger.info("=== 开始更新图表数据 ===")
-            logger.info(f"接收到的stock_data键: {list(stock_data.keys()) if stock_data else 'None'}")
+            # 🔴 性能优化P1.4：降低日志级别，减少I/O和list()转换开销
+            logger.debug("=== 开始更新图表数据 ===")
+            logger.debug(f"接收到的stock_data键数: {len(stock_data.keys()) if stock_data else 0}")
 
             self.stock_data = stock_data
             self.current_stock = stock_data.get('stock_code', '')
-            logger.info(f"更新图表: {self.current_stock}")
+            logger.debug(f"更新图表: {self.current_stock}")
 
             # 获取OHLCV数据 - 支持多种数据格式
             kline_data = stock_data.get('kline_data', stock_data.get('kdata', []))
-            logger.info(f"获取到K线数据类型: {type(kline_data)}, 数据概要: {self._get_data_summary(kline_data)}")
+            logger.debug(f"获取到K线数据类型: {type(kline_data)}")
 
             # 检查数据是否为空
             import pandas as pd
@@ -322,7 +323,7 @@ class ChartCanvas(QWidget):
                     logger.error("K线数据为空DataFrame，无法更新图表")
                     self._show_no_data_message()
                     return
-                logger.info(f"K线数据为DataFrame，形状: {kline_data.shape}, 列: {list(kline_data.columns)}")
+                logger.debug(f"K线数据为DataFrame，形状: {kline_data.shape}")
                 self.current_kdata = kline_data
             elif isinstance(kline_data, list):
                 # 处理列表格式
@@ -330,19 +331,19 @@ class ChartCanvas(QWidget):
                     logger.error("K线数据为空列表，无法更新图表")
                     self._show_no_data_message()
                     return
-                logger.info(f"K线数据为列表，长度: {len(kline_data)}")
+                logger.debug(f"K线数据为列表，长度: {len(kline_data)}")
                 try:
                     self.current_kdata = pd.DataFrame(kline_data)
                     if not self.current_kdata.empty and 'date' in self.current_kdata.columns:
                         self.current_kdata.set_index('date', inplace=True)
-                    logger.info(f"列表转换为DataFrame成功，形状: {self.current_kdata.shape}")
+                    logger.debug(f"列表转换为DataFrame成功，形状: {self.current_kdata.shape}")
                 except Exception as e:
                     logger.error(f"列表转换为DataFrame失败: {e}")
                     self._show_error_message(f"数据格式转换失败: {e}")
                     return
             elif isinstance(kline_data, dict):
                 # 处理字典格式 - 改进处理逻辑
-                logger.info(f"K线数据为字典，键: {list(kline_data.keys())}")
+                logger.debug(f"K线数据为字典")
 
                 # 尝试从字典中提取DataFrame
                 df_data = None
@@ -362,11 +363,11 @@ class ChartCanvas(QWidget):
                         self._show_no_data_message()
                         return
                     self.current_kdata = df_data
-                    logger.info(f"从字典中获取DataFrame成功，形状: {df_data.shape}")
+                    logger.debug(f"从字典中获取DataFrame成功，形状: {df_data.shape}")
                 elif isinstance(df_data, list) and df_data:
                     try:
                         self.current_kdata = pd.DataFrame(df_data)
-                        logger.info(f"从字典中获取列表并转换为DataFrame成功，长度: {len(df_data)}")
+                        logger.debug(f"从字典中获取列表并转换为DataFrame成功，长度: {len(df_data)}")
                     except Exception as e:
                         logger.error(f"字典中列表转换为DataFrame失败: {e}")
                         self._show_error_message(f"数据格式转换失败: {e}")
@@ -967,10 +968,11 @@ class MiddlePanel(BasePanel):
     def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
         """处理UI数据就绪事件，更新图表"""
         try:
-            logger.info(f"=== MiddlePanel收到UIDataReadyEvent事件 ===")
-            logger.info(f"事件源: {event.source}")
-            logger.info(f"股票代码: {event.stock_code}")
-            logger.info(f"股票名称: {event.stock_name}")
+            # 🔴 性能优化P1.4：降低日志级别，减少I/O开销
+            logger.debug(f"=== MiddlePanel收到UIDataReadyEvent事件 ===")
+            logger.debug(f"事件源: {event.source}")
+            logger.debug(f"股票代码: {event.stock_code}")
+            logger.debug(f"股票名称: {event.stock_name}")
 
             # 确保从event.ui_data获取数据
             data = event.ui_data
@@ -979,7 +981,7 @@ class MiddlePanel(BasePanel):
                 self._update_status("错误：事件数据为空")
                 return
 
-            logger.info(f"ui_data包含的键: {list(data.keys())}")
+            logger.debug(f"ui_data包含的键: {list(data.keys())}")
 
             self.current_stock_code = event.stock_code
             self.current_stock_name = event.stock_name
@@ -989,7 +991,7 @@ class MiddlePanel(BasePanel):
             for key in ['kline_data', 'kdata', 'kline']:
                 if key in data:
                     kdata = data.get(key)
-                    logger.info(f"从键'{key}'中获取到K线数据，类型: {type(kdata)}")
+                    logger.debug(f"从键'{key}'中获取到K线数据，类型: {type(kdata)}")
                     break
 
             if kdata is None:
@@ -1009,7 +1011,7 @@ class MiddlePanel(BasePanel):
                     self.chart_canvas.update_chart(chart_data)
                     return
                 else:
-                    logger.info(f"K线数据验证通过，DataFrame形状: {kdata.shape}")
+                    logger.debug(f"K线数据验证通过，DataFrame形状: {kdata.shape}")
             elif isinstance(kdata, list):
                 if not kdata:
                     logger.warning(f"K线数据为空列表，股票代码: {self.current_stock_code}")
@@ -1018,9 +1020,9 @@ class MiddlePanel(BasePanel):
                     self.chart_canvas.update_chart(chart_data)
                     return
                 else:
-                    logger.info(f"K线数据验证通过，列表长度: {len(kdata)}")
+                    logger.debug(f"K线数据验证通过，列表长度: {len(kdata)}")
             else:
-                logger.info(f"K线数据类型: {type(kdata)}")
+                logger.debug(f"K线数据类型: {type(kdata)}")
 
             self.current_kdata = kdata
 
@@ -1034,9 +1036,9 @@ class MiddlePanel(BasePanel):
                 self._update_status(f"已加载 {self.current_stock_name} ({data_count} 条数据)")
 
             # 准备并更新图表
-            logger.info("准备图表数据并更新图表")
+            logger.debug("准备图表数据并更新图表")
             chart_data = self._prepare_chart_data(data)
-            logger.info(f"准备的图表数据键: {list(chart_data.keys())}")
+            logger.debug(f"准备的图表数据键: {list(chart_data.keys())}")
 
             # 确保chart_canvas存在
             if not hasattr(self, 'chart_canvas') or self.chart_canvas is None:
@@ -1061,8 +1063,9 @@ class MiddlePanel(BasePanel):
     def _prepare_chart_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """准备传递给图表控件的数据"""
         try:
-            logger.info("=== 准备图表数据 ===")
-            logger.info(f"输入数据键: {list(data.keys())}")
+            # 🔴 性能优化P1.4：降低日志级别，减少I/O开销
+            logger.debug("=== 准备图表数据 ===")
+            logger.debug(f"输入数据键: {list(data.keys())}")
 
             # 创建图表数据副本
             chart_data = data.copy()
@@ -1071,11 +1074,11 @@ class MiddlePanel(BasePanel):
             if hasattr(self, 'current_stock_name') and self.current_stock_name:
                 chart_data['title'] = self.current_stock_name
                 chart_data['stock_name'] = self.current_stock_name
-                logger.info(f"设置股票名称: {self.current_stock_name}")
+                logger.debug(f"设置股票名称: {self.current_stock_name}")
 
             if hasattr(self, 'current_stock_code') and self.current_stock_code:
                 chart_data['stock_code'] = self.current_stock_code
-                logger.info(f"设置股票代码: {self.current_stock_code}")
+                logger.debug(f"设置股票代码: {self.current_stock_code}")
 
             # 确保K线数据存在且格式正确
             kline_data = None
@@ -1085,15 +1088,15 @@ class MiddlePanel(BasePanel):
                     # 统一使用 'kline_data' 键
                     if key != 'kline_data':
                         chart_data['kline_data'] = kline_data
-                        logger.info(f"将键'{key}'统一为'kline_data'")
+                        logger.debug(f"将键'{key}'统一为'kline_data'")
                     break
 
             if kline_data is not None:
-                logger.info(f"K线数据类型: {type(kline_data)}")
+                logger.debug(f"K线数据类型: {type(kline_data)}")
                 if hasattr(kline_data, 'shape'):
-                    logger.info(f"K线数据形状: {kline_data.shape}")
+                    logger.debug(f"K线数据形状: {kline_data.shape}")
                 elif hasattr(kline_data, '__len__'):
-                    logger.info(f"K线数据长度: {len(kline_data)}")
+                    logger.debug(f"K线数据长度: {len(kline_data)}")
             else:
                 logger.warning("准备的图表数据中没有K线数据")
 
@@ -1107,8 +1110,8 @@ class MiddlePanel(BasePanel):
             if 'chart_type' not in chart_data and hasattr(self, '_current_chart_type'):
                 chart_data['chart_type'] = self._current_chart_type
 
-            logger.info(f"最终图表数据键: {list(chart_data.keys())}")
-            logger.info("=== 图表数据准备完成 ===")
+            logger.debug(f"最终图表数据键: {list(chart_data.keys())}")
+            logger.debug("=== 图表数据准备完成 ===")
 
             return chart_data
 

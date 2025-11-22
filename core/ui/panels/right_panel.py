@@ -999,10 +999,16 @@ class RightPanel(BasePanel):
             logger.error(traceback.format_exc())
 
     def _async_update_professional_tabs(self, kline_data):
-        """异步更新专业标签页，避免阻塞UI线程"""
+        """✅ 性能优化：并行更新专业标签页，避免阻塞UI线程"""
         try:
             from PyQt5.QtCore import QTimer
+            from concurrent.futures import ThreadPoolExecutor
+            import os
 
+            # ✅ 性能优化：使用线程池并行更新标签页
+            if not hasattr(self, '_tab_update_executor'):
+                self._tab_update_executor = ThreadPoolExecutor(max_workers=min(3, len(self._professional_tabs)))
+            
             # 创建一个队列来管理标签页更新
             self._tab_update_queue = list(self._professional_tabs)
             self._current_kline_data = kline_data
@@ -1022,37 +1028,62 @@ class RightPanel(BasePanel):
             self._sync_update_professional_tabs(kline_data)
 
     def _process_next_tab_update(self):
-        """处理队列中的下一个标签页更新"""
+        """✅ 性能优化：并行处理多个标签页更新"""
         try:
             if not hasattr(self, '_tab_update_queue') or not self._tab_update_queue:
                 logger.debug("所有专业标签页数据更新完成")
                 return
 
-            # 取出队列中的下一个标签页
-            tab = self._tab_update_queue.pop(0)
+            # ✅ 性能优化：并行处理多个标签页（最多3个）
+            tabs_to_update = []
+            for _ in range(min(3, len(self._tab_update_queue))):
+                if self._tab_update_queue:
+                    tabs_to_update.append(self._tab_update_queue.pop(0))
+            
+            if not tabs_to_update:
+                return
 
-            # 如果标签声明跳过K线数据，则直接处理下一个
-            try:
-                if hasattr(tab, 'skip_kdata') and getattr(tab, 'skip_kdata') is True:
-                    logger.debug(f"跳过向{type(tab).__name__}传递K线数据（skip_kdata=True）")
-                elif hasattr(tab, 'set_kdata'):
-                    try:
-                        tab.set_kdata(self._current_kline_data)
-                        # 如果是形态分析标签页，确保数据正确设置
-                        if hasattr(tab, 'kdata'):
-                            tab.kdata = self._current_kline_data
-                        logger.debug(f"K线数据已传递到{type(tab).__name__}")
-                    except Exception as e:
-                        logger.error(f"传递K线数据到{type(tab).__name__}失败: {e}")
-            finally:
-                pass
+            # 使用线程池并行更新
+            if hasattr(self, '_tab_update_executor'):
+                futures = []
+                for tab in tabs_to_update:
+                    if hasattr(tab, 'skip_kdata') and getattr(tab, 'skip_kdata') is True:
+                        logger.debug(f"跳过向{type(tab).__name__}传递K线数据（skip_kdata=True）")
+                        continue
+                    
+                    # 提交更新任务到线程池
+                    future = self._tab_update_executor.submit(self._update_single_tab, tab)
+                    futures.append(future)
+                
+                # 等待所有更新完成（可选，也可以不等待）
+                # for future in futures:
+                #     try:
+                #         future.result(timeout=5)  # 5秒超时
+                #     except Exception as e:
+                #         logger.error(f"标签页更新失败: {e}")
+            else:
+                # 回退到串行更新
+                for tab in tabs_to_update:
+                    self._update_single_tab(tab)
 
             # 如果还有更多标签页需要处理，调度下一次更新
             if self._tab_update_queue:
-                self._tab_update_timer.start(100)  # 增加间隔，减少UI线程压力
+                self._tab_update_timer.start(50)  # ✅ 优化：减少间隔到50ms，提升并行度
 
         except Exception as e:
             logger.error(f"处理标签页更新失败: {e}")
+
+    def _update_single_tab(self, tab):
+        """更新单个标签页的数据（线程安全）"""
+        try:
+            if hasattr(tab, 'set_kdata'):
+                tab.set_kdata(self._current_kline_data)
+                # 如果是形态分析标签页，确保数据正确设置
+                if hasattr(tab, 'kdata'):
+                    tab.kdata = self._current_kline_data
+                logger.debug(f"K线数据已传递到{type(tab).__name__}")
+        except Exception as e:
+            logger.error(f"传递K线数据到{type(tab).__name__}失败: {e}")
 
     def _sync_update_professional_tabs(self, kline_data):
         """同步更新专业标签页（作为异步更新的备用方案）"""

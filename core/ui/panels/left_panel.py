@@ -1474,7 +1474,7 @@ class LeftPanel(BasePanel):
         self._selection_timer = QTimer()
         self._selection_timer.setSingleShot(True)
         self._selection_timer.timeout.connect(self._process_pending_selection)
-        self._selection_timer.start(150)  # 150ms防抖
+        self._selection_timer.start(10)  # 10ms防抖
 
     def _process_pending_selection(self) -> None:
         """处理待处理的选择请求"""

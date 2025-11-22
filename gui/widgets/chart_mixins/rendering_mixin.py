@@ -21,19 +21,17 @@ class RenderingMixin:
             if not data:
                 return
 
-            # 记录传入的数据结构
-            logger.info(f"RenderingMixin.update_chart接收到数据类型: {type(data)}")
-            if isinstance(data, dict):
-                logger.info(f"RenderingMixin.update_chart接收到数据键: {list(data.keys())}")
+            # 🔴 性能优化P1.4：降低日志级别，避免list()调用和DataFrame.head()打印
+            logger.debug(f"RenderingMixin.update_chart接收到数据类型: {type(data)}")
 
             # 处理不同的数据字段格式，兼容kdata和kline_data
             kdata = None
             if 'kdata' in data:
                 kdata = data['kdata']
-                logger.info(f"从'kdata'键获取数据，类型: {type(kdata)}")
+                logger.debug(f"从'kdata'键获取数据，类型: {type(kdata)}")
             elif 'kline_data' in data:
                 kdata = data['kline_data']
-                logger.info(f"从'kline_data'键获取数据，类型: {type(kdata)}")
+                logger.debug(f"从'kline_data'键获取数据，类型: {type(kdata)}")
             else:
                 # 没有找到有效的K线数据
                 logger.error("未找到有效的K线数据键")
@@ -43,27 +41,27 @@ class RenderingMixin:
             # 处理嵌套的数据结构
             if isinstance(kdata, dict) and 'kline_data' in kdata:
                 # 这是一个嵌套的数据结构，真正的K线数据在kline_data键中
-                logger.info(f"检测到嵌套的数据结构，从kline_data键中提取真正的K线数据")
+                logger.debug(f"检测到嵌套的数据结构，从kline_data键中提取真正的K线数据")
                 nested_kdata = kdata.get('kline_data')
-                logger.info(f"嵌套的K线数据类型: {type(nested_kdata)}")
+                logger.debug(f"嵌套的K线数据类型: {type(nested_kdata)}")
                 kdata = nested_kdata
 
             # 处理kdata是字典的情况
             if isinstance(kdata, dict):
                 # 如果kdata是字典，尝试从中提取DataFrame
-                logger.info(f"kdata是字典，包含键: {list(kdata.keys())}")
+                logger.debug(f"kdata是字典")
 
                 if 'data' in kdata:
                     # 如果字典中有data键，使用它
                     df_data = kdata.get('data')
-                    logger.info(f"从字典的'data'键获取数据，类型: {type(df_data)}")
+                    logger.debug(f"从字典的'data'键获取数据，类型: {type(df_data)}")
 
                     if isinstance(df_data, pd.DataFrame):
                         kdata = df_data
-                        logger.info(f"成功从字典的'data'键获取DataFrame，形状: {kdata.shape}")
+                        logger.debug(f"成功从字典的'data'键获取DataFrame，形状: {kdata.shape}")
                     elif isinstance(df_data, list) and df_data:
                         kdata = pd.DataFrame(df_data)
-                        logger.info(f"将列表转换为DataFrame，形状: {kdata.shape}")
+                        logger.debug(f"将列表转换为DataFrame，形状: {kdata.shape}")
                     else:
                         logger.error(f"字典中的'data'键内容无效: {type(df_data)}")
                         self.show_no_data(f"K线数据格式错误: {type(df_data)}")
@@ -72,19 +70,16 @@ class RenderingMixin:
                     # 尝试将整个字典转换为DataFrame
                     try:
                         kdata = pd.DataFrame([kdata])
-                        logger.info(f"将整个字典转换为DataFrame，形状: {kdata.shape}")
+                        logger.debug(f"将整个字典转换为DataFrame，形状: {kdata.shape}")
                     except Exception as e:
                         logger.error(f"无法将字典转换为DataFrame: {e}")
                         self.show_no_data("K线数据格式错误")
                         return
 
             # 记录处理后的kdata信息
-            logger.info(f"处理后的kdata类型: {type(kdata)}")
+            logger.debug(f"处理后的kdata类型: {type(kdata)}")
             if hasattr(kdata, 'shape'):
-                logger.info(f"处理后的kdata形状: {kdata.shape}")
-                if not kdata.empty:
-                    logger.info(f"处理后的kdata列: {list(kdata.columns)}")
-                    logger.info(f"处理后的kdata前5行: \n{kdata.head()}")
+                logger.debug(f"处理后的kdata形状: {kdata.shape}")
 
             # 检查kdata是否包含必要的列
             required_columns = ['open', 'high', 'low', 'close', 'volume']
@@ -101,14 +96,12 @@ class RenderingMixin:
             self.current_kdata = kdata
 
             # 记录清理后的kdata信息
-            logger.info(f"清理后的kdata形状: {kdata.shape}")
-            if not kdata.empty:
-                logger.info(f"清理后的kdata列: {list(kdata.columns)}")
+            logger.debug(f"清理后的kdata形状: {kdata.shape}")
 
             if not kdata.empty:
                 self._ymin = float(kdata['low'].min())
                 self._ymax = float(kdata['high'].max())
-                logger.info(f"Y轴范围: {self._ymin} - {self._ymax}")
+                logger.debug(f"Y轴范围: {self._ymin} - {self._ymax}")
             else:
                 self._ymin = 0
                 self._ymax = 1
@@ -120,45 +113,40 @@ class RenderingMixin:
             x = np.arange(len(kdata))  # 用等距序号做X轴
 
             # 记录渲染参数
-            logger.info(f"准备调用renderer.render_candlesticks，x轴长度: {len(x)}")
-            logger.info(f"price_ax: {self.price_ax}")
+            logger.debug(f"准备调用renderer.render_candlesticks，x轴长度: {len(x)}")
 
             # ✅ 性能优化：延迟绘制 - 先完成所有渲染，最后统一绘制
             # 调用渲染器
             try:
                 self.renderer.render_candlesticks(self.price_ax, kdata, style, x=x)
-                logger.info("K线渲染成功")
+                logger.debug("K线渲染成功")
             except Exception as e:
                 logger.error(f"K线渲染失败: {e}", exc_info=True)
                 raise
 
             try:
                 self.renderer.render_volume(self.volume_ax, kdata, style, x=x)
-                logger.info("成交量渲染成功")
+                logger.debug("成交量渲染成功")
             except Exception as e:
                 logger.error(f"成交量渲染失败: {e}", exc_info=True)
-            
-            # ✅ 性能优化：合并autoscale_view()调用 - 在所有渲染完成后统一调用
-            # 统一设置两个轴的自动缩放范围
+
+            # ✅ 性能优化P2.1：合并autoscale_view()调用 - 在所有渲染完成后统一调用
+            # 统一设置所有轴（价格、成交量、指标）的自动缩放范围
             try:
                 self.price_ax.autoscale_view()
                 self.volume_ax.autoscale_view()
-                logger.debug("✅ 统一调用autoscale_view()完成")
+                if hasattr(self, 'indicator_ax') and self.indicator_ax:
+                    self.indicator_ax.autoscale_view()
+                logger.debug("✅ 统一调用autoscale_view()完成（3轴合并）")
             except Exception as e:
                 logger.warning(f"autoscale_view()调用失败: {e}")
-            
+
             # 处理indicators_data（如果存在）
             indicators_data = data.get('indicators_data', {})
             if indicators_data:
                 # 将indicators_data传递给渲染函数
-                logger.info(f"开始渲染指标数据，指标数量: {len(indicators_data)}")
+                logger.debug(f"开始渲染指标数据，指标数量: {len(indicators_data)}")
                 self._render_indicator_data(indicators_data, kdata, x)
-                # ✅ 性能优化：指标渲染后也需要更新范围
-                try:
-                    if hasattr(self, 'indicator_ax') and self.indicator_ax:
-                        self.indicator_ax.autoscale_view()
-                except Exception as e:
-                    logger.warning(f"指标轴autoscale_view()调用失败: {e}")
 
             # 修复：自动同步主窗口指标
             if hasattr(self, 'parentWidget') and callable(getattr(self, 'parentWidget', None)):
@@ -216,17 +204,16 @@ class RenderingMixin:
                 self.canvas.draw_idle()
                 logger.debug("✅ 统一绘制完成（延迟绘制优化）")
             
-            # ✅ 性能优化：延迟十字光标初始化到渲染和绘制完成后
-            # 在渲染和绘制完成后，再初始化十字光标，避免影响渲染性能
+            # ✅ 性能优化P3：进一步延迟十字光标初始化到用户交互时
+            # 不在渲染完成后立即初始化，而是在用户首次鼠标移动时再初始化
+            # 这样可以避免在渲染过程中初始化十字光标，进一步提升渲染性能
             if hasattr(self, 'crosshair_enabled') and self.crosshair_enabled:
-                if not (hasattr(self, '_crosshair_initialized') and self._crosshair_initialized):
-                    try:
-                        self.enable_crosshair(force_rebind=False)  # 不强制重新绑定，检查状态
-                        logger.debug("✅ 十字光标延迟初始化完成")
-                    except Exception as e:
-                        logger.warning(f"十字光标延迟初始化失败: {e}")
-                else:
-                    # 如果已经初始化，只需要清除旧元素（不重新绑定事件）
+                # 标记需要初始化，但不立即执行
+                self._crosshair_needs_init = True
+                logger.debug("✅ 十字光标初始化已延迟到用户交互时")
+                
+                # 如果已经初始化，只需要清除旧元素（不重新绑定事件）
+                if hasattr(self, '_crosshair_initialized') and self._crosshair_initialized:
                     try:
                         if hasattr(self, '_clear_crosshair_elements'):
                             self._clear_crosshair_elements()
