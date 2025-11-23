@@ -149,34 +149,116 @@ class SignalMixin:
 
             kdata = self.current_kdata
 
+            # 去重索引，避免重复绘制
+            unique_indices = list(set(all_indices))
+            logger.debug(f"准备绘制 {len(unique_indices)} 个唯一的形态信号（原始数量: {len(all_indices)}）")
+            
             # 绘制所有同类型的信号
-            for index in all_indices:
+            drawn_count = 0
+            for index in unique_indices:
                 if 0 <= index < len(kdata):
-                    price = kdata['high'].iloc[index] * 1.02  # 在K线上方绘制标记
+                    try:
+                        # 获取价格，确保在可见范围内
+                        price = float(kdata['high'].iloc[index]) * 1.02  # 在K线上方绘制标记
+                        
+                        # 验证价格是否有效
+                        if pd.isna(price) or price <= 0:
+                            logger.warning(f"索引 {index} 的价格无效: {price}")
+                            continue
 
-                    is_highlighted = (index == highlighted_index)
+                        is_highlighted = (index == highlighted_index)
 
-                    # 根据是否高亮选择不同的标记样式
-                    marker = 'v'
-                    size = 150 if is_highlighted else 80
-                    color = 'red' if is_highlighted else 'orange'
-                    alpha = 1.0 if is_highlighted else 0.7
-                    zorder = 10 if is_highlighted else 5
+                        # 根据是否高亮选择不同的标记样式
+                        marker = 'v' if not is_highlighted else '^'  # 高亮使用向上箭头
+                        size = 150 if is_highlighted else 80
+                        color = 'red' if is_highlighted else 'orange'
+                        alpha = 1.0 if is_highlighted else 0.7
+                        zorder = 10 if is_highlighted else 5
 
-                    # 使用 scatter 绘制标记
-                    scatter = self.price_ax.scatter(index, price, s=size, c=color, marker=marker,
-                                                    alpha=alpha, edgecolors='white', linewidth=1, zorder=zorder)
-                    self._pattern_signal_artists.append(scatter)
+                        # 使用 scatter 绘制标记
+                        scatter = self.price_ax.scatter(
+                            index, price, 
+                            s=size, 
+                            c=color, 
+                            marker=marker,
+                            alpha=alpha, 
+                            edgecolors='white', 
+                            linewidth=1, 
+                            zorder=zorder,
+                            label=pattern_name if is_highlighted else None
+                        )
+                        self._pattern_signal_artists.append(scatter)
+                        drawn_count += 1
 
-                    # 如果是高亮信号，添加一个文本标签
-                    if is_highlighted:
-                        text = self.price_ax.text(index, price, f'  {pattern_name}',
-                                                  fontsize=9, color=color, va='center', ha='left',
-                                                  fontweight='bold')
-                        self._pattern_signal_artists.append(text)
+                        # 如果是高亮信号，添加一个文本标签
+                        if is_highlighted:
+                            text = self.price_ax.text(
+                                index, price, f'  {pattern_name}',
+                                fontsize=9, 
+                                color=color, 
+                                va='bottom' if marker == '^' else 'top', 
+                                ha='left',
+                                fontweight='bold',
+                                zorder=zorder + 1
+                            )
+                            self._pattern_signal_artists.append(text)
+                    except Exception as e:
+                        logger.warning(f"绘制索引 {index} 的信号失败: {e}")
+                        continue
 
-            self.canvas.draw_idle()
-            logger.info(f"成功绘制了 {len(all_indices)} 个 '{pattern_name}' 形态信号，并高亮显示了索引 {highlighted_index}。")
+            # 确保坐标轴范围包含所有绘制的点
+            if drawn_count > 0:
+                try:
+                    # 获取当前坐标轴范围
+                    xlim = self.price_ax.get_xlim()
+                    ylim = self.price_ax.get_ylim()
+                    
+                    # 计算需要包含的索引范围
+                    if unique_indices:
+                        min_idx = min(unique_indices)
+                        max_idx = max(unique_indices)
+                        
+                        # 扩展X轴范围以包含所有信号
+                        new_xlim = (
+                            min(xlim[0], max(0, min_idx - 10)),
+                            max(xlim[1], max_idx + 10)
+                        )
+                        
+                        # 计算需要包含的价格范围
+                        signal_prices = []
+                        for idx in unique_indices:
+                            if 0 <= idx < len(kdata):
+                                try:
+                                    p = float(kdata['high'].iloc[idx]) * 1.05  # 包含标签空间
+                                    if not pd.isna(p) and p > 0:
+                                        signal_prices.append(p)
+                                except:
+                                    pass
+                        
+                        if signal_prices:
+                            min_price = min(signal_prices)
+                            max_price = max(signal_prices)
+                            new_ylim = (
+                                min(ylim[0], min_price * 0.95),
+                                max(ylim[1], max_price * 1.05)
+                            )
+                            
+                            # 更新坐标轴范围
+                            self.price_ax.set_xlim(new_xlim)
+                            self.price_ax.set_ylim(new_ylim)
+                except Exception as e:
+                    logger.warning(f"调整坐标轴范围失败: {e}")
+
+            # 强制立即重绘，而不是使用 draw_idle
+            if hasattr(self, 'canvas') and self.canvas:
+                try:
+                    self.canvas.draw()
+                    logger.debug("已调用 canvas.draw() 强制重绘")
+                except Exception as e:
+                    logger.warning(f"canvas.draw() 失败，尝试 draw_idle(): {e}")
+                    self.canvas.draw_idle()
+            
+            logger.info(f"成功绘制了 {drawn_count} 个 '{pattern_name}' 形态信号（去重后），并高亮显示了索引 {highlighted_index}。")
 
         except Exception as e:
             logger.error(f"绘制形态信号失败: {e}")

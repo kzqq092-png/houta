@@ -44,12 +44,8 @@ class AnalysisThread(QThread, QApplication):
         self.prediction_days = prediction_days  # 添加预测天数
         print(f"[AnalysisThread-INIT] 探针: 线程已初始化，接收到 {len(self.selected_patterns)} 个待识别形态: {self.selected_patterns}")
 
-        # 连接主图信号
-        try:
-            self._connect_main_chart_signals()
-        except Exception as e:
-            if True:  # 使用Loguru日志
-                logger.error(f"连接主图信号失败: {e}")
+        # 注意：_connect_main_chart_signals 方法属于 PatternAnalysisTabPro 类，不在 AnalysisThread 中
+        # 主图信号连接应该在 PatternAnalysisTabPro 的初始化中完成
 
     def run(self):
         """执行分析任务"""
@@ -2309,9 +2305,11 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
                 # 导入并使用中文显示名称
                 try:
+                    from core.services.ai_prediction_service import get_model_display_name
                     model_display_name = get_model_display_name(predictions['model_type'])
                     predictions['model_display_name'] = model_display_name
-                except ImportError:
+                except (ImportError, NameError) as e:
+                    logger.warning(f"无法导入 get_model_display_name: {e}")
                     predictions['model_display_name'] = predictions['model_type']
 
                 logger.info(f" ML预测合并完成:")
@@ -3428,8 +3426,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 获取中文模型名称
             try:
+                from core.services.ai_prediction_service import get_model_display_name
                 model_display_name = get_model_display_name(model_type)
-            except ImportError:
+            except (ImportError, NameError) as e:
+                logger.warning(f"无法导入 get_model_display_name: {e}")
                 model_display_name = model_type
 
             prediction_horizon = predictions.get('prediction_horizon', 5)

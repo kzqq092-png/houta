@@ -1838,8 +1838,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
             # ✅ 性能优化：减少list()调用
             logger.debug(f"指标 {indicator_name} 的值数量: {len(values)}")
-            if logger.level <= 10:  # DEBUG级别才记录详细信息
-                logger.debug(f"值的键: {tuple(values.keys())}")
+            # if logger.level <= 10:  # DEBUG级别才记录详细信息
+            #     logger.debug(f"值的键: {tuple(values.keys())}")
 
             # 处理不同的结果格式
             if not values:
@@ -1855,8 +1855,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
                     # ✅ 性能优化：减少list()调用
                     logger.debug(f"从结果中提取的值数量: {len(values)}")
-                    if logger.level <= 10:  # DEBUG级别才记录详细信息
-                        logger.debug(f"值的键: {tuple(values.keys())}")
+                    # if logger.level <= 10:  # DEBUG级别才记录详细信息
+                    #     logger.debug(f"值的键: {tuple(values.keys())}")
 
             if not values:
                 # 仍然没有数据，添加一个提示行
@@ -2018,15 +2018,15 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 if current_value is not None:
                     # 指标名称 - 改进显示逻辑
                     display_name = self._get_display_name(indicator_name, value_name)
-                    
+
                     # 数值 - 格式化显示
                     value_str = self._format_value(current_value)
-                    
+
                     # 备注 - 添加更多信息
                     note = f"周期: {len(value_data) if hasattr(value_data, '__len__') else 'N/A'}"
                     if summary:
                         note += f", 均值: {summary.get('mean', 'N/A')}"
-                    
+
                     # 收集行数据
                     rows_data.append({
                         'time': current_time,
@@ -2043,10 +2043,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             if rows_data:
                 start_row = self.technical_table.rowCount()
                 self.technical_table.setRowCount(start_row + len(rows_data))
-                
+
                 for i, row_data in enumerate(rows_data):
                     row = start_row + i
-                    
+
                     # 批量设置单元格
                     self.technical_table.setItem(row, 0, QTableWidgetItem(row_data['time']))
                     self.technical_table.setItem(row, 1, QTableWidgetItem(row_data['name']))
@@ -2056,16 +2056,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     self.technical_table.setItem(row, 5, QTableWidgetItem(row_data['trend']))
                     self.technical_table.setItem(row, 6, QTableWidgetItem(row_data['advice']))
                     self.technical_table.setItem(row, 7, QTableWidgetItem(row_data['note']))
-                    
+
                     # 设置行颜色（基于信号类型）
                     self._set_row_color(row, row_data['signal'])
-                
+
                 logger.debug(f"批量插入 {len(rows_data)} 行数据完成")
 
             # 恢复排序设置
             self.technical_table.setSortingEnabled(sorting_enabled)
-
-            logger.info(f"成功添加 {rows_added} 行数据到表格")
 
             # 自动调整列宽
             self.technical_table.resizeColumnsToContents()

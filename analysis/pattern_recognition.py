@@ -245,6 +245,96 @@ class EnhancedPatternRecognizer(PatternRecognizer):
                 print(f"计算置信度失败: {e}")
             return 0.5
 
+    def identify_patterns(self, kdata: pd.DataFrame, 
+                         confidence_threshold: float = 0.5,
+                         pattern_types: Optional[List[str]] = None) -> List[PatternResult]:
+        """
+        识别形态 - 兼容接口方法
+        
+        Args:
+            kdata: K线数据
+            confidence_threshold: 置信度阈值
+            pattern_types: 要识别的形态类型列表，None表示识别所有类型
+            
+        Returns:
+            形态识别结果列表
+        """
+        try:
+            # 使用 PatternManager 进行形态识别
+            from analysis.pattern_manager import PatternManager
+            
+            pattern_manager = PatternManager()
+            
+            # 获取要识别的形态配置
+            if pattern_types:
+                # 如果指定了形态类型，只识别这些类型
+                pattern_configs = []
+                for pattern_type in pattern_types:
+                    config = pattern_manager.get_pattern_config(pattern_type)
+                    if config:
+                        pattern_configs.append(config)
+            else:
+                # 识别所有激活的形态
+                pattern_configs = pattern_manager.get_pattern_configs(active_only=True)
+            
+            if not pattern_configs:
+                if self.debug_mode:
+                    print(f"[identify_patterns] 没有找到可用的形态配置")
+                return []
+            
+            # 执行形态识别
+            all_results = []
+            
+            for config in pattern_configs:
+                try:
+                    # 使用配置的置信度阈值或传入的阈值
+                    threshold = max(config.confidence_threshold, confidence_threshold)
+                    
+                    # 尝试使用 PatternAlgorithmFactory 创建识别器
+                    recognizer = None
+                    try:
+                        from analysis.pattern_base import PatternAlgorithmFactory
+                        recognizer = PatternAlgorithmFactory.create(config)
+                    except (ValueError, AttributeError) as e:
+                        # 如果工厂无法创建识别器，使用基础识别器
+                        if self.debug_mode:
+                            print(f"[identify_patterns] 无法通过工厂创建识别器，使用基础识别器: {e}")
+                        recognizer = PatternRecognizer(config)
+                    
+                    # 验证数据
+                    if not recognizer.validate_data(kdata):
+                        continue
+                    
+                    # 识别形态
+                    results = recognizer.recognize(kdata)
+                    
+                    # 过滤置信度
+                    filtered_results = [
+                        r for r in results 
+                        if hasattr(r, 'confidence') and r.confidence >= threshold
+                    ]
+                    
+                    all_results.extend(filtered_results)
+                    
+                except Exception as e:
+                    if self.debug_mode:
+                        print(f"[identify_patterns] 识别形态 {config.name} 时出错: {e}")
+                    continue
+            
+            # 按置信度排序
+            all_results.sort(key=lambda x: x.confidence if hasattr(x, 'confidence') else 0, reverse=True)
+            
+            if self.debug_mode:
+                print(f"[identify_patterns] 识别完成，发现 {len(all_results)} 个形态")
+            
+            return all_results
+            
+        except Exception as e:
+            if self.debug_mode:
+                print(f"[identify_patterns] 形态识别失败: {e}")
+            # 如果 PatternManager 不可用，回退到基础识别方法
+            return self.recognize(kdata)
+
     def get_pattern_statistics(self) -> Dict[str, Any]:
         """获取形态统计信息"""
         if not self.pattern_history:
