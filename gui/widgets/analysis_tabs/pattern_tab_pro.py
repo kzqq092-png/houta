@@ -762,6 +762,13 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         self.pattern_cache = {}
         self.ml_predictions = {}
         self.pattern_history = []
+        self.incremental_feature_names = [
+            "return_1", "return_5", "momentum_10", "price_change",
+            "high_low_spread", "close_open_ratio", "volatility_5", "volatility_20",
+            "sma_ratio_5_20", "ema_ratio_12_26", "volume_zscore",
+            "volume_acceleration", "bollinger_width", "avg_true_range"
+        ]
+        self.incremental_features_table = None
 
         self.event_bus = event_bus
 
@@ -1107,6 +1114,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         # 历史回测
         backtest_tab = self._create_backtest_tab()
         self.results_tabs.addTab(backtest_tab, "历史回测")
+
+        # 增量特征
+        incremental_tab = self._create_incremental_features_tab()
+        self.results_tabs.addTab(incremental_tab, "增量特征")
 
         layout.addWidget(self.results_tabs)
         return panel
@@ -1824,6 +1835,19 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         layout.addWidget(config_group)
         return widget
 
+    def _create_incremental_features_tab(self) -> QWidget:
+        """增量特征面板"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        self.incremental_features_table = QTableWidget(0, 2)
+        self.incremental_features_table.setHorizontalHeaderLabels(["特征", "数值"])
+        self.incremental_features_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.incremental_features_table)
+
+        hint_label = QLabel("当增量模型参与预测后，将实时展示对应特征向量")
+        layout.addWidget(hint_label)
+        return widget
+
     def _create_status_bar(self, layout):
         """创建结果状态栏"""
         status_frame = QFrame()
@@ -2251,6 +2275,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     def _generate_ml_predictions(self, patterns: List[Dict] = None) -> Dict:
         """生成机器学习预测"""
         logger.info("=== _generate_ml_predictions 开始 ===")
+        self._update_incremental_features_panel(None)
 
         try:
             # 检查AI预测服务是否可用
@@ -2318,6 +2343,12 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 logger.info(f"    使用模型: {predictions.get('model_display_name', predictions['model_type'])}")
                 logger.info(f"    模型路径: {predictions['model_path']}")
 
+                self._update_incremental_features_panel(
+                    pattern_prediction.get('feature_vector') or predictions.get('feature_vector')
+                )
+                if hasattr(self.ai_prediction_service, '_model_metadata'):
+                    predictions['model_metadata'] = self.ai_prediction_service._model_metadata.get('pattern', {})
+
                 return predictions
 
             else:
@@ -2346,6 +2377,20 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 'ai_model_used': False,
                 'error': str(e)
             }
+
+    def _update_incremental_features_panel(self, feature_vector: Optional[List[float]]):
+        """更新增量特征面板"""
+        if not self.incremental_features_table:
+            return
+        self.incremental_features_table.setRowCount(0)
+        if not feature_vector:
+            return
+        for idx, value in enumerate(feature_vector):
+            row = self.incremental_features_table.rowCount()
+            self.incremental_features_table.insertRow(row)
+            name = self.incremental_feature_names[idx] if idx < len(self.incremental_feature_names) else f"feature_{idx}"
+            self.incremental_features_table.setItem(row, 0, QTableWidgetItem(name))
+            self.incremental_features_table.setItem(row, 1, QTableWidgetItem(f"{value:.6f}"))
 
     def _generate_fallback_predictions(self):
         """生成后备预测结果"""
@@ -3260,7 +3305,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                     highlighted_signal_index=clicked_index
                 )
                 self.event_bus.publish(display_event)
-                logger.info(f"发布了 PatternSignalsDisplayEvent 事件: {display_event}")
+                logger.info(f"发布了 PatternSignalsDisplayEvent 事件: {clicked_pattern_name}")
             else:
                 logger.warning("未能发布 PatternSignalsDisplayEvent 事件，因为 event_bus 不可用。")
 
@@ -3488,6 +3533,24 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 direction_emoji = ""
                 direction_color = ""
 
+            metadata = predictions.get('model_metadata') or {}
+            metrics = metadata.get('metrics') or metadata.get('performance_metrics') or {}
+            if not isinstance(metrics, dict):
+                metrics = {}
+            walk_forward = metrics.get('walk_forward') or {}
+            if not isinstance(walk_forward, dict):
+                walk_forward = {}
+            net_return = metrics.get('net_return')
+            avg_trades = metrics.get('avg_trades_per_step')
+            sharpe = walk_forward.get('sharpe')
+            max_drawdown = walk_forward.get('max_drawdown')
+            win_rate = walk_forward.get('win_rate')
+            net_return_text = f"{net_return*100:.2f}%" if isinstance(net_return, (int, float)) else "N/A"
+            sharpe_text = f"{sharpe:.2f}" if isinstance(sharpe, (int, float)) else "N/A"
+            drawdown_text = f"{max_drawdown:.4f}" if isinstance(max_drawdown, (int, float)) else "N/A"
+            win_rate_text = f"{win_rate*100:.1f}%" if isinstance(win_rate, (int, float)) else "N/A"
+            avg_trade_text = f"{avg_trades:.2f}" if isinstance(avg_trades, (int, float)) else "N/A"
+
             text = f"""
 {direction_emoji} AI智能预测报告
 {'='*50}
@@ -3513,6 +3576,13 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 │  形态信号: {pattern_pred.get('direction', 'N/A'):<8} 置信度: {pattern_pred.get('confidence', 0)*100:.1f}% 
 │  趋势信号: {trend_pred.get('direction', 'N/A'):<8} 置信度: {trend_pred.get('confidence', 0)*100:.1f}% 
 │  价格信号: {price_pred.get('direction', 'N/A'):<8} 置信度: {price_pred.get('confidence', 0)*100:.1f}% 
+└─────────────────────────────────────────────┘
+
+ 模型绩效
+┌─────────────────────────────────────────────┐
+│  净收益: {net_return_text:<10}   Sharpe: {sharpe_text:<8} 
+│  最大回撤: {drawdown_text:<10}  胜率: {win_rate_text:<8} 
+│  平均交易次数: {avg_trade_text:<10} 
 └─────────────────────────────────────────────┘
 
  操作建议

@@ -341,7 +341,7 @@ class RightPanel(BasePanel):
             if KLINE_TECHNICAL_AVAILABLE:
                 try:
                     logger.info("开始创建K线技术分析标签页...")
-                    
+
                     start_time = time.time()
 
                     logger.info("导入K线技术分析标签页模块...")
@@ -495,8 +495,6 @@ class RightPanel(BasePanel):
         button_layout.addWidget(export_btn)
         self.add_widget('export_btn', export_btn)
 
-        # 性能监控按钮已删除 - 根据用户要求移除
-
         # 状态标签
         status_label = QLabel("就绪")
         status_label.setStyleSheet("color: #6c757d; font-size: 12px;")
@@ -597,7 +595,6 @@ class RightPanel(BasePanel):
         risk_table.setHorizontalHeaderLabels(['指标', '数值'])
         risk_table.horizontalHeader().setStretchLastSection(True)
         risk_table.setAlternatingRowColors(True)
-        risk_table.setMaximumHeight(200)
         risk_metrics_layout.addWidget(risk_table)
         self.add_widget('risk_table', risk_table)
 
@@ -611,7 +608,6 @@ class RightPanel(BasePanel):
         # 风险建议文本
         risk_advice_text = QTextEdit()
         risk_advice_text.setReadOnly(True)
-        risk_advice_text.setMaximumHeight(100)
         risk_advice_layout.addWidget(risk_advice_text)
         self.add_widget('risk_advice_text', risk_advice_text)
 
@@ -637,7 +633,6 @@ class RightPanel(BasePanel):
         backtest_table.setHorizontalHeaderLabels(['指标', '数值'])
         backtest_table.horizontalHeader().setStretchLastSection(True)
         backtest_table.setAlternatingRowColors(True)
-        backtest_table.setMaximumHeight(150)
         backtest_results_layout.addWidget(backtest_table)
         self.add_widget('backtest_table', backtest_table)
 
@@ -668,6 +663,8 @@ class RightPanel(BasePanel):
 
         # 选股条件组
         condition_group = QGroupBox("选股条件")
+        condition_group.setMinimumHeight(150)
+        condition_group.setMaximumHeight(250)
         layout.addWidget(condition_group)
         self.add_widget('ai_condition_group', condition_group)
 
@@ -679,6 +676,8 @@ class RightPanel(BasePanel):
         condition_text.setMaximumHeight(80)
         condition_layout.addWidget(condition_text)
         self.add_widget('ai_condition_text', condition_text)
+
+        type_layout_main = QVBoxLayout()
 
         # 选股类型选择
         type_layout = QHBoxLayout()
@@ -702,6 +701,9 @@ class RightPanel(BasePanel):
         risk_combo.addItems(["保守", "稳健", "积极", "激进"])
         risk_layout.addWidget(risk_combo)
         self.add_widget('ai_risk_combo', risk_combo)
+
+        type_layout_main.addLayout(type_layout)
+        type_layout_main.addLayout(risk_layout)
 
         # 执行按钮
         ai_run_btn = QPushButton("一键AI选股")
@@ -753,7 +755,6 @@ class RightPanel(BasePanel):
         overview_table.setHorizontalHeaderLabels(['指标', '数值'])
         overview_table.horizontalHeader().setStretchLastSection(True)
         overview_table.setAlternatingRowColors(True)
-        overview_table.setMaximumHeight(120)
         overview_layout.addWidget(overview_table)
         self.add_widget('industry_overview_table', overview_table)
 
@@ -783,7 +784,6 @@ class RightPanel(BasePanel):
         # 热点文本
         hotspot_text = QTextEdit()
         hotspot_text.setReadOnly(True)
-        hotspot_text.setMaximumHeight(100)
         hotspot_layout.addWidget(hotspot_text)
         self.add_widget('industry_hotspot_text', hotspot_text)
 
@@ -798,7 +798,7 @@ class RightPanel(BasePanel):
         """注册事件处理器"""
         self.event_bus.subscribe(UIDataReadyEvent, self._on_ui_data_ready)
         logger.debug("RightPanel已订阅UIDataReadyEvent事件")
-        
+
         # ✅ 优化2：连接标签页切换信号，实现懒加载
         tab_widget = self.get_widget('tab_widget')
         if tab_widget:
@@ -912,11 +912,11 @@ class RightPanel(BasePanel):
             if not tab_widget:
                 logger.warning("标签页组件不存在，跳过更新")
                 return
-            
+
             # 获取当前激活的标签页索引
             current_index = tab_widget.currentIndex()
             logger.info(f"当前激活标签页索引: {current_index}/{len(self._professional_tabs)}")
-            
+
             # 为每个标签页更新数据或标记为待更新
             for i, tab in enumerate(self._professional_tabs):
                 # 获取标签页类型
@@ -926,7 +926,7 @@ class RightPanel(BasePanel):
                 if hasattr(tab, 'skip_kdata') and getattr(tab, 'skip_kdata') is True:
                     logger.debug(f"跳过标签页（skip_kdata=True）: {tab_type}")
                     continue
-                
+
                 # ✅ 懒加载：只更新当前激活的标签页
                 if i == current_index:
                     logger.info(f"立即更新当前激活标签页: {tab_type} (索引{i})")
@@ -960,18 +960,18 @@ class RightPanel(BasePanel):
     def _on_tab_changed(self, index: int):
         """✅ 优化2：标签页切换处理器（懒加载触发）"""
         try:
-            logger.info(f"标签页切换到索引: {index}")
-            
+            # logger.info(f"标签页切换到索引: {index}")
+
             # 检查是否有待更新的数据
             if index in self._pending_tab_updates:
                 kline_data = self._pending_tab_updates.pop(index)
                 logger.info(f"加载待更新标签页数据（索引{index}）")
-                
+
                 # 获取对应的标签页
                 if index < len(self._professional_tabs):
                     tab = self._professional_tabs[index]
                     tab_type = type(tab).__name__.lower().replace('tab', '').replace('analysis', '')
-                    
+
                     # 使用性能管理器更新数据
                     if self._performance_manager:
                         self._performance_manager.update_tab_data(
@@ -992,7 +992,7 @@ class RightPanel(BasePanel):
                 # 检查是否需要刷新（股票已变更）
                 if index in self._tab_stock_code and self._tab_stock_code[index] != self._current_stock_code:
                     logger.debug(f"标签页{index}的股票已变更，但数据已在待更新队列中")
-        
+
         except Exception as e:
             logger.error(f"标签页切换处理失败: {e}")
             import traceback
@@ -1008,7 +1008,7 @@ class RightPanel(BasePanel):
             # ✅ 性能优化：使用线程池并行更新标签页
             if not hasattr(self, '_tab_update_executor'):
                 self._tab_update_executor = ThreadPoolExecutor(max_workers=min(3, len(self._professional_tabs)))
-            
+
             # 创建一个队列来管理标签页更新
             self._tab_update_queue = list(self._professional_tabs)
             self._current_kline_data = kline_data
@@ -1039,7 +1039,7 @@ class RightPanel(BasePanel):
             for _ in range(min(3, len(self._tab_update_queue))):
                 if self._tab_update_queue:
                     tabs_to_update.append(self._tab_update_queue.pop(0))
-            
+
             if not tabs_to_update:
                 return
 
@@ -1050,11 +1050,11 @@ class RightPanel(BasePanel):
                     if hasattr(tab, 'skip_kdata') and getattr(tab, 'skip_kdata') is True:
                         logger.debug(f"跳过向{type(tab).__name__}传递K线数据（skip_kdata=True）")
                         continue
-                    
+
                     # 提交更新任务到线程池
                     future = self._tab_update_executor.submit(self._update_single_tab, tab)
                     futures.append(future)
-                
+
                 # 等待所有更新完成（可选，也可以不等待）
                 # for future in futures:
                 #     try:

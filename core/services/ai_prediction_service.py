@@ -36,6 +36,10 @@ except ImportError:
     TENSORFLOW_AVAILABLE = False
 
 from core.services.base_service import BaseService
+try:
+    from core.services.model_training_service import IncrementalTrainingModel
+except ImportError:  # noqa: F401
+    IncrementalTrainingModel = None
 
 logger = logger
 
@@ -168,6 +172,7 @@ class AIPredictionService(BaseService):
 
         # 模型缓存
         self._models = {}
+        self._model_metadata: Dict[str, Dict[str, Any]] = {}
         self._predictions_cache = {}
         self._last_update = {}
 
@@ -780,60 +785,60 @@ class AIPredictionService(BaseService):
         for pred_type in [PredictionType.PATTERN, PredictionType.TREND,
                           PredictionType.SENTIMENT, PredictionType.PRICE]:
             model_path = Path(f"models/trained/{pred_type}_model.h5")
+            model_loaded = False
             if model_path.exists():
                 try:
                     # 尝试加载TensorFlow模型
                     if TENSORFLOW_AVAILABLE:
                         import tensorflow as tf
 
-                        # 验证模型文件
                         if model_path.stat().st_size == 0:
                             logger.warning(f"{pred_type}模型文件为空")
-                            self._models[pred_type] = None
-                            continue
-
-                        # 加载模型并验证
-                        model = tf.keras.models.load_model(str(model_path))
-
-                        # 基础模型验证
-                        if not hasattr(model, 'predict'):
-                            logger.warning(f"{pred_type}模型缺少predict方法")
-                            self._models[pred_type] = None
-                            continue
-
-                        self._models[pred_type] = model
-                        logger.info(f" 加载{pred_type}深度学习模型成功")
+                        else:
+                            model = tf.keras.models.load_model(str(model_path))
+                            if hasattr(model, 'predict'):
+                                self._models[pred_type] = model
+                                model_loaded = True
+                                logger.info(f" 加载{pred_type}深度学习模型成功")
+                            else:
+                                logger.warning(f"{pred_type}模型缺少predict方法")
                     else:
-                        # 如果没有TensorFlow，检查是否是简化模型
-                        try:
-                            with open(model_path, 'r', encoding='utf-8') as f:
-                                model_data = json.load(f)
-                                if model_data.get('model_type') == 'simplified':
-                                    self._models[pred_type] = model_data
-                                    logger.info(f" 加载{pred_type}简化模型")
-                                else:
-                                    raise ValueError("Not a simplified model")
-                        except Exception:
-                            self._models[pred_type] = None
-                            logger.warning(f" 无法识别{pred_type}模型格式")
-
-                except Exception as e:
-                    # 回退：尝试加载为简化模型
-                    try:
                         with open(model_path, 'r', encoding='utf-8') as f:
                             model_data = json.load(f)
                             if model_data.get('model_type') == 'simplified':
                                 self._models[pred_type] = model_data
-                                logger.info(f" 加载{pred_type}简化模型（回退模式）")
+                                self._model_metadata[pred_type] = model_data.get('model_info', {})
+                                model_loaded = True
+                                logger.info(f" 加载{pred_type}简化模型")
                             else:
-                                raise ValueError("Not a simplified model")
-                    except Exception:
-                        logger.warning(f" 加载{pred_type}模型失败: {e}")
-                        self._models[pred_type] = None
-            else:
-                # 标记需要训练
+                                logger.warning(f" 无法识别{pred_type}模型格式")
+
+                except Exception as e:
+                    logger.warning(f" 加载{pred_type}模型失败: {e}")
+
+            if not model_loaded:
+                active_path = self._get_active_model_path(pred_type)
+                if active_path.exists():
+                    model_obj, metadata = self._load_pickle_model(active_path)
+                    if model_obj:
+                        self._models[pred_type] = model_obj
+                        self._model_metadata[pred_type] = metadata or {}
+                        model_loaded = True
+                        logger.info(f" 加载{pred_type}激活模型: {active_path}")
+
+            if not model_loaded:
+                pickle_path = self._find_latest_pickle_model(pred_type)
+                if pickle_path:
+                    model_obj, metadata = self._load_pickle_model(pickle_path)
+                    if model_obj:
+                        self._models[pred_type] = model_obj
+                        self._model_metadata[pred_type] = metadata or {}
+                        model_loaded = True
+                        logger.info(f" 加载{pred_type}增量训练模型: {pickle_path.name}")
+
+            if not model_loaded:
                 self._models[pred_type] = None
-                logger.warning(f" 加载{pred_type}模型不存在，路径: {model_path}")
+                logger.warning(f" 加载{pred_type}模型失败，已标记为未初始化")
 
     def _initialize_statistical_models(self):
         """初始化统计模型"""
@@ -849,6 +854,99 @@ class AIPredictionService(BaseService):
         for pred_type in [PredictionType.PATTERN, PredictionType.TREND,
                           PredictionType.SENTIMENT, PredictionType.PRICE]:
             self._models[pred_type] = "rule_based"
+
+    def _find_latest_pickle_model(self, pred_type: str) -> Optional[Path]:
+        """查找最近训练完成的.pkl模型"""
+        model_dir = Path("models/trained")
+        if not model_dir.exists():
+            return None
+        pattern = f"{pred_type}_*.pkl"
+        candidates = list(model_dir.glob(pattern))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        return candidates[0]
+
+    def _load_pickle_model(self, pickle_path: Path) -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
+        """加载由ModelTrainingService保存的.pkl模型"""
+        try:
+            with open(pickle_path, 'rb') as f:
+                payload = pickle.load(f)
+            model_obj = payload.get('model')
+            metadata = payload.get('metadata', {})
+            return model_obj, metadata
+        except Exception as e:
+            logger.warning(f"加载pickle模型失败({pickle_path}): {e}")
+            return None, None
+
+    def _is_incremental_model(self, model: Any) -> bool:
+        return IncrementalTrainingModel is not None and isinstance(model, IncrementalTrainingModel)
+
+    def _get_active_model_path(self, pred_type: str) -> Path:
+        return Path("models/trained/active") / f"{pred_type}.pkl"
+
+    def _get_model_horizon(self, metadata: Optional[Dict[str, Any]]) -> int:
+        if not metadata:
+            return 5
+        if 'prediction_horizon' in metadata:
+            return max(1, int(metadata.get('prediction_horizon', 5)))
+        config = metadata.get('config') if isinstance(metadata, dict) else {}
+        return max(1, int(config.get('prediction_horizon', 5)))
+
+    def _build_incremental_feature_vector(self, kdata: pd.DataFrame,
+                                          prediction_type: str,
+                                          metadata: Optional[Dict[str, Any]]) -> Optional[np.ndarray]:
+        if pd is None or kdata is None or kdata.empty:
+            return None
+
+        df = kdata.copy()
+        df.columns = [str(col).lower() for col in df.columns]
+        required = {'open', 'high', 'low', 'close'}
+        if not required.issubset(df.columns):
+            logger.warning(f"{prediction_type} 特征提取缺少必要列: {required - set(df.columns)}")
+            return None
+
+        if 'volume' not in df.columns:
+            df['volume'] = 0.0
+
+        close = df['close'].astype(float)
+        volume = df['volume'].astype(float).replace(0, np.nan)
+        high = df['high'].astype(float)
+        low = df['low'].astype(float)
+        open_price = df['open'].astype(float)
+
+        feature_frame = pd.DataFrame(index=df.index)
+        feature_frame['return_1'] = close.pct_change().fillna(0)
+        feature_frame['return_5'] = close.pct_change(5).fillna(0)
+        feature_frame['momentum_10'] = close.pct_change(10).fillna(0)
+        feature_frame['price_change'] = close.diff().fillna(0)
+        feature_frame['high_low_spread'] = ((high - low) / close.replace(0, np.nan)).fillna(0)
+        feature_frame['close_open_ratio'] = ((close - open_price) / open_price.replace(0, np.nan)).fillna(0)
+        feature_frame['volatility_5'] = close.pct_change().rolling(5).std().fillna(0)
+        feature_frame['volatility_20'] = close.pct_change().rolling(20).std().fillna(0)
+        feature_frame['sma_ratio_5_20'] = (close.rolling(5).mean() / (close.rolling(20).mean() + 1e-9)).fillna(1.0)
+        feature_frame['ema_ratio_12_26'] = (close.ewm(span=12).mean() / (close.ewm(span=26).mean() + 1e-9)).fillna(1.0)
+        feature_frame['volume_zscore'] = ((volume - volume.rolling(20).mean()) /
+                                          (volume.rolling(20).std() + 1e-9)).fillna(0)
+        feature_frame['volume_acceleration'] = volume.pct_change().fillna(0)
+        feature_frame['bollinger_width'] = ((close.rolling(20).std() * 2) / close.replace(0, np.nan)).fillna(0)
+        true_ranges = pd.concat([
+            (high - low).abs(),
+            (high - close.shift(1)).abs(),
+            (low - close.shift(1)).abs()
+        ], axis=1)
+        feature_frame['avg_true_range'] = true_ranges.max(axis=1).fillna(0)
+
+        horizon = self._get_model_horizon(metadata)
+        if horizon > 0 and len(feature_frame) > horizon:
+            feature_frame = feature_frame.iloc[:-horizon]
+
+        feature_frame = feature_frame.replace([np.inf, -np.inf], 0).fillna(0)
+        if feature_frame.empty:
+            return None
+
+        latest_row = feature_frame.iloc[-1]
+        return latest_row.to_numpy(dtype=np.float32)
 
     def predict_patterns(self, kdata: pd.DataFrame, patterns: List[Dict]) -> Dict[str, Any]:
         """
@@ -946,8 +1044,18 @@ class AIPredictionService(BaseService):
             if len(kdata) < timeframe * 2:
                 raise ValueError(f"数据长度({len(kdata)})不足，至少需要{timeframe * 2}个数据点")
 
-            features = self._extract_trend_features(kdata)
             model = self._models.get(PredictionType.TREND)
+
+            if self._is_incremental_model(model):
+                metadata = self._model_metadata.get(PredictionType.TREND, {})
+                incremental_features = self._build_incremental_feature_vector(
+                    kdata, PredictionType.TREND, metadata)
+                if incremental_features is not None:
+                    prediction = self._predict_with_incremental_model(model, incremental_features, PredictionType.TREND)
+                    if prediction:
+                        return prediction
+
+            features = self._extract_trend_features(kdata)
 
             if model and model != "rule_based" and model != "statistical":
                 # 使用深度学习模型
@@ -981,8 +1089,18 @@ class AIPredictionService(BaseService):
             情绪预测结果
         """
         try:
-            features = self._extract_sentiment_features(kdata, market_data)
             model = self._models.get(PredictionType.SENTIMENT)
+
+            if self._is_incremental_model(model):
+                metadata = self._model_metadata.get(PredictionType.SENTIMENT, {})
+                incremental_features = self._build_incremental_feature_vector(
+                    kdata, PredictionType.SENTIMENT, metadata)
+                if incremental_features is not None:
+                    prediction = self._predict_with_incremental_model(model, incremental_features, PredictionType.SENTIMENT)
+                    if prediction:
+                        return prediction
+
+            features = self._extract_sentiment_features(kdata, market_data)
 
             if model and model != "rule_based" and model != "statistical":
                 prediction = self._predict_with_dl_model(model, features, PredictionType.SENTIMENT)
@@ -1009,8 +1127,19 @@ class AIPredictionService(BaseService):
             价格预测结果
         """
         try:
-            features = self._extract_price_features(kdata)
             model = self._models.get(PredictionType.PRICE)
+
+            if self._is_incremental_model(model):
+                metadata = self._model_metadata.get(PredictionType.PRICE, {})
+                incremental_features = self._build_incremental_feature_vector(
+                    kdata, PredictionType.PRICE, metadata)
+                if incremental_features is not None:
+                    prediction = self._predict_with_incremental_model(model, incremental_features, PredictionType.PRICE)
+                    if prediction:
+                        prediction['horizon'] = horizon
+                        return prediction
+
+            features = self._extract_price_features(kdata)
 
             if model and model != "rule_based" and model != "statistical":
                 # 使用深度学习模型
@@ -1110,6 +1239,28 @@ class AIPredictionService(BaseService):
             logger.warning("没有有效的形态数据，使用无形态预测")
             return self._predict_without_patterns(kdata)
 
+        incremental_model = self._models.get(PredictionType.PATTERN)
+        if self._is_incremental_model(incremental_model):
+            metadata = self._model_metadata.get(PredictionType.PATTERN, {})
+            incremental_features = self._build_incremental_feature_vector(kdata, PredictionType.PATTERN, metadata)
+            if incremental_features is not None:
+                incremental_result = self._predict_with_incremental_model(
+                    incremental_model,
+                    incremental_features,
+                    PredictionType.PATTERN
+                )
+                if incremental_result:
+                    incremental_result.update({
+                        'pattern_count': len(valid_patterns),
+                        'bullish_signals': len(buy_signals),
+                        'bearish_signals': len(sell_signals),
+                        'prediction_type': PredictionType.PATTERN,
+                        'timestamp': datetime.now().isoformat(),
+                        'predictions_source': 'incremental_model'
+                    })
+                    incremental_result.setdefault('model_path', str(self._get_active_model_path(PredictionType.PATTERN)))
+                    return incremental_result
+
         # === 关键修复：根据模型类型进行不同的形态预测 ===
         model_type = self.model_config.get('model_type', AIModelType.ENSEMBLE)
         logger.info(f" 有形态的预测，使用模型类型: {model_type}")
@@ -1173,6 +1324,17 @@ class AIPredictionService(BaseService):
         # === 调试日志结束 ===
 
         try:
+            incremental_model = self._models.get(PredictionType.PATTERN)
+            if self._is_incremental_model(incremental_model):
+                metadata = self._model_metadata.get(PredictionType.PATTERN, {})
+                incremental_features = self._build_incremental_feature_vector(
+                    kdata, PredictionType.PATTERN, metadata)
+                if incremental_features is not None:
+                    result = self._predict_with_incremental_model(incremental_model, incremental_features, PredictionType.PATTERN)
+                    if result:
+                        result['model_path'] = 'incremental_without_patterns'
+                        return result
+
             # 根据模型类型选择预测方法
             if model_type == AIModelType.DEEP_LEARNING:
                 logger.info("调用深度学习模型预测...")
@@ -1530,6 +1692,9 @@ class AIPredictionService(BaseService):
     def _predict_with_dl_model(self, model, features, prediction_type):
         """使用深度学习模型进行预测"""
         try:
+            if self._is_incremental_model(model):
+                return self._predict_with_incremental_model(model, features, prediction_type)
+
             # 检查是否是简化模型
             if isinstance(model, dict) and model.get('model_type') == 'simplified':
                 return self._predict_with_simplified_model(model, features, prediction_type)
@@ -1566,6 +1731,45 @@ class AIPredictionService(BaseService):
                 'direction': '震荡',
                 'confidence': 0.5,
                 'model_type': 'dl_model_fallback',
+                'timestamp': datetime.now().isoformat()
+            }
+
+    def _predict_with_incremental_model(self, model: 'IncrementalTrainingModel',
+                                        features: np.ndarray,
+                                        prediction_type: str) -> Dict[str, Any]:
+        """使用增量训练模型进行预测"""
+        try:
+            feature_array = np.asarray(features, dtype=np.float32)
+            if feature_array.ndim == 1:
+                feature_array = feature_array.reshape(1, -1)
+            predictions = model.predict(feature_array)
+
+            if model.is_classifier:
+                predicted_class = int(predictions[0])
+                proba = model.predict_proba(feature_array)
+                confidence = float(np.max(proba)) if proba is not None else 0.6
+                result = self._format_prediction_result(predicted_class, confidence, prediction_type)
+                result['model_type'] = 'incremental_ml'
+                result['feature_vector'] = feature_array.flatten().tolist()
+                return result
+
+            predicted_value = float(predictions[0])
+            direction = "上涨" if predicted_value > 0 else ("下跌" if predicted_value < 0 else "震荡")
+            confidence = min(max(abs(predicted_value) * 10, 0.3), 0.9)
+            return {
+                'direction': direction,
+                'confidence': confidence,
+                'predicted_change': predicted_value,
+                'model_type': 'incremental_regressor',
+                'feature_vector': feature_array.flatten().tolist(),
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            logger.warning(f"增量模型预测失败: {e}")
+            return {
+                'direction': '震荡',
+                'confidence': 0.5,
+                'model_type': 'incremental_fallback',
                 'timestamp': datetime.now().isoformat()
             }
 

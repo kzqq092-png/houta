@@ -566,6 +566,23 @@ class MainMenuBar(QMenuBar):
             # 修复：使用 addMenu 而不是 addAction
             self.optimization_menu.addMenu(self.enhanced_menu)
 
+            self.advanced_menu.addSeparator()
+
+            # AI模型训练管理子菜单
+            self.ai_training_menu = self.advanced_menu.addMenu("AI模型训练")
+
+            # 模型训练管理
+            self.model_training_action = QAction("模型训练管理", self)
+            self.model_training_action.setStatusTip("管理AI模型训练任务、版本和日志")
+            self.model_training_action.setShortcut("Ctrl+Shift+T")
+            self.ai_training_menu.addAction(self.model_training_action)
+
+            # 预测准确性跟踪
+            self.prediction_accuracy_action = QAction("预测准确性跟踪", self)
+            self.prediction_accuracy_action.setStatusTip("跟踪和统计AI预测的准确性")
+            self.prediction_accuracy_action.setShortcut("Ctrl+Shift+A")
+            self.ai_training_menu.addAction(self.prediction_accuracy_action)
+
         except Exception as e:
             if True:  # 使用Loguru日志
                 logger.error(f"初始化高级功能菜单失败: {str(e)}")
@@ -999,6 +1016,10 @@ class MainMenuBar(QMenuBar):
                 ('version_manager_action', '_on_version_manager'),
                 ('performance_evaluation_action', '_on_performance_evaluation'),
 
+                # AI模型训练
+                ('model_training_action', 'show_model_training_dialog'),
+                ('prediction_accuracy_action', 'show_prediction_accuracy_dialog'),
+
                 # 调试功能
                 ('toggle_log_action', '_toggle_log_panel'),
 
@@ -1072,6 +1093,38 @@ class MainMenuBar(QMenuBar):
             )
             if True:  # 使用Loguru日志
                 logger.error(f"打开插件管理器失败: {str(e)}")
+
+    def show_model_training_dialog(self):
+        """显示模型训练管理对话框"""
+        try:
+            from gui.dialogs.model_training_dialog import ModelTrainingDialog
+            
+            dialog = ModelTrainingDialog(self.parent())
+            dialog.exec_()
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"打开模型训练管理对话框失败:\n{str(e)}"
+            )
+            if True:  # 使用Loguru日志
+                logger.error(f"打开模型训练管理对话框失败: {str(e)}")
+
+    def show_prediction_accuracy_dialog(self):
+        """显示预测准确性跟踪对话框"""
+        try:
+            from gui.dialogs.prediction_accuracy_dialog import PredictionAccuracyDialog
+            
+            dialog = PredictionAccuracyDialog(self.parent())
+            dialog.exec_()
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"打开预测准确性跟踪对话框失败:\n{str(e)}"
+            )
+            if True:  # 使用Loguru日志
+                logger.error(f"打开预测准确性跟踪对话框失败: {str(e)}")
 
     def show_distributed_monitor(self):
         """显示分布式节点监控对话框"""

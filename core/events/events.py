@@ -645,3 +645,181 @@ class UpdateHistoryEvent(BaseEvent):
             'estimated_time': self.estimated_time,
             'error_message': self.error_message
         })
+
+
+@dataclass
+class TrainingTaskCreatedEvent(BaseEvent):
+    """
+    训练任务创建事件
+    
+    当创建新的训练任务时触发
+    """
+    task_id: str = ""
+    task_name: str = ""
+    model_type: str = ""
+    config: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'task_id': self.task_id,
+            'task_name': self.task_name,
+            'model_type': self.model_type,
+            'config': self.config
+        })
+
+
+@dataclass
+class TrainingTaskStatusChangedEvent(BaseEvent):
+    """
+    训练任务状态变更事件
+    
+    当训练任务状态发生变化时触发
+    """
+    task_id: str = ""
+    old_status: str = ""
+    new_status: str = ""
+    progress: Optional[float] = None
+    error_message: Optional[str] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'task_id': self.task_id,
+            'old_status': self.old_status,
+            'new_status': self.new_status,
+            'progress': self.progress,
+            'error_message': self.error_message
+        })
+
+
+@dataclass
+class TrainingProgressUpdatedEvent(BaseEvent):
+    """
+    训练进度更新事件
+    
+    当训练进度更新时触发
+    """
+    task_id: str = ""
+    progress: float = 0.0
+    epoch: Optional[int] = None
+    loss: Optional[float] = None
+    metrics: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'task_id': self.task_id,
+            'progress': self.progress,
+            'epoch': self.epoch,
+            'loss': self.loss,
+            'metrics': self.metrics
+        })
+
+
+@dataclass
+class ModelVersionCreatedEvent(BaseEvent):
+    """
+    模型版本创建事件
+    
+    当创建新的模型版本时触发
+    """
+    version_id: str = ""
+    version_number: str = ""
+    model_type: str = ""
+    model_file_path: str = ""
+    training_task_id: Optional[str] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'version_id': self.version_id,
+            'version_number': self.version_number,
+            'model_type': self.model_type,
+            'model_file_path': self.model_file_path,
+            'training_task_id': self.training_task_id
+        })
+
+
+@dataclass
+class ModelVersionCurrentChangedEvent(BaseEvent):
+    """
+    模型当前版本变更事件
+    
+    当设置新的当前版本时触发
+    """
+    version_id: str = ""
+    version_number: str = ""
+    model_type: str = ""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'version_id': self.version_id,
+            'version_number': self.version_number,
+            'model_type': self.model_type
+        })
+
+
+@dataclass
+class ModelVersionRolledBackEvent(BaseEvent):
+    """
+    模型版本回滚事件
+    
+    当回滚到历史版本时触发
+    """
+    version_id: str = ""
+    version_number: str = ""
+    previous_version_id: Optional[str] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'version_id': self.version_id,
+            'version_number': self.version_number,
+            'previous_version_id': self.previous_version_id
+        })
+
+
+@dataclass
+class PredictionRecordedEvent(BaseEvent):
+    """
+    预测记录事件
+    
+    当记录新的预测结果时触发
+    """
+    record_id: str = ""
+    model_version_id: str = ""
+    prediction_type: str = ""
+    confidence: float = 0.0
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'record_id': self.record_id,
+            'model_version_id': self.model_version_id,
+            'prediction_type': self.prediction_type,
+            'confidence': self.confidence
+        })
+
+
+@dataclass
+class PredictionAccuracyUpdatedEvent(BaseEvent):
+    """
+    预测准确性更新事件
+    
+    当更新预测准确性时触发
+    """
+    record_id: str = ""
+    accuracy: float = 0.0
+    model_version_id: str = ""
+    prediction_type: str = ""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'record_id': self.record_id,
+            'accuracy': self.accuracy,
+            'model_version_id': self.model_version_id,
+            'prediction_type': self.prediction_type
+        })

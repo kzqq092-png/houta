@@ -360,6 +360,32 @@ class ServiceBootstrap:
             logger.error(f" AI预测服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
+        # 模型训练服务
+        try:
+            from .model_training_service import ModelTrainingService
+            if not self._is_service_registered(ModelTrainingService):
+                self.service_container.register(
+                    ModelTrainingService, scope=ServiceScope.SINGLETON)
+            model_training_service = self.service_container.resolve(ModelTrainingService)
+            model_training_service.initialize()
+            logger.info("模型训练服务注册完成")
+        except Exception as e:
+            logger.error(f" 模型训练服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # 预测跟踪服务
+        try:
+            from .prediction_tracking_service import PredictionTrackingService
+            if not self._is_service_registered(PredictionTrackingService):
+                self.service_container.register(
+                    PredictionTrackingService, scope=ServiceScope.SINGLETON)
+            prediction_tracking_service = self.service_container.resolve(PredictionTrackingService)
+            prediction_tracking_service.initialize()
+            logger.info("预测跟踪服务注册完成")
+        except Exception as e:
+            logger.error(f" 预测跟踪服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
         # 资产服务（多资产类型支持）
         try:
             from .asset_service import AssetService
