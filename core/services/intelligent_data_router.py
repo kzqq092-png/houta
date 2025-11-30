@@ -4,7 +4,7 @@
 提供智能数据源选择、负载均衡、故障转移等功能。
 根据数据质量、响应时间、可用性等因素智能选择最优数据源。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0
 日期: 2025-09-21
 """
@@ -25,6 +25,7 @@ from core.tet_data_pipeline import StandardQuery, StandardData
 
 logger = logger.bind(module=__name__)
 
+
 class RoutingStrategy(Enum):
     """路由策略"""
     QUALITY_FIRST = "quality_first"        # 质量优先
@@ -33,6 +34,7 @@ class RoutingStrategy(Enum):
     ROUND_ROBIN = "round_robin"            # 轮询
     FAILOVER = "failover"                  # 故障转移
     COST_OPTIMIZED = "cost_optimized"      # 成本优化
+
 
 @dataclass
 class DataSourceMetrics:
@@ -96,6 +98,7 @@ class DataSourceMetrics:
         # 更新成功率
         self.success_rate = self.successful_requests / self.total_requests if self.total_requests > 0 else 0.0
 
+
 @dataclass
 class RoutingRule:
     """路由规则"""
@@ -114,6 +117,7 @@ class RoutingRule:
     quality_weight: float = 0.4
     speed_weight: float = 0.3
     availability_weight: float = 0.3
+
 
 class IntelligentDataRouter:
     """

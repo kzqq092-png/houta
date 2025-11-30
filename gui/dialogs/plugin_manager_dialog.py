@@ -904,7 +904,7 @@ class PluginManagerDialog(QDialog):
 
     def init_ui(self):
         """初始化UI - 优化样式和布局"""
-        self.setWindowTitle("HIkyuu 插件管理器")
+        self.setWindowTitle("FactorWeave-Quant 插件管理器")
         self.setModal(True)
         self.resize(1000, 700)
 
@@ -1657,7 +1657,7 @@ class PluginManagerDialog(QDialog):
 ├─ 平均响应时间: {response_times['average']:.2f} ms
 ├─ 最快响应: {response_times['min']:.2f} ms
 ├─ 最慢响应: {response_times['max']:.2f} ms
-└─ 插件管理器版本: HIkyuu v2.0
+└─ 插件管理器版本: FactorWeave-Quant v2.0
 
  最后更新: {self._get_current_time()}
 """

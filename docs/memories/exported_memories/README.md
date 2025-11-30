@@ -1,6 +1,6 @@
-# HIkyuu-UI 项目记忆导出
+# FactorWeave-Quant 项目记忆导出
 
-本目录包含HIkyuu-UI项目开发过程中的重要记忆和文档。
+本目录包含FactorWeave-Quant项目开发过程中的重要记忆和文档。
 
 ## 最新记忆 (2025-10-23)
 

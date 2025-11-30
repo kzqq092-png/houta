@@ -30,7 +30,7 @@ class LearningMode(Enum):
     """学习模式"""
     OFFLINE = "offline"          # 离线学习
     ONLINE = "online"           # 在线学习
-    INCREMENTAL = "incremental" # 增量学习
+    INCREMENTAL = "incremental"  # 增量学习
     FEDERATED = "federated"     # 联邦学习
     TRANSFER = "transfer"       # 迁移学习
 
@@ -107,24 +107,24 @@ class ModelVersion:
 
 class DataDriftDetector:
     """数据漂移检测器"""
-    
+
     def __init__(self, window_size: int = 1000, threshold: float = 0.1):
         self.window_size = window_size
         self.threshold = threshold
         self.reference_data = deque(maxlen=window_size)
         self.current_data = deque(maxlen=window_size)
         self._lock = threading.Lock()
-    
+
     def add_reference_sample(self, sample: Dict[str, Any]):
         """添加参考样本"""
         with self._lock:
             self.reference_data.append(sample)
-    
+
     def add_current_sample(self, sample: Dict[str, Any]):
         """添加当前样本"""
         with self._lock:
             self.current_data.append(sample)
-    
+
     def detect_drift(self) -> Dict[str, Any]:
         """检测数据漂移"""
         try:
@@ -134,11 +134,11 @@ class DataDriftDetector:
                     'drift_score': 0.0,
                     'reason': 'insufficient_data'
                 }
-            
+
             # 转换为DataFrame进行分析
             ref_df = pd.DataFrame(list(self.reference_data))
             cur_df = pd.DataFrame(list(self.current_data))
-            
+
             # 确保列一致
             common_columns = set(ref_df.columns) & set(cur_df.columns)
             if not common_columns:
@@ -147,13 +147,13 @@ class DataDriftDetector:
                     'drift_score': 0.0,
                     'reason': 'no_common_features'
                 }
-            
+
             ref_df = ref_df[list(common_columns)]
             cur_df = cur_df[list(common_columns)]
-            
+
             # 计算统计差异
             drift_scores = {}
-            
+
             for column in common_columns:
                 if pd.api.types.is_numeric_dtype(ref_df[column]):
                     # 数值型特征：使用KS检验
@@ -161,13 +161,13 @@ class DataDriftDetector:
                 else:
                     # 分类型特征：使用卡方检验
                     drift_score = self._chi_square_test(ref_df[column], cur_df[column])
-                
+
                 drift_scores[column] = drift_score
-            
+
             # 计算总体漂移分数
             overall_drift_score = np.mean(list(drift_scores.values()))
             drift_detected = overall_drift_score > self.threshold
-            
+
             return {
                 'drift_detected': drift_detected,
                 'drift_score': overall_drift_score,
@@ -178,7 +178,7 @@ class DataDriftDetector:
                     'current': len(self.current_data)
                 }
             }
-            
+
         except Exception as e:
             logger.error(f"数据漂移检测失败: {e}")
             return {
@@ -186,7 +186,7 @@ class DataDriftDetector:
                 'drift_score': 0.0,
                 'error': str(e)
             }
-    
+
     def _ks_test(self, ref_data: pd.Series, cur_data: pd.Series) -> float:
         """Kolmogorov-Smirnov检验"""
         try:
@@ -199,29 +199,29 @@ class DataDriftDetector:
             cur_mean = cur_data.mean()
             ref_std = ref_data.std()
             cur_std = cur_data.std()
-            
+
             mean_diff = abs(ref_mean - cur_mean) / (ref_std + 1e-8)
             std_diff = abs(ref_std - cur_std) / (ref_std + 1e-8)
-            
+
             return (mean_diff + std_diff) / 2
-    
+
     def _chi_square_test(self, ref_data: pd.Series, cur_data: pd.Series) -> float:
         """卡方检验"""
         try:
             # 计算频率分布
             ref_counts = ref_data.value_counts(normalize=True)
             cur_counts = cur_data.value_counts(normalize=True)
-            
+
             # 对齐索引
             all_categories = set(ref_counts.index) | set(cur_counts.index)
-            
+
             ref_freq = [ref_counts.get(cat, 0) for cat in all_categories]
             cur_freq = [cur_counts.get(cat, 0) for cat in all_categories]
-            
+
             # 计算卡方统计量
             chi_square = sum((r - c) ** 2 / (r + 1e-8) for r, c in zip(ref_freq, cur_freq))
             return chi_square / len(all_categories)
-            
+
         except Exception as e:
             logger.error(f"卡方检验失败: {e}")
             return 0.0
@@ -229,22 +229,22 @@ class DataDriftDetector:
 
 class PerformanceMonitor:
     """性能监控器"""
-    
+
     def __init__(self, window_size: int = 100):
         self.window_size = window_size
         self.metrics_history = defaultdict(lambda: deque(maxlen=window_size))
         self.baseline_metrics = {}
         self._lock = threading.Lock()
-    
+
     def record_metrics(self, model_id: str, metrics: ModelMetrics):
         """记录模型性能指标"""
         with self._lock:
             self.metrics_history[model_id].append(metrics)
-    
+
     def set_baseline(self, model_id: str, metrics: ModelMetrics):
         """设置基线性能"""
         self.baseline_metrics[model_id] = metrics
-    
+
     def check_performance_degradation(self, model_id: str, threshold: float = 0.05) -> Dict[str, Any]:
         """检查性能退化"""
         try:
@@ -253,23 +253,23 @@ class PerformanceMonitor:
                     'degradation_detected': False,
                     'reason': 'insufficient_data'
                 }
-            
+
             recent_metrics = list(self.metrics_history[model_id])[-10:]  # 最近10次
             baseline = self.baseline_metrics.get(model_id)
-            
+
             if not baseline:
                 # 使用历史最佳作为基线
                 all_metrics = list(self.metrics_history[model_id])
                 baseline = max(all_metrics, key=lambda x: x.accuracy)
                 self.baseline_metrics[model_id] = baseline
-            
+
             # 计算性能变化
             recent_accuracy = np.mean([m.accuracy for m in recent_metrics])
             baseline_accuracy = baseline.accuracy
-            
+
             accuracy_drop = baseline_accuracy - recent_accuracy
             degradation_detected = accuracy_drop > threshold
-            
+
             # 计算其他指标的变化
             metrics_comparison = {
                 'accuracy': {
@@ -288,7 +288,7 @@ class PerformanceMonitor:
                     'change': np.mean([m.recall for m in recent_metrics]) - baseline.recall
                 }
             }
-            
+
             return {
                 'degradation_detected': degradation_detected,
                 'accuracy_drop': accuracy_drop,
@@ -296,38 +296,38 @@ class PerformanceMonitor:
                 'metrics_comparison': metrics_comparison,
                 'sample_count': len(recent_metrics)
             }
-            
+
         except Exception as e:
             logger.error(f"性能退化检查失败: {e}")
             return {
                 'degradation_detected': False,
                 'error': str(e)
             }
-    
+
     def get_performance_trend(self, model_id: str) -> Dict[str, Any]:
         """获取性能趋势"""
         try:
             if model_id not in self.metrics_history:
                 return {}
-            
+
             metrics_list = list(self.metrics_history[model_id])
             if len(metrics_list) < 5:
                 return {'trend': 'insufficient_data'}
-            
+
             # 计算趋势
             accuracies = [m.accuracy for m in metrics_list]
-            
+
             # 简单线性趋势
             x = np.arange(len(accuracies))
             slope = np.polyfit(x, accuracies, 1)[0]
-            
+
             if slope > 0.001:
                 trend = 'improving'
             elif slope < -0.001:
                 trend = 'declining'
             else:
                 trend = 'stable'
-            
+
             return {
                 'trend': trend,
                 'slope': slope,
@@ -337,7 +337,7 @@ class PerformanceMonitor:
                 'variance': np.var(accuracies),
                 'sample_count': len(accuracies)
             }
-            
+
         except Exception as e:
             logger.error(f"获取性能趋势失败: {e}")
             return {'error': str(e)}
@@ -345,20 +345,20 @@ class PerformanceMonitor:
 
 class ModelVersionManager:
     """模型版本管理器"""
-    
+
     def __init__(self, storage_path: Optional[str] = None):
         self.storage_path = storage_path or self._get_default_storage_path()
         self.versions = {}  # model_id -> List[ModelVersion]
         self.active_versions = {}  # model_id -> version
         self._lock = threading.Lock()
         self._load_versions()
-    
+
     def _get_default_storage_path(self) -> str:
         """获取默认存储路径"""
-        app_data_dir = Path.home() / ".hikyuu-ui" / "model_versions"
+        app_data_dir = Path.home() / ".FactorWeave-Quant" / "model_versions"
         app_data_dir.mkdir(parents=True, exist_ok=True)
         return str(app_data_dir)
-    
+
     def _load_versions(self):
         """加载版本信息"""
         try:
@@ -366,7 +366,7 @@ class ModelVersionManager:
             if versions_file.exists():
                 with open(versions_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                
+
                 for model_id, version_list in data.items():
                     self.versions[model_id] = []
                     for v_data in version_list:
@@ -388,7 +388,7 @@ class ModelVersionManager:
                             training_time=metrics_data.get('training_time'),
                             inference_time=metrics_data.get('inference_time')
                         )
-                        
+
                         version = ModelVersion(
                             model_id=v_data['model_id'],
                             version=v_data['version'],
@@ -400,22 +400,22 @@ class ModelVersionManager:
                             is_active=v_data.get('is_active', False),
                             is_baseline=v_data.get('is_baseline', False)
                         )
-                        
+
                         self.versions[model_id].append(version)
-                        
+
                         if version.is_active:
                             self.active_versions[model_id] = version.version
-                
+
                 logger.info(f"已加载 {len(self.versions)} 个模型的版本信息")
-                
+
         except Exception as e:
             logger.error(f"加载版本信息失败: {e}")
-    
+
     def _save_versions(self):
         """保存版本信息"""
         try:
             versions_file = Path(self.storage_path) / "versions.json"
-            
+
             # 转换为可序列化的格式
             data = {}
             for model_id, version_list in self.versions.items():
@@ -448,62 +448,62 @@ class ModelVersionManager:
                         'is_baseline': version.is_baseline
                     }
                     data[model_id].append(version_data)
-            
+
             with open(versions_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-                
+
         except Exception as e:
             logger.error(f"保存版本信息失败: {e}")
-    
+
     def add_version(self, version: ModelVersion) -> bool:
         """添加新版本"""
         try:
             with self._lock:
                 if version.model_id not in self.versions:
                     self.versions[version.model_id] = []
-                
+
                 self.versions[version.model_id].append(version)
-                
+
                 # 如果是活跃版本，更新活跃版本映射
                 if version.is_active:
                     # 取消其他版本的活跃状态
                     for v in self.versions[version.model_id]:
                         if v.version != version.version:
                             v.is_active = False
-                    
+
                     self.active_versions[version.model_id] = version.version
-                
+
                 self._save_versions()
                 return True
-                
+
         except Exception as e:
             logger.error(f"添加模型版本失败: {e}")
             return False
-    
+
     def get_active_version(self, model_id: str) -> Optional[ModelVersion]:
         """获取活跃版本"""
         if model_id not in self.versions:
             return None
-        
+
         active_version_id = self.active_versions.get(model_id)
         if not active_version_id:
             return None
-        
+
         for version in self.versions[model_id]:
             if version.version == active_version_id:
                 return version
-        
+
         return None
-    
+
     def get_best_version(self, model_id: str, metric: str = 'accuracy') -> Optional[ModelVersion]:
         """获取最佳版本"""
         if model_id not in self.versions:
             return None
-        
+
         versions = self.versions[model_id]
         if not versions:
             return None
-        
+
         # 根据指定指标选择最佳版本
         if metric == 'accuracy':
             return max(versions, key=lambda v: v.metrics.accuracy)
@@ -515,66 +515,66 @@ class ModelVersionManager:
             return max(versions, key=lambda v: v.metrics.recall)
         else:
             return versions[-1]  # 返回最新版本
-    
+
     def activate_version(self, model_id: str, version_id: str) -> bool:
         """激活指定版本"""
         try:
             with self._lock:
                 if model_id not in self.versions:
                     return False
-                
+
                 # 找到目标版本
                 target_version = None
                 for version in self.versions[model_id]:
                     if version.version == version_id:
                         target_version = version
                         break
-                
+
                 if not target_version:
                     return False
-                
+
                 # 取消所有版本的活跃状态
                 for version in self.versions[model_id]:
                     version.is_active = False
-                
+
                 # 激活目标版本
                 target_version.is_active = True
                 self.active_versions[model_id] = version_id
-                
+
                 self._save_versions()
                 return True
-                
+
         except Exception as e:
             logger.error(f"激活模型版本失败: {e}")
             return False
-    
+
     def get_version_history(self, model_id: str) -> List[ModelVersion]:
         """获取版本历史"""
         return self.versions.get(model_id, [])
-    
+
     def cleanup_old_versions(self, model_id: str, keep_count: int = 5) -> int:
         """清理旧版本"""
         try:
             if model_id not in self.versions:
                 return 0
-            
+
             versions = self.versions[model_id]
             if len(versions) <= keep_count:
                 return 0
-            
+
             # 按创建时间排序，保留最新的版本
             versions.sort(key=lambda v: v.created_at, reverse=True)
-            
+
             # 保留活跃版本和基线版本
             to_keep = []
             to_remove = []
-            
+
             for version in versions:
                 if version.is_active or version.is_baseline or len(to_keep) < keep_count:
                     to_keep.append(version)
                 else:
                     to_remove.append(version)
-            
+
             # 删除文件
             removed_count = 0
             for version in to_remove:
@@ -584,13 +584,13 @@ class ModelVersionManager:
                     removed_count += 1
                 except Exception as e:
                     logger.error(f"删除模型文件失败 {version.file_path}: {e}")
-            
+
             # 更新版本列表
             self.versions[model_id] = to_keep
             self._save_versions()
-            
+
             return removed_count
-            
+
         except Exception as e:
             logger.error(f"清理旧版本失败: {e}")
             return 0
@@ -598,20 +598,20 @@ class ModelVersionManager:
 
 class ContinuousLearningManager:
     """持续学习管理器主类"""
-    
+
     def __init__(self, storage_path: Optional[str] = None):
         self.storage_path = storage_path or self._get_default_storage_path()
-        
+
         # 核心组件
         self.drift_detector = DataDriftDetector()
         self.performance_monitor = PerformanceMonitor()
         self.version_manager = ModelVersionManager(self.storage_path)
-        
+
         # 学习任务管理
         self.learning_tasks = queue.PriorityQueue()
         self.active_tasks = {}
         self.task_executor = ThreadPoolExecutor(max_workers=2)
-        
+
         # 配置
         self.config = {
             'drift_threshold': 0.1,
@@ -621,54 +621,54 @@ class ContinuousLearningManager:
             'model_retention_count': 5,
             'auto_activation': True
         }
-        
+
         # 状态
         self.is_running = False
         self.scheduler_thread = None
         self._lock = threading.Lock()
-        
+
         logger.info("持续学习管理器已初始化")
-    
+
     def _get_default_storage_path(self) -> str:
         """获取默认存储路径"""
-        app_data_dir = Path.home() / ".hikyuu-ui" / "continuous_learning"
+        app_data_dir = Path.home() / ".FactorWeave-Quant" / "continuous_learning"
         app_data_dir.mkdir(parents=True, exist_ok=True)
         return str(app_data_dir)
-    
+
     def start(self):
         """启动持续学习服务"""
         try:
             if self.is_running:
                 logger.warning("持续学习服务已在运行")
                 return
-            
+
             self.is_running = True
-            
+
             # 启动调度器线程
             self.scheduler_thread = threading.Thread(target=self._scheduler_loop, daemon=True)
             self.scheduler_thread.start()
-            
+
             logger.info("持续学习服务已启动")
-            
+
         except Exception as e:
             logger.error(f"启动持续学习服务失败: {e}")
-    
+
     def stop(self):
         """停止持续学习服务"""
         try:
             self.is_running = False
-            
+
             if self.scheduler_thread:
                 self.scheduler_thread.join(timeout=5)
-            
+
             # 停止任务执行器
             self.task_executor.shutdown(wait=True)
-            
+
             logger.info("持续学习服务已停止")
-            
+
         except Exception as e:
             logger.error(f"停止持续学习服务失败: {e}")
-    
+
     def add_training_sample(self, model_id: str, sample: Dict[str, Any], is_reference: bool = False):
         """添加训练样本"""
         try:
@@ -676,24 +676,24 @@ class ContinuousLearningManager:
                 self.drift_detector.add_reference_sample(sample)
             else:
                 self.drift_detector.add_current_sample(sample)
-            
+
             # 检查是否需要触发学习
             self._check_learning_triggers(model_id)
-            
+
         except Exception as e:
             logger.error(f"添加训练样本失败: {e}")
-    
+
     def record_prediction_metrics(self, model_id: str, metrics: ModelMetrics):
         """记录预测性能指标"""
         try:
             self.performance_monitor.record_metrics(model_id, metrics)
-            
+
             # 检查性能退化
             degradation_result = self.performance_monitor.check_performance_degradation(model_id)
-            
+
             if degradation_result.get('degradation_detected', False):
                 logger.warning(f"检测到模型 {model_id} 性能退化: {degradation_result}")
-                
+
                 # 触发重训练
                 self.trigger_learning(
                     model_id=model_id,
@@ -701,17 +701,17 @@ class ContinuousLearningManager:
                     priority=4,
                     config={'reason': 'performance_degradation', 'details': degradation_result}
                 )
-            
+
         except Exception as e:
             logger.error(f"记录预测性能指标失败: {e}")
-    
-    def trigger_learning(self, model_id: str, trigger: LearningTrigger, 
-                        learning_mode: LearningMode = LearningMode.INCREMENTAL,
-                        priority: int = 1, config: Optional[Dict[str, Any]] = None) -> str:
+
+    def trigger_learning(self, model_id: str, trigger: LearningTrigger,
+                         learning_mode: LearningMode = LearningMode.INCREMENTAL,
+                         priority: int = 1, config: Optional[Dict[str, Any]] = None) -> str:
         """触发学习任务"""
         try:
             task_id = self._generate_task_id(model_id)
-            
+
             task = LearningTask(
                 task_id=task_id,
                 model_id=model_id,
@@ -721,36 +721,36 @@ class ContinuousLearningManager:
                 config=config or {},
                 priority=priority
             )
-            
+
             # 添加到任务队列（优先级队列，数字越小优先级越高）
             self.learning_tasks.put((6 - priority, task))
-            
+
             logger.info(f"已触发学习任务: {task_id} (模型: {model_id}, 触发器: {trigger.value})")
-            
+
             return task_id
-            
+
         except Exception as e:
             logger.error(f"触发学习任务失败: {e}")
             return ""
-    
+
     def get_model_status(self, model_id: str) -> Dict[str, Any]:
         """获取模型状态"""
         try:
             # 获取活跃版本
             active_version = self.version_manager.get_active_version(model_id)
-            
+
             # 获取性能趋势
             performance_trend = self.performance_monitor.get_performance_trend(model_id)
-            
+
             # 检查数据漂移
             drift_result = self.drift_detector.detect_drift()
-            
+
             # 检查性能退化
             degradation_result = self.performance_monitor.check_performance_degradation(model_id)
-            
+
             # 获取版本历史
             version_history = self.version_manager.get_version_history(model_id)
-            
+
             return {
                 'model_id': model_id,
                 'active_version': active_version.version if active_version else None,
@@ -762,97 +762,97 @@ class ContinuousLearningManager:
                 'active_tasks': [task_id for task_id, task in self.active_tasks.items() if task.model_id == model_id],
                 'status': self._determine_model_status(model_id)
             }
-            
+
         except Exception as e:
             logger.error(f"获取模型状态失败: {e}")
             return {'error': str(e)}
-    
+
     def _scheduler_loop(self):
         """调度器循环"""
         while self.is_running:
             try:
                 # 处理学习任务
                 self._process_learning_tasks()
-                
+
                 # 定期检查
                 self._periodic_checks()
-                
+
                 # 休眠
                 time.sleep(60)  # 每分钟检查一次
-                
+
             except Exception as e:
                 logger.error(f"调度器循环错误: {e}")
                 time.sleep(60)
-    
+
     def _process_learning_tasks(self):
         """处理学习任务"""
         try:
             # 检查是否有可用的执行器
             if len(self.active_tasks) >= self.config['max_concurrent_tasks']:
                 return
-            
+
             # 从队列获取任务
             if not self.learning_tasks.empty():
                 try:
                     priority, task = self.learning_tasks.get_nowait()
-                    
+
                     # 提交任务执行
                     future = self.task_executor.submit(self._execute_learning_task, task)
                     self.active_tasks[task.task_id] = task
-                    
+
                     # 设置完成回调
                     future.add_done_callback(lambda f: self._on_task_completed(task.task_id, f))
-                    
+
                     logger.info(f"开始执行学习任务: {task.task_id}")
-                    
+
                 except queue.Empty:
                     pass
-            
+
         except Exception as e:
             logger.error(f"处理学习任务失败: {e}")
-    
+
     def _execute_learning_task(self, task: LearningTask) -> Dict[str, Any]:
         """执行学习任务"""
         try:
             task.started_at = datetime.now()
             task.status = "running"
-            
+
             logger.info(f"执行学习任务: {task.task_id} (模型: {task.model_id})")
-            
+
             # 模拟学习过程
             result = self._simulate_model_training(task)
-            
+
             task.completed_at = datetime.now()
             task.status = "completed"
             task.progress = 1.0
             task.result = result
-            
+
             # 如果训练成功，创建新版本
             if result.get('success', False):
                 self._create_new_model_version(task, result)
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"执行学习任务失败: {e}")
             task.status = "failed"
             task.error_message = str(e)
             return {'success': False, 'error': str(e)}
-    
+
     def _simulate_model_training(self, task: LearningTask) -> Dict[str, Any]:
         """模拟模型训练（实际应用中应替换为真实的训练逻辑）"""
         try:
             # 获取当前最佳模型作为基线
             current_version = self.version_manager.get_best_version(task.model_id)
-            
+
             # 模拟训练过程
             training_time = np.random.uniform(30, 120)  # 30-120秒
-            
+
             # 模拟进度更新
             for progress in [0.2, 0.4, 0.6, 0.8, 1.0]:
                 task.progress = progress
                 time.sleep(training_time / 5)
-            
+
             # 模拟性能提升
             if current_version:
                 base_accuracy = current_version.metrics.accuracy
@@ -861,7 +861,7 @@ class ContinuousLearningManager:
                 new_accuracy = min(max(base_accuracy + improvement, 0.0), 1.0)
             else:
                 new_accuracy = np.random.uniform(0.7, 0.9)
-            
+
             # 生成新的性能指标
             new_metrics = ModelMetrics(
                 model_id=task.model_id,
@@ -873,7 +873,7 @@ class ContinuousLearningManager:
                 training_time=training_time,
                 sample_count=np.random.randint(1000, 10000)
             )
-            
+
             return {
                 'success': True,
                 'metrics': new_metrics,
@@ -881,21 +881,21 @@ class ContinuousLearningManager:
                 'improvement': improvement if current_version else 0.0,
                 'learning_mode': task.learning_mode.value
             }
-            
+
         except Exception as e:
             logger.error(f"模拟模型训练失败: {e}")
             return {'success': False, 'error': str(e)}
-    
+
     def _create_new_model_version(self, task: LearningTask, result: Dict[str, Any]):
         """创建新模型版本"""
         try:
             metrics = result['metrics']
-            
+
             # 生成模型文件路径
             model_dir = Path(self.storage_path) / "models" / task.model_id
             model_dir.mkdir(parents=True, exist_ok=True)
             model_file = model_dir / f"model_{metrics.version}.pkl"
-            
+
             # 模拟保存模型文件
             model_data = {
                 'model_id': task.model_id,
@@ -904,10 +904,10 @@ class ContinuousLearningManager:
                 'metrics': asdict(metrics),
                 'created_at': datetime.now().isoformat()
             }
-            
+
             with open(model_file, 'wb') as f:
                 pickle.dump(model_data, f)
-            
+
             # 创建版本记录
             version = ModelVersion(
                 model_id=task.model_id,
@@ -923,57 +923,57 @@ class ContinuousLearningManager:
                 is_active=False,  # 新版本默认不激活
                 is_baseline=False
             )
-            
+
             # 添加版本
             self.version_manager.add_version(version)
-            
+
             # 如果启用自动激活且性能更好，则激活新版本
             if self.config.get('auto_activation', True):
                 current_active = self.version_manager.get_active_version(task.model_id)
                 if not current_active or metrics.accuracy > current_active.metrics.accuracy:
                     self.version_manager.activate_version(task.model_id, metrics.version)
                     logger.info(f"自动激活新版本: {task.model_id} v{metrics.version}")
-            
+
             # 清理旧版本
             removed_count = self.version_manager.cleanup_old_versions(
-                task.model_id, 
+                task.model_id,
                 self.config.get('model_retention_count', 5)
             )
-            
+
             if removed_count > 0:
                 logger.info(f"清理了 {removed_count} 个旧版本")
-            
+
         except Exception as e:
             logger.error(f"创建新模型版本失败: {e}")
-    
+
     def _on_task_completed(self, task_id: str, future: Future):
         """任务完成回调"""
         try:
             result = future.result()
-            
+
             # 从活跃任务中移除
             if task_id in self.active_tasks:
                 task = self.active_tasks[task_id]
                 del self.active_tasks[task_id]
-                
+
                 if result.get('success', False):
                     logger.info(f"学习任务完成: {task_id} (模型: {task.model_id})")
                 else:
                     logger.error(f"学习任务失败: {task_id} - {result.get('error', 'Unknown error')}")
-            
+
         except Exception as e:
             logger.error(f"任务完成回调失败: {e}")
-    
+
     def _periodic_checks(self):
         """定期检查"""
         try:
             # 检查所有模型的数据漂移和性能退化
             for model_id in self.version_manager.versions.keys():
                 self._check_learning_triggers(model_id)
-            
+
         except Exception as e:
             logger.error(f"定期检查失败: {e}")
-    
+
     def _check_learning_triggers(self, model_id: str):
         """检查学习触发条件"""
         try:
@@ -987,12 +987,12 @@ class ContinuousLearningManager:
                     priority=3,
                     config={'drift_result': drift_result}
                 )
-            
+
             # 性能退化检查在record_prediction_metrics中处理
-            
+
         except Exception as e:
             logger.error(f"检查学习触发条件失败: {e}")
-    
+
     def _determine_model_status(self, model_id: str) -> str:
         """确定模型状态"""
         try:
@@ -1000,33 +1000,33 @@ class ContinuousLearningManager:
             active_task_count = sum(1 for task in self.active_tasks.values() if task.model_id == model_id)
             if active_task_count > 0:
                 return ModelStatus.TRAINING.value
-            
+
             # 检查是否有活跃版本
             active_version = self.version_manager.get_active_version(model_id)
             if not active_version:
                 return ModelStatus.ERROR.value
-            
+
             # 检查性能状态
             degradation_result = self.performance_monitor.check_performance_degradation(model_id)
             if degradation_result.get('degradation_detected', False):
                 return ModelStatus.DEPRECATED.value
-            
+
             return ModelStatus.READY.value
-            
+
         except Exception as e:
             logger.error(f"确定模型状态失败: {e}")
             return ModelStatus.ERROR.value
-    
+
     def _generate_task_id(self, model_id: str) -> str:
         """生成任务ID"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"{model_id}_task_{timestamp}"
-    
+
     def _generate_version_id(self) -> str:
         """生成版本ID"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"v_{timestamp}"
-    
+
     def get_learning_statistics(self) -> Dict[str, Any]:
         """获取学习统计信息"""
         try:
@@ -1034,7 +1034,7 @@ class ContinuousLearningManager:
             total_versions = sum(len(versions) for versions in self.version_manager.versions.values())
             active_tasks = len(self.active_tasks)
             pending_tasks = self.learning_tasks.qsize()
-            
+
             # 计算平均性能提升
             performance_improvements = []
             for model_id, versions in self.version_manager.versions.items():
@@ -1044,9 +1044,9 @@ class ContinuousLearningManager:
                     baseline = sorted_versions[0]
                     improvement = latest.metrics.accuracy - baseline.metrics.accuracy
                     performance_improvements.append(improvement)
-            
+
             avg_improvement = np.mean(performance_improvements) if performance_improvements else 0.0
-            
+
             return {
                 'total_models': total_models,
                 'total_versions': total_versions,
@@ -1056,7 +1056,7 @@ class ContinuousLearningManager:
                 'service_status': 'running' if self.is_running else 'stopped',
                 'config': self.config
             }
-            
+
         except Exception as e:
             logger.error(f"获取学习统计信息失败: {e}")
             return {'error': str(e)}
@@ -1069,10 +1069,10 @@ continuous_learning_manager = None
 def get_continuous_learning_manager(storage_path: Optional[str] = None) -> ContinuousLearningManager:
     """获取持续学习管理器实例"""
     global continuous_learning_manager
-    
+
     if continuous_learning_manager is None:
         continuous_learning_manager = ContinuousLearningManager(storage_path)
-    
+
     return continuous_learning_manager
 
 

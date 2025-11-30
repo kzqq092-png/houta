@@ -26,6 +26,7 @@ from core.indicator_extensions import (
 
 logger = logger
 
+
 class TALibIndicatorsPlugin(IIndicatorPlugin):
     """
     TA-Lib指标插件
@@ -40,7 +41,7 @@ class TALibIndicatorsPlugin(IIndicatorPlugin):
             "name": "TA-Lib指标插件",
             "version": "1.0.0",
             "description": "基于TA-Lib库的经典技术指标计算插件",
-            "author": "HIkyuu-UI Team",
+            "author": "FactorWeave-Quant Team",
             "backend": "TA-Lib C",
             "performance_level": "high"
         }

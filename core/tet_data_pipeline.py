@@ -2,7 +2,7 @@ from loguru import logger
 """
 TET数据管道实现
 Transform-Extract-Transform数据处理管道
-借鉴OpenBB架构设计，为HIkyuu-UI提供标准化多资产数据支持
+借鉴OpenBB架构设计，为FactorWeave-Quant提供标准化多资产数据支持
 
 增强版本：支持多数据源路由、故障转移、插件化数据源
 """

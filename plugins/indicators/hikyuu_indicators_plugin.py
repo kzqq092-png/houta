@@ -1,9 +1,9 @@
 from loguru import logger
 """
-HIkyuu指标插件
+FactorWeave-Quant指标插件
 
-基于HIkyuu框架的高性能指标计算插件，提供完整的技术指标支持。
-HIkyuu是专业的量化分析框架，具有优秀的性能和丰富的指标库。
+基于FactorWeave-Quant框架的高性能指标计算插件，提供完整的技术指标支持。
+FactorWeave-Quant是专业的量化分析框架，具有优秀的性能和丰富的指标库。
 """
 
 import pandas as pd
@@ -27,22 +27,23 @@ from core.indicator_extensions import (
 
 logger = logger
 
+
 class HikyuuIndicatorsPlugin(IIndicatorPlugin):
     """
-    HIkyuu指标插件
+    FactorWeave-Quant指标插件
 
-    封装HIkyuu框架的指标计算能力，提供高性能的技术指标计算。
+    封装FactorWeave-Quant框架的指标计算能力，提供高性能的技术指标计算。
     支持趋势、动量、波动率、成交量等各类技术指标。
     """
 
     def __init__(self):
         self._plugin_info = {
             "id": "hikyuu_indicators",
-            "name": "HIkyuu指标插件",
+            "name": "FactorWeave-Quant指标插件",
             "version": "1.0.0",
-            "description": "基于HIkyuu框架的高性能技术指标计算插件",
-            "author": "HIkyuu-UI Team",
-            "backend": "HIkyuu C++",
+            "description": "基于FactorWeave-Quant框架的高性能技术指标计算插件",
+            "author": "FactorWeave-Quant Team",
+            "backend": "FactorWeave-Quant C++",
             "performance_level": "high"
         }
 
@@ -56,7 +57,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
         self._error_count = 0
 
         if not HIKYUU_AVAILABLE:
-            logger.warning("HIkyuu库不可用，HIkyuu指标插件将无法正常工作")
+            logger.warning("FactorWeave-Quant库不可用，FactorWeave-Quant指标插件将无法正常工作")
 
     @property
     def plugin_info(self) -> Dict[str, Any]:
@@ -90,7 +91,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             # 数学函数
             'MAX', 'MIN', 'SUM', 'ABS', 'SQRT',
 
-            # 自定义HIkyuu指标
+            # 自定义FactorWeave-Quant指标
             'HSL', 'VIGOR', 'COPPOCK'
         ]
 
@@ -102,7 +103,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
                             params: Dict[str, Any], context: IndicatorCalculationContext) -> StandardIndicatorResult:
         """计算单个指标"""
         if not HIKYUU_AVAILABLE:
-            raise RuntimeError("HIkyuu库不可用，无法计算指标")
+            raise RuntimeError("FactorWeave-Quant库不可用，无法计算指标")
 
         start_time = time.time()
         self._calculation_count += 1
@@ -129,7 +130,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
                 indicator_name=indicator_name,
                 data=result_df,
                 metadata={
-                    'backend': 'HIkyuu',
+                    'backend': 'FactorWeave-Quant',
                     'calculation_time_ms': calculation_time,
                     'symbol': context.symbol,
                     'timeframe': context.timeframe,
@@ -140,15 +141,15 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
 
         except Exception as e:
             self._error_count += 1
-            logger.error(f"HIkyuu指标计算失败 {indicator_name}: {e}")
+            logger.error(f"FactorWeave-Quant指标计算失败 {indicator_name}: {e}")
             raise
 
     def batch_calculate_indicators(self, indicators: List[Tuple[str, Dict[str, Any]]],
                                    kline_data: StandardKlineData,
                                    context: IndicatorCalculationContext) -> Dict[str, StandardIndicatorResult]:
-        """批量计算指标（HIkyuu优化版本）"""
+        """批量计算指标（FactorWeave-Quant优化版本）"""
         if not HIKYUU_AVAILABLE:
-            raise RuntimeError("HIkyuu库不可用，无法计算指标")
+            raise RuntimeError("FactorWeave-Quant库不可用，无法计算指标")
 
         start_time = time.time()
         results = {}
@@ -174,7 +175,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
                         indicator_name=indicator_name,
                         data=result_df,
                         metadata={
-                            'backend': 'HIkyuu',
+                            'backend': 'FactorWeave-Quant',
                             'symbol': context.symbol,
                             'timeframe': context.timeframe,
                             'parameters': params.copy(),
@@ -200,21 +201,21 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
 
         except Exception as e:
             self._error_count += 1
-            logger.error(f"HIkyuu批量指标计算失败: {e}")
+            logger.error(f"FactorWeave-Quant批量指标计算失败: {e}")
             raise
 
     def _convert_to_hikyuu_kdata(self, kline_data: StandardKlineData, symbol: str) -> 'hku.KData':
-        """将标准K线数据转换为HIkyuu KData格式"""
+        """将标准K线数据转换为FactorWeave-Quant KData格式"""
         try:
-            # 创建HIkyuu Stock对象（如果需要的话）
+            # 创建FactorWeave-Quant Stock对象（如果需要的话）
             # 这里简化处理，直接使用数据创建KData
 
-            # 将pandas数据转换为HIkyuu格式
-            # 注意：这里需要根据实际HIkyuu API调整
+            # 将pandas数据转换为FactorWeave-Quant格式
+            # 注意：这里需要根据实际FactorWeave-Quant API调整
             kdata_list = []
 
             for i in range(len(kline_data.datetime)):
-                # 创建HIkyuu KRecord
+                # 创建FactorWeave-Quant KRecord
                 record = hku.KRecord()
                 record.datetime = hku.Datetime(kline_data.datetime.iloc[i])
                 record.open = float(kline_data.open.iloc[i])
@@ -232,14 +233,14 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             return kdata
 
         except Exception as e:
-            logger.error(f"转换K线数据到HIkyuu格式失败: {e}")
+            logger.error(f"转换K线数据到FactorWeave-Quant格式失败: {e}")
             # 如果转换失败，尝试其他方式或抛出异常
-            raise ValueError(f"无法转换K线数据到HIkyuu格式: {e}")
+            raise ValueError(f"无法转换K线数据到FactorWeave-Quant格式: {e}")
 
     def _calculate_hikyuu_indicator(self, indicator_name: str, kdata: 'hku.KData', params: Dict[str, Any]) -> Any:
-        """使用HIkyuu计算指标"""
+        """使用FactorWeave-Quant计算指标"""
         try:
-            # 根据指标名称调用相应的HIkyuu指标函数
+            # 根据指标名称调用相应的FactorWeave-Quant指标函数
             if indicator_name == 'MA':
                 period = params.get('period', 20)
                 return hku.MA(kdata, period)
@@ -298,14 +299,14 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
 
             elif indicator_name == 'MAX':
                 period = params.get('period', 20)
-                return hku.HHV(kdata, period)  # HIkyuu中可能叫HHV
+                return hku.HHV(kdata, period)  # FactorWeave-Quant中可能叫HHV
 
             elif indicator_name == 'MIN':
                 period = params.get('period', 20)
-                return hku.LLV(kdata, period)  # HIkyuu中可能叫LLV
+                return hku.LLV(kdata, period)  # FactorWeave-Quant中可能叫LLV
 
             else:
-                # 尝试动态调用HIkyuu指标函数
+                # 尝试动态调用FactorWeave-Quant指标函数
                 if hasattr(hku, indicator_name):
                     indicator_func = getattr(hku, indicator_name)
                     # 根据参数数量调用
@@ -317,14 +318,14 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
                         # 更复杂的参数处理
                         return indicator_func(kdata, **params)
                 else:
-                    raise ValueError(f"不支持的HIkyuu指标: {indicator_name}")
+                    raise ValueError(f"不支持的FactorWeave-Quant指标: {indicator_name}")
 
         except Exception as e:
-            logger.error(f"HIkyuu指标计算错误 {indicator_name}: {e}")
+            logger.error(f"FactorWeave-Quant指标计算错误 {indicator_name}: {e}")
             raise
 
     def _convert_result_to_dataframe(self, result_data: Any, datetime_index: pd.Series) -> pd.DataFrame:
-        """将HIkyuu指标结果转换为DataFrame"""
+        """将FactorWeave-Quant指标结果转换为DataFrame"""
         try:
             if hasattr(result_data, '__len__') and len(result_data) > 0:
                 # 处理单列结果
@@ -354,7 +355,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
                 return pd.DataFrame(index=datetime_index)
 
         except Exception as e:
-            logger.error(f"转换HIkyuu结果到DataFrame失败: {e}")
+            logger.error(f"转换FactorWeave-Quant结果到DataFrame失败: {e}")
             # 返回空DataFrame
             return pd.DataFrame(index=datetime_index)
 
@@ -371,7 +372,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['value'],
             tags=['trend', 'moving_average', 'basic'],
-            author='HIkyuu'
+            author='FactorWeave-Quant'
         )
 
         self._metadata_cache['EMA'] = IndicatorMetadata(
@@ -384,7 +385,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['value'],
             tags=['trend', 'exponential', 'moving_average'],
-            author='HIkyuu'
+            author='FactorWeave-Quant'
         )
 
         self._metadata_cache['MACD'] = IndicatorMetadata(
@@ -399,7 +400,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['macd', 'signal', 'histogram'],
             tags=['momentum', 'oscillator', 'classic'],
-            author='HIkyuu'
+            author='FactorWeave-Quant'
         )
 
         self._metadata_cache['RSI'] = IndicatorMetadata(
@@ -412,7 +413,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['value'],
             tags=['momentum', 'oscillator', 'overbought_oversold'],
-            author='HIkyuu'
+            author='FactorWeave-Quant'
         )
 
         self._metadata_cache['KDJ'] = IndicatorMetadata(
@@ -427,7 +428,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['k', 'd', 'j'],
             tags=['momentum', 'stochastic', 'overbought_oversold'],
-            author='HIkyuu'
+            author='FactorWeave-Quant'
         )
 
         self._metadata_cache['BOLL'] = IndicatorMetadata(
@@ -441,7 +442,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['upper', 'middle', 'lower'],
             tags=['volatility', 'bands', 'channel'],
-            author='HIkyuu'
+            author='FactorWeave-Quant'
         )
 
         self._metadata_cache['ATR'] = IndicatorMetadata(
@@ -454,7 +455,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['value'],
             tags=['volatility', 'range', 'risk'],
-            author='HIkyuu'
+            author='FactorWeave-Quant'
         )
 
         self._metadata_cache['OBV'] = IndicatorMetadata(
@@ -465,7 +466,7 @@ class HikyuuIndicatorsPlugin(IIndicatorPlugin):
             parameters=[],
             output_columns=['value'],
             tags=['volume', 'accumulation', 'distribution'],
-            author='HIkyuu'
+            author='FactorWeave-Quant'
         )
 
         # 添加更多指标元数据...

@@ -1,7 +1,7 @@
 from loguru import logger
 """
 专业级回测UI组件
-集成到HIkyuu GUI系统中，提供实时回测监控和数据联动功能
+集成到FactorWeave-Quant GUI系统中，提供实时回测监控和数据联动功能
 对标行业专业软件标准
 """
 
@@ -1634,7 +1634,7 @@ if __name__ == "__main__":
 
     # 创建主窗口
     window = QMainWindow()
-    window.setWindowTitle("HIkyuu Professional Backtest System")
+    window.setWindowTitle("FactorWeave-Quant Professional Backtest System")
     window.setGeometry(100, 100, 1400, 800)
 
     # 创建回测组件

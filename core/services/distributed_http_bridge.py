@@ -4,7 +4,7 @@
 提供HTTP远程调用和本地fallback机制
 当有可用节点时通过HTTP调用，否则本地执行
 
-作者: HIkyuu-UI团队
+作者: FactorWeave-Quant团队
 版本: 1.0.0
 日期: 2025-10-23
 """

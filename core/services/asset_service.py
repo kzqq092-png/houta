@@ -2,7 +2,7 @@ from loguru import logger
 """
 统一资产服务
 提供OpenBB风格的统一资产访问接口，支持多种资产类型
-借鉴OpenBB的Provider模式，适配HIkyuu现有服务架构
+借鉴OpenBB的Provider模式，适配FactorWeave-Quant现有服务架构
 """
 
 from typing import List, Dict, Any, Optional

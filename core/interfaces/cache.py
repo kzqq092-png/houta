@@ -1,7 +1,7 @@
 """
 统一缓存接口定义
 
-本模块定义了HIkyuu-UI系统中缓存组件的统一接口。
+本模块定义了FactorWeave-Quant系统中缓存组件的统一接口。
 """
 
 from abc import ABC, abstractmethod
@@ -10,11 +10,13 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timedelta
 from enum import Enum
 
+
 class CacheLevel(Enum):
     """缓存级别枚举"""
     L1_MEMORY = "l1_memory"
     L2_REDIS = "l2_redis"
     L3_DISK = "l3_disk"
+
 
 @dataclass
 class CacheConfig:
@@ -37,6 +39,7 @@ class CacheConfig:
 
     # 扩展配置
     extra_config: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class CacheStats:
@@ -80,6 +83,7 @@ class CacheStats:
         result['start_time'] = self.start_time.isoformat()
         result['last_reset_time'] = self.last_reset_time.isoformat()
         return result
+
 
 class ICache(ABC):
     """统一缓存接口"""
@@ -233,10 +237,11 @@ class ICache(ABC):
             return await self.set(key, value, ttl)
         return False
 
+
 class INone      """缓存管理器接口"""
 
-    @abstractmethod
-    async def get_cache(self, level: CacheLevel) -> ICache:
+  @abstractmethod
+   async def get_cache(self, level: CacheLevel) -> ICache:
         """获取指定级别的缓存
 
         Args:
@@ -294,6 +299,7 @@ class INone      """缓存管理器接口"""
         """
         pass
 
+
 class CacheError(Exception):
     """缓存异常基类"""
 
@@ -302,13 +308,16 @@ class CacheError(Exception):
         self.message = message
         self.cache_level = cache_level
 
+
 class CacheConnectionError(CacheError):
     """缓存连接异常"""
     pass
 
+
 class CacheSerializationError(CacheError):
     """缓存序列化异常"""
     pass
+
 
 class CacheCapacityError(CacheError):
     """缓存容量异常"""

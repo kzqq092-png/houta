@@ -5,7 +5,7 @@ Unified Analysis Service
 Consolidates AnalysisManager, PatternManager, and various analysis components
 into unified analysis interface with caching and performance optimization.
 
-Created for: HIkyuu-UI Architecture Refactoring Project
+Created for: FactorWeave-Quant Architecture Refactoring Project
 Phase: 2 - Service Consolidation
 Task: 9 - Create AnalysisService consolidating analysis managers
 """

@@ -1,7 +1,7 @@
 """
 统一插件数据管理器
 
-统一HIkyuu-UI系统的数据源管理，建立单一的插件中心架构，
+统一FactorWeave-Quant系统的数据源管理，建立单一的插件中心架构，
 消除三套并行数据源管理体系，实现真正的插件中心统一管理。
 
 作者: FactorWeave-Quant团队
@@ -50,7 +50,7 @@ class UniPluginDataManager:
     """
     统一插件数据管理器
 
-    HIkyuu-UI系统的统一数据访问入口，协调插件中心、TET路由引擎和风险管理器
+    FactorWeave-Quant系统的统一数据访问入口，协调插件中心、TET路由引擎和风险管理器
     """
 
     def __init__(self, plugin_manager: PluginManager,

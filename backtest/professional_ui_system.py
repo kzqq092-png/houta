@@ -109,7 +109,7 @@ class ProfessionalUISystem:
     def _configure_streamlit(self):
         """配置Streamlit页面"""
         st.set_page_config(
-            page_title="HIkyuu Professional Backtest System",
+            page_title="FactorWeave-Quant Professional Backtest System",
             page_icon="",
             layout="wide",
             initial_sidebar_state="expanded"
@@ -301,7 +301,7 @@ class ProfessionalUISystem:
         """渲染主仪表板"""
         # 主标�?
         st.markdown(
-            '<h1 class="main-title"> HIkyuu Professional Backtest System</h1>', unsafe_allow_html=True)
+            '<h1 class="main-title"> FactorWeave-Quant Professional Backtest System</h1>', unsafe_allow_html=True)
 
         # 顶部状态栏
         self._render_status_bar()

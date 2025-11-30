@@ -130,7 +130,7 @@ class MainWindowCoordinator(BaseCoordinator):
         """初始化协调器"""
         import time
         start_time = time.time()
-        
+
         try:
             # 获取服务
             service_start = time.time()
@@ -343,23 +343,23 @@ class MainWindowCoordinator(BaseCoordinator):
                 coordinator=self,
                 width=self._layout_config['right_panel_width']
             )
-            
+
             # 创建 QDockWidget 包装右侧面板
             right_dock = QDockWidget("技术分析", self._main_window)
             right_dock.setWidget(right_panel._root_frame)
             right_dock.setAllowedAreas(Qt.RightDockWidgetArea | Qt.LeftDockWidgetArea)
-            
+
             # 设置尺寸限制
             right_dock.setMinimumWidth(self._layout_config['right_panel_width'])
             right_dock.setMaximumWidth(1500)
-            
+
             # 添加到主窗口右侧停靠区域
             self._main_window.addDockWidget(Qt.RightDockWidgetArea, right_dock)
-            
+
             # 保存引用
             self._panels['right'] = right_panel
             self._panels['right_dock'] = right_dock
-            
+
             logger.info("右侧技术分析面板已创建为 QDockWidget")
 
             # 设置分割器比例（仅包含左侧和中间面板）
@@ -1415,7 +1415,7 @@ Ctrl+F12 - 关于
         about_text = """
 FactorWeave-Quant  2.0 (重构版本)
 
-基于HIkyuu量化框架的股票分析工具
+基于FactorWeave-Quant量化框架的股票分析工具
 
 主要功能：
  股票数据查看和分析
@@ -1425,7 +1425,7 @@ FactorWeave-Quant  2.0 (重构版本)
  数据质量检查
 
 版本：2.0
-作者：HIkyuu开发团队
+作者：FactorWeave-Quant开发团队
         """
         QMessageBox.about(self._main_window, "关于 FactorWeave-Quant ",
                           about_text.strip())
@@ -1579,7 +1579,7 @@ FactorWeave-Quant  2.0 (重构版本)
             )
 
             # 设置对话框属性
-            self._plugin_manager_dialog.setWindowTitle("HIkyuu 插件管理器")
+            self._plugin_manager_dialog.setWindowTitle("FactorWeave-Quant 插件管理器")
             self._plugin_manager_dialog.setMinimumSize(1000, 700)
 
             # 连接对话框的关闭信号
@@ -3369,7 +3369,7 @@ FactorWeave-Quant  2.0 (重构版本)
         """异步初始化增强UI组件（在事件循环中执行，避免阻塞主初始化流程）"""
         import time
         start_time = time.time()
-        
+
         try:
             logger.info("开始异步初始化增强UI组件...")
 
@@ -3433,7 +3433,7 @@ FactorWeave-Quant  2.0 (重构版本)
             import traceback
             logger.debug(f"详细错误: {traceback.format_exc()}")
             self._enhanced_components = {}
-    
+
     def _initialize_enhanced_ui_components(self):
         """初始化增强UI组件（同步版本，保留用于向后兼容）"""
         # 重定向到异步版本
@@ -3443,7 +3443,7 @@ FactorWeave-Quant  2.0 (重构版本)
         """将增强组件集成到UI中"""
         import time
         start_time = time.time()
-        
+
         try:
             if not hasattr(self, '_enhanced_components') or not self._enhanced_components:
                 logger.warning("增强组件未初始化，跳过UI集成")
@@ -3462,7 +3462,7 @@ FactorWeave-Quant  2.0 (重构版本)
 
             # ✅ 修复：存储所有需要组合到右侧的 QDockWidget
             right_area_docks = []
-            
+
             # 将技术分析面板作为第一个（如果存在）
             if right_dock:
                 right_area_docks.append(right_dock)
@@ -3545,7 +3545,7 @@ FactorWeave-Quant  2.0 (重构版本)
                         logger.debug(f"已将标签页位置设置为顶部: {tab_bar}")
                     except Exception as e:
                         logger.warning(f"设置标签页位置失败: {e}")
-                
+
                 logger.info(f"所有 QDockWidget 的标签页位置已设置为顶部（右侧{len(right_area_docks)}个，底部{len(bottom_area_docks)}个）")
 
             # 如果存在分析标签页，将基本面分析添加到其中

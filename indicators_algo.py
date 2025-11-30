@@ -1,6 +1,6 @@
 from loguru import logger
 """
-HIkyuu-UI 指标算法模块
+FactorWeave-Quant 指标算法模块
 提供技术指标计算功能，支持ta-lib和自定义实现
 """
 

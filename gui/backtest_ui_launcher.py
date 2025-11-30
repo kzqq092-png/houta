@@ -1,5 +1,5 @@
 """
-HIkyuu专业级回测UI启动器
+FactorWeave-Quant专业级回测UI启动器
 集成Streamlit Web UI和PyQt5桌面UI两种界面
 提供统一的启动入口和配置管理
 """
@@ -194,7 +194,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         if not PYQT5_AVAILABLE:
             return
 
-        self.setWindowTitle("HIkyuu Professional Backtest System Launcher")
+        self.setWindowTitle("FactorWeave-Quant Professional Backtest System Launcher")
         self.setGeometry(100, 100, 800, 600)
 
         # 设置样式
@@ -253,7 +253,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         main_layout = QVBoxLayout(central_widget)
 
         # 标题
-        title = QLabel("HIkyuu Professional Backtest System")
+        title = QLabel("FactorWeave-Quant Professional Backtest System")
         title.setStyleSheet("""
             QLabel {
                 font-size: 24px;
@@ -292,7 +292,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
 
         # 说明文本
         description = QLabel("""
-        HIkyuu专业级回测系统提供两种用户界面：
+        FactorWeave-Quant专业级回测系统提供两种用户界面：
         
          Web界面 (Streamlit)：
          现代化的Web界面，支持实时图表
@@ -464,7 +464,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
             # 创建回测组件窗口
             self.backtest_window = QMainWindow()
             self.backtest_window.setWindowTitle(
-                "HIkyuu Professional Backtest System")
+                "FactorWeave-Quant Professional Backtest System")
             self.backtest_window.setGeometry(150, 150, 1400, 800)
 
             # 创建回测组件
@@ -590,7 +590,7 @@ def launch_pyqt5_only():
 
         # 创建主窗口
         window = QMainWindow()
-        window.setWindowTitle("HIkyuu Professional Backtest System")
+        window.setWindowTitle("FactorWeave-Quant Professional Backtest System")
         window.setGeometry(100, 100, 1400, 800)
         window.setCentralWidget(backtest_widget)
         window.show()
@@ -613,7 +613,7 @@ def launch_pyqt5_only():
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="HIkyuu Professional Backtest System Launcher")
+        description="FactorWeave-Quant Professional Backtest System Launcher")
     parser.add_argument("--ui", choices=["web", "desktop", "launcher"], default="launcher",
                         help="选择UI类型: web(仅Web界面), desktop(仅桌面界面), launcher(启动器)")
     parser.add_argument("--port", type=int, default=8501, help="Streamlit端口号")

@@ -1,7 +1,7 @@
-# HIkyuu-UI Project Overview
+# FactorWeave-Quant Project Overview
 
 ## Purpose
-HIkyuu-UI is a comprehensive quantitative trading platform built on Python. It provides:
+FactorWeave-Quant is a comprehensive quantitative trading platform built on Python. It provides:
 - Stock data analysis and visualization
 - Technical indicator calculations
 - Backtesting capabilities

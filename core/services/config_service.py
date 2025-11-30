@@ -200,7 +200,7 @@ class ConfigService(BaseService):
         """设置默认配置"""
         self._default_config = {
             'app': {
-                'name': 'HIkyuu-UI',
+                'name': 'FactorWeave-Quant',
                 'version': '2.0.0',
                 'debug': False,
                 'auto_save': True,

@@ -5,7 +5,7 @@ Production Architecture Deployment and Monitoring Setup
 This module provides comprehensive production deployment scripts and monitoring
 setup for the refactored architecture with zero-downtime deployment capabilities.
 
-Created for: HIkyuu-UI Architecture Refactoring Project
+Created for: FactorWeave-Quant Architecture Refactoring Project
 Phase: 4 - Integration and Testing
 Task: 19 - Production deployment preparation and monitoring setup
 """

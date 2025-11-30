@@ -4,7 +4,7 @@
 提供流式数据处理、技术指标计算、自定义公式计算等功能。
 支持高频数据流处理和实时指标更新。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0
 日期: 2025-09-21
 """
@@ -31,6 +31,7 @@ from core.events.event_bus import EventBus, TickDataEvent, RealtimeDataEvent
 
 logger = logger.bind(module=__name__)
 
+
 class IndicatorType(Enum):
     """技术指标类型"""
     MA = "ma"                    # 移动平均线
@@ -43,6 +44,7 @@ class IndicatorType(Enum):
     VWAP = "vwap"                # 成交量加权平均价
     ATR = "atr"                  # 平均真实波幅
     CUSTOM = "custom"            # 自定义指标
+
 
 @dataclass
 class IndicatorConfig:
@@ -63,6 +65,7 @@ class IndicatorConfig:
     formula: Optional[str] = None
     formula_func: Optional[Callable] = None
 
+
 @dataclass
 class IndicatorValue:
     """指标值"""
@@ -74,6 +77,7 @@ class IndicatorValue:
     # 元数据
     params: Dict[str, Any] = field(default_factory=dict)
     calculation_time: Optional[datetime] = None
+
 
 class StreamProcessor:
     """流处理器基类"""
@@ -100,6 +104,7 @@ class StreamProcessor:
         """计算指标值（子类实现）"""
         raise NotImplementedError
 
+
 class MAProcessor(StreamProcessor):
     """移动平均线处理器"""
 
@@ -124,6 +129,7 @@ class MAProcessor(StreamProcessor):
         except Exception as e:
             logger.error(f"MA计算失败: {self.symbol}, {e}")
             return None
+
 
 class EMAProcessor(StreamProcessor):
     """指数移动平均线处理器"""
@@ -158,6 +164,7 @@ class EMAProcessor(StreamProcessor):
         except Exception as e:
             logger.error(f"EMA计算失败: {self.symbol}, {e}")
             return None
+
 
 class MACDProcessor(StreamProcessor):
     """MACD处理器"""
@@ -200,6 +207,7 @@ class MACDProcessor(StreamProcessor):
             logger.error(f"MACD计算失败: {self.symbol}, {e}")
             return None
 
+
 class RSIProcessor(StreamProcessor):
     """RSI处理器"""
 
@@ -227,6 +235,7 @@ class RSIProcessor(StreamProcessor):
         except Exception as e:
             logger.error(f"RSI计算失败: {self.symbol}, {e}")
             return None
+
 
 class BOLLProcessor(StreamProcessor):
     """布林带处理器"""
@@ -268,6 +277,7 @@ class BOLLProcessor(StreamProcessor):
             logger.error(f"BOLL计算失败: {self.symbol}, {e}")
             return None
 
+
 class VWAPProcessor(StreamProcessor):
     """成交量加权平均价处理器"""
 
@@ -301,6 +311,7 @@ class VWAPProcessor(StreamProcessor):
             logger.error(f"VWAP计算失败: {self.symbol}, {e}")
             return None
 
+
 class CustomFormulaProcessor(StreamProcessor):
     """自定义公式处理器"""
 
@@ -326,6 +337,7 @@ class CustomFormulaProcessor(StreamProcessor):
         except Exception as e:
             logger.error(f"自定义公式计算失败: {self.symbol}, {e}")
             return None
+
 
 class RealtimeComputeEngine:
     """

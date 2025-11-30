@@ -61,10 +61,14 @@ class PredictionTrackingService(BaseService):
         try:
             logger.info("Initializing PredictionTrackingService...")
 
-            # 获取数据库服务
+            # 获取数据库服务（可选）
             try:
                 from .database_service import DatabaseService
-                self._database_service = self._service_container.resolve(DatabaseService)
+                if self._service_container.is_registered(DatabaseService):
+                    self._database_service = self._service_container.resolve(DatabaseService)
+                    logger.info("DatabaseService已注册并已获取")
+                else:
+                    logger.warning("DatabaseService未在容器中注册，将使用直接数据库连接")
             except Exception as e:
                 logger.warning(f"无法获取DatabaseService: {e}，将使用直接数据库连接")
 
@@ -85,8 +89,8 @@ class PredictionTrackingService(BaseService):
         """初始化数据库表结构"""
         try:
             if self._database_service:
-                # 使用DatabaseService创建表
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                # 使用DatabaseService创建表（使用strategy_sqlite数据库）
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     self._create_prediction_records_table(conn)
                     self._create_accuracy_statistics_table(conn)
             else:
@@ -255,7 +259,7 @@ class PredictionTrackingService(BaseService):
         """加载现有的准确性统计"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("SELECT * FROM accuracy_statistics")
                     rows = cursor.fetchall()
@@ -313,7 +317,7 @@ class PredictionTrackingService(BaseService):
         """加载近期的预测记录以便UI可以立即显示历史数据"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("""
                         SELECT record_id, model_version_id, prediction_type, prediction_time,
@@ -413,7 +417,7 @@ class PredictionTrackingService(BaseService):
         """保存预测记录到数据库"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("""
                         INSERT INTO prediction_records 
@@ -556,7 +560,7 @@ class PredictionTrackingService(BaseService):
         """更新数据库中的预测准确性"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("""
                         UPDATE prediction_records 
@@ -641,7 +645,7 @@ class PredictionTrackingService(BaseService):
         """保存统计到数据库"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("""
                         INSERT OR REPLACE INTO accuracy_statistics 

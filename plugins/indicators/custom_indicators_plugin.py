@@ -102,7 +102,7 @@ class CustomIndicatorsPlugin(IIndicatorPlugin):
             "name": "自定义指标插件",
             "version": "1.0.0",
             "description": "支持用户自定义指标开发和动态加载的插件框架",
-            "author": "HIkyuu-UI Team",
+            "author": "FactorWeave-Quant Team",
             "backend": "Custom Python",
             "performance_level": "variable"
         }
@@ -330,7 +330,7 @@ class CustomIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['value'],
             tags=['example', 'trend', 'moving_average'],
-            author='HIkyuu-UI Team'
+            author='FactorWeave-Quant Team'
         )
 
         self._builtin_indicators['SIMPLE_MA_EXAMPLE'] = CustomIndicatorFunction(
@@ -354,7 +354,7 @@ class CustomIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['value'],
             tags=['example', 'momentum'],
-            author='HIkyuu-UI Team'
+            author='FactorWeave-Quant Team'
         )
 
         self._builtin_indicators['PRICE_MOMENTUM_EXAMPLE'] = CustomIndicatorFunction(
@@ -379,7 +379,7 @@ class CustomIndicatorsPlugin(IIndicatorPlugin):
             ],
             output_columns=['value'],
             tags=['example', 'volume', 'vwap'],
-            author='HIkyuu-UI Team'
+            author='FactorWeave-Quant Team'
         )
 
         self._builtin_indicators['VWAP_EXAMPLE'] = CustomIndicatorFunction(

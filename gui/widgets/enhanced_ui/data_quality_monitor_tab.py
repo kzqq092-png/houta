@@ -421,7 +421,7 @@ class DataQualityMonitorTab(QWidget):
 
         filter_layout.addWidget(QLabel("数据源:"))
         self.source_filter = QComboBox()
-        self.source_filter.addItems(["全部", "HIkyuu", "Sina", "Eastmoney", "Tushare", "Local"])
+        self.source_filter.addItems(["全部", "FactorWeave-Quant", "Sina", "Eastmoney", "Tushare", "Local"])
         self.source_filter.currentTextChanged.connect(self._filter_anomalies)
         filter_layout.addWidget(self.source_filter)
 
@@ -1047,7 +1047,7 @@ class DataQualityMonitorTab(QWidget):
 - 数据唯一性: {self.quality_metrics['uniqueness'].value()}%
 
 ## 数据源状态
-- HIkyuu: 正常
+- FactorWeave-Quant: 正常
 - Sina: 正常
 - Eastmoney: 正常
 - Tushare: 异常

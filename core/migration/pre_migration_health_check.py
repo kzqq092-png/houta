@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-HIkyuu-UI 迁移前系统健康检查
+FactorWeave-Quant 迁移前系统健康检查
 
 该模块提供传统数据源迁移前的全面系统健康检查功能，包括：
 - 核心组件状态检查
@@ -10,7 +10,7 @@ HIkyuu-UI 迁移前系统健康检查
 - 依赖项完整性检查
 - 迁移前置条件验证
 
-作者: HIkyuu-UI Migration Team
+作者: FactorWeave-Quant Migration Team
 日期: 2025-09-20
 """
 

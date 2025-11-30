@@ -1,7 +1,7 @@
 """
 统一性能监控模块 - 唯一入口点
 
-HIkyuu-UI 2.0 统一性能监控系统
+FactorWeave-Quant 2.0 统一性能监控系统
 整合所有性能监控功能到一个完整的解决方案中
 
 主要功能：
@@ -104,4 +104,4 @@ __all__ = [
 
 # 版本信息
 __version__ = "2.0.0"
-__author__ = "HIkyuu-UI Team"
+__author__ = "FactorWeave-Quant Team"

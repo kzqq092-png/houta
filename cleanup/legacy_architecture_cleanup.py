@@ -5,7 +5,7 @@ Legacy Architecture Cleanup and Code Removal
 This module provides comprehensive cleanup of deprecated Manager classes
 and legacy code following the successful architecture refactoring.
 
-Created for: HIkyuu-UI Architecture Refactoring Project
+Created for: FactorWeave-Quant Architecture Refactoring Project
 Phase: 4 - Integration and Testing  
 Task: 20 - Final cleanup and legacy code removal
 """

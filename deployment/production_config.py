@@ -31,12 +31,14 @@ except ImportError:
     import logging
     logger = logging.getLogger(__name__)
 
+
 class Environment(Enum):
     """环境类型枚举"""
     DEVELOPMENT = "development"
     TESTING = "testing"
     STAGING = "staging"
     PRODUCTION = "production"
+
 
 @dataclass
 class DatabaseConfig:
@@ -67,6 +69,7 @@ class DatabaseConfig:
             'enable_profiling': os.getenv('DUCKDB_PROFILING', 'false').lower() == 'true',
             'preserve_insertion_order': True
         }
+
 
 @dataclass
 class CacheConfig:
@@ -134,6 +137,7 @@ class CacheConfig:
 
         return config
 
+
 @dataclass
 class LoggingConfig:
     """日志配置"""
@@ -196,6 +200,7 @@ class LoggingConfig:
 
         return handlers
 
+
 @dataclass
 class PerformanceConfig:
     """性能配置"""
@@ -222,6 +227,7 @@ class PerformanceConfig:
     # 缓存预热
     cache_warmup_enabled: bool = field(default_factory=lambda: os.getenv('CACHE_WARMUP_ENABLED', 'true').lower() == 'true')
     warmup_data_size: int = field(default_factory=lambda: int(os.getenv('WARMUP_DATA_SIZE', '10000')))
+
 
 @dataclass
 class SecurityConfig:
@@ -251,6 +257,7 @@ class SecurityConfig:
     ssl_cert_path: Optional[str] = field(default_factory=lambda: os.getenv('SSL_CERT_PATH'))
     ssl_key_path: Optional[str] = field(default_factory=lambda: os.getenv('SSL_KEY_PATH'))
 
+
 @dataclass
 class MonitoringConfig:
     """监控配置"""
@@ -279,6 +286,7 @@ class MonitoringConfig:
     error_rate_threshold: float = field(default_factory=lambda: float(os.getenv('ERROR_RATE_THRESHOLD', '5.0')))
     response_time_threshold: float = field(default_factory=lambda: float(os.getenv('RESPONSE_TIME_THRESHOLD', '2.0')))
 
+
 @dataclass
 class UIConfig:
     """UI配置"""
@@ -300,6 +308,7 @@ class UIConfig:
     enable_advanced_charts: bool = field(default_factory=lambda: os.getenv('UI_ENABLE_ADVANCED_CHARTS', 'true').lower() == 'true')
     enable_data_export: bool = field(default_factory=lambda: os.getenv('UI_ENABLE_DATA_EXPORT', 'true').lower() == 'true')
 
+
 @dataclass
 class PluginConfig:
     """插件配置"""
@@ -319,6 +328,7 @@ class PluginConfig:
     # 插件性能
     max_memory_mb: int = field(default_factory=lambda: int(os.getenv('PLUGIN_MAX_MEMORY_MB', '512')))
     max_execution_time: int = field(default_factory=lambda: int(os.getenv('PLUGIN_MAX_EXECUTION_TIME', '60')))
+
 
 class ProductionConfig:
     """生产环境配置管理器"""
@@ -507,6 +517,7 @@ class ProductionConfig:
             'config_validation': len(self.validate_config()) == 0
         }
 
+
 def create_production_config(environment: str = None) -> ProductionConfig:
     """创建生产环境配置"""
     if environment:
@@ -517,11 +528,12 @@ def create_production_config(environment: str = None) -> ProductionConfig:
 
     return ProductionConfig(env)
 
+
 def main():
     """主函数 - 用于配置验证和生成"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='HIkyuu-UI 生产环境配置管理')
+    parser = argparse.ArgumentParser(description='FactorWeave-Quant 生产环境配置管理')
     parser.add_argument('--env', choices=['development', 'testing', 'staging', 'production'],
                         default='production', help='环境类型')
     parser.add_argument('--validate', action='store_true', help='验证配置')
@@ -562,6 +574,7 @@ def main():
     except Exception as e:
         print(f"配置管理失败: {e}")
         return 1
+
 
 if __name__ == "__main__":
     exit(main())

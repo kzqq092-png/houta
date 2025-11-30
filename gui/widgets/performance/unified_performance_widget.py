@@ -638,7 +638,7 @@ class ModernUnifiedPerformanceWidget(QWidget):
                         except Exception as e:
                             logger.debug(f"统一数据管理器质量数据获取失败: {e}")
 
-                        # 尝试从HIkyuu插件获取健康检查数据
+                        # 尝试从FactorWeave-Quant插件获取健康检查数据
                         try:
                             hikyuu_plugin = HikyuuDataPlugin()
                             if hikyuu_plugin.is_connected():
@@ -653,7 +653,7 @@ class ModernUnifiedPerformanceWidget(QWidget):
                                     quality_metrics['延迟水平'] = health_result.response_time_ms
 
                         except Exception as e:
-                            logger.debug(f"HIkyuu插件质量数据获取失败: {e}")
+                            logger.debug(f"FactorWeave-Quant插件质量数据获取失败: {e}")
 
                         # 从数据库获取数据质量统计
                         try:

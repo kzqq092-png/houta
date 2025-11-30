@@ -1,7 +1,7 @@
 """
 统一数据源接口定义
 
-本模块定义了HIkyuu-UI系统中所有数据源必须实现的统一接口，
+本模块定义了FactorWeave-Quant系统中所有数据源必须实现的统一接口，
 解决现有系统中多套数据访问接口并存的问题。
 """
 
@@ -12,6 +12,7 @@ from datetime import datetime
 from enum import Enum
 import asyncio
 
+
 class ConnectionStatus(Enum):
     """连接状态枚举"""
     DISCONNECTED = "disconnected"
@@ -19,6 +20,7 @@ class ConnectionStatus(Enum):
     CONNECTED = "connected"
     ERROR = "error"
     RECONNECTING = "reconnecting"
+
 
 class DataType(Enum):
     """数据类型枚举"""
@@ -29,6 +31,7 @@ class DataType(Enum):
     NEWS = "news"            # 新闻数据
     FACTOR = "factor"        # 因子数据
     INDEX = "index"          # 指数数据
+
 
 @dataclass
 class ConnectionConfig:
@@ -101,6 +104,7 @@ class ConnectionConfig:
 
         return errors
 
+
 @dataclass
 class DataRequest:
     """数据请求对象"""
@@ -142,6 +146,7 @@ class DataRequest:
             result['end_time'] = self.end_time.isoformat()
         return result
 
+
 @dataclass
 class DataResponse:
     """数据响应对象"""
@@ -175,6 +180,7 @@ class DataResponse:
         result['timestamp'] = self.timestamp.isoformat()
         return result
 
+
 @dataclass
 class HealthStatus:
     """健康状态对象"""
@@ -201,6 +207,7 @@ class HealthStatus:
         result['connection_status'] = self.connection_status.value
         result['last_check_time'] = self.last_check_time.isoformat()
         return result
+
 
 class IDataSource(ABC):
     """统一数据源接口
@@ -334,6 +341,7 @@ class IDataSource(ABC):
             "description": f"{data_type.value} data from {self.name}"
         }
 
+
 class DataSourceError(Exception):
     """数据源异常基类"""
 
@@ -344,21 +352,26 @@ class DataSourceError(Exception):
         self.error_code = error_code
         self.source = source
 
+
 class ConnectionError(DataSourceError):
     """连接异常"""
     pass
+
 
 class AuthenticationError(DataSourceError):
     """认证异常"""
     pass
 
+
 class DataNotFoundError(DataSourceError):
     """数据未找到异常"""
     pass
 
+
 class RateLimitError(DataSourceError):
     """频率限制异常"""
     pass
+
 
 class ValidationError(DataSourceError):
     """参数验证异常"""

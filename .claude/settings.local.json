@@ -13,7 +13,13 @@
       "Bash(kill:*)",
       "Bash(timeout 60 python:*)",
       "Bash(timeout 90 python:*)",
-      "Bash(timeout 30 python:*)"
+      "Bash(timeout 30 python:*)",
+      "mcp__memory__create_entities",
+      "mcp__my-filesystem__search_files",
+      "mcp__my-filesystem__list_directory",
+      "mcp__my-filesystem__read_text_file",
+      "mcp__memory__add_observations",
+      "mcp__thinking__sequentialthinking"
     ],
     "deny": [],
     "ask": []

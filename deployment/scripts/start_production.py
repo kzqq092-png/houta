@@ -4,7 +4,7 @@
 Production Startup Script
 生产环境启动脚本
 
-本脚本负责在生产环境中启动HIkyuu-UI应用，包括配置验证、
+本脚本负责在生产环境中启动FactorWeave-Quant应用，包括配置验证、
 服务初始化、健康检查、监控设置等。
 
 启动流程：
@@ -429,7 +429,7 @@ class ProductionServer:
             # 启动服务器
             server = uvicorn.Server(uvicorn_config)
 
-            logger.info(f"🌟 HIkyuu-UI 生产环境启动成功")
+            logger.info(f"🌟 FactorWeave-Quant 生产环境启动成功")
             logger.info(f"📍 访问地址: http://{self.config.ui.host}:{self.config.ui.port}")
             logger.info(f"📊 监控地址: http://{self.config.ui.host}:{self.config.monitoring.metrics_port}/metrics")
 
@@ -475,7 +475,7 @@ class ProductionServer:
 async def main():
     """主函数"""
     print("=" * 60)
-    print("HIkyuu-UI 专业量化平台 - 生产环境")
+    print("FactorWeave-Quant 专业量化平台 - 生产环境")
     print("=" * 60)
 
     server = ProductionServer()

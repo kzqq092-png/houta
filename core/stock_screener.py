@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional, List, Union, Tuple
 from datetime import datetime, timedelta
-# HIkyuu已移除，使用TET框架和指标服务
+# FactorWeave-Quant已移除，使用TET框架和指标服务
 # from hikyuu.interactive import *
 # from hikyuu.indicator import *
 from core.services.unified_data_manager import UnifiedDataManager
@@ -17,6 +17,7 @@ import json
 # 替换旧的指标系统导入
 from core.indicator_service import calculate_indicator, get_indicator_categories, get_all_indicators_metadata
 import ptvsd
+
 
 class StockScreener:
     """选股策略核心类"""

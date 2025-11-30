@@ -9,6 +9,7 @@ from loguru import logger
 
 logger = logger
 
+
 class DataUsageTermsDialog(QDialog):
     """数据使用条款对话框"""
 
@@ -412,11 +413,12 @@ class DataUsageTermsDialog(QDialog):
             # 降级处理：假设用户已同意（在实际部署时应该更严格）
             return True
 
+
 class DataUsageManager:
     """数据使用管理器"""
 
     def __init__(self):
-        self.settings = QSettings("HIkyuu", "DataUsage")
+        self.settings = QSettings("FactorWeave-Quant", "DataUsage")
 
     def has_agreed_to_terms(self) -> bool:
         """检查用户是否已同意条款"""

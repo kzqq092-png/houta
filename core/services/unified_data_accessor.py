@@ -2,7 +2,7 @@ from loguru import logger
 """
 统一数据访问适配器
 
-提供统一的数据访问接口，替代UI层和其他组件的直接HIkyuu调用。
+提供统一的数据访问接口，替代UI层和其他组件的直接FactorWeave-Quant调用。
 所有数据访问都通过插件系统进行，确保架构一致性。
 """
 
@@ -243,7 +243,7 @@ def get_unified_data_accessor() -> UnifiedDataAccessor:
         _global_accessor = UnifiedDataAccessor()
     return _global_accessor
 
-# 便捷函数，用于替代直接HIkyuu调用
+# 便捷函数，用于替代直接FactorWeave-Quant调用
 
 
 def get_stock_data(stock_code: str, period: str = 'D', count: int = 30) -> Optional[pd.DataFrame]:

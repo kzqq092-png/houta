@@ -1,7 +1,7 @@
 """
 统一数据管理器实现
 
-本模块实现了HIkyuu-UI系统的统一数据管理器，
+本模块实现了FactorWeave-Quant系统的统一数据管理器，
 替代现有的UnifiedDataManager和UniPluginDataManager双重架构。
 """
 
@@ -19,6 +19,7 @@ from ..interfaces.data_source import (
 from .data_router import DataRouter
 
 logger = logging.getLogger(__name__)
+
 
 class UnifiedDataManager:
     """统一数据管理器
@@ -40,7 +41,7 @@ class UnifiedDataManager:
         self._router = DataRouter()
         self._cache_manager = cache_manager
         self._circuit_breaker_manager = circuit_breaker_manager
-        self._performance_monitor = None  
+        self._performance_monitor = None
         # 状态管理
         self._initialized = False
         self._running = False

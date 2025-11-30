@@ -106,7 +106,7 @@
       "name_field": "巨潮资讯基本面数据源",
       "display_name_field": null,
       "description": "提供公司公告等基本面数据",
-      "author": "HIkyuu-UI增强团队",
+      "author": "FactorWeave-Quant增强团队",
       "version": "1.0.0",
       "status": "✅ 完整",
       "issues": []
@@ -132,7 +132,7 @@
       "name_field": "新浪财经基本面数据源",
       "display_name_field": null,
       "description": "提供财务报表、公司公告等基本面数据",
-      "author": "HIkyuu-UI增强团队",
+      "author": "FactorWeave-Quant增强团队",
       "version": "1.0.0",
       "status": "✅ 完整",
       "issues": []
@@ -186,7 +186,7 @@
       "name_field": "Level-2实时数据源",
       "display_name_field": null,
       "description": "提供Level-2实时行情数据，支持tick数据和订单簿数据",
-      "author": "HIkyuu-UI增强团队",
+      "author": "FactorWeave-Quant增强团队",
       "version": "1.0.0",
       "status": "✅ 完整",
       "issues": []
@@ -198,7 +198,7 @@
       "name_field": "新浪财经数据源",
       "display_name_field": null,
       "description": "新浪财经数据源插件，专注于实时行情数据",
-      "author": "HIkyuu-UI Team",
+      "author": "FactorWeave-Quant Team",
       "version": "2.0.0",
       "status": "✅ 完整",
       "issues": []

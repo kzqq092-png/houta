@@ -5,7 +5,7 @@ Architecture Migration Guide and Automation Scripts
 This module provides comprehensive migration scripts and guidance for transitioning
 from the old Manager-based architecture to the new 15-service architecture.
 
-Created for: HIkyuu-UI Architecture Refactoring Project
+Created for: FactorWeave-Quant Architecture Refactoring Project
 Phase: 4 - Integration and Testing
 Task: 17 - Create migration scripts and documentation
 """

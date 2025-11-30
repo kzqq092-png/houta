@@ -143,7 +143,7 @@
     "install_command": "pip install hikyuu",
     "verify_command": "python -c \"import hikyuu; print('FactorWeave数据源安装成功')\"",
     "setup_instructions": [
-      "1. 安装HIkyuu: pip install hikyuu",
+      "1. 安装FactorWeave-Quant: pip install hikyuu",
       "2. 配置数据目录",
       "3. 启用插件"
     ]

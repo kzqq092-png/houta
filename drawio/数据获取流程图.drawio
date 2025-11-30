@@ -37,7 +37,7 @@
                 <mxCell id="source_selection" value="应用路由策略选择最优数据源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
                     <mxGeometry x="300" y="880" width="200" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="hikyuu_source" value="HIkyuu数据源&#10;hikyuu_data_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1ffc7;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                <mxCell id="hikyuu_source" value="FactorWeave-Quant数据源&#10;hikyuu_data_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1ffc7;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
                     <mxGeometry x="50" y="980" width="150" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="tdx_source" value="通达信数据源&#10;tongdaxin_stock_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#050505;" parent="1" vertex="1">
@@ -115,7 +115,7 @@
                 <mxCell id="line9" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="health_check" target="source_selection" edge="1">
                     <mxGeometry width="50" height="50" relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="line10a" value="HIkyuu" style="endArrow=classic;html=1;fontColor=#f20202;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="source_selection" target="hikyuu_source" edge="1">
+                <mxCell id="line10a" value="FactorWeave-Quant" style="endArrow=classic;html=1;fontColor=#f20202;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="source_selection" target="hikyuu_source" edge="1">
                     <mxGeometry width="50" height="50" relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="line10b" value="通达信" style="endArrow=classic;html=1;fontColor=#f20202;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="source_selection" target="tdx_source" edge="1">

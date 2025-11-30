@@ -352,7 +352,7 @@ def get_indicator_categories():
             'Custom Indicators': [
                 'CUSTOM_MA', 'CUSTOM_MACD', 'CUSTOM_RSI', 'CUSTOM_KDJ'
             ],
-            'HIkyuu Indicators': [
+            'FactorWeave-Quant Indicators': [
                 'HKU_MA', 'HKU_MACD', 'HKU_RSI', 'HKU_KDJ', 'HKU_BOLL'
             ]
         })

@@ -4,7 +4,7 @@
 提供财务报表、公司公告等基本面数据。
 基于新浪财经网站API实现数据获取和解析。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0.0
 日期: 2025-09-21
 """
@@ -29,7 +29,7 @@ class SinaFundamentalPlugin(StandardDataSourcePlugin):
         self.plugin_info = PluginInfo(
             name="新浪财经基本面数据源",
             version="1.0.0",
-            author="HIkyuu-UI增强团队",
+            author="FactorWeave-Quant增强团队",
             description="提供财务报表、公司公告等基本面数据",
             supported_data_types=[DataType.FINANCIAL_STATEMENT, DataType.ANNOUNCEMENT],
             supported_asset_types=[AssetType.STOCK_A],

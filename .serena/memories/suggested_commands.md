@@ -1,4 +1,4 @@
-# Suggested Commands for HIkyuu-UI Development
+# Suggested Commands for FactorWeave-Quant Development
 
 ## Running the Application
 ```bash

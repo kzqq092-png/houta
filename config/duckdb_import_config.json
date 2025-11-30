@@ -2,7 +2,7 @@
   "task_name": "",
   "description": "",
   "created_time": "2025-09-24T22:11:27.134963",
-  "data_source": "HIkyuu",
+  "data_source": "FactorWeave-Quant",
   "asset_type": "股票",
   "data_types": [
     "K线数据"

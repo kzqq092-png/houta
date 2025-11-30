@@ -1,7 +1,7 @@
 from loguru import logger
 """
 数据源插件扩展接口
-为HIkyuu插件化提供标准化的数据源插件接口和适配器
+为FactorWeave-Quant插件化提供标准化的数据源插件接口和适配器
 """
 
 import pandas as pd
@@ -99,7 +99,7 @@ class IDataSourcePlugin(ABC):
     """
     数据源插件接口
 
-    为HIkyuu插件化提供标准化的数据源接口
+    为FactorWeave-Quant插件化提供标准化的数据源接口
     支持多资产类型、多数据类型、连接管理、健康检查等功能
     """
 

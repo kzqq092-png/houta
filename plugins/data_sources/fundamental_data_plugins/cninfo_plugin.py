@@ -4,7 +4,7 @@
 提供公司公告、财务报表等基本面数据。
 基于巨潮资讯网站API实现数据获取和解析。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0.0
 日期: 2025-09-21
 """
@@ -29,7 +29,7 @@ class CninfoPlugin(StandardDataSourcePlugin):
         self.plugin_info = PluginInfo(
             name="巨潮资讯基本面数据源",
             version="1.0.0",
-            author="HIkyuu-UI增强团队",
+            author="FactorWeave-Quant增强团队",
             description="提供公司公告等基本面数据",
             supported_data_types=[DataType.ANNOUNCEMENT],
             supported_asset_types=[AssetType.STOCK_A],

@@ -1,7 +1,7 @@
 """
 新浪数据源插件
 
-基于HIkyuu-UI标准插件模板实现的新浪数据源插件，
+基于FactorWeave-Quant标准插件模板实现的新浪数据源插件，
 提供股票实时行情和历史数据。
 
 作者: FactorWeave-Quant团队
@@ -151,7 +151,7 @@ class SinaPlugin(StandardDataSourcePlugin):
             name="新浪财经数据源",
             version="2.0.0",
             description="新浪财经数据源插件，专注于实时行情数据",
-            author="HIkyuu-UI Team",
+            author="FactorWeave-Quant Team",
             supported_asset_types=[AssetType.STOCK_A, AssetType.INDEX],
             supported_data_types=self.get_supported_data_types(),
             capabilities={

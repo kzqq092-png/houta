@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-HIkyuu-UI 迁移监控和日志系统
+FactorWeave-Quant 迁移监控和日志系统
 
 该模块提供传统数据源迁移过程的实时监控、进度跟踪和详细日志记录功能。
 集成现有的Loguru日志系统和指标收集服务。
 
-作者: HIkyuu-UI Migration Team
+作者: FactorWeave-Quant Migration Team
 日期: 2025-09-20
 """
 
@@ -45,12 +45,14 @@ except ImportError:
         def record_metric(self, name, value, tags=None):
             pass
 
+
 class MigrationPhase(Enum):
     """迁移阶段枚举"""
     PREPARATION = "preparation"
     DECOUPLING = "decoupling"
     ENHANCEMENT = "enhancement"
     CLEANUP = "cleanup"
+
 
 class MigrationStatus(Enum):
     """迁移状态枚举"""
@@ -61,6 +63,7 @@ class MigrationStatus(Enum):
     PAUSED = "paused"
     ROLLED_BACK = "rolled_back"
 
+
 class TaskStatus(Enum):
     """任务状态枚举"""
     PENDING = "pending"
@@ -68,6 +71,7 @@ class TaskStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+
 
 @dataclass
 class MigrationTask:
@@ -88,6 +92,7 @@ class MigrationTask:
         if self.metadata is None:
             self.metadata = {}
 
+
 @dataclass
 class MigrationEvent:
     """迁移事件数据类"""
@@ -103,6 +108,7 @@ class MigrationEvent:
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
+
 
 class MigrationMonitor:
     """迁移监控器"""
@@ -645,8 +651,10 @@ class MigrationMonitor:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop_monitoring()
 
+
 # 全局监控器实例
 _global_monitor: Optional[MigrationMonitor] = None
+
 
 def get_migration_monitor() -> MigrationMonitor:
     """获取全局迁移监控器实例"""
@@ -654,6 +662,7 @@ def get_migration_monitor() -> MigrationMonitor:
     if _global_monitor is None:
         _global_monitor = MigrationMonitor()
     return _global_monitor
+
 
 def initialize_migration_monitor(log_dir: str = None, enable_metrics: bool = True) -> MigrationMonitor:
     """初始化全局迁移监控器"""
@@ -665,21 +674,26 @@ def initialize_migration_monitor(log_dir: str = None, enable_metrics: bool = Tru
     return _global_monitor
 
 # 便捷函数
+
+
 def log_migration_info(message: str, task_id: str = None, phase: MigrationPhase = None):
     """记录迁移信息日志"""
     monitor = get_migration_monitor()
     monitor.log_info(message, task_id, phase)
+
 
 def log_migration_warning(message: str, task_id: str = None, phase: MigrationPhase = None):
     """记录迁移警告日志"""
     monitor = get_migration_monitor()
     monitor.log_warning(message, task_id, phase)
 
+
 def log_migration_error(message: str, task_id: str = None, phase: MigrationPhase = None,
                         exception: Exception = None):
     """记录迁移错误日志"""
     monitor = get_migration_monitor()
     monitor.log_error(message, task_id, phase, exception)
+
 
 if __name__ == "__main__":
     # 测试代码

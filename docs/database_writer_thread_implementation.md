@@ -225,12 +225,12 @@ ON {table_name}(symbol, timestamp)
 
 1. **启动应用**
    ```bash
-   cd hikyuu-ui
+   cd FactorWeave-Quant
    python main.py
    ```
 
 2. **配置任务**
-   - 数据源：HIkyuu
+   - 数据源：FactorWeave-Quant
    - 资产类型：股票
    - 频率：日线
    - 股票代码：输入7个股票（如：000001、000002、600000、600036、000858、601318、600519）

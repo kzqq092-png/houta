@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-HIkyuu-UI 传统数据源依赖关系分析器
+FactorWeave-Quant 传统数据源依赖关系分析器
 
 该模块提供传统数据源迁移过程中的依赖关系分析功能，包括：
 - 代码库扫描和AST分析
@@ -12,7 +12,7 @@ HIkyuu-UI 传统数据源依赖关系分析器
 注意：传统数据源已迁移到TET+Plugin架构，此分析器主要用于历史依赖检查。
 - 迁移优先级建议
 
-作者: HIkyuu-UI Migration Team
+作者: FactorWeave-Quant Migration Team
 日期: 2025-09-20
 """
 
@@ -43,6 +43,7 @@ except ImportError:
     def get_logger(name):
         return logging.getLogger(name)
 
+
 class DependencyType(Enum):
     """依赖类型枚举"""
     IMPORT = "import"
@@ -53,12 +54,14 @@ class DependencyType(Enum):
     CONFIGURATION = "configuration"
     STRING_REFERENCE = "string_reference"
 
+
 class ImpactLevel(Enum):
     """影响级别枚举"""
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
 
 @dataclass
 class DependencyReference:
@@ -91,6 +94,7 @@ class DependencyReference:
         elif self.dependency_type == DependencyType.STRING_REFERENCE:
             self.impact_level = ImpactLevel.LOW
 
+
 @dataclass
 class FileAnalysisResult:
     """文件分析结果"""
@@ -106,6 +110,7 @@ class FileAnalysisResult:
     def __post_init__(self):
         self.has_legacy_dependencies = len(self.dependencies) > 0
 
+
 @dataclass
 class DependencyGraph:
     """依赖关系图"""
@@ -114,6 +119,7 @@ class DependencyGraph:
     legacy_sources: Set[str]  # 传统数据源集合
     affected_files: Set[str]  # 受影响的文件
     dependency_chains: List[List[str]]  # 依赖链
+
 
 class DependencyAnalyzer:
     """依赖关系分析器"""
@@ -557,6 +563,7 @@ class DependencyAnalyzer:
         self.logger.info(f"依赖分析报告已保存: {file_path}")
         return str(file_path)
 
+
 class DependencyVisitor(ast.NodeVisitor):
     """AST访问器，用于分析依赖关系"""
 
@@ -713,6 +720,7 @@ class DependencyVisitor(ast.NodeVisitor):
 
         self.dependencies.append(dependency)
 
+
 def analyze_project_dependencies(project_root: str = None) -> Tuple[Dict[str, Any], str]:
     """分析项目依赖关系的便捷函数"""
     analyzer = DependencyAnalyzer(project_root)
@@ -720,6 +728,7 @@ def analyze_project_dependencies(project_root: str = None) -> Tuple[Dict[str, An
     report_file = analyzer.save_analysis_report()
 
     return summary, report_file
+
 
 if __name__ == "__main__":
     # 测试代码

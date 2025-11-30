@@ -3,7 +3,7 @@ from loguru import logger
 """
 自适应策略模块
 
-使用统一的策略管理系统框架，集成HIkyuu原生组件
+使用统一的策略管理系统框架，集成FactorWeave-Quant原生组件
 """
 
 from hikyuu import *
@@ -16,6 +16,7 @@ from core.strategy.base_strategy import BaseStrategy, StrategySignal, SignalType
 from core.strategy import register_strategy
 from core.stop_loss import AdaptiveStopLoss
 from core.take_profit import AdaptiveTakeProfit
+
 
 @register_strategy("AdaptiveFactorWeave", metadata={
     "description": "基于FactorWeave框架的自适应止损止盈策略",
@@ -211,12 +212,15 @@ class AdaptiveFactorWeaveStrategy(BaseStrategy):
         })
         return info
 
+
 def create_adaptive_strategy():
     """创建自适应止损策略（向后兼容函数）"""
     strategy = AdaptiveHikuuStrategy()
     return strategy.get_hikyuu_system()
 
 # 向后兼容的工厂函数
+
+
 def create_adaptive_hikyuu_strategy(name: str = "AdaptiveHikyuu", **kwargs) -> AdaptiveHikuuStrategy:
     """创建自适应HIkyuu策略实例"""
     strategy = AdaptiveHikuuStrategy(name)

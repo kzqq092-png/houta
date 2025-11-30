@@ -144,7 +144,7 @@ class UnifiedDataManager:
     5. 优化数据加载性能
     6. 支持TET数据管道（Transform-Extract-Transform）
     7. 多资产类型数据处理
-    8. 集成HIkyuu、东方财富、新浪等多数据源
+    8. 集成FactorWeave-Quant、东方财富、新浪等多数据源
     9. 行业数据管理
     10. SQLite数据库支持
     """
@@ -198,7 +198,7 @@ class UnifiedDataManager:
 
         self._is_initialized = False
 
-        # HIkyuu已移除，系统基于TET框架和插件架构运行
+        # FactorWeave-Quant已移除，系统基于TET框架和插件架构运行
         self._invalid_stocks_cache = set()
         self._valid_stocks_cache = set()
 
@@ -256,7 +256,7 @@ class UnifiedDataManager:
             self.tet_pipeline = TETDataPipeline(data_source_router)
             logger.info("TET数据管道初始化成功")
 
-            # 注册HIkyuu数据源插件到路由器和TET管道 - 删除手动注册，使用自动发现机制
+            # 注册FactorWeave-Quant数据源插件到路由器和TET管道 - 删除手动注册，使用自动发现机制
             # self._register_hikyuu_plugin_to_router(data_source_router)
 
             # 插件发现状态标记
@@ -519,7 +519,7 @@ class UnifiedDataManager:
     def get_available_sources(self) -> List[str]:
         """获取可用的数据源列表"""
         sources = []
-        # HIkyuu已移除
+        # FactorWeave-Quant已移除
         sources.extend(self._data_sources.keys())
         return sources
 
@@ -559,7 +559,7 @@ class UnifiedDataManager:
                 logger.warning(f"获取股票 {stock_code} 行业信息失败: {e}")
         return '其他'
 
-    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365, 
+    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365,
                   asset_type: AssetType = AssetType.STOCK_A) -> pd.DataFrame:
         """
         获取K线数据 - 统一接口（✅ 优化：支持多资产类型 + 集成DuckDB智能路由）
@@ -705,7 +705,7 @@ class UnifiedDataManager:
                         try:
                             from datetime import datetime
                             days_diff = (end_date - start_date).days
-                            
+
                             # 根据不同的频率类型，使用不同的估算方法
                             if frequency == 'daily':
                                 # 日线：一年约250个交易日，估算公式：天数 * 0.7（考虑周末和节假日）
@@ -725,7 +725,7 @@ class UnifiedDataManager:
                             else:
                                 # 其他频率：使用默认估算方法
                                 estimated_count = int(days_diff * 0.7)
-                            
+
                             # ✅ 修复：不再强制最小值为800，而是使用实际计算出的数量
                             # 只有超过上限时才限制，不超过800时就使用实际计算的数量
                             # 上限设置为10000（超过这个值会在Tongdaxin插件中分片）
@@ -736,14 +736,14 @@ class UnifiedDataManager:
                             else:
                                 # 使用实际计算出的数量（可能是1、10、100等任何值，不再强制800）
                                 actual_count = estimated_count
-                            
+
                             # 确保最小值为1（避免0或负数）
                             if actual_count < 1:
                                 actual_count = 1
                                 logger.warning(f"[数据获取] 估算数量过小，调整为最小值1")
-                            
+
                             logger.info(f"[数据获取] 已指定时间范围 {start_date} ~ {end_date}，"
-                                      f"日期跨度{days_diff}天，频率={frequency}，估算需要{estimated_count}条，实际请求{actual_count}条")
+                                        f"日期跨度{days_diff}天，频率={frequency}，估算需要{estimated_count}条，实际请求{actual_count}条")
                         except Exception as e:
                             # 如果计算失败，使用传入的count参数（而不是强制800）
                             actual_count = count if count > 0 else 365
@@ -777,7 +777,7 @@ class UnifiedDataManager:
                         # ✅ 修复：先进行数据标准化（包含排序），再进行截断
                         # 确保数据在截断前已经按时间升序排列
                         df = self._standardize_kdata_format(df, stock_code)
-                        
+
                         if should_truncate and not df.empty:
                             original_len = len(df)
                             # ✅ 修复：数据已经标准化并排序（升序），使用tail获取最新的count条数据
@@ -1034,7 +1034,7 @@ class UnifiedDataManager:
                 ORDER BY timestamp DESC 
                 LIMIT ?
             """
-            
+
             logger.info(f"📊 [基础表查询] database={database_path}, symbol={stock_code}, frequency={frequency}, limit={count}")
 
             try:
@@ -1079,9 +1079,9 @@ class UnifiedDataManager:
                     ORDER BY timestamp DESC 
                     LIMIT ?
                 """
-                
+
                 logger.debug(f"📊 [视图查询] 尝试使用质量优选视图...")
-                
+
                 result = self.duckdb_operations.execute_query(
                     database_path=database_path,
                     query=view_query,
@@ -1095,7 +1095,7 @@ class UnifiedDataManager:
                         # ✅ 修复：对从视图获取的数据进行标准化和排序
                         df = self._standardize_kdata_format(df, stock_code)
                         return df
-                    
+
             except Exception as view_error:
                 logger.warning(f"⚠️  [视图查询失败]: {view_error}")
 
@@ -1248,7 +1248,7 @@ class UnifiedDataManager:
     def get_stock_info(self, stock_code: str) -> Optional[Dict[str, Any]]:
         """获取股票信息"""
         try:
-            # HIkyuu已移除，使用TET框架获取股票信息
+            # FactorWeave-Quant已移除，使用TET框架获取股票信息
 
             # 从股票列表中查找
             stock_list = self.get_stock_list()
@@ -1492,7 +1492,7 @@ class UnifiedDataManager:
     def test_connection(self) -> bool:
         """测试数据源连接"""
         try:
-            # HIkyuu已移除，使用TET框架测试连接
+            # FactorWeave-Quant已移除，使用TET框架测试连接
             if self._current_source in self._data_sources:
                 # 尝试获取股票列表来测试连接
                 test_list = self._data_sources[self._current_source].get_stock_list('sh')
@@ -1971,7 +1971,7 @@ class UnifiedDataManager:
         return end_date >= today
 
     async def request_data(self, stock_code: str, data_type: str = 'kdata',
-                           period: str = 'D', time_range: str = "最近1年", 
+                           period: str = 'D', time_range: str = "最近1年",
                            asset_type: AssetType = AssetType.STOCK_A, **kwargs) -> Any:
         """请求数据（✅ 优化：支持多资产类型）
 
@@ -2046,7 +2046,7 @@ class UnifiedDataManager:
             logger.error(f"请求数据失败: {e}", exc_info=True)
             return None
 
-    async def _get_kdata(self, stock_code: str, period: str = 'D', count: int = 365, 
+    async def _get_kdata(self, stock_code: str, period: str = 'D', count: int = 365,
                          asset_type: AssetType = AssetType.STOCK_A) -> pd.DataFrame:
         """获取K线数据（✅ 优化：支持多资产类型）
 

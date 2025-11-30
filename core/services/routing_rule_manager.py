@@ -4,7 +4,7 @@
 提供智能数据路由规则的配置、管理和动态更新功能。
 支持复杂规则引擎、条件匹配和实时规则更新。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0
 日期: 2025-09-21
 """
@@ -26,6 +26,7 @@ from core.services.config_service import ConfigService
 
 logger = logger.bind(module=__name__)
 
+
 class RuleOperator(Enum):
     """规则操作符"""
     EQUALS = "equals"
@@ -40,6 +41,7 @@ class RuleOperator(Enum):
     IN_LIST = "in_list"
     NOT_IN_LIST = "not_in_list"
 
+
 class RuleConditionType(Enum):
     """规则条件类型"""
     DATA_TYPE = "data_type"
@@ -52,6 +54,7 @@ class RuleConditionType(Enum):
     SUCCESS_RATE = "success_rate"
     LOAD_LEVEL = "load_level"
     CUSTOM = "custom"
+
 
 @dataclass
 class RuleCondition:
@@ -111,6 +114,7 @@ class RuleCondition:
         except Exception as e:
             logger.error(f"比较值失败: {e}")
             return False
+
 
 @dataclass
 class RoutingRuleConfig:
@@ -187,6 +191,7 @@ class RoutingRuleConfig:
             availability_weight=self.availability_weight
         )
 
+
 @dataclass
 class RuleTemplate:
     """规则模板"""
@@ -204,6 +209,7 @@ class RuleTemplate:
     created_by: str = "system"
     created_at: datetime = field(default_factory=datetime.now)
     usage_count: int = 0
+
 
 class RoutingRuleManager:
     """

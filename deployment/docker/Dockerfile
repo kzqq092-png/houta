@@ -1,4 +1,4 @@
-# HIkyuu-UI Production Dockerfile
+# FactorWeave-Quant Production Dockerfile
 # 专业量化平台生产环境Docker镜像
 
 FROM python:3.11-slim as base

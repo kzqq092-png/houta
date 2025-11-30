@@ -28,6 +28,7 @@ from typing import Dict, List, Any, Optional
 # Loguru配置在core.loguru_config中统一管理s - %(levelname)s - %(message)s')
 logger = logger
 
+
 class CompleteDatabaseInitializer:
     """完整数据库初始化器"""
 
@@ -71,8 +72,8 @@ class CompleteDatabaseInitializer:
         logger.info("SUCCESS SQLite数据库初始化完成")
 
     def _init_hikyuu_system_db(self):
-        """初始化HIkyuu系统数据库"""
-        logger.info("创建HIkyuu系统数据库表...")
+        """初始化FactorWeave-Quant系统数据库"""
+        logger.info("创建FactorWeave-Quant系统数据库表...")
 
         with sqlite3.connect(self.sqlite_db_path) as conn:
             cursor = conn.cursor()
@@ -929,6 +930,7 @@ class CompleteDatabaseInitializer:
 
         logger.info("索引创建完成")
 
+
 def main():
     """主函数"""
     logger.info("=" * 60)
@@ -955,6 +957,7 @@ def main():
     else:
         logger.info("\n 数据库系统初始化失败！")
         return False
+
 
 if __name__ == "__main__":
     success = main()

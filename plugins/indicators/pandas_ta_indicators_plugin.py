@@ -26,6 +26,7 @@ from core.indicator_extensions import (
 
 logger = logger
 
+
 class PandasTAIndicatorsPlugin(IIndicatorPlugin):
     """
     Pandas-TA指标插件
@@ -40,7 +41,7 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
             "name": "Pandas-TA指标插件",
             "version": "1.0.0",
             "description": "基于pandas-ta库的纯Python技术指标计算插件",
-            "author": "HIkyuu-UI Team",
+            "author": "FactorWeave-Quant Team",
             "backend": "pandas-ta Python",
             "performance_level": "medium"
         }

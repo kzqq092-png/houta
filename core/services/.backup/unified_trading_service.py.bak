@@ -5,7 +5,7 @@ Unified Trading Service
 Consolidates TradingManager, PositionManager, RiskManager into unified service
 with proper transaction boundaries and integrated risk controls.
 
-Created for: HIkyuu-UI Architecture Refactoring Project
+Created for: FactorWeave-Quant Architecture Refactoring Project
 Phase: 2 - Service Consolidation
 Task: 8 - Implement TradingService consolidating trading managers
 """

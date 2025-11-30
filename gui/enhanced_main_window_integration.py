@@ -401,7 +401,7 @@ def example_integration():
     """
     示例：如何在现有主窗口中集成增强UI组件
 
-    这个函数展示了如何在现有的HIkyuu-UI主窗口中
+    这个函数展示了如何在现有的FactorWeave-Quant主窗口中
     集成新的增强UI组件。
     """
 

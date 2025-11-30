@@ -57,7 +57,7 @@ class LegacyDataSourceAdapter(IDataSourcePlugin):
             name=f"传统数据源-{self.source_id}",
             version="1.0.0",
             description=f"传统{self.source_id}数据源的适配器",
-            author="HIkyuu-UI Team",
+            author="FactorWeave-Quant Team",
             supported_asset_types=self._asset_type_mapping.get(self.source_id, [AssetType.STOCK_A]),
             supported_data_types=self._supported_data_types,
             capabilities={

@@ -195,10 +195,14 @@ class ModelTrainingService(BaseService):
         try:
             logger.info("Initializing ModelTrainingService...")
 
-            # 获取数据库服务
+            # 获取数据库服务（可选）
             try:
                 from .database_service import DatabaseService
-                self._database_service = self._service_container.resolve(DatabaseService)
+                if self._service_container.is_registered(DatabaseService):
+                    self._database_service = self._service_container.resolve(DatabaseService)
+                    logger.info("DatabaseService已注册并已获取")
+                else:
+                    logger.warning("DatabaseService未在容器中注册，将使用直接数据库连接")
             except Exception as e:
                 logger.warning(f"无法获取DatabaseService: {e}，将使用直接数据库连接")
 
@@ -219,8 +223,8 @@ class ModelTrainingService(BaseService):
         """初始化数据库表结构"""
         try:
             if self._database_service:
-                # 使用DatabaseService创建表
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                # 使用DatabaseService创建表（使用strategy_sqlite数据库）
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     self._create_training_tasks_table(conn)
                     self._create_model_versions_table(conn)
                     self._create_training_logs_table(conn)
@@ -376,7 +380,7 @@ class ModelTrainingService(BaseService):
         """加载现有的训练任务"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("SELECT * FROM training_tasks")
                     rows = cursor.fetchall()
@@ -460,7 +464,7 @@ class ModelTrainingService(BaseService):
         """加载现有的模型版本"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("SELECT * FROM model_versions")
                     rows = cursor.fetchall()
@@ -579,7 +583,7 @@ class ModelTrainingService(BaseService):
         """保存任务到数据库"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("""
                         INSERT OR REPLACE INTO training_tasks 
@@ -782,7 +786,7 @@ class ModelTrainingService(BaseService):
         """保存版本到数据库"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("""
                         INSERT OR REPLACE INTO model_versions 
@@ -900,7 +904,7 @@ class ModelTrainingService(BaseService):
         """更新版本的当前标记"""
         try:
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     # 先取消所有版本的当前标记
                     cursor.execute("UPDATE model_versions SET is_current = 0")
@@ -1040,7 +1044,7 @@ class ModelTrainingService(BaseService):
                 if len(self._training_logs) > 1000:
                     self._training_logs.pop(0)
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute("INSERT INTO training_logs (training_task_id, log_level, log_message, log_data_json) VALUES (?, ?, ?, ?)", (task_id, log_level, log_message, json.dumps(log_data)))
                     conn.commit()
@@ -2002,7 +2006,7 @@ class ModelTrainingService(BaseService):
             params.append(limit)
 
             if self._database_service:
-                with self._database_service.get_connection("analytics_duckdb") as conn:
+                with self._database_service.get_connection("strategy_sqlite") as conn:
                     cursor = conn.cursor()
                     cursor.execute(query, tuple(params))
                     rows = cursor.fetchall()

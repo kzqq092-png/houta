@@ -52,7 +52,7 @@
                 <mxCell id="duckdb" value="DuckDB&#10;列式数据库" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#ffa000;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="490" y="620" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="hikyuu-db" value="HIkyuu数据库&#10;K线数据存储" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#4caf50;fontColor=#000000;" parent="1" vertex="1">
+                <mxCell id="hikyuu-db" value="FactorWeave-Quant数据库&#10;K线数据存储" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#4caf50;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="630" y="620" width="120" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="cache-db" value="Redis缓存&#10;高速缓存" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#f44336;fontColor=#000000;" parent="1" vertex="1">
@@ -202,7 +202,7 @@
                 <mxCell id="store-duckdb" value="存储到DuckDB数据库" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#ffa000;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="180" y="820" width="160" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="store-hikyuu" value="存储到HIkyuu数据库" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#4caf50;fontColor=#000000;" parent="1" vertex="1">
+                <mxCell id="store-hikyuu" value="存储到FactorWeave-Quant数据库" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e8;strokeColor=#4caf50;fontColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="480" y="880" width="160" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="cache-data" value="缓存到Redis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#f44336;fontColor=#000000;" parent="1" vertex="1">

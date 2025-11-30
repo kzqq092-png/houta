@@ -2,7 +2,7 @@
 指标插件模块
 
 提供多种指标计算后端支持：
-- HIkyuu指标插件：基于HIkyuu框架的高性能指标计算
+- FactorWeave-Quant指标插件：基于FactorWeave-Quant框架的高性能指标计算
 - TA-Lib指标插件：基于TA-Lib库的经典技术指标
 - Pandas-TA指标插件：基于pandas-ta的纯Python指标实现
 - 自定义指标插件：支持用户自定义指标开发

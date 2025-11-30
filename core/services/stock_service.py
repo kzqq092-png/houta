@@ -18,7 +18,8 @@ import time
 
 logger = logger
 
-# 移除MockDataManager，使用真正的HIkyuu数据管理器
+# 移除MockDataManager，使用真正的FactorWeave-Quant数据管理器
+
 
 class StockService(CacheableService, ConfigurableService):
     """
@@ -268,7 +269,7 @@ class StockService(CacheableService, ConfigurableService):
             self._no_data_cache.add(stock_code)
             return None
 
-    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365, 
+    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365,
                   asset_type: 'AssetType' = None) -> pd.DataFrame:
         """
         获取K线数据（✅ 优化：支持多资产类型智能路由）
@@ -296,7 +297,7 @@ class StockService(CacheableService, ConfigurableService):
                 except Exception as e:
                     logger.error(f"UnifiedDataManager路由失败: {e}")
                     return pd.DataFrame()
-        
+
         # 股票资产或未指定类型，使用传统方法
         stock_data = self.get_stock_data(stock_code, period, count)
         if stock_data is not None:

@@ -7,10 +7,9 @@
 - 节点注册和心跳
 - Web UI监控
 
-作者: HIkyuu-UI团队
+作者: FactorWeave-Quant团队
 版本: 1.0.0
 """
 
 __version__ = "1.0.0"
-__author__ = "HIkyuu-UI Team"
-
+__author__ = "FactorWeave-Quant Team"

@@ -506,11 +506,11 @@ class SectorFundFlowService(QObject):
                         except Exception as e:
                             logger.warning(f" 检测传统数据源 {source_id} 失败: {e}")
 
-            # 特别检查HIkyuu（明确标注不支持板块资金流）
+            # 特别检查FactorWeave-Quant（明确标注不支持板块资金流）
             if 'hikyuu' in self._available_sources:
                 self._available_sources['hikyuu']['supports_fund_flow'] = False
-                self._available_sources['hikyuu']['note'] = 'HIkyuu专注K线数据，不支持板块资金流'
-                logger.info("ℹ️ HIkyuu数据源：专注K线数据，不适用于板块资金流")
+                self._available_sources['hikyuu']['note'] = 'FactorWeave-Quant专注K线数据，不支持板块资金流'
+                logger.info("ℹ️ FactorWeave-Quant数据源：专注K线数据，不适用于板块资金流")
 
         except Exception as e:
             logger.error(f"[ERROR] 传统数据源检测失败: {e}")

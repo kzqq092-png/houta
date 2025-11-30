@@ -5,7 +5,7 @@ Unified Performance Service
 Consolidates performance managers into comprehensive monitoring and optimization service
 with real-time metrics collection, alerting, and automatic optimization.
 
-Created for: HIkyuu-UI Architecture Refactoring Project
+Created for: FactorWeave-Quant Architecture Refactoring Project
 Phase: 3 - Infrastructure Services
 Task: 13 - Create PerformanceService for monitoring and optimization
 """

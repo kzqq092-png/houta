@@ -61,7 +61,7 @@
                 <mxCell id="plugin_layer" value="插件层 (Plugin Layer)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce5cd;strokeColor=#d79b00;fontSize=14;fontStyle=1;fontColor=#050505;labelBackgroundColor=none;labelBorderColor=none;verticalAlign=top;" parent="1" vertex="1">
                     <mxGeometry x="50" y="480" width="900" height="120" as="geometry"/>
                 </mxCell>
-                <mxCell id="hikyuu_plugin" value="HIkyuu插件&#10;hikyuu_data_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;labelBackgroundColor=none;labelBorderColor=none;" parent="1" vertex="1">
+                <mxCell id="hikyuu_plugin" value="FactorWeave-Quant插件&#10;hikyuu_data_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;labelBackgroundColor=none;labelBorderColor=none;" parent="1" vertex="1">
                     <mxGeometry x="70" y="520" width="120" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="tdx_plugin" value="通达信插件&#10;tongdaxin_stock_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;labelBackgroundColor=none;labelBorderColor=none;" parent="1" vertex="1">

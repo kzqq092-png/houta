@@ -92,7 +92,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
             import requests
             self.session = requests.Session()
             self.session.headers.update({
-                "User-Agent": "HIkyuu-YahooFinance/1.0",
+                "User-Agent": "FactorWeave-Quant-YahooFinance/1.0",
                 "Accept": "application/json"
             })
 
@@ -552,7 +552,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
             name=getattr(self, 'name', self.__class__.__name__),
             version=getattr(self, 'version', '1.0.0'),
             description=getattr(self, 'description', '数据源插件'),
-            author=getattr(self, 'author', 'HIkyuu-UI Team'),
+            author=getattr(self, 'author', 'FactorWeave-Quant Team'),
             supported_asset_types=getattr(self, 'supported_asset_types', [AssetType.STOCK_A]),
             supported_data_types=getattr(self, 'supported_data_types', [DataType.HISTORICAL_KLINE]),
             capabilities={

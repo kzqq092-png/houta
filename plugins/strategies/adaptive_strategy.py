@@ -3,7 +3,7 @@ from loguru import logger
 """
 自适应策略模块
 
-使用统一的策略管理系统框架，集成HIkyuu原生组件
+使用统一的策略管理系统框架，集成FactorWeave-Quant原生组件
 """
 
 from hikyuu import *
@@ -17,14 +17,15 @@ from core.strategy import register_strategy
 from core.stop_loss import AdaptiveStopLoss
 from core.take_profit import AdaptiveTakeProfit
 
+
 @register_strategy("AdaptiveHikyuu", metadata={
-    "description": "基于HIkyuu框架的自适应止损止盈策略",
+    "description": "基于FactorWeave-Quant框架的自适应止损止盈策略",
     "author": "FactorWeave 团队",
     "version": "2.0.0",
     "category": "adaptive"
 })
 class AdaptiveHikuuStrategy(BaseStrategy):
-    """自适应HIkyuu策略"""
+    """自适应FactorWeave-Quant策略"""
 
     def __init__(self, name: str = "AdaptiveHikyuu"):
         super().__init__(name, StrategyType.CUSTOM)
@@ -63,18 +64,18 @@ class AdaptiveHikuuStrategy(BaseStrategy):
         """
         生成交易信号
 
-        注意：这个策略主要用于系统配置，实际信号生成由HIkyuu系统处理
+        注意：这个策略主要用于系统配置，实际信号生成由FactorWeave-Quant系统处理
         """
         signals = []
 
-        # 创建HIkyuu系统
+        # 创建FactorWeave-Quant系统
         system = self._create_hikyuu_system()
 
         if system is None:
             return signals
 
-        # 这里可以添加基于HIkyuu系统的信号生成逻辑
-        # 由于HIkyuu系统的复杂性，这里提供一个简化的示例
+        # 这里可以添加基于FactorWeave-Quant系统的信号生成逻辑
+        # 由于FactorWeave-Quant系统的复杂性，这里提供一个简化的示例
 
         try:
             # 简化的信号生成逻辑
@@ -119,12 +120,12 @@ class AdaptiveHikuuStrategy(BaseStrategy):
                         ))
 
         except Exception as e:
-            logger.info(f"HIkyuu自适应策略信号生成失败: {e}")
+            logger.info(f"FactorWeave-Quant自适应策略信号生成失败: {e}")
 
         return signals
 
     def _create_hikyuu_system(self):
-        """创建HIkyuu交易系统"""
+        """创建FactorWeave-Quant交易系统"""
         try:
             # 创建交易管理对象
             tm = crtTM(init_cash=self.get_parameter("init_cash"))
@@ -178,11 +179,11 @@ class AdaptiveHikuuStrategy(BaseStrategy):
             return system
 
         except Exception as e:
-            logger.info(f"创建HIkyuu系统失败: {e}")
+            logger.info(f"创建FactorWeave-Quant系统失败: {e}")
             return None
 
     def get_hikyuu_system(self):
-        """获取HIkyuu系统实例"""
+        """获取FactorWeave-Quant系统实例"""
         if self._system is None:
             self._system = self._create_hikyuu_system()
         return self._system
@@ -211,14 +212,17 @@ class AdaptiveHikuuStrategy(BaseStrategy):
         })
         return info
 
+
 def create_adaptive_strategy():
     """创建自适应止损策略（向后兼容函数）"""
     strategy = AdaptiveHikuuStrategy()
     return strategy.get_hikyuu_system()
 
 # 向后兼容的工厂函数
+
+
 def create_adaptive_hikyuu_strategy(name: str = "AdaptiveHikyuu", **kwargs) -> AdaptiveHikuuStrategy:
-    """创建自适应HIkyuu策略实例"""
+    """创建自适应FactorWeave-Quant策略实例"""
     strategy = AdaptiveHikuuStrategy(name)
 
     # 设置参数

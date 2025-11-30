@@ -672,7 +672,7 @@ class FactorWeaveQuantLauncher:
             # 检查必要模块
             required_modules = [
                 'PyQt5', 'pandas', 'numpy', 'matplotlib',
-                'hikyuu', 'scikit-learn', 'sqlite3'
+                'FactorWeave-Quant', 'scikit-learn', 'sqlite3'
             ]
 
             for module in required_modules:
@@ -711,7 +711,7 @@ class FactorWeaveQuantLauncher:
             import tempfile
             import shutil
             temp_dir = tempfile.gettempdir()
-            hikyuu_temp = os.path.join(temp_dir, "hikyuu_*")
+            FactorWeave-Quant_temp = os.path.join(temp_dir, "FactorWeave-Quant_*")
 
             # 清理日志文件
             log_dir = project_root / "logs"
@@ -939,7 +939,7 @@ class FactorWeaveQuantLauncher:
         print("- PyQt5")
         print("- pandas, numpy")
         print("- matplotlib")
-        print("- hikyuu")
+        print("- FactorWeave-Quant")
         print("- scikit-learn")
         print("- sqlite3")
 
@@ -1417,7 +1417,7 @@ class FactorWeaveQuantLauncher:
         print("=" * 50)
         print("1. 基本使用示例:")
         print("```python")
-        print("from hikyuu import *")
+        print("from FactorWeave-Quant import *")
         print("from core.services import StockService")
         print()
         print("# 获取股票数据")
@@ -1463,25 +1463,25 @@ class FactorWeaveQuantLauncher:
         print("如果您遇到问题或需要帮助，请通过以下方式联系我们:")
         print()
         print("官方网站:")
-        print(" https://hikyuu.org")
+        print(" https://FactorWeave-Quant.org")
         print()
         print("邮箱支持:")
-        print(" support@hikyuu.org")
+        print(" support@FactorWeave-Quant.org")
         print()
         print("社区论坛:")
-        print(" https://forum.hikyuu.org")
+        print(" https://forum.FactorWeave-Quant.org")
         print()
         print("问题反馈:")
-        print(" https://github.com/fasiondog/hikyuu/issues")
+        print(" https://github.com/fasiondog/FactorWeave-Quant/issues")
         print()
         print("文档中心:")
-        print(" https://docs.hikyuu.org")
+        print(" https://docs.FactorWeave-Quant.org")
         print()
         print("视频教程:")
-        print(" https://www.bilibili.com/hikyuu")
+        print(" https://www.bilibili.com/FactorWeave-Quant")
         print()
         print("微信群:")
-        print(" 请添加微信号: hikyuu-support")
+        print(" 请添加微信号: FactorWeave-Quant-support")
         print()
         print("常见问题:")
         print(" 1. 安装问题: 请检查Python版本和依赖")
@@ -1492,7 +1492,7 @@ class FactorWeaveQuantLauncher:
         print("提交问题时请包含:")
         print(" - 操作系统版本")
         print(" - Python版本")
-        print(" - HIkyuu版本")
+        print(" - FactorWeave-Quant版本")
         print(" - 错误信息截图")
         print(" - 重现步骤")
 

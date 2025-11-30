@@ -4,7 +4,7 @@
 提供基于用户行为分析和内容特征的个性化推荐功能。
 支持协同过滤、内容推荐、混合推荐等多种推荐算法。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0
 日期: 2025-09-21
 """
@@ -29,6 +29,7 @@ from loguru import logger
 
 logger = logger.bind(module=__name__)
 
+
 class RecommendationType(Enum):
     """推荐类型"""
     STOCK = "stock"                 # 股票推荐
@@ -37,6 +38,7 @@ class RecommendationType(Enum):
     NEWS = "news"                   # 新闻推荐
     RESEARCH = "research"           # 研报推荐
     PORTFOLIO = "portfolio"         # 组合推荐
+
 
 class RecommendationReason(Enum):
     """推荐原因"""
@@ -47,6 +49,7 @@ class RecommendationReason(Enum):
     PERFORMANCE_BASED = "performance_based"  # 基于表现
     COLLABORATIVE = "collaborative"         # 协同过滤
     HYBRID = "hybrid"                      # 混合推荐
+
 
 @dataclass
 class UserProfile:
@@ -77,6 +80,7 @@ class UserProfile:
     feature_vector: Optional[np.ndarray] = None
     last_updated: datetime = field(default_factory=datetime.now)
 
+
 @dataclass
 class ContentItem:
     """内容项"""
@@ -106,6 +110,7 @@ class ContentItem:
     # 元数据
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass
 class UserInteraction:
     """用户交互记录"""
@@ -116,6 +121,7 @@ class UserInteraction:
     duration: Optional[float] = None  # 交互持续时间（秒）
     rating: Optional[float] = None    # 用户评分
     context: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class Recommendation:
@@ -139,6 +145,7 @@ class Recommendation:
     generated_at: datetime = field(default_factory=datetime.now)
     expires_at: Optional[datetime] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 class SmartRecommendationEngine:
     """
@@ -309,13 +316,13 @@ class SmartRecommendationEngine:
         """生成推荐结果"""
         try:
             recommendations = []
-            
+
             logger.info(f"开始生成推荐 - 用户: {user_id}, 类型: {recommendation_type}, 数量: {count}")
 
             # 获取用户画像
             user_profile = self.user_profiles.get(user_id)
             logger.info(f"用户画像存在: {user_profile is not None}")
-            
+
             if not user_profile:
                 # 为新用户生成基于热门内容的推荐
                 logger.info("用户无画像，使用热门推荐策略")
@@ -453,7 +460,7 @@ class SmartRecommendationEngine:
         """生成热门推荐（用于新用户）"""
         try:
             recommendations = []
-            
+
             logger.info(f"生成热门推荐 - 用户: {user_id}, 类型: {recommendation_type}, 数量: {count}")
             logger.info(f"当前内容项总数: {len(self.content_items)}")
 
@@ -464,7 +471,7 @@ class SmartRecommendationEngine:
                 key=lambda x: (x.view_count + x.like_count * 2 + x.share_count * 3, x.created_at),
                 reverse=True
             )
-            
+
             logger.info(f"排序后内容项数量: {len(popular_items)}")
 
             for item in popular_items[:count]:
@@ -494,7 +501,7 @@ class SmartRecommendationEngine:
                 )
 
                 recommendations.append(recommendation)
-            
+
             logger.info(f"生成了 {len(recommendations)} 个热门推荐")
             return recommendations
 
@@ -569,7 +576,7 @@ class SmartRecommendationEngine:
             valid_tags = [str(tag) for tag in item.tags if tag is not None and tag != '']
             valid_keywords = [str(kw) for kw in item.keywords if kw is not None and kw != '']
             valid_categories = [str(cat) for cat in item.categories if cat is not None and cat != '']
-            
+
             text_features = f"{item.title} {item.description} {' '.join(valid_tags)} {' '.join(valid_keywords)}"
 
             # 使用TF-IDF提取特征（这里需要先训练vectorizer）

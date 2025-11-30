@@ -802,13 +802,13 @@ class ModernStrategyPerformanceTab(QWidget):
             return None
 
     def update_data(self, monitor):
-        """更新策略性能数据 - 使用HIkyuu真实市场数据"""
+        """更新策略性能数据 - 使用FactorWeave-Quant真实市场数据"""
         try:
-            # 获取真实的HIkyuu市场数据计算策略性能
+            # 获取真实的FactorWeave-Quant市场数据计算策略性能
             import pandas as pd
 
             try:
-                # 获取真实的HIkyuu股票数据
+                # 获取真实的FactorWeave-Quant股票数据
                 real_returns = self._get_real_market_returns()
                 if real_returns is not None and len(real_returns) > 0:
                     strategy_stats = monitor.evaluate_strategy_performance(real_returns)

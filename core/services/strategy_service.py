@@ -1,9 +1,20 @@
+from ..strategy_events import (
+    StrategyStartedEvent, StrategyStoppedEvent, StrategyErrorEvent
+)
+from ..strategy_extensions import (
+    IStrategyPlugin, StrategyInfo, StrategyContext, PerformanceMetrics,
+    Signal, TradeResult, Position, StandardMarketData,
+    StrategyType, AssetType, TimeFrame, RiskLevel
+)
+from ..containers import ServiceContainer
+from ..events import EventBus
+from .base_service import BaseService
 from loguru import logger
 """
 策略服务
 
 提供策略插件管理、回测、优化等功能。
-支持多种策略框架（HIkyuu、Backtrader、自定义等）。
+支持多种策略框架（FactorWeave-Quant、Backtrader、自定义等）。
 """
 
 import json
@@ -24,19 +35,9 @@ _project_root = Path(__file__).parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from .base_service import BaseService
-from ..events import EventBus
-from ..containers import ServiceContainer
-from ..strategy_extensions import (
-    IStrategyPlugin, StrategyInfo, StrategyContext, PerformanceMetrics,
-    Signal, TradeResult, Position, StandardMarketData,
-    StrategyType, AssetType, TimeFrame, RiskLevel
-)
-from ..strategy_events import (
-    StrategyStartedEvent, StrategyStoppedEvent, StrategyErrorEvent
-)
 
 logger = logger
+
 
 class BacktestStatus(Enum):
     """回测状态"""
@@ -46,6 +47,7 @@ class BacktestStatus(Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+
 class OptimizationStatus(Enum):
     """优化状态"""
     PENDING = "pending"
@@ -53,6 +55,7 @@ class OptimizationStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
 
 @dataclass
 class StrategyConfig:
@@ -64,6 +67,7 @@ class StrategyConfig:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class BacktestTask:
@@ -79,6 +83,7 @@ class BacktestTask:
     created_at: datetime = field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
 
 @dataclass
 class OptimizationTask:
@@ -97,6 +102,7 @@ class OptimizationTask:
     created_at: datetime = field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
 
 class StrategyService(BaseService):
     """
@@ -167,12 +173,12 @@ class StrategyService(BaseService):
     def _register_builtin_plugin_factories(self) -> None:
         """注册内置策略插件工厂"""
         try:
-            # HIkyuu策略插件
+            # FactorWeave-Quant策略插件
             try:
                 from plugins.strategies.hikyuu_strategy_plugin import HikyuuStrategyPlugin
                 self._plugin_factories['hikyuu'] = lambda: HikyuuStrategyPlugin()
             except ImportError:
-                logger.warning("HIkyuu策略插件不可用")
+                logger.warning("FactorWeave-Quant策略插件不可用")
 
             # Backtrader策略插件
             try:
@@ -188,7 +194,7 @@ class StrategyService(BaseService):
                 project_root = Path(__file__).parent.parent.parent
                 if str(project_root) not in sys.path:
                     sys.path.insert(0, str(project_root))
-                
+
                 from strategies.adj_vwap_strategies import AdjMomentumPlugin, VWAPReversionPlugin
                 self._plugin_factories['adj_momentum_v2'] = lambda: AdjMomentumPlugin()
                 self._plugin_factories['vwap_reversion_v2'] = lambda: VWAPReversionPlugin()

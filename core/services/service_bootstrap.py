@@ -19,6 +19,7 @@ from core.events import EventBus, get_event_bus
 # 然后导入服务类型
 from core.services.config_service import ConfigService
 from core.services.extension_service import ExtensionService
+from core.services.database_service import DatabaseService
 from core.services.stock_service import StockService
 from core.services.chart_service import ChartService
 from core.services.analysis_service import AnalysisService
@@ -269,6 +270,24 @@ class ServiceBootstrap:
             logger.info("数据源路由器注册完成")
         except Exception as e:
             logger.warning(f" 数据源路由器注册失败: {e}")
+
+        # 注册数据库服务（在其他业务服务之前）
+        logger.info("注册数据库服务...")
+        try:
+            if not self._is_service_registered(DatabaseService):
+                self.service_container.register(
+                    DatabaseService,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: DatabaseService(
+                        service_container=self.service_container
+                    )
+                )
+            database_service = self.service_container.resolve(DatabaseService)
+            database_service.initialize()
+            logger.info("✅ 数据库服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ 数据库服务注册失败: {e}")
+            logger.error(traceback.format_exc())
 
         # 然后注册UnifiedDataManager（使用安全注册）
         if not self._safe_register_service(

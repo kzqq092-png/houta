@@ -1,7 +1,7 @@
 """
 统一插件接口定义
 
-本模块定义了HIkyuu-UI系统中所有插件必须实现的统一接口，
+本模块定义了FactorWeave-Quant系统中所有插件必须实现的统一接口，
 解决现有系统中插件生命周期管理混乱的问题。
 """
 
@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Set
 from datetime import datetime
 from enum import Enum
 import asyncio
+
 
 class PluginState(Enum):
     """插件状态枚举"""
@@ -23,6 +24,7 @@ class PluginState(Enum):
     ERROR = "error"
     UNLOADING = "unloading"
 
+
 class PluginType(Enum):
     """插件类型枚举"""
     DATA_SOURCE = "data_source"
@@ -31,6 +33,7 @@ class PluginType(Enum):
     VISUALIZATION = "visualization"
     NOTIFICATION = "notification"
     UTILITY = "utility"
+
 
 @dataclass
 class PluginInfo:
@@ -89,6 +92,7 @@ class PluginInfo:
         result.pop('instance', None)
         return result
 
+
 @dataclass
 class PluginEvent:
     """插件事件"""
@@ -104,6 +108,7 @@ class PluginEvent:
         result = asdict(self)
         result['timestamp'] = self.timestamp.isoformat()
         return result
+
 
 class IPlugin(ABC):
     """统一插件接口
@@ -247,6 +252,7 @@ class IPlugin(ABC):
             "load_time": self.info.load_time.isoformat() if self.info.load_time else None
         }
 
+
 class IPluginEventHandler(ABC):
     """插件事件处理器接口"""
 
@@ -261,6 +267,7 @@ class IPluginEventHandler(ABC):
             bool: 处理是否成功
         """
         pass
+
 
 class IPluginRegistry(ABC):
     """插件注册表接口"""
@@ -325,6 +332,7 @@ class IPluginRegistry(ABC):
         """
         pass
 
+
 class PluginError(Exception):
     """插件异常基类"""
 
@@ -335,21 +343,26 @@ class PluginError(Exception):
         self.plugin_name = plugin_name
         self.error_code = error_code
 
+
 class PluginLoadError(PluginError):
     """插件加载异常"""
     pass
+
 
 class PluginInitializationError(PluginError):
     """插件初始化异常"""
     pass
 
+
 class PluginDependencyError(PluginError):
     """插件依赖异常"""
     pass
 
+
 class PluginValidationError(PluginError):
     """插件验证异常"""
     pass
+
 
 class CircularDependencyError(PluginError):
     """循环依赖异常"""

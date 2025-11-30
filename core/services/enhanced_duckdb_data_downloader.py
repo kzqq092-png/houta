@@ -1,7 +1,7 @@
 """
 增强DuckDB数据下载服务
 
-专门用于替代HIkyuu的数据下载功能，提供：
+专门用于替代FactorWeave-Quant的数据下载功能，提供：
 1. 历史K线数据下载和存储
 2. 基本面数据下载和存储
 3. 实时数据缓存和管理
@@ -42,7 +42,7 @@ class EnhancedDuckDBDataDownloader:
     """
     增强DuckDB数据下载器
 
-    替代HIkyuu的核心数据获取功能，通过TET框架和插件系统
+    替代FactorWeave-Quant的核心数据获取功能，通过TET框架和插件系统
     实现多数据源的数据下载、存储和管理。新增智能增量下载功能。
     """
 
@@ -1088,10 +1088,10 @@ class EnhancedDuckDBDataDownloader:
         logger.info("增强DuckDB数据下载器清理完成")
 
     async def download_single_symbol_with_breakpoint(self,
-                                                   symbol: str,
-                                                   data_type: str = "K线数据",
-                                                   frequency: str = "日线",
-                                                   resume_state: Optional[Any] = None) -> bool:
+                                                     symbol: str,
+                                                     data_type: str = "K线数据",
+                                                     frequency: str = "日线",
+                                                     resume_state: Optional[Any] = None) -> bool:
         """下载单个股票（支持断点续传）"""
         try:
             start_time = datetime.now()

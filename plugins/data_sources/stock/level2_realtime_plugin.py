@@ -2,9 +2,9 @@
 Level-2实时数据源插件
 
 提供Level-2实时行情数据接入，支持新浪、东方财富、腾讯等多个数据源。
-基于HIkyuu-UI标准插件模板实现，集成WebSocket实时数据推送。
+基于FactorWeave-Quant标准插件模板实现，集成WebSocket实时数据推送。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0.0
 日期: 2025-09-21
 """
@@ -98,7 +98,7 @@ class Level2RealtimePlugin(StandardDataSourcePlugin):
             id="level2_realtime_plugin",
             name="Level-2实时数据源",
             version="1.0.0",
-            author="HIkyuu-UI增强团队",
+            author="FactorWeave-Quant增强团队",
             description="提供Level-2实时行情数据，支持tick数据和订单簿数据",
             supported_data_types=self.config.supported_data_types,
             supported_asset_types=self.config.supported_asset_types,
@@ -142,7 +142,7 @@ class Level2RealtimePlugin(StandardDataSourcePlugin):
 
     def get_author(self) -> str:
         """获取插件作者"""
-        return "HIkyuu-UI增强团队"
+        return "FactorWeave-Quant增强团队"
 
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
@@ -624,7 +624,7 @@ def create_plugin() -> Level2RealtimePlugin:
 PLUGIN_METADATA = {
     'name': 'Level-2实时数据源',
     'version': '1.0.0',
-    'author': 'HIkyuu-UI增强团队',
+    'author': 'FactorWeave-Quant增强团队',
     'description': '提供Level-2实时行情数据，支持tick数据和订单簿数据',
     'plugin_class': Level2RealtimePlugin,
     'factory_function': create_plugin,

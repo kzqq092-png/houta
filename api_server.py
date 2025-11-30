@@ -30,15 +30,18 @@ from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess
 from core.services.unified_data_manager import get_unified_data_manager
 data_manager = get_unified_data_manager()
 
-app = FastAPI(title="HIkyuu量化交易API", version="1.0.0")
+app = FastAPI(title="FactorWeave-Quant量化交易API", version="1.0.0")
+
 
 @app.get("/")
 def read_root():
-    return {"message": "HIkyuu量化交易API服务"}
+    return {"message": "FactorWeave-Quant量化交易API服务"}
+
 
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy", "service": "hikyuu-api"}
+
 
 @app.get("/api/stock/list", response_model=List[Dict[str, Any]])
 def get_stock_list():
@@ -52,6 +55,7 @@ def get_stock_list():
         return df.to_dict(orient="records")
     return []
 
+
 @app.post("/api/backtest")
 def run_backtest(params: Dict[str, Any]):
     """
@@ -64,6 +68,7 @@ def run_backtest(params: Dict[str, Any]):
     # TODO: 调用回测引擎
     return {"result": "success", "metrics": {}}
 
+
 @app.post("/api/analyze")
 def run_analysis(params: Dict[str, Any]):
     """
@@ -75,6 +80,7 @@ def run_analysis(params: Dict[str, Any]):
     """
     # TODO: 调用分析引擎
     return {"result": "success", "analysis": {}}
+
 
 @app.post("/api/ai/select_stocks")
 def ai_select_stocks(params: Dict[str, Any]):
@@ -104,6 +110,7 @@ def ai_select_stocks(params: Dict[str, Any]):
         code) for code in selected}
     return {"selected": selected, "explanations": explanations}
 
+
 @app.post("/api/ai/recommend_strategy")
 def ai_recommend_strategy(params: Dict[str, Any]):
     """
@@ -123,6 +130,7 @@ def ai_recommend_strategy(params: Dict[str, Any]):
     recommended = strategies[0] if strategies else 'MA'
     reason = "基于历史表现和特征，推荐最优策略。"
     return {"recommended": recommended, "reason": reason}
+
 
 @app.post("/api/ai/optimize_params")
 def ai_optimize_params(params: Dict[str, Any]):
@@ -145,6 +153,7 @@ def ai_optimize_params(params: Dict[str, Any]):
                    for k, v in param_space.items() if isinstance(v, list) and v}
     return {"best_params": best_params, "history": [best_params]}
 
+
 @app.post("/api/ai/diagnosis")
 def ai_diagnosis(params: Dict[str, Any]):
     """
@@ -165,6 +174,7 @@ def ai_diagnosis(params: Dict[str, Any]):
 # ===========================================
 # 板块资金流数据API
 # ===========================================
+
 
 @app.get("/api/sector/fund-flow/ranking")
 def get_sector_fund_flow_ranking(
@@ -214,6 +224,7 @@ def get_sector_fund_flow_ranking(
         logger.error(f"获取板块资金流排行榜失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取板块资金流排行榜失败: {str(e)}")
 
+
 @app.get("/api/sector/fund-flow/trend/{sector_id}")
 def get_sector_historical_trend(
     sector_id: str,
@@ -261,6 +272,7 @@ def get_sector_historical_trend(
     except Exception as e:
         logger.error(f"获取板块历史趋势失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取板块历史趋势失败: {str(e)}")
+
 
 @app.get("/api/sector/fund-flow/intraday/{sector_id}")
 def get_sector_intraday_flow(
@@ -321,6 +333,7 @@ def get_sector_intraday_flow(
     except Exception as e:
         logger.error(f"获取板块分时资金流失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取板块分时资金流失败: {str(e)}")
+
 
 @app.post("/api/sector/fund-flow/import")
 def import_sector_historical_data(params: Dict[str, Any]):
@@ -394,6 +407,7 @@ def import_sector_historical_data(params: Dict[str, Any]):
         logger.error(f"导入板块历史数据失败: {e}")
         raise HTTPException(status_code=500, detail=f"导入板块历史数据失败: {str(e)}")
 
+
 @app.get("/api/sector/fund-flow/status")
 def get_sector_service_status():
     """
@@ -438,6 +452,7 @@ def get_sector_service_status():
         }
 
 # 后续可扩展：用户认证、插件注册、WebHook等
+
 
 def _kdata_preprocess(df, context="分析"):
     """K线数据预处理：检查并修正所有关键字段，统一处理datetime字段"""
@@ -511,6 +526,7 @@ def _kdata_preprocess(df, context="分析"):
         logger.info(f"[{context}] 数据全部无效，返回空")
 
     return df.reset_index(drop=True)
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,7 +1,7 @@
 """
 统一熔断器接口定义
 
-本模块定义了HIkyuu-UI系统中熔断器组件的统一接口。
+本模块定义了FactorWeave-Quant系统中熔断器组件的统一接口。
 """
 
 from abc import ABC, abstractmethod
@@ -11,11 +11,13 @@ from datetime import datetime
 from enum import Enum
 import asyncio
 
+
 class CircuitBreakerState(Enum):
     """熔断器状态枚举"""
     CLOSED = "closed"      # 关闭状态，正常执行
     OPEN = "open"          # 打开状态，拒绝执行
     HALF_OPEN = "half_open"  # 半开状态，试探性执行
+
 
 @dataclass
 class CircuitBreakerConfig:
@@ -42,6 +44,7 @@ class CircuitBreakerConfig:
 
     # 扩展配置
     extra_config: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class CircuitBreakerMetrics:
@@ -92,6 +95,7 @@ class CircuitBreakerMetrics:
         if self.last_failure_time:
             result['last_failure_time'] = self.last_failure_time.isoformat()
         return result
+
 
 class ICircuitBreaker(ABC):
     """统一熔断器接口"""
@@ -200,10 +204,11 @@ class ICircuitBreaker(ABC):
         # 综合分数
         return (success_score * 0.5 + time_score * 0.3 + state_score * 0.2)
 
+
 class INone      """熔断器管理器接口"""
 
-    @abstractmethod
-    async def get_circuit_breaker(self, name: str) -> ICircuitBreaker:
+  @abstractmethod
+   async def get_circuit_breaker(self, name: str) -> ICircuitBreaker:
         """获取熔断器
 
         Args:
@@ -275,6 +280,7 @@ class INone      """熔断器管理器接口"""
 
         return total_score / len(circuit_breakers)
 
+
 class CircuitBreakerError(Exception):
     """熔断器异常基类"""
 
@@ -283,13 +289,16 @@ class CircuitBreakerError(Exception):
         self.message = message
         self.circuit_breaker_name = circuit_breaker_name
 
+
 class CircuitBreakerOpenError(CircuitBreakerError):
     """熔断器打开异常"""
     pass
 
+
 class CircuitBreakerConfigError(CircuitBreakerError):
     """熔断器配置异常"""
     pass
+
 
 class CircuitBreakerNotFoundError(CircuitBreakerError):
     """熔断器未找到异常"""

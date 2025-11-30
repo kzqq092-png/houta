@@ -21,6 +21,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
+
 class ActionType(Enum):
     """用户行为类型"""
     LOGIN = "login"
@@ -39,6 +40,7 @@ class ActionType(Enum):
     ERROR_ENCOUNTER = "error_encounter"
     HELP_ACCESS = "help_access"
 
+
 class UserSegment(Enum):
     """用户细分类型"""
     BEGINNER = "beginner"        # 新手用户
@@ -48,6 +50,7 @@ class UserSegment(Enum):
     ANALYST = "analyst"          # 分析师
     DEVELOPER = "developer"      # 开发者
 
+
 class RecommendationType(Enum):
     """推荐类型"""
     FEATURE = "feature"          # 功能推荐
@@ -56,6 +59,7 @@ class RecommendationType(Enum):
     TUTORIAL = "tutorial"        # 教程推荐
     OPTIMIZATION = "optimization"  # 优化建议
     SHORTCUT = "shortcut"        # 快捷方式推荐
+
 
 @dataclass
 class UserAction:
@@ -69,6 +73,7 @@ class UserAction:
     success: bool = True
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class UserProfile:
@@ -86,6 +91,7 @@ class UserProfile:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
+
 @dataclass
 class BehaviorPattern:
     """行为模式"""
@@ -98,6 +104,7 @@ class BehaviorPattern:
     conditions: Dict[str, Any] = field(default_factory=dict)
     outcomes: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
+
 
 @dataclass
 class Recommendation:
@@ -117,6 +124,7 @@ class Recommendation:
     is_accepted: bool = False
     is_dismissed: bool = False
 
+
 class UserBehaviorStorage:
     """用户行为数据存储"""
 
@@ -127,7 +135,7 @@ class UserBehaviorStorage:
 
     def _get_default_db_path(self) -> str:
         """获取默认数据库路径"""
-        app_data_dir = Path.home() / ".hikyuu-ui" / "user_behavior"
+        app_data_dir = Path.home() / ".FactorWeave-Quant" / "user_behavior"
         app_data_dir.mkdir(parents=True, exist_ok=True)
         return str(app_data_dir / "user_behavior.db")
 
@@ -353,6 +361,7 @@ class UserBehaviorStorage:
         except Exception as e:
             logger.error(f"获取用户画像失败: {e}")
             return None
+
 
 class BehaviorAnalyzer:
     """行为分析器"""
@@ -587,6 +596,7 @@ class BehaviorAnalyzer:
             logger.error(f"效率分析失败: {e}")
             return {}
 
+
 class UserSegmentClassifier:
     """用户细分分类器"""
 
@@ -738,6 +748,7 @@ class UserSegmentClassifier:
         except Exception as e:
             logger.error(f"计算细分得分失败: {e}")
             return 0.0
+
 
 class RecommendationEngine:
     """推荐引擎"""
@@ -1017,6 +1028,7 @@ class RecommendationEngine:
         """生成推荐ID"""
         content = f"{user_id}_{title}_{datetime.now().date()}"
         return hashlib.md5(content.encode()).hexdigest()[:16]
+
 
 class UserBehaviorLearner:
     """用户行为学习器主类"""
@@ -1428,8 +1440,10 @@ class UserBehaviorLearner:
         except Exception:
             return 0.0
 
+
 # 全局实例
 user_behavior_learner = None
+
 
 def get_user_behavior_learner(storage_path: Optional[str] = None) -> UserBehaviorLearner:
     """获取用户行为学习器实例"""
@@ -1440,10 +1454,12 @@ def get_user_behavior_learner(storage_path: Optional[str] = None) -> UserBehavio
 
     return user_behavior_learner
 
+
 def record_user_action(user_id: str, session_id: str, action_type: ActionType, **kwargs) -> bool:
     """记录用户行为的便捷函数"""
     learner = get_user_behavior_learner()
     return learner.record_action(user_id, session_id, action_type, **kwargs)
+
 
 def get_user_recommendations(user_id: str, limit: int = 5) -> List[Recommendation]:
     """获取用户推荐的便捷函数"""

@@ -166,6 +166,41 @@ class DatabaseConnection:
             logger.error(f"Query execution failed: {e}")
             raise
 
+    def cursor(self):
+        """获取数据库游标 - 代理方法以支持SQLite API兼容性"""
+        if self.db_type == DatabaseType.SQLITE:
+            # 对于SQLite，直接返回原生cursor
+            return self.connection.cursor()
+        elif self.db_type == DatabaseType.DUCKDB:
+            # 对于DuckDB，返回包装的cursor对象以提供兼容的API
+            return DuckDBCursorWrapper(self.connection)
+        else:
+            raise ValueError(f"Unsupported database type: {self.db_type}")
+
+    def commit(self):
+        """提交事务"""
+        try:
+            if self.db_type == DatabaseType.SQLITE:
+                self.connection.commit()
+            elif self.db_type == DatabaseType.DUCKDB:
+                # DuckDB自动提交，但为了兼容性保留此方法
+                pass
+        except Exception as e:
+            logger.error(f"Commit failed: {e}")
+            raise
+
+    def rollback(self):
+        """回滚事务"""
+        try:
+            if self.db_type == DatabaseType.SQLITE:
+                self.connection.rollback()
+            elif self.db_type == DatabaseType.DUCKDB:
+                # DuckDB不支持显式回滚
+                pass
+        except Exception as e:
+            logger.error(f"Rollback failed: {e}")
+            raise
+
     def close(self):
         """关闭连接"""
         try:
@@ -174,6 +209,41 @@ class DatabaseConnection:
                 self.is_active = False
         except Exception as e:
             logger.error(f"Error closing connection: {e}")
+
+
+class DuckDBCursorWrapper:
+    """DuckDB游标包装器，提供SQLite兼容的API"""
+
+    def __init__(self, connection: Any):
+        self.connection = connection
+
+    def execute(self, sql: str, parameters: Optional[Tuple] = None):
+        """执行SQL查询"""
+        try:
+            if parameters:
+                return self.connection.execute(sql, parameters)
+            else:
+                return self.connection.execute(sql)
+        except Exception as e:
+            logger.error(f"DuckDB execute failed: {e}")
+            raise
+
+    def fetchall(self):
+        """获取所有结果"""
+        # DuckDB的execute()已经返回结果，这里直接返回
+        return []
+
+    def fetchone(self):
+        """获取单个结果"""
+        return None
+
+    def commit(self):
+        """提交事务（DuckDB自动提交）"""
+        pass
+
+    def close(self):
+        """关闭游标（无操作）"""
+        pass
 
 
 class DatabaseService(BaseService):

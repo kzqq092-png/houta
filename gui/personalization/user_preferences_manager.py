@@ -28,6 +28,7 @@ import threading
 
 logger = logging.getLogger(__name__)
 
+
 class PreferenceCategory(Enum):
     """偏好设置类别"""
     APPEARANCE = "appearance"       # 外观设置
@@ -37,6 +38,7 @@ class PreferenceCategory(Enum):
     PERFORMANCE = "performance"    # 性能设置
     ACCESSIBILITY = "accessibility"  # 无障碍设置
 
+
 class ThemeType(Enum):
     """主题类型"""
     LIGHT = "light"
@@ -44,12 +46,14 @@ class ThemeType(Enum):
     AUTO = "auto"
     CUSTOM = "custom"
 
+
 class LayoutType(Enum):
     """布局类型"""
     COMPACT = "compact"
     NORMAL = "normal"
     EXPANDED = "expanded"
     CUSTOM = "custom"
+
 
 @dataclass
 class AppearancePreferences:
@@ -65,6 +69,7 @@ class AppearancePreferences:
     animation_speed: float = 1.0
     icon_theme: str = "default"
 
+
 @dataclass
 class LayoutPreferences:
     """布局偏好设置"""
@@ -77,6 +82,7 @@ class LayoutPreferences:
     splitter_sizes: Dict[str, List[int]] = field(default_factory=dict)
     window_geometry: Dict[str, Any] = field(default_factory=dict)
     dock_positions: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
 
 @dataclass
 class BehaviorPreferences:
@@ -93,12 +99,14 @@ class BehaviorPreferences:
     date_format: str = "yyyy-MM-dd"
     time_format: str = "HH:mm:ss"
 
+
 @dataclass
 class ShortcutPreferences:
     """快捷键偏好设置"""
     shortcuts: Dict[str, str] = field(default_factory=dict)
     enable_global_shortcuts: bool = False
     shortcut_context: str = "application"  # application, widget
+
 
 @dataclass
 class PerformancePreferences:
@@ -111,6 +119,7 @@ class PerformancePreferences:
     memory_limit_mb: int = 1024
     gc_interval: int = 60  # 秒
 
+
 @dataclass
 class AccessibilityPreferences:
     """无障碍偏好设置"""
@@ -121,6 +130,7 @@ class AccessibilityPreferences:
     focus_indicators: bool = True
     sound_feedback: bool = False
     reduce_motion: bool = False
+
 
 @dataclass
 class UserPreferences:
@@ -137,6 +147,7 @@ class UserPreferences:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     modified_at: str = field(default_factory=lambda: datetime.now().isoformat())
     user_id: str = ""
+
 
 class PreferenceValidator:
     """偏好设置验证器"""
@@ -231,6 +242,7 @@ class PreferenceValidator:
 
         return errors
 
+
 class PreferenceStorage:
     """偏好设置存储管理器"""
 
@@ -241,7 +253,7 @@ class PreferenceStorage:
 
     def _get_default_storage_path(self) -> str:
         """获取默认存储路径"""
-        app_data_dir = Path.home() / ".hikyuu-ui" / "preferences"
+        app_data_dir = Path.home() / ".FactorWeave-Quant" / "preferences"
         app_data_dir.mkdir(parents=True, exist_ok=True)
         return str(app_data_dir / "user_preferences.json")
 
@@ -367,6 +379,7 @@ class PreferenceStorage:
         except Exception as e:
             logger.error(f"导入偏好设置失败: {e}")
             return None
+
 
 class PreferenceDialog(QDialog):
     """偏好设置对话框"""
@@ -1109,6 +1122,7 @@ class PreferenceDialog(QDialog):
         except Exception as e:
             logger.error(f"接受更改失败: {e}")
 
+
 class UserPreferencesManager(QObject):
     """用户偏好设置管理器主类"""
 
@@ -1308,8 +1322,10 @@ class UserPreferencesManager(QObject):
             logger.error(f"获取偏好设置统计失败: {e}")
             return {'error': str(e)}
 
+
 # 全局实例
 user_preferences_manager = None
+
 
 def get_user_preferences_manager(storage_path: Optional[str] = None) -> UserPreferencesManager:
     """获取用户偏好设置管理器实例"""
@@ -1320,10 +1336,12 @@ def get_user_preferences_manager(storage_path: Optional[str] = None) -> UserPref
 
     return user_preferences_manager
 
+
 def get_current_preferences() -> UserPreferences:
     """获取当前偏好设置的便捷函数"""
     manager = get_user_preferences_manager()
     return manager.get_preferences()
+
 
 def show_preferences_dialog(parent: Optional[QWidget] = None) -> bool:
     """显示偏好设置对话框的便捷函数"""

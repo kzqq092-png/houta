@@ -4,7 +4,7 @@
 提供宏观经济指标数据的获取、存储、分析和相关性计算功能。
 支持GDP、CPI、PMI、利率等核心经济指标的管理。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0
 日期: 2025-09-21
 """
@@ -27,6 +27,7 @@ from core.data_validator import DataValidator
 
 logger = logger.bind(module=__name__)
 
+
 class SimpleDuckDBManager:
     """简单的DuckDB管理器包装器"""
 
@@ -48,6 +49,7 @@ class SimpleDuckDBManager:
         self.conn.execute(f"INSERT INTO {table_name} SELECT * FROM temp_{table_name}")
         self.conn.unregister(f"temp_{table_name}")
 
+
 class EconomicIndicatorType(Enum):
     """经济指标类型"""
     GDP = "gdp"                          # 国内生产总值
@@ -65,6 +67,7 @@ class EconomicIndicatorType(Enum):
     HOUSING_STARTS = "housing_starts"    # 新屋开工
     CONSUMER_CONFIDENCE = "consumer_confidence"  # 消费者信心指数
 
+
 class IndicatorFrequency(Enum):
     """指标频率"""
     DAILY = "daily"
@@ -72,6 +75,7 @@ class IndicatorFrequency(Enum):
     MONTHLY = "monthly"
     QUARTERLY = "quarterly"
     ANNUALLY = "annually"
+
 
 @dataclass
 class EconomicIndicator:
@@ -97,6 +101,7 @@ class EconomicIndicator:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
+
 @dataclass
 class IndicatorCorrelation:
     """指标相关性"""
@@ -116,6 +121,7 @@ class IndicatorCorrelation:
     confidence_interval: Tuple[float, float] = (0.0, 0.0)  # 置信区间
 
     calculated_at: datetime = field(default_factory=datetime.now)
+
 
 class MacroEconomicDataManager:
     """

@@ -4,7 +4,7 @@
 提供推荐模型的训练、评估、在线学习和自动更新功能。
 支持多种机器学习算法和模型评估指标。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0
 日期: 2025-09-21
 """
@@ -38,6 +38,7 @@ from core.ai.continuous_learning_manager import ContinuousLearningManager
 
 logger = logger.bind(module=__name__)
 
+
 class ModelType(Enum):
     """模型类型"""
     COLLABORATIVE_FILTERING = "collaborative_filtering"
@@ -47,6 +48,7 @@ class ModelType(Enum):
     ENSEMBLE = "ensemble"
     CLUSTERING = "clustering"
 
+
 class TrainingStatus(Enum):
     """训练状态"""
     IDLE = "idle"
@@ -55,6 +57,7 @@ class TrainingStatus(Enum):
     EVALUATING = "evaluating"
     COMPLETED = "completed"
     FAILED = "failed"
+
 
 @dataclass
 class ModelConfig:
@@ -86,6 +89,7 @@ class ModelConfig:
     retrain_interval: timedelta = timedelta(days=7)
 
     created_at: datetime = field(default_factory=datetime.now)
+
 
 @dataclass
 class TrainingJob:
@@ -119,6 +123,7 @@ class TrainingJob:
     model_path: Optional[str] = None
     model_size: Optional[int] = None
 
+
 @dataclass
 class ModelPerformance:
     """模型性能"""
@@ -147,6 +152,7 @@ class ModelPerformance:
     training_samples: int = 0
     test_samples: int = 0
     feature_count: int = 0
+
 
 class RecommendationModelTrainer:
     """

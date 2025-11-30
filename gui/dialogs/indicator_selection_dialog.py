@@ -29,6 +29,7 @@ from PyQt5.QtGui import QFont, QIcon, QPalette
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
+
 class IndicatorPreviewThread(QThread):
     """指标预览计算线程"""
     preview_ready = pyqtSignal(str, object)  # indicator_name, result_data
@@ -52,6 +53,7 @@ class IndicatorPreviewThread(QThread):
             })
         except Exception as e:
             self.preview_error.emit(self.indicator_name, str(e))
+
 
 class ParameterWidget(QFrame):
     """参数配置组件"""
@@ -151,6 +153,7 @@ class ParameterWidget(QFrame):
             if index >= 0:
                 self.input_widget.setCurrentIndex(index)
 
+
 class IndicatorSelectionDialog(QDialog):
     """指标选择对话框"""
 
@@ -185,7 +188,7 @@ class IndicatorSelectionDialog(QDialog):
 
         # 后端选择
         self.backend_combo = QComboBox()
-        self.backend_combo.addItems(["所有后端", "HIkyuu", "TA-Lib", "Pandas-TA", "自定义"])
+        self.backend_combo.addItems(["所有后端", "FactorWeave-Quant", "TA-Lib", "Pandas-TA", "自定义"])
         toolbar_layout.addWidget(QLabel("后端:"))
         toolbar_layout.addWidget(self.backend_combo)
 
@@ -628,6 +631,7 @@ class IndicatorSelectionDialog(QDialog):
     def get_selected_indicators(self):
         """获取选中的指标配置"""
         return self.selected_indicators.copy()
+
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

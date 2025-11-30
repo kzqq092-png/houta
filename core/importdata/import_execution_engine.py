@@ -4941,7 +4941,7 @@ def main():
     task_config = ImportTaskConfig(
         task_id="test_task_001",
         name="测试K线数据导入",
-        data_source="HIkyuu",
+        data_source="FactorWeave-Quant",
         asset_type="股票",
         data_type="K线数据",
         symbols=["000001", "000002"],

@@ -4,7 +4,7 @@
 提供技术指标依赖关系分析、计算优化和增量更新功能。
 支持复杂指标依赖图构建、循环依赖检测和计算路径优化。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0
 日期: 2025-09-21
 """
@@ -25,12 +25,14 @@ from core.services.realtime_compute_engine import IndicatorType, IndicatorConfig
 
 logger = logger.bind(module=__name__)
 
+
 class DependencyType(Enum):
     """依赖类型"""
     DIRECT = "direct"           # 直接依赖
     INDIRECT = "indirect"       # 间接依赖
     CIRCULAR = "circular"       # 循环依赖
     CONDITIONAL = "conditional"  # 条件依赖
+
 
 class ComputeStatus(Enum):
     """计算状态"""
@@ -39,6 +41,7 @@ class ComputeStatus(Enum):
     COMPLETED = "completed"     # 计算完成
     FAILED = "failed"          # 计算失败
     CACHED = "cached"          # 已缓存
+
 
 @dataclass
 class IndicatorDependency:
@@ -59,6 +62,7 @@ class IndicatorDependency:
     # 元数据
     created_at: datetime = field(default_factory=datetime.now)
     last_used: Optional[datetime] = None
+
 
 @dataclass
 class ComputeNode:
@@ -90,6 +94,7 @@ class ComputeNode:
             return False
         return datetime.now() < self.cache_expiry
 
+
 @dataclass
 class ComputeTask:
     """计算任务"""
@@ -111,6 +116,7 @@ class ComputeTask:
     # 结果
     result: Optional[IndicatorValue] = None
     error: Optional[str] = None
+
 
 class IndicatorDependencyManager:
     """

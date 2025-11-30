@@ -5,7 +5,7 @@ Architecture Performance Optimizer and Final Validation
 This module provides comprehensive performance optimization and validation
 for the refactored architecture, ensuring all performance targets are met.
 
-Created for: HIkyuu-UI Architecture Refactoring Project
+Created for: FactorWeave-Quant Architecture Refactoring Project
 Phase: 4 - Integration and Testing
 Task: 18 - Performance optimization and final validation
 """
@@ -864,7 +864,7 @@ class ArchitecturePerformanceOptimizer:
 # Architecture Performance Report
 
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-**Project:** HIkyuu-UI Architecture Refactoring
+**Project:** FactorWeave-Quant Architecture Refactoring
 
 ## Executive Summary
 

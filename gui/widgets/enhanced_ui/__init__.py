@@ -4,7 +4,7 @@
 Enhanced UI Components Package
 专业量化平台UI增强组件包
 
-本包提供了一系列专业的UI增强组件，用于提升HIkyuu-UI系统的用户体验和功能完整性。
+本包提供了一系列专业的UI增强组件，用于提升FactorWeave-Quant系统的用户体验和功能完整性。
 这些组件基于现有的ChartWidget和AnalysisWidget设计风格，保持了系统的一致性。
 
 主要组件：

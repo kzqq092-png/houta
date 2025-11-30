@@ -1,7 +1,7 @@
 from loguru import logger
 #!/usr/bin/env python3
 """
-HIkyuu系统优化器服务
+FactorWeave-Quant系统优化器服务
 
 基于新架构的系统优化器，提供自动分析和优化功能，清理冗余文件，提升性能
 """
@@ -858,7 +858,7 @@ class SystemOptimizerService(AsyncBaseService):
         result = self._current_result
 
         report = f"""
-HIkyuu系统优化报告
+FactorWeave-Quant系统优化报告
 ==================
 
 优化时间: {result.start_time.strftime('%Y-%m-%d %H:%M:%S')} - {result.end_time.strftime('%Y-%m-%d %H:%M:%S')}

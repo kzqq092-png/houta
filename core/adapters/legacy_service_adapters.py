@@ -385,7 +385,7 @@ class MigrationGuide:
 🔄 ARCHITECTURE REFACTORING MIGRATION GUIDE
 ================================================================================
 
-HIkyuu-UI has been refactored from 226+ Manager classes to 15 unified services.
+FactorWeave-Quant has been refactored from 226+ Manager classes to 15 unified services.
 This guide helps you migrate your code to the new architecture.
 
 🎯 NEW SERVICE ARCHITECTURE:

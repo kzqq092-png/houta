@@ -4,7 +4,7 @@
 提供数据质量分析报告生成功能，包括质量趋势分析、可视化图表和自动化报告。
 支持多种报告格式和定制化配置。
 
-作者: HIkyuu-UI增强团队
+作者: FactorWeave-Quant增强团队
 版本: 1.0
 日期: 2025-09-21
 """
@@ -30,6 +30,7 @@ from core.services.enhanced_data_quality_monitor import EnhancedDataQualityMonit
 
 logger = logger.bind(module=__name__)
 
+
 class ReportFormat(Enum):
     """报告格式"""
     HTML = "html"
@@ -38,6 +39,7 @@ class ReportFormat(Enum):
     EXCEL = "excel"
     MARKDOWN = "markdown"
 
+
 class ReportType(Enum):
     """报告类型"""
     DAILY = "daily"
@@ -45,6 +47,7 @@ class ReportType(Enum):
     MONTHLY = "monthly"
     QUARTERLY = "quarterly"
     CUSTOM = "custom"
+
 
 @dataclass
 class ReportConfig:
@@ -76,6 +79,7 @@ class ReportConfig:
     figure_size: Tuple[int, int] = (12, 8)
     dpi: int = 300
 
+
 @dataclass
 class QualityTrend:
     """质量趋势数据"""
@@ -101,6 +105,7 @@ class QualityTrend:
     # 预测信息
     predicted_next_score: Optional[float] = None
     confidence_interval: Optional[Tuple[float, float]] = None
+
 
 class QualityReportGenerator:
     """
