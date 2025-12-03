@@ -31,6 +31,15 @@ from gui.widgets.performance.tabs.system_health_tab import ModernSystemHealthTab
 # 已合并或升级为新的标签页
 from core.performance.unified_monitor import UnifiedPerformanceMonitor
 
+# 深度优化模块导入
+try:
+    from core.advanced_optimization.unified_optimization_service import UnifiedOptimizationService
+    from core.services.service_container import ServiceContainer
+    DEEP_OPTIMIZATION_AVAILABLE = True
+except ImportError:
+    DEEP_OPTIMIZATION_AVAILABLE = False
+    logger.warning("深度优化模块不可用")
+
 logger = logger
 
 
@@ -64,6 +73,11 @@ class ModernUnifiedPerformanceWidget(QWidget):
         # 初始化性能监控器
         self.performance_monitor = UnifiedPerformanceMonitor()
         logger.info("性能监控器初始化完成")
+        
+        # 初始化深度优化服务
+        self.optimization_service = None
+        self._init_deep_optimization_service()
+        
         self.performance_integrator = None
         self._has_smart_monitoring = False
 
@@ -250,6 +264,16 @@ class ModernUnifiedPerformanceWidget(QWidget):
         # 7. 系统健康检查 - 系统诊断和健康状态
         self.health_tab = ModernSystemHealthTab(self._health_checker)
         tab_widget.addTab(self.health_tab, "健康检查")
+
+        # 8. 深度优化控制面板 - 集成已注册的深度优化模块
+        if DEEP_OPTIMIZATION_AVAILABLE:
+            try:
+                from gui.widgets.performance.tabs.deep_optimization_tab import DeepOptimizationTab
+                self.deep_optimization_tab = DeepOptimizationTab(self.optimization_service)
+                tab_widget.addTab(self.deep_optimization_tab, "🚀 深度优化")
+                logger.info("深度优化标签页添加成功")
+            except ImportError as e:
+                logger.warning(f"无法创建深度优化标签页: {e}")
 
         return tab_widget
 
@@ -1010,6 +1034,77 @@ class ModernUnifiedPerformanceWidget(QWidget):
 
         except Exception as e:
             logger.error(f"强制刷新UI失败: {e}")
+            
+        # 更新标签页计数
+        self.tab_widget.setUpdatesEnabled(False)
+        old_count = self.tab_widget.count()
+        new_count = 8 + (1 if DEEP_OPTIMIZATION_AVAILABLE else 0)
+        
+        # 删除多余的标签页
+        while self.tab_widget.count() > new_count:
+            self.tab_widget.removeTab(new_count)
+        
+        # 如果当前tab被删除，回到第一个tab
+        if self.current_tab_index >= new_count:
+            self.current_tab_index = 0
+            self.tab_widget.setCurrentIndex(0)
+        
+        self.tab_widget.setUpdatesEnabled(True)
+        logger.info(f"强制刷新UI完成 - 标签页数量: {self.tab_widget.count()}")
+        
+    def _init_deep_optimization_service(self):
+        """初始化深度优化服务"""
+        if DEEP_OPTIMIZATION_AVAILABLE:
+            try:
+                # 创建优化配置
+                from core.advanced_optimization.unified_optimization_service import OptimizationConfig, OptimizationMode
+                config = OptimizationConfig(
+                    mode=OptimizationMode.BALANCED,
+                    enable_cache=True,
+                    enable_virtual_scroll=True,
+                    enable_realtime_data=True,
+                    enable_ai_recommendation=True,
+                    enable_responsive_ui=True,
+                    cache_size_mb=512,
+                    cache_ttl_seconds=3600,
+                    chunk_size=100,
+                    preload_threshold=5,
+                    max_connections=50,
+                    buffer_size=1024,
+                    recommendation_count=5,
+                    learning_window_days=30,
+                    screen_adaptation=True,
+                    touch_optimization=True
+                )
+                
+                # 初始化统一优化服务
+                self.optimization_service = UnifiedOptimizationService(config)
+                
+                # 异步初始化服务
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # 初始化优化服务
+                success = loop.run_until_complete(self.optimization_service.initialize())
+                if success:
+                    # 启动优化服务
+                    start_success = loop.run_until_complete(self.optimization_service.start())
+                    if start_success:
+                        logger.info("深度优化服务初始化成功")
+                    else:
+                        logger.warning("深度优化服务启动失败")
+                        self.optimization_service = None
+                else:
+                    logger.warning("深度优化服务初始化失败")
+                    self.optimization_service = None
+                
+                loop.close()
+                
+            except Exception as e:
+                logger.error(f"深度优化服务初始化失败: {e}")
+                self.optimization_service = None
+                logger.warning("将使用基础性能优化功能")
 
     def start_immediate_update(self):
         """启动立即更新"""

@@ -335,6 +335,12 @@ class MainMenuBar(QMenuBar):
             self.system_optimizer_action.setStatusTip("打开系统优化器")
             self.tools_menu.addAction(self.system_optimizer_action)
 
+            # 统一优化服务
+            self.unified_optimization_action = QAction("统一优化服务", self)
+            self.unified_optimization_action.setStatusTip("统一管理5个深度优化模块的GUI控制台")
+            self.unified_optimization_action.setShortcut("Ctrl+Shift+U")
+            self.tools_menu.addAction(self.unified_optimization_action)
+
             # WebGPU状态
             self.webgpu_status_action = QAction("WebGPU状态", self)
             self.webgpu_status_action.setStatusTip("查看WebGPU硬件加速状态")
@@ -988,6 +994,7 @@ class MainMenuBar(QMenuBar):
                 ('calculator_action', '_on_calculator'),
                 ('converter_action', '_on_converter'),
                 ('system_optimizer_action', '_on_system_optimizer'),
+                ('unified_optimization_action', '_on_unified_optimization'),
                 ('webgpu_status_action', 'show_webgpu_status'),
                 ('advanced_search_action', '_on_advanced_search'),
                 ('settings_action', '_on_settings'),
@@ -1278,7 +1285,7 @@ class MainMenuBar(QMenuBar):
                 f"增强版数据导入UI组件加载失败:\n{str(e)}\n\n请确保所有依赖项已正确安装。"
             )
             logger.error(f"增强版数据导入UI组件加载失败: {e}")
-
+            
         except Exception as e:
             QMessageBox.critical(
                 self.parent(),
@@ -1286,6 +1293,46 @@ class MainMenuBar(QMenuBar):
                 f"启动增强版数据导入系统失败:\n{str(e)}"
             )
             logger.error(f"启动增强版数据导入系统失败: {e}")
+
+    def _on_unified_optimization(self):
+        """处理统一优化服务菜单点击"""
+        try:
+            # 导入并显示统一优化服务对话框
+            from gui.dialogs.unified_optimization_dialog import UnifiedOptimizationDialog
+            
+            # 获取主窗口
+            main_window = self.parent()
+            if not main_window:
+                QMessageBox.warning(
+                    self,
+                    "警告",
+                    "无法获取主窗口"
+                )
+                return
+            
+            # 创建并显示对话框
+            dialog = UnifiedOptimizationDialog(main_window)
+            dialog.exec_()
+            
+            logger.info("统一优化服务管理对话框已打开")
+            
+        except ImportError as e:
+            QMessageBox.critical(
+                self.parent(),
+                "导入错误",
+                f"无法加载统一优化服务模块:\n{str(e)}\n\n请检查模块文件是否存在。"
+            )
+            logger.error(f"统一优化服务模块导入失败: {e}")
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"打开统一优化服务管理对话框失败:\n{str(e)}"
+            )
+            logger.error(f"打开统一优化服务管理对话框失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def _on_duckdb_import(self):
         """处理DuckDB数据导入菜单点击"""
@@ -1297,6 +1344,8 @@ class MainMenuBar(QMenuBar):
                 "提示",
                 "建议使用增强版智能导入系统，它包含了所有DuckDB功能并增加了AI优化功能。"
             )
+
+            logger.info("DuckDB导入功能被重定向到增强版导入系统")
 
         except Exception as e:
             QMessageBox.critical(

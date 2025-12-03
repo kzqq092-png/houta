@@ -14,6 +14,47 @@ import uuid
 from ..plugin_types import AssetType
 
 
+class EventType(Enum):
+    """事件类型枚举"""
+    # 图表相关事件
+    CHART_CREATED = "chart_created"
+    CHART_UPDATED = "chart_updated"
+    CHART_DATA_UPDATED = "chart_data_updated"
+    CHART_REMOVED = "chart_removed"
+    CHART_RESIZED = "chart_resized"
+    
+    # 数据相关事件
+    DATA_LOADED = "data_loaded"
+    DATA_UPDATED = "data_updated"
+    DATA_ERROR = "data_error"
+    REAL_TIME_DATA = "real_time_data"
+    
+    # 性能相关事件
+    PERFORMANCE_OPTIMIZED = "performance_optimized"
+    PERFORMANCE_DEGRADED = "performance_degraded"
+    PERFORMANCE_METRICS_UPDATED = "performance_metrics_updated"
+    
+    # UI相关事件
+    UI_UPDATE = "ui_update"
+    THEME_CHANGED = "theme_changed"
+    ASSET_SELECTED = "asset_selected"
+    
+    # 交易相关事件
+    TRADE_EXECUTED = "trade_executed"
+    ORDER_PLACED = "order_placed"
+    POSITION_UPDATED = "position_updated"
+    
+    # AI/ML相关事件
+    MODEL_TRAINED = "model_trained"
+    PREDICTION_MADE = "prediction_made"
+    ACCURACY_UPDATED = "accuracy_updated"
+    
+    # 系统事件
+    SYSTEM_ERROR = "system_error"
+    SYSTEM_WARNING = "system_warning"
+    SYSTEM_INFO = "system_info"
+
+
 @dataclass
 class BaseEvent(ABC):
     """
@@ -823,3 +864,7 @@ class PredictionAccuracyUpdatedEvent(BaseEvent):
             'model_version_id': self.model_version_id,
             'prediction_type': self.prediction_type
         })
+
+
+# 为兼容性提供Event别名
+Event = BaseEvent

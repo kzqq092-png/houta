@@ -1,0 +1,172 @@
+{
+  "test_suite": "深度优化系统",
+  "total_tests": 9,
+  "passed_tests": 9,
+  "failed_tests": 0,
+  "overall_score": 100.0,
+  "performance_metrics": [
+    {
+      "module_name": "渲染性能优化",
+      "test_name": "大数据虚拟滚动",
+      "execution_time": 0.07302403450012207,
+      "memory_usage_mb": 1.234375,
+      "cpu_usage_percent": 6.7,
+      "throughput": 1369412.1488156456,
+      "success_rate": 1.0,
+      "additional_metrics": {
+        "data_size": 100000,
+        "chunk_size": 1000,
+        "rendering_fps": 60,
+        "memory_efficiency": 0.85
+      }
+    },
+    {
+      "module_name": "实时数据处理",
+      "test_name": "WebSocket消息流",
+      "execution_time": 7.347885608673096,
+      "memory_usage_mb": 338.80078125,
+      "cpu_usage_percent": 14.7,
+      "throughput": 1360.9357211816791,
+      "success_rate": 1.0,
+      "additional_metrics": {
+        "total_messages": 10000,
+        "processed_messages": 10000,
+        "processing_latency_ms": 0.7347885608673095,
+        "message_success_rate": 1.0,
+        "compression_ratio": 0.7
+      }
+    },
+    {
+      "module_name": "智能缓存",
+      "test_name": "ML驱动缓存",
+      "execution_time": 2.8055856227874756,
+      "memory_usage_mb": 0,
+      "cpu_usage_percent": 14.6,
+      "throughput": 1782.159118363415,
+      "success_rate": 0.4698,
+      "additional_metrics": {
+        "total_operations": 5000,
+        "cache_hits": 2349,
+        "cache_misses": 2651,
+        "hit_rate": 0.4698,
+        "preload_efficiency": 0.8,
+        "memory_usage_mb": 50.0
+      }
+    },
+    {
+      "module_name": "响应式界面",
+      "test_name": "mobile适配",
+      "execution_time": 0.05088400840759277,
+      "memory_usage_mb": 0.41015625,
+      "cpu_usage_percent": 32.4,
+      "throughput": 19.65253979186873,
+      "success_rate": 1.0,
+      "additional_metrics": {
+        "screen_type": "mobile",
+        "adaptation_time_ms": 50.0,
+        "layout_mode": "responsive",
+        "interaction_mode": "touch",
+        "elements_adapted": 25,
+        "responsive_score": 0.95
+      }
+    },
+    {
+      "module_name": "响应式界面",
+      "test_name": "tablet适配",
+      "execution_time": 0.030307292938232422,
+      "memory_usage_mb": 2.6875,
+      "cpu_usage_percent": 33.3,
+      "throughput": 32.99535864315046,
+      "success_rate": 1.0,
+      "additional_metrics": {
+        "screen_type": "tablet",
+        "adaptation_time_ms": 30.0,
+        "layout_mode": "responsive",
+        "interaction_mode": "touch",
+        "elements_adapted": 50,
+        "responsive_score": 0.95
+      }
+    },
+    {
+      "module_name": "响应式界面",
+      "test_name": "desktop适配",
+      "execution_time": 0.02108454704284668,
+      "memory_usage_mb": 2.140625,
+      "cpu_usage_percent": 33.3,
+      "throughput": 47.42809973426811,
+      "success_rate": 1.0,
+      "additional_metrics": {
+        "screen_type": "desktop",
+        "adaptation_time_ms": 20.0,
+        "layout_mode": "responsive",
+        "interaction_mode": "mouse",
+        "elements_adapted": 50,
+        "responsive_score": 0.95
+      }
+    },
+    {
+      "module_name": "响应式界面",
+      "test_name": "ultra_wide适配",
+      "execution_time": 0.02084803581237793,
+      "memory_usage_mb": 1.2109375,
+      "cpu_usage_percent": 20.0,
+      "throughput": 47.966149377308646,
+      "success_rate": 1.0,
+      "additional_metrics": {
+        "screen_type": "ultra_wide",
+        "adaptation_time_ms": 20.0,
+        "layout_mode": "responsive",
+        "interaction_mode": "mouse",
+        "elements_adapted": 50,
+        "responsive_score": 0.95
+      }
+    },
+    {
+      "module_name": "AI推荐",
+      "test_name": "智能推荐算法",
+      "execution_time": 4.140687465667725,
+      "memory_usage_mb": 0,
+      "cpu_usage_percent": 10.2,
+      "throughput": 48.30115811886037,
+      "success_rate": 1.0,
+      "additional_metrics": {
+        "user_activities_processed": 1000,
+        "recommendations_generated": 200,
+        "avg_confidence": 0.7661854979483209,
+        "avg_expected_satisfaction": 0.8059585939160041,
+        "learning_accuracy": 0.85,
+        "personalization_score": 0.78
+      }
+    },
+    {
+      "module_name": "系统集成",
+      "test_name": "并发压力测试",
+      "execution_time": 0.271709680557251,
+      "memory_usage_mb": 0,
+      "cpu_usage_percent": 21.7,
+      "throughput": 7360.797730497449,
+      "success_rate": 1.0,
+      "additional_metrics": {
+        "concurrent_operations": 100,
+        "total_operations": 2000,
+        "avg_data_per_operation": 1000.0,
+        "cache_hit_rate": 0.809,
+        "system_stability": 0.98,
+        "concurrent_performance": "excellent"
+      }
+    }
+  ],
+  "recommendations": [
+    "实时数据处理: 执行时间过长(7.3s)，建议进一步优化",
+    "实时数据处理: 内存使用较高(338.8MB)，建议优化内存管理",
+    "响应式界面: 吞吐量偏低(20/s)，建议优化处理流程",
+    "响应式界面: 吞吐量偏低(33/s)，建议优化处理流程",
+    "响应式界面: 吞吐量偏低(47/s)，建议优化处理流程",
+    "响应式界面: 吞吐量偏低(48/s)，建议优化处理流程",
+    "AI推荐: 吞吐量偏低(48/s)，建议优化处理流程",
+    "性能最佳模块: 渲染性能优化",
+    "建议重点优化: 响应式界面"
+  ],
+  "error_details": [],
+  "timestamp": 1764780815.5915525
+}

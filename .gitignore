@@ -38,3 +38,5 @@ data/strategy.db-shm
 .claude/*
 .trae/*
 nul
+.serena/.gitignore
+.gitignore

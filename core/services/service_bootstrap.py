@@ -949,7 +949,7 @@ class ServiceBootstrap:
             logger.error(traceback.format_exc())
 
     def _register_advanced_services(self) -> None:
-        """注册高级服务（GPU加速、分布式等）"""
+        """注册高级服务（GPU加速、分布式、深度优化功能等）"""
         logger.info("注册高级服务...")
 
         # GPU加速服务
@@ -1009,6 +1009,299 @@ class ServiceBootstrap:
             logger.warning(f"分布式服务模块不可用，跳过注册: {e}")
         except Exception as e:
             logger.error(f"❌ 分布式服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # 🚀 注册5个深度优化功能模块
+        self._register_optimization_modules()
+
+    def _register_optimization_modules(self) -> None:
+        """注册5个深度优化功能模块"""
+        logger.info("🚀 开始注册5个深度优化功能模块...")
+        
+        try:
+            # 1. 注册智能缓存管理器
+            self._register_intelligent_cache()
+            
+            # 2. 注册组件虚拟化
+            self._register_component_virtualization()
+            
+            # 3. 注册WebSocket客户端
+            self._register_websocket_client()
+            
+            # 4. 注册智能图表推荐器
+            self._register_smart_chart_recommender()
+            
+            # 5. 注册响应式界面适配器
+            self._register_responsive_adapter()
+            
+            logger.info("✅ 5个深度优化功能模块注册完成")
+            
+        except Exception as e:
+            logger.error(f"❌ 深度优化模块注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _register_intelligent_cache(self) -> None:
+        """注册智能缓存管理器"""
+        try:
+            from core.advanced_optimization.cache.intelligent_cache import IntelligentCache
+            
+            def create_intelligent_cache():
+                """创建智能缓存服务实例"""
+                cache = IntelligentCache(
+                    max_memory_mb=512,
+                    default_ttl=3600,
+                    enable_ml_prediction=True
+                )
+                return cache
+            
+            # 按类型注册（主注册）
+            self.service_container.register_factory(
+                IntelligentCache,
+                create_intelligent_cache,
+                scope=ServiceScope.SINGLETON
+            )
+            
+            # 添加名称注册，方便UI按名称访问
+            self.service_container.register_factory(
+                IntelligentCache,
+                create_intelligent_cache,
+                scope=ServiceScope.SINGLETON,
+                name='intelligent_cache'
+            )
+            
+            # 添加常用名称
+            self.service_container.register_factory(
+                IntelligentCache,
+                create_intelligent_cache,
+                scope=ServiceScope.SINGLETON,
+                name='cache_manager'
+            )
+            
+            logger.info("✅ 智能缓存管理器注册完成（类型 + 名称 'intelligent_cache' + 'cache_manager'）")
+            
+        except ImportError as e:
+            logger.warning(f"智能缓存模块不可用，跳过注册: {e}")
+        except Exception as e:
+            logger.error(f"❌ 智能缓存管理器注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _register_component_virtualization(self) -> None:
+        """注册组件虚拟化"""
+        try:
+            from core.advanced_optimization.performance.virtualization import VirtualScrollRenderer
+            
+            def create_component_virtualization():
+                """创建组件虚拟化服务实例"""
+                virtualization = VirtualScrollRenderer()
+                return virtualization
+            
+            # 按类型注册（主注册）
+            self.service_container.register_factory(
+                VirtualScrollRenderer,
+                create_component_virtualization,
+                scope=ServiceScope.SINGLETON
+            )
+            
+            # 添加名称注册
+            self.service_container.register_factory(
+                VirtualScrollRenderer,
+                create_component_virtualization,
+                scope=ServiceScope.SINGLETON,
+                name='component_virtualization'
+            )
+            
+            logger.info("✅ 组件虚拟化注册完成（类型 + 名称 'component_virtualization'）")
+            
+        except ImportError as e:
+            logger.warning(f"组件虚拟化模块不可用，跳过注册: {e}")
+        except Exception as e:
+            logger.error(f"❌ 组件虚拟化注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _register_websocket_client(self) -> None:
+        """注册WebSocket客户端"""
+        try:
+            from core.advanced_optimization.timing.websocket_client import RealTimeDataProcessor
+            
+            def create_websocket_client():
+                """创建WebSocket客户端服务实例"""
+                client = RealTimeDataProcessor()
+                return client
+            
+            # 按类型注册（主注册）
+            self.service_container.register_factory(
+                RealTimeDataProcessor,
+                create_websocket_client,
+                scope=ServiceScope.SINGLETON
+            )
+            
+            # 添加名称注册
+            self.service_container.register_factory(
+                RealTimeDataProcessor,
+                create_websocket_client,
+                scope=ServiceScope.SINGLETON,
+                name='websocket_client'
+            )
+            
+            # 添加常用名称
+            self.service_container.register_factory(
+                RealTimeDataProcessor,
+                create_websocket_client,
+                scope=ServiceScope.SINGLETON,
+                name='ws_client'
+            )
+            
+            logger.info("✅ WebSocket客户端注册完成（类型 + 名称 'websocket_client' + 'ws_client'）")
+            
+        except ImportError as e:
+            logger.warning(f"WebSocket客户端模块不可用，跳过注册: {e}")
+        except Exception as e:
+            logger.error(f"❌ WebSocket客户端注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _register_smart_chart_recommender(self) -> None:
+        """注册智能图表推荐器"""
+        try:
+            from core.advanced_optimization.ai.smart_chart_recommender import UserBehaviorAnalyzer
+            
+            def create_smart_chart_recommender():
+                """创建智能图表推荐器服务实例"""
+                recommender = UserBehaviorAnalyzer()
+                return recommender
+            
+            # 按类型注册（主注册）
+            self.service_container.register_factory(
+                UserBehaviorAnalyzer,
+                create_smart_chart_recommender,
+                scope=ServiceScope.SINGLETON
+            )
+            
+            # 添加名称注册
+            self.service_container.register_factory(
+                UserBehaviorAnalyzer,
+                create_smart_chart_recommender,
+                scope=ServiceScope.SINGLETON,
+                name='smart_chart_recommender'
+            )
+            
+            # 添加常用名称
+            self.service_container.register_factory(
+                UserBehaviorAnalyzer,
+                create_smart_chart_recommender,
+                scope=ServiceScope.SINGLETON,
+                name='chart_recommender'
+            )
+            
+            logger.info("✅ 智能图表推荐器注册完成（类型 + 名称 'smart_chart_recommender' + 'chart_recommender'）")
+            
+        except ImportError as e:
+            logger.warning(f"智能图表推荐器模块不可用，跳过注册: {e}")
+        except Exception as e:
+            logger.error(f"❌ 智能图表推荐器注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _register_responsive_adapter(self) -> None:
+        """注册响应式界面适配器"""
+        try:
+            from core.advanced_optimization.ui.responsive_adapter import ResponsiveLayoutManager
+            
+            def create_responsive_adapter():
+                """创建响应式界面适配器服务实例"""
+                adapter = ResponsiveLayoutManager()
+                return adapter
+            
+            # 按类型注册（主注册）
+            self.service_container.register_factory(
+                ResponsiveLayoutManager,
+                create_responsive_adapter,
+                scope=ServiceScope.SINGLETON
+            )
+            
+            # 添加名称注册
+            self.service_container.register_factory(
+                ResponsiveLayoutManager,
+                create_responsive_adapter,
+                scope=ServiceScope.SINGLETON,
+                name='responsive_adapter'
+            )
+            
+            # 添加常用名称
+            self.service_container.register_factory(
+                ResponsiveLayoutManager,
+                create_responsive_adapter,
+                scope=ServiceScope.SINGLETON,
+                name='ui_adapter'
+            )
+            
+            logger.info("✅ 响应式界面适配器注册完成（类型 + 名称 'responsive_adapter' + 'ui_adapter'）")
+            
+        except ImportError as e:
+            logger.warning(f"响应式界面适配器模块不可用，跳过注册: {e}")
+        except Exception as e:
+            logger.error(f"❌ 响应式界面适配器注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # 🚀 注册统一优化服务接口
+        self._register_unified_optimization_service()
+
+    def _register_unified_optimization_service(self) -> None:
+        """注册统一优化服务接口"""
+        try:
+            from ..advanced_optimization.unified_optimization_service import UnifiedOptimizationService, OptimizationMode, OptimizationConfig
+            
+            def create_unified_optimization_service():
+                """创建统一优化服务实例"""
+                config = OptimizationConfig(
+                    mode=OptimizationMode.BALANCED,
+                    enable_cache=True,
+                    enable_virtual_scroll=True,
+                    enable_realtime_data=True,
+                    enable_ai_recommendation=True,
+                    enable_responsive_ui=True,
+                    cache_size_mb=512,
+                    cache_ttl_seconds=3600,
+                    chunk_size=100,
+                    preload_threshold=5,
+                    max_connections=50,
+                    buffer_size=1024,
+                    recommendation_count=5,
+                    learning_window_days=30,
+                    screen_adaptation=True,
+                    touch_optimization=True
+                )
+                
+                service = UnifiedOptimizationService(config)
+                return service
+            
+            # 按类型注册（主注册）
+            self.service_container.register_factory(
+                UnifiedOptimizationService,
+                create_unified_optimization_service,
+                scope=ServiceScope.SINGLETON
+            )
+            
+            # 添加名称注册，方便UI按名称访问
+            self.service_container.register_factory(
+                UnifiedOptimizationService,
+                create_unified_optimization_service,
+                scope=ServiceScope.SINGLETON,
+                name='unified_optimization_service'
+            )
+            
+            # 添加常用名称
+            self.service_container.register_factory(
+                UnifiedOptimizationService,
+                create_unified_optimization_service,
+                scope=ServiceScope.SINGLETON,
+                name='optimization_service'
+            )
+            
+            logger.info("✅ 统一优化服务接口注册完成（类型 + 名称 'unified_optimization_service' + 'optimization_service'）")
+            
+        except ImportError as e:
+            logger.warning(f"统一优化服务模块不可用，跳过注册: {e}")
+        except Exception as e:
+            logger.error(f"❌ 统一优化服务接口注册失败: {e}")
             logger.error(traceback.format_exc())
 
     def _register_plugin_manager_early(self) -> None:
