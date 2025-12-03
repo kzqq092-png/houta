@@ -1,3 +1,4 @@
+from math import log
 from PyQt5.QtCore import QObject, pyqtSignal
 import numpy as np
 import pandas as pd
@@ -9,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
-import warnings
+import time
 from loguru import logger
 
 # 配置中文字体
@@ -79,14 +80,14 @@ class ChartRenderer(QObject):
         try:
             view_data = self._get_view_data(data)
             plot_data = self._downsample_data(view_data)
-            
+
             # ✅ 修复：支持datetime X轴
             if use_datetime_axis and x is None and 'datetime' in plot_data.columns:
                 try:
                     # 使用datetime作为X轴
                     datetime_series = pd.to_datetime(plot_data['datetime'])
                     x = mdates.date2num(datetime_series)
-                    
+
                     # 设置智能日期格式化
                     formatter, locator = self._get_smart_date_formatter(plot_data, 'datetime')
                     if formatter and locator:
@@ -99,12 +100,12 @@ class ChartRenderer(QObject):
                     logger.warning(f"⚠️ datetime X轴设置失败，回退到数字索引: {e}")
                     use_datetime_axis = False
                     x = None
-            
+
             # 如果use_datetime_axis为False或x为None，使用数字索引
             if x is None:
                 x = np.arange(len(plot_data))
                 logger.debug(f"使用数字索引X轴，数据长度: {len(plot_data)}")
-            
+
             self._render_candlesticks_efficient(ax, plot_data, style or {}, x, use_datetime_axis)
             # ✅ 性能优化P1: 移除_optimize_display()调用，由调用方统一设置样式
             # 避免在每次渲染时重复设置样式，减少开销
@@ -118,7 +119,7 @@ class ChartRenderer(QObject):
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
         alpha = style.get('alpha', 1.0)
-        
+
         # 横坐标
         if x is not None:
             xvals = x
@@ -136,7 +137,7 @@ class ChartRenderer(QObject):
         else:
             # 默认使用数字索引
             xvals = np.arange(len(data))
-        
+
         # 计算蜡烛宽度（根据X轴类型调整）
         if use_datetime_axis and len(xvals) > 1:
             # datetime X轴：根据时间间隔计算宽度
@@ -145,7 +146,7 @@ class ChartRenderer(QObject):
         else:
             # 数字索引：固定宽度
             candle_width = 0.3
-        
+
         # ✅ 性能优化：使用完全向量化的numpy操作，提升10-100倍性能
         # 提取数据为numpy数组（避免iterrows()的性能开销）
         opens = data['open'].values
@@ -153,16 +154,16 @@ class ChartRenderer(QObject):
         highs = data['high'].values
         lows = data['low'].values
         n = len(data)
-        
+
         # 向量化计算left和right
         lefts = xvals - candle_width / 2
         rights = xvals + candle_width / 2
-        
+
         # 向量化判断涨跌
         is_up = closes >= opens
         up_indices = np.where(is_up)[0]
         down_indices = np.where(~is_up)[0]
-        
+
         # ✅ 性能优化：完全向量化构建，直接使用numpy数组（PolyCollection和LineCollection都支持）
         def build_candle_verts(indices):
             """批量构建蜡烛图顶点，返回numpy数组"""
@@ -179,10 +180,10 @@ class ChartRenderer(QObject):
             verts[:, 3, 0] = rights[idx_arr]  # 右下x
             verts[:, 3, 1] = opens[idx_arr]  # 右下y
             return verts  # 直接返回numpy数组，PolyCollection支持
-        
+
         verts_up = build_candle_verts(up_indices)
         verts_down = build_candle_verts(down_indices)
-        
+
         # 批量构建影线段（直接使用numpy数组）
         def build_shadow_segments(indices):
             """批量构建影线段，返回numpy数组"""
@@ -195,10 +196,10 @@ class ChartRenderer(QObject):
             segments[:, 1, 0] = xvals[idx_arr]  # 终点x
             segments[:, 1, 1] = highs[idx_arr]  # 终点y
             return segments  # 直接返回numpy数组，LineCollection支持
-        
+
         segments_up = build_shadow_segments(up_indices)
         segments_down = build_shadow_segments(down_indices)
-        
+
         # 修改：空心蜡烛图样式，只有边框无填充
         # ✅ 性能优化：检查数组长度而不是转换为bool（避免numpy警告）
         if len(verts_up) > 0:
@@ -232,7 +233,7 @@ class ChartRenderer(QObject):
         try:
             view_data = self._get_view_data(data)
             plot_data = self._downsample_data(view_data)
-            
+
             # ✅ 修复：支持datetime X轴（与K线图保持一致）
             if use_datetime_axis and x is None and 'datetime' in plot_data.columns:
                 try:
@@ -242,11 +243,14 @@ class ChartRenderer(QObject):
                     logger.warning(f"⚠️ 成交量datetime X轴设置失败，回退到数字索引: {e}")
                     use_datetime_axis = False
                     x = None
-            
+
             if x is None:
                 x = np.arange(len(plot_data))
-            
+            start_time = time.time()
             self._render_volume_efficient(ax, plot_data, style or {}, x, use_datetime_axis)
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ _render_volume_efficient，耗时: {render_time:.2f}ms")
+
             # ✅ 性能优化P1: 移除_optimize_display()调用，由调用方统一设置样式
             # 避免在每次渲染时重复设置样式，减少开销
             # self._optimize_display(ax, use_datetime_axis)  # 已移除，在rendering_mixin中统一设置
@@ -259,7 +263,7 @@ class ChartRenderer(QObject):
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
         alpha = style.get('volume_alpha', 0.5)
-        
+
         # 横坐标（与K线图保持一致）
         if x is not None:
             xvals = x
@@ -274,30 +278,30 @@ class ChartRenderer(QObject):
             xvals = mdates.date2num(data.index.to_pydatetime())
         else:
             xvals = np.arange(len(data))
-        
+
         # 计算柱状图宽度（与K线图保持一致）
         if use_datetime_axis and len(xvals) > 1:
             avg_interval = np.mean(np.diff(xvals))
             bar_width = max(0.3, avg_interval * 0.6)
         else:
             bar_width = 0.3
-        
+
         # ✅ 性能优化：使用完全向量化的numpy操作，提升10-100倍性能
         # 提取数据为numpy数组（避免iterrows()的性能开销）
         volumes = data['volume'].values
         closes = data['close'].values
         opens = data['open'].values
         n = len(data)
-        
+
         # 向量化计算left和right
         lefts = xvals - bar_width / 2
         rights = xvals + bar_width / 2
-        
+
         # 向量化判断涨跌
         is_up = closes >= opens
         up_indices = np.where(is_up)[0]
         down_indices = np.where(~is_up)[0]
-        
+
         # ✅ 性能优化：完全向量化构建，直接使用numpy数组（PolyCollection支持）
         def build_volume_verts(indices):
             """批量构建成交量柱状图顶点，返回numpy数组"""
@@ -314,7 +318,7 @@ class ChartRenderer(QObject):
             verts[:, 3, 0] = rights[idx_arr]     # 右下x
             verts[:, 3, 1] = 0                   # 右下y (底部)
             return verts  # 直接返回numpy数组，PolyCollection支持
-        
+
         verts_up = build_volume_verts(up_indices)
         verts_down = build_volume_verts(down_indices)
         # ✅ 性能优化：检查数组长度而不是转换为bool（避免numpy警告）
@@ -398,23 +402,23 @@ class ChartRenderer(QObject):
 
     def _get_smart_date_formatter(self, data: pd.DataFrame, datetime_col: str = 'datetime') -> Tuple[mdates.DateFormatter, mdates.AutoDateLocator]:
         """根据时间跨度智能选择日期格式化器
-        
+
         Args:
             data: K线数据DataFrame
             datetime_col: datetime列名
-            
+
         Returns:
             Tuple[DateFormatter, AutoDateLocator]: 日期格式化器和定位器
         """
         try:
             if datetime_col not in data.columns:
                 return None, None
-                
+
             # 获取时间范围
             datetime_series = pd.to_datetime(data[datetime_col])
             time_span = datetime_series.max() - datetime_series.min()
             days = time_span.days
-            
+
             # 根据时间跨度选择格式化器
             if days <= 7:
                 # 7天内：显示 月-日 时:分
@@ -452,7 +456,7 @@ class ChartRenderer(QObject):
                 # 3年以上：显示 年-月
                 formatter = mdates.DateFormatter('%Y-%m')
                 locator = mdates.MonthLocator(interval=6)
-            
+
             return formatter, locator
         except Exception as e:
             logger.warning(f"智能日期格式化失败: {e}，使用默认格式")

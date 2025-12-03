@@ -1304,14 +1304,30 @@ class ModelTrainingService(BaseService):
                     from .unified_data_manager import UnifiedDataManager
                     data_manager = self._service_container.resolve(UnifiedDataManager)
                     if data_manager:
-                        kdata = data_manager.get_kdata(symbol, start_date, end_date)
+                        # 使用get_kdata_from_source方法，支持start_date和end_date参数
+                        kdata = data_manager.get_kdata_from_source(
+                            stock_code=symbol,
+                            start_date=start_date,
+                            end_date=end_date,
+                            period='D'  # 默认使用日线数据
+                        )
                         df = self._convert_to_dataframe(kdata)
+                        if df is not None and not df.empty:
+                            logger.info(f"成功获取{symbol}的K线数据，记录数: {len(df)}")
+                        else:
+                            logger.warning(f"获取{symbol}的K线数据为空")
                 except Exception as data_err:
-                    logger.warning(f"从数据管理器获取数据失败: {data_err}")
+                    logger.error(f"从数据管理器获取数据失败: {data_err}", exc_info=True)
 
             if df is None or len(df.index) < min_samples:
-                logger.warning(
-                    f"K线数据不足或缺失(符号:{symbol or 'N/A'})，使用合成数据训练 {model_type} 模型")
+                if symbol:
+                    reason = f"获取K线数据失败或数据量不足(当前:{len(df.index) if df is not None else 0}条, 需要:{min_samples}条)"
+                    logger.warning(
+                        f"{reason} - 符号:{symbol}, 日期范围:{start_date}至{end_date}，使用合成数据训练 {model_type} 模型")
+                else:
+                    logger.warning(
+                        f"未提供股票代码(symbol)，无法获取真实K线数据，使用合成数据训练 {model_type} 模型。"
+                        f"请在训练配置中提供'data.symbol'参数。")
                 features, targets = self._generate_synthetic_training_data(model_type, config)
                 synthetic_returns = targets.astype(np.float32) if np is not None else targets
                 return {

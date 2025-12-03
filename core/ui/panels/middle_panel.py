@@ -531,7 +531,7 @@ class ChartCanvas(QWidget):
                                                        time.time() - self.loading_start_time, PerformanceCategory.UI)
         else:
             # 使用普通更新
-            self.update_chart({'kdata': kdata})
+            self.update_chart({'kdata': kdata, 'indicators_data': {}})
 
     def update_volume(self, kdata):
         """更新成交量数据（第二阶段）"""
@@ -545,7 +545,7 @@ class ChartCanvas(QWidget):
                                                        time.time() - self.loading_start_time, PerformanceCategory.UI)
         else:
             # 使用普通更新
-            self.update_chart({'kdata': kdata})
+            self.update_chart({'kdata': kdata, 'indicators_data': {}})
 
     def update_indicators(self, kdata, indicators):
         """更新指标数据（第三阶段）"""
@@ -559,7 +559,7 @@ class ChartCanvas(QWidget):
                                                        time.time() - self.loading_start_time, PerformanceCategory.UI)
         else:
             # 使用普通更新
-            chart_data = {'kdata': kdata, 'indicators': indicators}
+            chart_data = {'kdata': kdata, 'indicators_data': {}}  # builtin指标会自动计算
             self.update_chart(chart_data)
 
     def _on_loading_progress(self, progress, stage_name):
@@ -1514,8 +1514,96 @@ class MiddlePanel(BasePanel):
     @pyqtSlot(object)
     def on_indicator_changed(self, event: IndicatorChangedEvent) -> None:
         """响应指标变化事件"""
-        # 刷新图表以应用新的指标
-        self._refresh_chart()
+        try:
+            # 从事件中提取指标列表
+            selected_indicators = event.selected_indicators if hasattr(event, 'selected_indicators') else event.data.get('selected_indicators', [])
+            logger.info(f"MiddlePanel收到指标变更事件: {selected_indicators}")
+
+            # 获取chart_widget（注意：self.chart_canvas是ChartCanvas容器，其内部有真正的chart_widget）
+            chart_canvas = self.get_widget('chart_canvas')
+            if not chart_canvas:
+                logger.warning("无法获取chart_canvas，跳过指标更新")
+                return
+
+            # 从ChartCanvas中获取真正的chart_widget
+            if hasattr(chart_canvas, 'chart_widget'):
+                chart_widget = chart_canvas.chart_widget
+                logger.info(f"✅ 从ChartCanvas中获取到实际的chart_widget")
+            else:
+                # 如果ChartCanvas没有chart_widget属性，尝试直接使用chart_canvas
+                logger.warning("ChartCanvas没有chart_widget属性，尝试直接使用chart_canvas")
+                chart_widget = chart_canvas
+
+            if not chart_widget:
+                logger.warning("无法获取有效的chart_widget，跳过指标更新")
+                return
+
+            # 定义内置指标列表（这些指标在indicator_mixin中有专门处理）
+            builtin_indicators = {
+                'MA', 'MACD', 'RSI', 'BOLL', 'KDJ', 'CCI', 'OBV'
+            }
+
+            # 定义talib指标的默认参数
+            talib_default_params = {
+                'ADOSC': {'fastperiod': 3, 'slowperiod': 10},
+                'AROON': {'timeperiod': 25},
+                'AROONOSC': {'timeperiod': 25},
+                'ATR': {'timeperiod': 14},
+                'BBANDS': {'timeperiod': 5, 'nbdevup': 2, 'nbdevdn': 2},
+                'CCI': {'timeperiod': 14},
+                'CMO': {'timeperiod': 14},
+                'DX': {'timeperiod': 14},
+                'KAMA': {'timeperiod': 10},
+                'MFI': {'timeperiod': 14},
+                'NATR': {'timeperiod': 14},
+                'STOCH': {'fastk_period': 5, 'slowk_period': 3, 'slowd_period': 3},
+                'STOCHF': {'fastk_period': 5, 'fastd_period': 3},
+                'STOCHRSI': {'timeperiod': 14, 'fastk_period': 5, 'fastd_period': 3},
+                'TRANGE': {'timeperiod': 14},
+                'WILLR': {'timeperiod': 14},
+            }
+
+            # 将指标名称转换为完整格式，并根据名称智能判断group
+            indicator_list = []
+            for ind_name in selected_indicators:
+                # 如果已经是字典格式，直接使用
+                if isinstance(ind_name, dict):
+                    indicator_list.append(ind_name)
+                else:
+                    # 否则转换为标准格式
+                    # 根据指标名称判断group：builtin或talib
+                    group = 'builtin' if ind_name in builtin_indicators else 'talib'
+                    # 为talib指标提供默认参数
+                    params = talib_default_params.get(ind_name, {}) if group == 'talib' else {}
+                    indicator_list.append({
+                        "name": ind_name,
+                        "params": params,
+                        "group": group
+                    })
+
+            logger.info(f"转换后的指标列表: {[ind['name'] for ind in indicator_list]}")
+            logger.info(f"指标分组信息: {[(ind['name'], ind['group']) for ind in indicator_list]}")
+
+            # 更新chart_widget的active_indicators
+            if hasattr(chart_widget, 'on_indicator_selected'):
+                chart_widget.on_indicator_selected(indicator_list)
+                logger.info(f"✅ 已通过on_indicator_selected更新主图指标")
+            elif hasattr(chart_widget, 'active_indicators'):
+                chart_widget.active_indicators = indicator_list
+                # 如果有current_kdata，触发图表更新
+                if hasattr(chart_widget, 'current_kdata') and chart_widget.current_kdata is not None:
+                    chart_widget.update_chart({
+                        'kdata': chart_widget.current_kdata,
+                        'indicators_data': {}  # 传递空的indicators_data，因为builtin指标会自己计算
+                    })
+                    logger.info(f"✅ 已直接设置active_indicators并更新主图")
+            else:
+                logger.warning("chart_widget没有on_indicator_selected或active_indicators属性")
+
+        except Exception as e:
+            logger.error(f"处理指标变更事件失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def on_stock_selected(self, event: StockSelectedEvent) -> None:
         """处理股票选择事件"""

@@ -67,9 +67,14 @@ class IndicatorMixin:
     def _render_indicators(self, kdata: pd.DataFrame, x=None):
         """渲染技术指标，所有指标与K线对齐，节假日无数据自动跳过，X轴为等距序号。"""
         try:
-
-            indicators = getattr(self, 'active_indicators', [])
+            logger.info(f"🎨 _render_indicators开始执行")
+            indicators = getattr(self, 'active_indicators', None)
+            # 如果active_indicators为None，使用空列表
+            if indicators is None:
+                indicators = []
+            logger.info(f"🎨 获取到active_indicators: {len(indicators) if indicators else 0}个指标")
             if not indicators:
+                logger.warning(f"❌ active_indicators为空或不存在，_render_indicators直接返回")
                 return
 
             if x is None:
@@ -191,9 +196,40 @@ class IndicatorMixin:
                             # 如果name是中文名称，需要转换为英文名称
                             english_name = get_indicator_english_name(name)
 
+                            # 为某些需要特定参数的指标提供默认参数
+                            final_params = params.copy() if params else {}
+
+                            # 定义各指标的默认参数（TA-Lib要求）
+                            default_params_map = {
+                                'ADOSC': {'fastperiod': 3, 'slowperiod': 10},  # AD Oscillator
+                                'AROON': {'timeperiod': 25},  # Aroon
+                                'AROONOSC': {'timeperiod': 25},  # Aroon Oscillator
+                                'ATR': {'timeperiod': 14},  # Average True Range
+                                'BBANDS': {'timeperiod': 5, 'nbdevup': 2, 'nbdevdn': 2},  # Bollinger Bands
+                                'CCI': {'timeperiod': 14},  # Commodity Channel Index
+                                'CMO': {'timeperiod': 14},  # Chande Momentum Oscillator
+                                'DX': {'timeperiod': 14},  # Directional Movement Index
+                                'KAMA': {'timeperiod': 10},  # Kaufman's Adaptive Moving Average
+                                'MACD': {'fastperiod': 12, 'slowperiod': 26, 'signalperiod': 9},
+                                'MFI': {'timeperiod': 14},  # Money Flow Index
+                                'NATR': {'timeperiod': 14},  # Normalized Average True Range
+                                'RSI': {'timeperiod': 14},
+                                'STOCH': {'fastk_period': 5, 'slowk_period': 3, 'slowd_period': 3},
+                                'STOCHF': {'fastk_period': 5, 'fastd_period': 3},
+                                'STOCHRSI': {'timeperiod': 14, 'fastk_period': 5, 'fastd_period': 3},
+                                'TRANGE': {'timeperiod': 14},
+                                'WILLR': {'timeperiod': 14},
+                            }
+
+                            # 如果指标有默认参数且当前params为空，则使用默认参数
+                            if english_name in default_params_map and not final_params:
+                                final_params = default_params_map[english_name]
+
+                            logger.debug(f"计算{english_name}指标，参数: {final_params}")
+
                             # 使用新的指标系统计算
                             result_df = calculate_indicator(
-                                english_name, kdata, params)
+                                english_name, kdata, **final_params)
 
                             # 遍历结果中的每一列，绘制到图表上
                             for j, col in enumerate(result_df.columns):
@@ -217,7 +253,7 @@ class IndicatorMixin:
                                                    linewidth=0.7, alpha=0.85,
                                                    label=f"{name}-{col}" if len(result_df.columns) > 1 else name)
                         except Exception as e:
-                            self.log_error(f"TA-Lib指标 {name} 渲染失败: {str(e)}")
+                            logger.error(f"TA-Lib指标 {name} 渲染失败: {str(e)}", exc_info=True)
 
                     elif group == 'custom' and formula:
                         try:
@@ -229,10 +265,10 @@ class IndicatorMixin:
                             self.price_ax.plot(x[-len(arr):], arr.values, color=style['color'],
                                                linewidth=style['linewidth'], alpha=style['alpha'], label=name)
                         except Exception as e:
-                            self.log_error(f"自定义公式渲染失败: {str(e)}")
+                            logger.error(f"自定义公式渲染失败: {str(e)}")
 
                 except Exception as e:
-                    self.log_error(f"渲染指标 {name} 失败: {str(e)}")
+                    logger.error(f"渲染指标 {name} 失败: {str(e)}")
                     continue
 
         except Exception as e:
@@ -359,6 +395,11 @@ class IndicatorMixin:
     def _on_indicator_changed(self, indicators):
         """内部指标变更处理"""
         self.active_indicators = indicators
+        # 修复：传入当前K线数据，否则update_chart会因data=None直接返回
+        if hasattr(self, 'current_kdata') and self.current_kdata is not None and not self.current_kdata.empty:
+            self.update_chart({'kdata': self.current_kdata})
+        else:
+            logger.warning("_on_indicator_changed: 没有可用的K线数据，无法更新图表")
 
     def _on_calculation_progress(self, progress: int, message: str):
         """处理计算进度"""

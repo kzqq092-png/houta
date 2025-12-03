@@ -44,6 +44,33 @@ class LeftPanel(BasePanel):
     5. 资产信息展示
     """
 
+    # 市场代码到中文名称的映射（支持多资产类型）
+    MARKET_NAME_MAP = {
+        # A股市场
+        'sh': '上海',
+        'sz': '深圳',
+        'bj': '北交所',
+        # 加密货币交易所
+        'binance': 'Binance',
+        'coinbase': 'Coinbase',
+        'okx': 'OKX',
+        'huobi': '火币',
+        # 期货交易所
+        'shfe': '上期所',
+        'dce': '大商所',
+        'czce': '郑商所',
+        'cffex': '中金所',
+        'ine': '上能源',
+        # 外汇
+        'forex': '外汇',
+        # 港股
+        'hk': '香港',
+        # 美股
+        'us': '美国',
+        'nasdaq': '纳斯达克',
+        'nyse': '纽交所',
+    }
+
     def __init__(self,
                  stock_service: StockService,
                  data_manager: UnifiedDataManager,
@@ -289,9 +316,20 @@ class LeftPanel(BasePanel):
                         return ''
                     return str(value)
 
-                item.setText(0, safe_text(asset.get('symbol', '')))
-                item.setText(1, safe_text(asset.get('name', '')))
-                item.setText(2, safe_text(asset.get('market', '')))
+                # 获取原始数据
+                symbol = safe_text(asset.get('symbol', ''))
+                market = safe_text(asset.get('market', '')).lower()
+                name = safe_text(asset.get('name', ''))
+                industry = safe_text(asset.get('industry', ''))
+
+                # 组合市场编码（如：sz000001）
+                market_code = f"{market}{symbol}" if market and symbol else symbol
+
+                # 设置列数据
+                item.setText(0, market_code)  # 市场编码（如sz000001）
+                item.setText(1, name)         # 名称
+                item.setText(2, market.upper() if market else '')  # 市场（大写显示）
+                item.setText(3, industry)     # 行业
 
                 # 存储完整的资产信息
                 item.setData(0, Qt.UserRole, asset)
@@ -426,7 +464,7 @@ class LeftPanel(BasePanel):
         """创建资产列表（支持多资产类型）"""
         # 股票列表
         self.stock_tree = QTreeWidget()
-        self.stock_tree.setHeaderLabels(["代码", "名称"])
+        self.stock_tree.setHeaderLabels(["代码", "名称","市场","行业"])
         self.stock_tree.setRootIsDecorated(False)
         self.stock_tree.setAlternatingRowColors(True)
         self.stock_tree.setSortingEnabled(True)
@@ -434,8 +472,8 @@ class LeftPanel(BasePanel):
         # 设置列宽
         self.stock_tree.setColumnWidth(0, 80)   # 代码
         self.stock_tree.setColumnWidth(1, 80)  # 名称
-        # self.stock_tree.setColumnWidth(2, 60)   # 市场
-        # self.stock_tree.setColumnWidth(3, 100)  # 行业
+        self.stock_tree.setColumnWidth(2, 60)   # 市场
+        self.stock_tree.setColumnWidth(3, 100)  # 行业
         # self.stock_tree.setColumnWidth(4, 60)   # 类型
 
         # 启用拖拽功能
@@ -460,19 +498,26 @@ class LeftPanel(BasePanel):
             if not item:
                 return
 
-            stock_code = item.text(0)
+            # 从存储的数据中获取股票信息
+            asset_data = item.data(0, Qt.UserRole) or {}
+            stock_code = asset_data.get('code', '')  # 纯代码，如 000001
             stock_name = item.text(1)
+            market = asset_data.get('market', '')  # 市场前缀，如 sz
+
+            # 组合显示用的完整代码（带市场前缀）
+            display_code = f"{market}{stock_code}" if market else stock_code
 
             # 创建MIME数据
             from PyQt5.QtCore import QMimeData
             from PyQt5.QtGui import QDrag
 
             mime_data = QMimeData()
-            # 设置文本格式，便于通用处理
-            mime_data.setText(f"{stock_code} {stock_name}")
-            # 设置自定义格式，便于特定处理
+            # 设置文本格式，使用带市场前缀的完整代码
+            mime_data.setText(f"{display_code} {stock_name}")
+            # 设置自定义格式，传递纯代码和市场前缀
             mime_data.setData("application/x-stock-code", stock_code.encode("utf-8"))
             mime_data.setData("application/x-stock-name", stock_name.encode("utf-8"))
+            mime_data.setData("application/x-stock-market", market.encode("utf-8"))
 
             # 创建拖拽对象
             drag = QDrag(self.stock_tree)
@@ -618,9 +663,11 @@ class LeftPanel(BasePanel):
             return
 
         if item:
-            stock_code = item.text(0)
+            # 从存储的数据中获取纯代码和市场前缀
+            asset_data = item.data(0, Qt.UserRole) or {}
+            stock_code = asset_data.get('code', '')  # 纯代码，如 000001
             stock_name = item.text(1)
-            market = item.data(0, Qt.UserRole).get('market', '')
+            market = asset_data.get('market', '')  # 市场前缀，如 sz
             self._debounced_select_stock(stock_code, stock_name, market)
 
     @pyqtSlot(QTreeWidgetItem, int)
@@ -632,11 +679,11 @@ class LeftPanel(BasePanel):
             self.show_message(f"多屏模式下请拖拽{self.current_asset_type.value}到目标图表", level="info")
             return
 
-        # 获取资产信息
-        symbol = item.text(0)
-        name = item.text(1)
+        # 从存储的数据中获取资产信息
         asset_data = item.data(0, Qt.UserRole) or {}
-        market = asset_data.get('market', '')
+        symbol = asset_data.get('code', '')  # 纯代码，如 000001
+        name = item.text(1)
+        market = asset_data.get('market', '')  # 市场前缀，如 sz
 
         # 选择资产
         self._select_asset(symbol, name, market)
@@ -688,8 +735,14 @@ class LeftPanel(BasePanel):
         if not item:
             return
 
-        stock_code = item.text(0)
+        # 从存储的数据中获取股票信息
+        asset_data = item.data(0, Qt.UserRole) or {}
+        stock_code = asset_data.get('code', '')  # 纯代码，如 000001
         stock_name = item.text(1)
+        market = asset_data.get('market', '')  # 市场前缀，如 sz
+
+        # 组合显示用的完整代码（带市场前缀）
+        display_code = f"{market}{stock_code}" if market else stock_code
 
         # 创建右键菜单
         menu = QMenu(self.stock_tree)
@@ -1092,16 +1145,33 @@ class LeftPanel(BasePanel):
 
             items = []
             for stock in stocks:
-                code = stock.get('code', '')
-                name = stock.get('name', '')
+                # 安全地获取字段值
+                def safe_text(value):
+                    """安全地转换值为字符串,处理pandas NA值"""
+                    if value is None:
+                        return ''
+                    if pd.isna(value):  # 处理pandas NA值
+                        return ''
+                    return str(value)
+
+                code = safe_text(stock.get('code', ''))
+                name = safe_text(stock.get('name', ''))
+                market = safe_text(stock.get('market', '')).lower()
+                industry = safe_text(stock.get('industry', ''))
                 update_time = stock.get('update_time', '未知')
 
-                item = QTreeWidgetItem([code, name])
+                # 组合市场编码(如:sz000001)
+                market_code = f"{market}{code}" if market and code else code
 
-                # 设置Tooltip显示更新时间
-                tooltip = f"股票代码: {code}\n股票名称: {name}\n更新时间: {update_time}"
+                # 创建树项,包含市场前缀和所有列
+                item = QTreeWidgetItem([market_code, name, market.upper() if market else '', industry])
+
+                # 设置Tooltip显示完整信息
+                tooltip = f"股票代码: {market_code}\n股票名称: {name}\n市场: {market.upper() if market else '未知'}\n行业: {industry if industry else '未知'}\n更新时间: {update_time}"
                 item.setToolTip(0, tooltip)
                 item.setToolTip(1, tooltip)
+                item.setToolTip(2, tooltip)
+                item.setToolTip(3, tooltip)
 
                 # 将完整的股票信息字典存储在item中
                 item.setData(0, Qt.UserRole, stock)
@@ -1155,6 +1225,8 @@ class LeftPanel(BasePanel):
                         'code': str(row.get('code', '')),
                         'name': str(row.get('name', '')),
                         'market': str(row.get('market', '')),
+                        'industry': str(row.get('industry', '')),
+                        'sector': str(row.get('sector', '')),
                         'asset_type': str(row.get('asset_type', 'stock_a')),
                         'update_time': row.get('update_time', '')
                     }
@@ -1193,6 +1265,8 @@ class LeftPanel(BasePanel):
                             'code': str(row.get('code', '')),
                             'name': str(row.get('name', '')),
                             'market': str(row.get('market', '')),
+                            'industry': str(row.get('industry', '')),
+                            'sector': str(row.get('sector', '')),
                             'asset_type': str(row.get('asset_type', 'STOCK')),
                             'update_time': row.get('update_time', '')
                         }
@@ -1270,7 +1344,8 @@ class LeftPanel(BasePanel):
 
             # ✅ 修复：从asset_metadata表查询（这是数据导入时保存资产元数据的表）
             # 字段映射：symbol→code（UI使用code字段）
-            base_query = "SELECT symbol as code, name, market, asset_type, updated_at as update_time FROM asset_metadata"
+            # 添加industry和sector字段以支持行业列显示
+            base_query = "SELECT symbol as code, name, market, industry, sector, asset_type, updated_at as update_time FROM asset_metadata"
             if query_conditions:
                 # 注意：查询条件中的code需要改为symbol
                 adjusted_conditions = []
@@ -1353,7 +1428,8 @@ class LeftPanel(BasePanel):
                 query_conditions.append(search_condition)
 
             # ✅ 修复：从asset_metadata表查询，字段映射symbol→code
-            base_query = "SELECT symbol as code, name, market, asset_type, updated_at as update_time FROM asset_metadata"
+            # 添加industry和sector字段以支持行业列显示
+            base_query = "SELECT symbol as code, name, market, industry, sector, asset_type, updated_at as update_time FROM asset_metadata"
             if query_conditions:
                 query = f"{base_query} WHERE {' AND '.join(query_conditions)}"
             else:

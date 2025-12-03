@@ -674,12 +674,21 @@ class CreateTrainingTaskDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("创建训练任务")
-        self.setMinimumSize(600, 500)
+        self.setMinimumSize(700, 600)
         self.setup_ui()
 
     def setup_ui(self):
         """设置UI"""
         layout = QVBoxLayout(self)
+
+        # 添加说明标签
+        info_label = QLabel(
+            "💡 提示：填写股票代码（如sh600000）获取真实K线数据进行训练。\n"
+            "如果不填写股票代码，系统将使用合成数据进行训练。"
+        )
+        info_label.setStyleSheet("background-color: #e3f2fd; padding: 8px; border-radius: 4px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
 
         # 表单
         form = QFormLayout()
@@ -697,6 +706,40 @@ class CreateTrainingTaskDialog(QDialog):
         self.description_edit = QTextEdit()
         self.description_edit.setMaximumHeight(100)
         form.addRow("任务描述:", self.description_edit)
+
+        # 数据配置
+        data_group = QGroupBox("数据配置")
+        data_layout = QFormLayout()
+
+        # Symbol
+        self.symbol_edit = QLineEdit()
+        self.symbol_edit.setPlaceholderText("例如: sh600000, sz000001")
+        data_layout.addRow("股票代码:", self.symbol_edit)
+
+        # Start Date
+        self.start_date_edit = QDateEdit()
+        self.start_date_edit.setCalendarPopup(True)
+        self.start_date_edit.setDisplayFormat("yyyy-MM-dd")
+        from datetime import datetime, timedelta
+        self.start_date_edit.setDate(datetime.now().date() - timedelta(days=365))
+        data_layout.addRow("开始日期:", self.start_date_edit)
+
+        # End Date
+        self.end_date_edit = QDateEdit()
+        self.end_date_edit.setCalendarPopup(True)
+        self.end_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.end_date_edit.setDate(datetime.now().date())
+        data_layout.addRow("结束日期:", self.end_date_edit)
+
+        # Prediction Horizon
+        self.horizon_spin = QSpinBox()
+        self.horizon_spin.setMinimum(1)
+        self.horizon_spin.setMaximum(100)
+        self.horizon_spin.setValue(5)
+        data_layout.addRow("预测视窗:", self.horizon_spin)
+
+        data_group.setLayout(data_layout)
+        form.addRow(data_group)
 
         # 训练配置
         config_group = QGroupBox("训练配置")
@@ -734,12 +777,37 @@ class CreateTrainingTaskDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         ok_btn = QPushButton("确定")
-        ok_btn.clicked.connect(self.accept)
+        ok_btn.clicked.connect(self.validate_and_accept)
         cancel_btn = QPushButton("取消")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(ok_btn)
         button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
+
+    def validate_and_accept(self):
+        """验证输入并接受"""
+        # 验证任务名称
+        if not self.task_name_edit.text().strip():
+            QMessageBox.warning(self, "验证错误", "请输入任务名称")
+            return
+
+        # 验证股票代码
+        symbol = self.symbol_edit.text().strip()
+        if not symbol:
+            reply = QMessageBox.question(
+                self, "确认",
+                "未提供股票代码，训练将使用合成数据。是否继续？",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+        # 验证日期范围
+        if self.start_date_edit.date() >= self.end_date_edit.date():
+            QMessageBox.warning(self, "验证错误", "开始日期必须早于结束日期")
+            return
+
+        self.accept()
 
     def get_task_data(self) -> Dict[str, Any]:
         """获取任务数据"""
@@ -748,9 +816,16 @@ class CreateTrainingTaskDialog(QDialog):
             'model_type': self.model_type_combo.currentText(),
             'description': self.description_edit.toPlainText(),
             'config': {
+                'data': {
+                    'symbol': self.symbol_edit.text().strip(),
+                    'start_date': self.start_date_edit.date().toString("yyyy-MM-dd"),
+                    'end_date': self.end_date_edit.date().toString("yyyy-MM-dd"),
+                    'prediction_horizon': self.horizon_spin.value()
+                },
                 'epochs': self.epochs_spin.value(),
                 'batch_size': self.batch_size_spin.value(),
-                'learning_rate': self.learning_rate_spin.value()
+                'learning_rate': self.learning_rate_spin.value(),
+                'prediction_horizon': self.horizon_spin.value()
             }
         }
 

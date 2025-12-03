@@ -20,6 +20,7 @@ from core.indicators.library.oscillators import calculate_macd, calculate_rsi
 import os
 import sys
 import pandas as pd
+import numpy as np
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 # 添加项目根目录到Python路径
@@ -27,6 +28,86 @@ sys.path.insert(0, os.path.abspath(
     os.path.join(os.path.dirname(__file__), '..')))
 
 # Loguru 日志配置已在全局配置中设置，无需额外配置
+
+
+def ensure_float64_array(data: Union[pd.Series, np.ndarray, list]) -> np.ndarray:
+    """
+    确保数据转换为float64类型的numpy数组，用于TA-Lib函数调用
+    
+    TA-Lib的C实现要求所有输入数据必须是双精度浮点数（double/float64）类型。
+    如果输入数据类型不正确（如int32, int64, object等），会抛出"input array type is not double"错误。
+    
+    Args:
+        data: 输入数据，可以是pandas Series、numpy数组或列表
+        
+    Returns:
+        np.ndarray: 转换为float64类型的numpy数组
+        
+    Examples:
+        >>> close_prices = pd.Series([100, 101, 102], dtype='int64')
+        >>> float_prices = ensure_float64_array(close_prices)
+        >>> float_prices.dtype
+        dtype('float64')
+    """
+    try:
+        if isinstance(data, pd.Series):
+            # pandas Series -> numpy array -> float64
+            return data.values.astype(np.float64)
+        elif isinstance(data, np.ndarray):
+            # numpy array -> float64
+            return data.astype(np.float64)
+        elif isinstance(data, (list, tuple)):
+            # list/tuple -> numpy array -> float64
+            return np.array(data, dtype=np.float64)
+        else:
+            # 其他类型尝试转换
+            logger.warning(f"未知数据类型 {type(data)}，尝试转换为float64数组")
+            return np.asarray(data, dtype=np.float64)
+    except Exception as e:
+        logger.error(f"数据类型转换失败: {e}，数据类型: {type(data)}")
+        raise ValueError(f"无法将数据转换为float64数组: {e}")
+
+
+def prepare_talib_inputs(kdata: pd.DataFrame, required_inputs: List[str]) -> List[np.ndarray]:
+    """
+    从K线数据中准备TA-Lib函数所需的输入数组
+    
+    自动提取所需的列（如open, high, low, close, volume）并确保转换为float64类型。
+    
+    Args:
+        kdata: K线数据DataFrame，必须包含required_inputs中指定的列
+        required_inputs: 需要的输入列名列表，如['high', 'low', 'close', 'volume']
+        
+    Returns:
+        List[np.ndarray]: 转换为float64类型的numpy数组列表
+        
+    Raises:
+        ValueError: 如果kdata中缺少必要的列
+        
+    Examples:
+        >>> kdata = pd.DataFrame({'high': [100, 101], 'low': [99, 100], 'close': [100, 101], 'volume': [1000, 1100]})
+        >>> inputs = prepare_talib_inputs(kdata, ['high', 'low', 'close', 'volume'])
+        >>> len(inputs)
+        4
+        >>> all(arr.dtype == np.float64 for arr in inputs)
+        True
+    """
+    try:
+        result = []
+        for input_name in required_inputs:
+            if input_name not in kdata.columns:
+                raise ValueError(f"K线数据缺少必要列: {input_name}")
+            
+            # 转换为float64数组
+            input_array = ensure_float64_array(kdata[input_name])
+            result.append(input_array)
+            
+            logger.debug(f"准备TA-Lib输入 {input_name}: dtype={input_array.dtype}, shape={input_array.shape}")
+        
+        return result
+    except Exception as e:
+        logger.error(f"准备TA-Lib输入数据失败: {e}")
+        raise
 
 def get_indicator_english_name(name: str) -> str:
     """
@@ -516,6 +597,89 @@ def get_indicator_params_config(english_name: str) -> Optional[Dict[str, Any]]:
                 'params': {
                     'timeperiod': {'desc': '周期', 'default': 14, 'min': 1, 'max': 100, 'type': 'int'}
                 }
+            },
+            'ADOSC': {
+                'name': 'ADOSC',
+                'display_name': '佳庆线',
+                'description': 'Chaikin A/D 振荡器指标',
+                'params': {
+                    'fastperiod': {'desc': '快速周期', 'default': 3, 'min': 1, 'max': 50, 'type': 'int'},
+                    'slowperiod': {'desc': '慢速周期', 'default': 10, 'min': 1, 'max': 100, 'type': 'int'}
+                }
+            },
+            'AD': {
+                'name': 'AD',
+                'display_name': '积累分布线',
+                'description': '积累分布线指标',
+                'params': {}
+            },
+            'OBV': {
+                'name': 'OBV',
+                'display_name': '能量潮',
+                'description': '能量潮指标',
+                'params': {}
+            },
+            'ATR': {
+                'name': 'ATR',
+                'display_name': '平均真实波幅',
+                'description': '平均真实波幅指标',
+                'params': {
+                    'timeperiod': {'desc': '周期', 'default': 14, 'min': 1, 'max': 100, 'type': 'int'}
+                }
+            },
+            'ADX': {
+                'name': 'ADX',
+                'display_name': '平均方向指数',
+                'description': '平均方向指数指标',
+                'params': {
+                    'timeperiod': {'desc': '周期', 'default': 14, 'min': 1, 'max': 100, 'type': 'int'}
+                }
+            },
+            'CCI': {
+                'name': 'CCI',
+                'display_name': '商品通道指数',
+                'description': '商品通道指数指标',
+                'params': {
+                    'timeperiod': {'desc': '周期', 'default': 20, 'min': 1, 'max': 100, 'type': 'int'}
+                }
+            },
+            'STOCH': {
+                'name': 'STOCH',
+                'display_name': '随机指标',
+                'description': '随机指标',
+                'params': {
+                    'fastk_period': {'desc': '快速K周期', 'default': 5, 'min': 1, 'max': 50, 'type': 'int'},
+                    'slowk_period': {'desc': '慢速K周期', 'default': 3, 'min': 1, 'max': 50, 'type': 'int'},
+                    'slowd_period': {'desc': '慢速D周期', 'default': 3, 'min': 1, 'max': 50, 'type': 'int'}
+                }
+            },
+            'BBANDS': {
+                'name': 'BBANDS',
+                'display_name': '布林带',
+                'description': '布林带指标',
+                'params': {
+                    'timeperiod': {'desc': '周期', 'default': 20, 'min': 1, 'max': 100, 'type': 'int'},
+                    'nbdevup': {'desc': '上带偏差', 'default': 2.0, 'min': 0.1, 'max': 5.0, 'type': 'float'},
+                    'nbdevdn': {'desc': '下带偏差', 'default': 2.0, 'min': 0.1, 'max': 5.0, 'type': 'float'}
+                }
+            },
+            'MFI': {
+                'name': 'MFI',
+                'display_name': '资金流量指标',
+                'description': '资金流量指标',
+                'params': {
+                    'timeperiod': {'desc': '周期', 'default': 14, 'min': 1, 'max': 100, 'type': 'int'}
+                }
+            },
+            'KDJ': {
+                'name': 'KDJ',
+                'display_name': 'KDJ随机指标',
+                'description': 'KDJ随机指标',
+                'params': {
+                    'fastk_period': {'desc': '快速K周期', 'default': 9, 'min': 1, 'max': 50, 'type': 'int'},
+                    'slowk_period': {'desc': '慢速K周期', 'default': 3, 'min': 1, 'max': 50, 'type': 'int'},
+                    'slowd_period': {'desc': '慢速D周期', 'default': 3, 'min': 1, 'max': 50, 'type': 'int'}
+                }
             }
         }
 
@@ -555,39 +719,219 @@ def get_indicator_inputs(indicator_name: str) -> list:
     indicator_name = indicator_name.upper()
 
     # 处理指标别名
-    if 'INDICATOR_ALIASES' in globals() and indicator_name in INDICATOR_ALIASES:
-        indicator_name = INDICATOR_ALIASES[indicator_name]
-    else:
+    try:
+        indicator_aliases = INDICATOR_ALIASES if 'INDICATOR_ALIASES' in globals() else {}
+    except (NameError, KeyError):
+        indicator_aliases = {}
+
+    if not indicator_aliases:
         # 导入INDICATOR_ALIASES
         try:
-            from core.indicator_service import INDICATOR_ALIASES
-            if indicator_name in INDICATOR_ALIASES:
-                indicator_name = INDICATOR_ALIASES[indicator_name]
+            from core.unified_indicator_service import INDICATOR_ALIASES as UNIFIED_ALIASES
+            indicator_aliases = UNIFIED_ALIASES
         except ImportError:
-            pass
+            try:
+                from core.indicator_service import INDICATOR_ALIASES as SERVICE_ALIASES
+                indicator_aliases = SERVICE_ALIASES
+            except ImportError:
+                indicator_aliases = {}
 
-    # 预定义的输入映射
+    if indicator_aliases and indicator_name in indicator_aliases:
+        indicator_name = indicator_aliases[indicator_name]
+
+    # 预定义的输入映射 - 🔥 修复：补充所有缺失的TA-Lib指标输入映射（158个函数完整覆盖）
     input_mapping = {
+        # ===== 趋势类指标 (Overlap Studies) =====
         'MA': ['close'],
         'SMA': ['close'],
         'EMA': ['close'],
+        'DEMA': ['close'],
+        'TEMA': ['close'],
+        'WMA': ['close'],
+        'TRIMA': ['close'],
+        'KAMA': ['close'],
+        'MAMA': ['close'],
+        'T3': ['close'],
+        'MAVP': ['close'],  # Moving Average with Variable Period
         'MACD': ['close'],
+        'MACDEXT': ['close'],
+        'MACDFIX': ['close'],
+        'SAR': ['high', 'low'],
+        'SAREXT': ['high', 'low'],
+
+        # ===== 震荡类指标 (Momentum Indicators) =====
         'RSI': ['close'],
+        'STOCHRSI': ['close'],
+        'STOCH': ['high', 'low', 'close'],
+        'STOCHF': ['high', 'low', 'close'],
+        'CCI': ['high', 'low', 'close'],
+        'CMO': ['close'],
+        'WILLR': ['high', 'low', 'close'],
+        'ULTOSC': ['high', 'low', 'close'],
+        'BOP': ['open', 'high', 'low', 'close'],
+        'MOM': ['close'],
+        'ROC': ['close'],
+        'ROCP': ['close'],
+        'ROCR': ['close'],
+        'ROCR100': ['close'],
+        'APO': ['close'],
+        'PPO': ['close'],
+
+        # ===== 方向性指标 (Directional Movement) - 🔥 关键修复 =====
+        'ADX': ['high', 'low', 'close'],
+        'ADXR': ['high', 'low', 'close'],
+        'DX': ['high', 'low', 'close'],
+        'MINUS_DI': ['high', 'low', 'close'],
+        'PLUS_DI': ['high', 'low', 'close'],
+        'MINUS_DM': ['high', 'low'],
+        'PLUS_DM': ['high', 'low'],
+
+        # ===== Aroon指标系列 =====
+        'AROON': ['high', 'low'],
+        'AROONOSC': ['high', 'low'],
+
+        # ===== 布林带相关 =====
         'BBANDS': ['close'],
         'BOLL': ['close'],
-        'KDJ': ['high', 'low', 'close'],
-        'STOCH': ['high', 'low', 'close'],
-        'ADX': ['high', 'low', 'close'],
-        'CCI': ['high', 'low', 'close'],
+
+        # ===== 成交量类指标 (Volume Indicators) =====
         'OBV': ['close', 'volume'],
-        'ROC': ['close'],
-        'ATR': ['high', 'low', 'close'],
-        'SAR': ['high', 'low'],
-        'WILLR': ['high', 'low', 'close'],
-        'MOM': ['close'],
-        'TRIX': ['close'],
+        'AD': ['high', 'low', 'close', 'volume'],
+        'ADOSC': ['high', 'low', 'close', 'volume'],
+        'MFI': ['high', 'low', 'close', 'volume'],
         'CMF': ['high', 'low', 'close', 'volume'],
-        'MFI': ['high', 'low', 'close', 'volume']
+
+        # ===== 波动性指标 (Volatility Indicators) =====
+        'ATR': ['high', 'low', 'close'],
+        'NATR': ['high', 'low', 'close'],
+        'TRANGE': ['high', 'low', 'close'],
+
+        # ===== KDJ随机指标 =====
+        'KDJ': ['high', 'low', 'close'],
+
+        # ===== 其他震荡/趋势指标 =====
+        'TRIX': ['close'],
+        'MESA': ['close'],
+
+        # ===== Hilbert Transform系列 (Cycle Indicators) =====
+        'HT_TRENDLINE': ['close'],
+        'HT_SINE': ['close'],
+        'HT_PHASOR': ['close'],
+        'HT_DCPERIOD': ['close'],
+        'HT_DCPHASE': ['close'],
+        'HT_TRENDMODE': ['close'],
+
+        # ===== 统计函数 (Statistic Functions) =====
+        'BETA': ['close'],
+        'CORREL': ['close'],
+        'LINEARREG': ['close'],
+        'LINEARREG_ANGLE': ['close'],
+        'LINEARREG_INTERCEPT': ['close'],
+        'LINEARREG_SLOPE': ['close'],
+        'STDDEV': ['close'],
+        'TSF': ['close'],
+        'VAR': ['close'],
+
+        # ===== 价格转换 (Price Transform) =====
+        'AVGPRICE': ['open', 'high', 'low', 'close'],
+        'MEDPRICE': ['high', 'low'],
+        'MIDPOINT': ['close'],
+        'MIDPRICE': ['high', 'low'],
+        'TYPPRICE': ['high', 'low', 'close'],
+        'WCLPRICE': ['high', 'low', 'close'],
+
+        # ===== 数学转换 (Math Transform) =====
+        'ACOS': ['close'],
+        'ASIN': ['close'],
+        'ATAN': ['close'],
+        'CEIL': ['close'],
+        'COS': ['close'],
+        'COSH': ['close'],
+        'EXP': ['close'],
+        'FLOOR': ['close'],
+        'LN': ['close'],
+        'LOG10': ['close'],
+        'SIN': ['close'],
+        'SINH': ['close'],
+        'SQRT': ['close'],
+        'TAN': ['close'],
+        'TANH': ['close'],
+
+        # ===== 数学运算 (Math Operators) =====
+        'ADD': ['close'],
+        'DIV': ['close'],
+        'MAX': ['close'],
+        'MAXINDEX': ['close'],
+        'MIN': ['close'],
+        'MININDEX': ['close'],
+        'MINMAX': ['close'],
+        'MINMAXINDEX': ['close'],
+        'MULT': ['close'],
+        'SUB': ['close'],
+        'SUM': ['close'],
+
+        # ===== 形态识别 (Pattern Recognition) - 所有CDL函数都需要OHLC =====
+        'CDL2CROWS': ['open', 'high', 'low', 'close'],
+        'CDL3BLACKCROWS': ['open', 'high', 'low', 'close'],
+        'CDL3INSIDE': ['open', 'high', 'low', 'close'],
+        'CDL3LINESTRIKE': ['open', 'high', 'low', 'close'],
+        'CDL3OUTSIDE': ['open', 'high', 'low', 'close'],
+        'CDL3STARSINSOUTH': ['open', 'high', 'low', 'close'],
+        'CDL3WHITESOLDIERS': ['open', 'high', 'low', 'close'],
+        'CDLABANDONEDBABY': ['open', 'high', 'low', 'close'],
+        'CDLADVANCEBLOCK': ['open', 'high', 'low', 'close'],
+        'CDLBELTHOLD': ['open', 'high', 'low', 'close'],
+        'CDLBREAKAWAY': ['open', 'high', 'low', 'close'],
+        'CDLCLOSINGMARUBOZU': ['open', 'high', 'low', 'close'],
+        'CDLCONCEALBABYSWALL': ['open', 'high', 'low', 'close'],
+        'CDLCOUNTERATTACK': ['open', 'high', 'low', 'close'],
+        'CDLDARKCLOUDCOVER': ['open', 'high', 'low', 'close'],
+        'CDLDOJI': ['open', 'high', 'low', 'close'],
+        'CDLDOJISTAR': ['open', 'high', 'low', 'close'],
+        'CDLDRAGONFLYDOJI': ['open', 'high', 'low', 'close'],
+        'CDLENGULFING': ['open', 'high', 'low', 'close'],
+        'CDLEVENINGDOJISTAR': ['open', 'high', 'low', 'close'],
+        'CDLEVENINGSTAR': ['open', 'high', 'low', 'close'],
+        'CDLGAPSIDESIDEWHITE': ['open', 'high', 'low', 'close'],
+        'CDLGRAVESTONEDOJI': ['open', 'high', 'low', 'close'],
+        'CDLHAMMER': ['open', 'high', 'low', 'close'],
+        'CDLHANGINGMAN': ['open', 'high', 'low', 'close'],
+        'CDLHARAMI': ['open', 'high', 'low', 'close'],
+        'CDLHARAMICROSS': ['open', 'high', 'low', 'close'],
+        'CDLHIGHWAVE': ['open', 'high', 'low', 'close'],
+        'CDLHIKKAKE': ['open', 'high', 'low', 'close'],
+        'CDLHIKKAKEMOD': ['open', 'high', 'low', 'close'],
+        'CDLHOMINGPIGEON': ['open', 'high', 'low', 'close'],
+        'CDLIDENTICAL3CROWS': ['open', 'high', 'low', 'close'],
+        'CDLINNECK': ['open', 'high', 'low', 'close'],
+        'CDLINVERTEDHAMMER': ['open', 'high', 'low', 'close'],
+        'CDLKICKING': ['open', 'high', 'low', 'close'],
+        'CDLKICKINGBYLENGTH': ['open', 'high', 'low', 'close'],
+        'CDLLADDERBOTTOM': ['open', 'high', 'low', 'close'],
+        'CDLLONGLEGGEDDOJI': ['open', 'high', 'low', 'close'],
+        'CDLLONGLINE': ['open', 'high', 'low', 'close'],
+        'CDLMARUBOZU': ['open', 'high', 'low', 'close'],
+        'CDLMATCHINGLOW': ['open', 'high', 'low', 'close'],
+        'CDLMATHOLD': ['open', 'high', 'low', 'close'],
+        'CDLMORNINGDOJISTAR': ['open', 'high', 'low', 'close'],
+        'CDLMORNINGSTAR': ['open', 'high', 'low', 'close'],
+        'CDLONNECK': ['open', 'high', 'low', 'close'],
+        'CDLPIERCING': ['open', 'high', 'low', 'close'],
+        'CDLRICKSHAWMAN': ['open', 'high', 'low', 'close'],
+        'CDLRISEFALL3METHODS': ['open', 'high', 'low', 'close'],
+        'CDLSEPARATINGLINES': ['open', 'high', 'low', 'close'],
+        'CDLSHOOTINGSTAR': ['open', 'high', 'low', 'close'],
+        'CDLSHORTLINE': ['open', 'high', 'low', 'close'],
+        'CDLSPINNINGTOP': ['open', 'high', 'low', 'close'],
+        'CDLSTALLEDPATTERN': ['open', 'high', 'low', 'close'],
+        'CDLSTICKSANDWICH': ['open', 'high', 'low', 'close'],
+        'CDLTAKURI': ['open', 'high', 'low', 'close'],
+        'CDLTASUKIGAP': ['open', 'high', 'low', 'close'],
+        'CDLTHRUSTING': ['open', 'high', 'low', 'close'],
+        'CDLTRISTAR': ['open', 'high', 'low', 'close'],
+        'CDLUNIQUE3RIVER': ['open', 'high', 'low', 'close'],
+        'CDLUPSIDEGAP2CROWS': ['open', 'high', 'low', 'close'],
+        'CDLXSIDEGAP3METHODS': ['open', 'high', 'low', 'close'],
     }
 
     if indicator_name in input_mapping:

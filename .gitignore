@@ -35,3 +35,6 @@ logs/*
 core/services/nul
 data/strategy.db-wal
 data/strategy.db-shm
+.claude/*
+.trae/*
+nul

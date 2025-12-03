@@ -304,6 +304,10 @@ class RightPanel(BasePanel):
             self.add_widget('technical_tab', self._technical_tab)
             self._professional_tabs.append(self._technical_tab)
 
+            # 🔧 修复：连接指标计算完成信号，通知主图更新
+            self._technical_tab.indicator_calculated.connect(self._on_indicator_calculated)
+            logger.info("✅ 已连接technical_tab的indicator_calculated信号")
+
         # 专业分析标签页
         if PROFESSIONAL_TABS_AVAILABLE:
             # 形态分析 - 异步初始化
@@ -1317,3 +1321,97 @@ class RightPanel(BasePanel):
             'code': self._current_stock_code,
             'name': self._current_stock_name
         }
+
+    def _on_indicator_calculated(self, indicator_type: str, indicator_results: dict):
+        """
+        处理指标计算完成信号，更新主图显示指标
+
+        Args:
+            indicator_type: 指标类型（"batch"或具体指标名）
+            indicator_results: 指标计算结果字典
+        """
+        try:
+            logger.info(f"🎯 收到指标计算完成信号: type={indicator_type}, results包含{len(indicator_results)}个指标")
+
+            # 获取中间面板和图表组件
+            if not self.coordinator:
+                logger.warning("coordinator不存在，无法更新主图")
+                return
+
+            # 获取main_window
+            main_window = self.coordinator._main_window if hasattr(self.coordinator, "_main_window") else None
+            if not main_window:
+                logger.warning("main_window不存在，无法更新主图")
+                return
+
+            # 查找中间面板
+            middle_panel = None
+            for panel_name, panel in self.coordinator._panels.items():
+                if "middle" in panel_name.lower() or "chart" in panel_name.lower():
+                    middle_panel = panel
+                    break
+
+            if not middle_panel:
+                logger.warning("未找到中间面板，无法更新主图")
+                return
+
+            # 获取chart_widget
+            chart_widget = None
+            if hasattr(middle_panel, "chart_canvas"):
+                # chart_canvas是一个容器，内部包含真正的chart_widget
+                chart_canvas = middle_panel.chart_canvas
+                if hasattr(chart_canvas, 'chart_widget'):
+                    chart_widget = chart_canvas.chart_widget
+                else:
+                    chart_widget = chart_canvas
+            elif hasattr(middle_panel, "get_widget"):
+                # 通过get_widget获取chart_canvas
+                chart_canvas = middle_panel.get_widget("chart_canvas")
+                if chart_canvas and hasattr(chart_canvas, 'chart_widget'):
+                    chart_widget = chart_canvas.chart_widget
+                else:
+                    chart_widget = chart_canvas
+
+            if not chart_widget:
+                logger.warning("未找到chart_widget，无法更新主图")
+                return
+
+            # 获取当前K线数据
+            if not hasattr(chart_widget, "current_kdata") or chart_widget.current_kdata is None or chart_widget.current_kdata.empty:
+                logger.warning("chart_widget没有可用的K线数据，无法更新")
+                return
+
+            logger.info(f"✅ 准备更新主图，K线数据长度: {len(chart_widget.current_kdata)}")
+
+            # 定义内置指标列表
+            builtin_indicators = {
+                'MA', 'MACD', 'RSI', 'BOLL', 'KDJ', 'CCI', 'OBV'
+            }
+
+            # 更新active_indicators（将计算结果转换为指标列表，并根据名称智能判断group）
+            active_indicators = []
+            for indicator_name in indicator_results.keys():
+                # 根据指标名称判断group：builtin或talib
+                group = 'builtin' if indicator_name in builtin_indicators else 'talib'
+                active_indicators.append({
+                    "name": indicator_name,
+                    "params": {},  # 参数已包含在计算结果中
+                    "group": group
+                })
+
+            chart_widget.active_indicators = active_indicators
+            logger.info(f"✅ 设置active_indicators: {[ind['name'] for ind in active_indicators]}")
+            logger.info(f"指标分组信息: {[(ind['name'], ind['group']) for ind in active_indicators]}")
+
+            # 调用update_chart更新图表，传递指标数据
+            chart_widget.update_chart({
+                "kdata": chart_widget.current_kdata,
+                "indicators_data": indicator_results
+            })
+            logger.info(f"✅ 主图更新完成")
+
+        except Exception as e:
+            logger.error(f"处理指标计算完成信号失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+

@@ -19,7 +19,11 @@
       "mcp__my-filesystem__list_directory",
       "mcp__my-filesystem__read_text_file",
       "mcp__memory__add_observations",
-      "mcp__thinking__sequentialthinking"
+      "mcp__thinking__sequentialthinking",
+      "Bash(iconv -f gbk -t utf-8)",
+      "mcp__memory__search_nodes",
+      "mcp__memory__create_relations",
+      "mcp__my-filesystem__edit_file"
     ],
     "deny": [],
     "ask": []

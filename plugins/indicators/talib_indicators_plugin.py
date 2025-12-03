@@ -190,12 +190,90 @@ class TALibIndicatorsPlugin(IIndicatorPlugin):
             elif indicator_name == 'OBV':
                 return talib.OBV(close, volume)
 
+            elif indicator_name == 'ADOSC':
+                # ADOSC (Chaikin A/D Oscillator) 需要 high, low, close, volume
+                fastperiod = params.get('fastperiod', 3)
+                slowperiod = params.get('slowperiod', 10)
+                return talib.ADOSC(high, low, close, volume, fastperiod=fastperiod, slowperiod=slowperiod)
+
+            elif indicator_name == 'AD':
+                # AD (Accumulation/Distribution) 需要 high, low, close, volume
+                return talib.AD(high, low, close, volume)
+
+            # 🔥 新增：方向性指标系列 - DX及相关指标
+            elif indicator_name == 'DX':
+                # DX (Directional Movement Index) 需要 high, low, close
+                timeperiod = params.get('timeperiod', 14)
+                return talib.DX(high, low, close, timeperiod=timeperiod)
+
+            elif indicator_name == 'MINUS_DI':
+                # -DI (Minus Directional Indicator) 需要 high, low, close
+                timeperiod = params.get('timeperiod', 14)
+                return talib.MINUS_DI(high, low, close, timeperiod=timeperiod)
+
+            elif indicator_name == 'PLUS_DI':
+                # +DI (Plus Directional Indicator) 需要 high, low, close
+                timeperiod = params.get('timeperiod', 14)
+                return talib.PLUS_DI(high, low, close, timeperiod=timeperiod)
+
+            elif indicator_name == 'MINUS_DM':
+                # -DM (Minus Directional Movement) 需要 high, low
+                timeperiod = params.get('timeperiod', 14)
+                return talib.MINUS_DM(high, low, timeperiod=timeperiod)
+
+            elif indicator_name == 'PLUS_DM':
+                # +DM (Plus Directional Movement) 需要 high, low
+                timeperiod = params.get('timeperiod', 14)
+                return talib.PLUS_DM(high, low, timeperiod=timeperiod)
+
             else:
-                # 尝试动态调用TA-Lib函数
+                # 🔥 改进：使用统一的input_mapping来动态调用TA-Lib函数
                 if hasattr(talib, indicator_name):
                     func = getattr(talib, indicator_name)
-                    # 简化调用，使用close价格和参数
-                    return func(close, **params)
+
+                    # 使用get_indicator_inputs获取正确的输入列表
+                    from core.indicator_adapter import get_indicator_inputs
+                    required_inputs = get_indicator_inputs(indicator_name)
+
+                    # 准备输入参数（按顺序映射到OHLCV数据）
+                    input_args = []
+                    ohlcv_mapping = {
+                        'open': open_price,
+                        'high': high,
+                        'low': low,
+                        'close': close,
+                        'volume': volume
+                    }
+
+                    for input_name in required_inputs:
+                        if input_name in ohlcv_mapping:
+                            input_args.append(ohlcv_mapping[input_name])
+                        else:
+                            logger.warning(f"指标 {indicator_name} 需要的输入 '{input_name}' 未在OHLCV映射中找到，跳过")
+
+                    # 如果没有匹配到任何输入参数，使用close作为默认值
+                    if not input_args:
+                        logger.warning(f"指标 {indicator_name} 没有匹配到输入参数，使用close作为默认值")
+                        input_args = [close]
+
+                    # 🔥 关键：使用inspect.signature动态提取配置参数
+                    import inspect
+                    sig = inspect.signature(func)
+                    param_names = list(sig.parameters.keys())
+
+                    # 过滤掉OHLCV输入参数，只保留配置参数
+                    config_params = {}
+                    for param_name in param_names:
+                        # 跳过OHLCV数据参数
+                        if param_name.lower() in ['open', 'high', 'low', 'close', 'volume',
+                                                    'real', 'inreal', 'real0', 'real1', 'price', 'prices']:
+                            continue
+                        # 如果params中提供了这个配置参数，使用它
+                        if param_name in params:
+                            config_params[param_name] = params[param_name]
+
+                    logger.debug(f"动态调用TA-Lib指标 {indicator_name}，输入参数: {required_inputs}, 配置参数: {config_params}")
+                    return func(*input_args, **config_params)
                 else:
                     raise ValueError(f"不支持的TA-Lib指标: {indicator_name}")
 

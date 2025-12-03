@@ -261,11 +261,19 @@ class InteractionMixin:
     def on_indicator_selected(self, indicators: list):
         """接收指标选择结果，更新active_indicators并刷新图表"""
         self.active_indicators = indicators
-        self.update_chart()
+        # 修复：传入当前K线数据，否则update_chart会因data=None直接返回
+        if hasattr(self, 'current_kdata') and self.current_kdata is not None and not self.current_kdata.empty:
+            self.update_chart({'kdata': self.current_kdata})
+        else:
+            logger.warning("on_indicator_selected: 没有可用的K线数据，无法更新图表")
 
     def _on_indicator_changed(self, indicators):
         """多屏同步所有激活指标，仅同步选中项（已废弃，自动同步主窗口get_current_indicators）"""
-        self.update_chart()
+        # 修复：传入当前K线数据，否则update_chart会因data=None直接返回
+        if hasattr(self, 'current_kdata') and self.current_kdata is not None and not self.current_kdata.empty:
+            self.update_chart({'kdata': self.current_kdata})
+        else:
+            logger.warning("_on_indicator_changed: 没有可用的K线数据，无法更新图表")
 
     # 删除冲突的refresh方法，使用ChartWidget或utility_mixin中的实现
 

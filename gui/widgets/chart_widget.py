@@ -105,6 +105,7 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             self._update_lock = QMutex()
             self._render_lock = QMutex()
             self.crosshair_enabled = True
+            self.active_indicators = None  # 初始化为None，用于区分"未设置"vs"用户设置"
             logger.info(f"ChartWidget __init__: crosshair_enabled 设置为 {self.crosshair_enabled}")
 
             # 4. 初始化UI (调用UIMixin中的init_ui)
@@ -282,7 +283,10 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             with QMutexLocker(self._render_lock):
                 if hasattr(self, 'current_kdata') and self.current_kdata is not None:
                     # 使用update_chart方法而不是直接调用renderer.render
-                    self.update_chart({'kdata': self.current_kdata})
+                    self.update_chart({
+                        'kdata': self.current_kdata,
+                        'indicators_data': {}  # builtin指标会自己计算
+                    })
                 else:
                     logger.error("刷新图表失败: K线数据不存在")
                     self.error_occurred.emit("刷新图表失败: K线数据不存在")

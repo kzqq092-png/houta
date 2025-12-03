@@ -218,6 +218,11 @@ class UtilityMixin:
             indicators: 选中的指标列表
         """
         self.active_indicators = indicators
+        # 修复：传入当前K线数据，否则update_chart会因data=None直接返回
+        if hasattr(self, 'current_kdata') and self.current_kdata is not None and not self.current_kdata.empty:
+            self.update_chart({'kdata': self.current_kdata})
+        else:
+            logger.warning("on_indicator_selected: 没有可用的K线数据，无法更新图表")
 
     def _on_indicator_changed(self, indicators):
         """指标变更处理（内部方法）
@@ -226,3 +231,8 @@ class UtilityMixin:
             indicators: 变更的指标列表
         """
         self.active_indicators = indicators
+        # 修复：传入当前K线数据，否则update_chart会因data=None直接返回
+        if hasattr(self, 'current_kdata') and self.current_kdata is not None and not self.current_kdata.empty:
+            self.update_chart({'kdata': self.current_kdata})
+        else:
+            logger.warning("_on_indicator_changed: 没有可用的K线数据，无法更新图表")

@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 # 替换旧的指标系统导入
 from core.indicator_adapter import get_indicator_english_name
 
+
 class RenderingMixin:
     """图表渲染功能Mixin"""
 
@@ -20,7 +21,7 @@ class RenderingMixin:
         try:
             if not data:
                 return
-
+            start_time = time.time()
             # 🔴 性能优化P1.4：降低日志级别，避免list()调用和DataFrame.head()打印
             logger.debug(f"RenderingMixin.update_chart接收到数据类型: {type(data)}")
 
@@ -49,7 +50,7 @@ class RenderingMixin:
             # 处理kdata是字典的情况
             if isinstance(kdata, dict):
                 # 如果kdata是字典，尝试从中提取DataFrame
-                logger.debug(f"kdata是字典")
+                logger.info(f"kdata是字典")
 
                 if 'data' in kdata:
                     # 如果字典中有data键，使用它
@@ -81,6 +82,10 @@ class RenderingMixin:
             if hasattr(kdata, 'shape'):
                 logger.debug(f"处理后的kdata形状: {kdata.shape}")
 
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ K线类型转化完成，耗时: {render_time:.2f}ms")
+
+            start_time = time.time()
             # 检查kdata是否包含必要的列
             required_columns = ['open', 'high', 'low', 'close', 'volume']
             if isinstance(kdata, pd.DataFrame):
@@ -93,6 +98,11 @@ class RenderingMixin:
             kdata = self._downsample_kdata(kdata)
             kdata = kdata.dropna(how='any')
             kdata = kdata.loc[~kdata.index.duplicated(keep='first')]
+
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ K线数据校验，耗时: {render_time:.2f}ms")
+
+            start_time = time.time()
             self.current_kdata = kdata
 
             # 记录清理后的kdata信息
@@ -109,8 +119,19 @@ class RenderingMixin:
 
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 ax.cla()
+
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ K线price_ax，耗时: {render_time:.2f}ms")
+
+            start_time = time.time()
+
             style = self._get_chart_style()
             x = np.arange(len(kdata))  # 用等距序号做X轴
+
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ K线style设置，耗时: {render_time:.2f}ms")
+
+            start_time = time.time()
 
             # 记录渲染参数
             logger.debug(f"准备调用renderer.render_candlesticks，x轴长度: {len(x)}")
@@ -123,12 +144,20 @@ class RenderingMixin:
             except Exception as e:
                 logger.error(f"K线渲染失败: {e}", exc_info=True)
                 raise
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ render_candlesticks，耗时: {render_time:.2f}ms")
 
+            start_time = time.time()
             try:
                 self.renderer.render_volume(self.volume_ax, kdata, style, x=x)
                 logger.debug("成交量渲染成功")
             except Exception as e:
                 logger.error(f"成交量渲染失败: {e}", exc_info=True)
+
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ render_volume，耗时: {render_time:.2f}ms")
+
+            start_time = time.time()
 
             # ✅ 性能优化P2.1：合并autoscale_view()调用 - 在所有渲染完成后统一调用
             # 统一设置所有轴（价格、成交量、指标）的自动缩放范围
@@ -145,28 +174,55 @@ class RenderingMixin:
             indicators_data = data.get('indicators_data', {})
             if indicators_data:
                 # 将indicators_data传递给渲染函数
-                logger.debug(f"开始渲染指标数据，指标数量: {len(indicators_data)}")
+                logger.info(f"✅ 检测到indicators_data，指标数量: {len(indicators_data)}, 指标名称: {list(indicators_data.keys())}")
                 self._render_indicator_data(indicators_data, kdata, x)
+                logger.info(f"✅ _render_indicator_data调用完成")
+            else:
+                logger.debug(f"💡 indicators_data为空，builtin指标将在_render_indicators中计算")
 
-            # 修复：自动同步主窗口指标
-            if hasattr(self, 'parentWidget') and callable(getattr(self, 'parentWidget', None)):
-                main_window = self.parentWidget()
-                while main_window and not hasattr(main_window, 'get_current_indicators'):
-                    main_window = main_window.parentWidget() if hasattr(
-                        main_window, 'parentWidget') else None
-                if main_window and hasattr(main_window, 'get_current_indicators'):
-                    self.active_indicators = main_window.get_current_indicators()
+            start_time = time.time()
+            # 🔧 修复：只在active_indicators为None时使用默认指标，保护用户的选择
+            if self.active_indicators is None:  # 仅当完全未设置时才使用默认
+                # 调用_get_active_indicators获取默认指标
+                if hasattr(self, '_get_active_indicators'):
+                    self.active_indicators = self._get_active_indicators()
+                    logger.info(f"✅ active_indicators为None，使用默认指标: {len(self.active_indicators) if self.active_indicators else 0}个")
+                else:
+                    # 硬编码默认指标作为最后的fallback
+                    self.active_indicators = [
+                        {"name": "MA20", "params": {"period": 20}, "group": "builtin"},
+                        {"name": "MA60", "params": {"period": 60}, "group": "builtin"}
+                    ]
+                    logger.info(f"✅ active_indicators为None，使用硬编码默认指标: MA20, MA60")
+            else:
+                logger.info(f"✅ active_indicators已被设置，保持现有值不变: {[ind.get('name', 'unknown') for ind in self.active_indicators] if self.active_indicators else 'None'}")
+
+            # 记录active_indicators状态
+            active_inds = getattr(self, 'active_indicators', None)
+            # 如果active_indicators为None，使用空列表
+            if active_inds is None:
+                active_inds = []
+            logger.info(f"📊 准备调用_render_indicators，active_indicators状态: {len(active_inds) if active_inds else 0}个指标")
+            if active_inds:
+                logger.info(f"📊 active_indicators内容: {[ind.get('name', 'unknown') for ind in active_inds]}")
+
             self._render_indicators(kdata, x=x)
+
             # --- 新增：形态信号可视化 ---
             pattern_signals = data.get('pattern_signals', None)
             if pattern_signals:
                 self.plot_patterns(pattern_signals)
-            
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ _render_indicators，耗时: {render_time:.2f}ms")
+
             # ✅ 性能优化P1: 统一调用_optimize_display()设置所有轴的完整样式
             # 替代chart_renderer中的_optimize_display()调用，避免重复设置样式
             # _optimize_display()会设置所有轴（price_ax、volume_ax、indicator_ax）的样式
             self._optimize_display()
-            
+
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ 形态信号可视化，耗时: {render_time:.2f}ms")
+
             if not kdata.empty:
                 for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                     ax.set_xlim(0, len(kdata)-1)
@@ -192,18 +248,18 @@ class RenderingMixin:
                 ax.yaxis.set_tick_params(direction='in', pad=0)
                 ax.yaxis.set_label_position('left')
                 ax.tick_params(axis='y', direction='in', pad=0)
-            
+
             # ✅ 性能优化：延迟十字光标初始化到渲染完成后
             # 不在渲染过程中初始化，避免影响渲染性能
             self.crosshair_enabled = True
             # self.enable_crosshair(force_rebind=True)  # 已移除，延迟到绘制完成后
-            
+
             # ✅ 性能优化：延迟绘制 - 所有渲染和范围设置完成后，只调用一次draw_idle()
             # 这样可以避免K线、成交量、指标分别触发绘制，大幅提升性能
             if hasattr(self, 'canvas') and self.canvas:
                 self.canvas.draw_idle()
                 logger.debug("✅ 统一绘制完成（延迟绘制优化）")
-            
+
             # ✅ 性能优化P3：进一步延迟十字光标初始化到用户交互时
             # 不在渲染完成后立即初始化，而是在用户首次鼠标移动时再初始化
             # 这样可以避免在渲染过程中初始化十字光标，进一步提升渲染性能
@@ -211,7 +267,7 @@ class RenderingMixin:
                 # 标记需要初始化，但不立即执行
                 self._crosshair_needs_init = True
                 logger.debug("✅ 十字光标初始化已延迟到用户交互时")
-                
+
                 # 如果已经初始化，只需要清除旧元素（不重新绑定事件）
                 if hasattr(self, '_crosshair_initialized') and self._crosshair_initialized:
                     try:
@@ -264,32 +320,32 @@ class RenderingMixin:
                 ax.xaxis.label.set_fontsize(8)
                 ax.yaxis.label.set_fontsize(8)
 
-            # 右下角显示数据时间
-            if hasattr(self, '_data_time_text') and self._data_time_text:
-                try:
-                    if self._data_time_text in self.price_ax.texts:
-                        self._data_time_text.remove()
-                except Exception as e:
-                    if True:  # 使用Loguru日志
-                        logger.warning(f"移除数据时间文本失败: {str(e)}")
-                self._data_time_text = None
+            # # 右下角显示数据时间
+            # if hasattr(self, '_data_time_text') and self._data_time_text:
+            #     try:
+            #         if self._data_time_text in self.price_ax.texts:
+            #             self._data_time_text.remove()
+            #     except Exception as e:
+            #         if True:  # 使用Loguru日志
+            #             logger.warning(f"移除数据时间文本失败: {str(e)}")
+            #     self._data_time_text = None
 
-            # 获取数据时间
-            import datetime
-            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            data_time_str = f"当前时间: {now}"
+            # # 获取数据时间
+            # import datetime
+            # now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # data_time_str = f"当前时间: {now}"
 
-            # 右下角显示数据时间
-            self._data_time_text = self.price_ax.text(
-                0.99, 0.01, data_time_str,
-                transform=self.price_ax.transAxes,
-                va='bottom', ha='right',
-                fontsize=8,
-                color=text_color,
-                bbox=dict(facecolor=bg_color, alpha=0.7,
-                          edgecolor='none', boxstyle='round,pad=0.2'),
-                zorder=200
-            )
+            # # 右下角显示数据时间
+            # self._data_time_text = self.price_ax.text(
+            #     0.99, 0.01, data_time_str,
+            #     transform=self.price_ax.transAxes,
+            #     va='bottom', ha='right',
+            #     fontsize=8,
+            #     color=text_color,
+            #     bbox=dict(facecolor=bg_color, alpha=0.7,
+            #               edgecolor='none', boxstyle='round,pad=0.2'),
+            #     zorder=200
+            # )
 
             self._optimize_display()
         except Exception as e:
@@ -299,14 +355,18 @@ class RenderingMixin:
     def _render_indicator_data(self, indicators_data, kdata, x=None):
         """渲染从indicators_data传递的指标数据"""
         try:
+            logger.info(f"🎨 _render_indicator_data开始执行")
             if not indicators_data:
+                logger.warning(f"❌ indicators_data为空，直接返回")
                 return
 
             if x is None:
                 x = np.arange(len(kdata))
 
+            logger.info(f"🎨 准备遍历indicators_data，指标数量: {len(indicators_data)}")
             # 遍历所有指标
             for i, (indicator_name, indicator_data) in enumerate(indicators_data.items()):
+                logger.info(f"🎨 处理指标 {i+1}/{len(indicators_data)}: {indicator_name}, 数据类型: {type(indicator_data)}")
                 # 处理MA指标
                 if indicator_name == 'MA':
                     for j, (period, values) in enumerate(indicator_data.items()):
@@ -416,9 +476,9 @@ class RenderingMixin:
                 params = indicator.get('params', {})
                 formula = indicator.get('formula', None)
                 style = self._get_indicator_style(name, i)
-                # 内置MA
-                if name.startswith('MA') and (group == 'builtin' or name[2:].isdigit()):
-                    period = int(params.get('n', name[2:]) or 5)
+                # 内置 MA 指标 - 精确匹配：必须是 'MA' 或 'MA' + 数字（如 'MA20'）
+                if (name == 'MA' or (name.startswith('MA') and name[2:].isdigit() and len(name) > 2)) and group == 'builtin':
+                    period = int(params.get('n', name[2:] if len(name) > 2 else 20) or 20)
                     ma = kdata['close'].rolling(period).mean().dropna()
                     self.price_ax.plot(x[-len(ma):], ma.values, color=style['color'],
                                        linewidth=style['linewidth'], alpha=style['alpha'], label=name)
@@ -463,9 +523,30 @@ class RenderingMixin:
                         # 只传递非空参数
                         func_params = {k: v for k,
                                        v in params.items() if v != ''}
-                        # 传递收盘价等
-                        result = func(
-                            kdata['close'].values, **{k: float(v) if v else None for k, v in func_params.items()})
+
+                        # 获取该指标需要的输入列
+                        from core.indicator_adapter import get_indicator_inputs
+                        required_inputs = get_indicator_inputs(english_name)
+
+                        # 构建函数参数 - 🔥 修复：确保所有输入数据都转换为float64类型
+                        func_args = []
+                        for input_name in required_inputs:
+                            if input_name in kdata.columns:
+                                # ✅ 关键修复：将数据转换为float64（double）类型
+                                input_data = kdata[input_name].values.astype(np.float64)
+                                func_args.append(input_data)
+                                logger.debug(f"指标 {english_name} 输入列 {input_name}: dtype={input_data.dtype}, shape={input_data.shape}")
+                            else:
+                                logger.warning(f"指标 {english_name} 缺少必要列: {input_name}")
+                                raise ValueError(f"缺少列: {input_name}")
+
+                        # 传递计算参数（转换为浮点数）
+                        kwargs = {k: float(v) if v else None for k, v in func_params.items()}
+                        logger.debug(f"指标 {english_name} 参数: {kwargs}")
+
+                        # 调用talib函数
+                        result = func(*func_args, **kwargs)
+
                         if isinstance(result, tuple):
                             for j, arr in enumerate(result):
                                 arr = np.asarray(arr)
@@ -481,6 +562,7 @@ class RenderingMixin:
                             self.indicator_ax.plot(x[-len(arr):], arr, color=style['color'],
                                                    linewidth=0.7, alpha=0.85, label=display_name)
                     except Exception as e:
+                        logger.error(f"ta-lib指标 {name} 渲染失败: {str(e)}")
                         self.error_occurred.emit(f"ta-lib指标渲染失败: {str(e)}")
                 elif group == 'custom' and formula:
                     try:
@@ -778,6 +860,9 @@ class RenderingMixin:
     def _optimize_display(self):
         """优化显示效果，所有坐标轴字体统一为8号，始终显示网格和XY轴刻度（任何操作都不隐藏）"""
         try:
+
+            start_time = time.time()
+
             # 确保所有子图都有网格和刻度
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 if not ax:
@@ -829,10 +914,8 @@ class RenderingMixin:
                     label.set_color(text_color)
                     label.set_rotation(30)
 
-            # ✅ 性能优化P0: 移除draw_idle()调用，由调用方统一绘制
-            # 不再在这里触发绘制，避免在渲染过程中触发额外绘制
-            # if hasattr(self, 'canvas') and self.canvas:
-            #     self.canvas.draw_idle()
+            render_time = (time.time() - start_time) * 1000  # 转换为毫秒
+            logger.info(f"✅ _optimize_display，耗时: {render_time:.2f}ms")
 
         except Exception as e:
             logger.error(f"优化显示失败: {str(e)}")
