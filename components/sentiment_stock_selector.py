@@ -7,7 +7,7 @@ from trade_api import SimulatedTradeAPI
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from loguru import logger
 
-SIGNAL_CONFIG_FILE = os.path.expanduser("~/.hikyuu_signal_config.json")
+SIGNAL_CONFIG_FILE = os.path.expanduser("~/.factorweave_signal_config.json")
 
 def load_signal_config():
     if os.path.exists(SIGNAL_CONFIG_FILE):

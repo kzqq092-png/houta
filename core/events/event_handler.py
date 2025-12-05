@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 from .events import BaseEvent
 
-logger = logger
 
 class EventHandler(ABC):
     """

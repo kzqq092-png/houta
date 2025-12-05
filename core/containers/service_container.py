@@ -8,8 +8,6 @@ from loguru import logger
 import threading
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
 from .service_registry import ServiceRegistry, ServiceInfo, ServiceScope
-
-logger = logger
 T = TypeVar('T')
 
 

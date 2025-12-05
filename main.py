@@ -51,15 +51,15 @@ except ImportError as e:
     QEventLoop = None
 
 # WebGPU硬件加速渲染初始化
-# try:
-#     from optimization.webgpu_chart_renderer import initialize_webgpu_chart_renderer
-#     # 初始化WebGPU图表渲染器（包含自动降级功能）
-#     initialize_webgpu_chart_renderer(max_workers=os.cpu_count(), enable_progressive=True)
-#     logger.info("WebGPU硬件加速渲染系统初始化成功")
-# except ImportError:
-#     logger.warning("WebGPU模块不可用，将使用标准渲染")
-# except Exception as e:
-#     logger.error(f"WebGPU初始化失败: {e}")
+try:
+    from optimization.webgpu_chart_renderer import initialize_webgpu_chart_renderer
+    # 初始化WebGPU图表渲染器（包含自动降级功能）
+    initialize_webgpu_chart_renderer(max_workers=os.cpu_count(), enable_progressive=True)
+    logger.info("WebGPU硬件加速渲染系统初始化成功")
+except ImportError:
+    logger.warning("WebGPU模块不可用，将使用标准渲染")
+except Exception as e:
+    logger.error(f"WebGPU初始化失败: {e}")
 
 
 class FactorWeaveQuantApplication:

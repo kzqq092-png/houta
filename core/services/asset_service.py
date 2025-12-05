@@ -13,8 +13,6 @@ from .unified_data_manager import UnifiedDataManager
 from .stock_service import StockService
 from ..tet_data_pipeline import StandardQuery, StandardData
 
-logger = logger
-
 
 class AssetService:
     """
@@ -43,7 +41,6 @@ class AssetService:
         self.unified_data_manager = unified_data_manager
         self.stock_service = stock_service
         self.service_container = service_container
-        self.logger = logger
 
         # 资产类型到服务的映射（用于优化特定资产类型的处理）
         self.asset_service_mapping = {
@@ -53,7 +50,7 @@ class AssetService:
             # 其他资产类型通过UnifiedDataManager的TET管道处理
         }
 
-        self.logger.info("AssetService初始化完成")
+        logger.info("AssetService初始化完成")
 
     def get_historical_data(self, symbol: str, asset_type: AssetType,
                             start_date: str = None, end_date: str = None,
@@ -83,11 +80,11 @@ class AssetService:
             crypto_data = asset_service.get_historical_data("BTCUSDT", AssetType.CRYPTO)
         """
         try:
-            self.logger.info(f" AssetService获取历史数据: {symbol} ({asset_type.value})")
+            logger.info(f" AssetService获取历史数据: {symbol} ({asset_type.value})")
 
             # 优先使用TET管道
             if self.unified_data_manager.tet_enabled:
-                self.logger.info(f" AssetService使用TET模式: {symbol}")
+                logger.info(f" AssetService使用TET模式: {symbol}")
                 result = self.unified_data_manager.get_asset_data(
                     symbol=symbol,
                     asset_type=asset_type,
@@ -99,12 +96,12 @@ class AssetService:
                     **kwargs
                 )
                 if result is not None:
-                    self.logger.info(f" AssetService TET模式成功: {symbol} | 记录数: {len(result)}")
+                    logger.info(f" AssetService TET模式成功: {symbol} | 记录数: {len(result)}")
                 else:
-                    self.logger.warning(f" AssetService TET模式返回空数据: {symbol}")
+                    logger.warning(f" AssetService TET模式返回空数据: {symbol}")
                 return result
             else:
-                self.logger.warning(f" TET模式未启用，降级到传统模式: {symbol}")
+                logger.warning(f" TET模式未启用，降级到传统模式: {symbol}")
 
             # 降级到专用服务
             if asset_type in self.asset_service_mapping:
@@ -116,7 +113,7 @@ class AssetService:
             return self.unified_data_manager._legacy_get_stock_data(symbol, period, **kwargs)
 
         except Exception as e:
-            self.logger.error(f"获取历史数据失败 {symbol}: {e}")
+            logger.error(f"获取历史数据失败 {symbol}: {e}")
             return pd.DataFrame()
 
     def get_asset_list(self, asset_type: AssetType,
@@ -142,7 +139,7 @@ class AssetService:
             cryptos = asset_service.get_asset_list(AssetType.CRYPTO)
         """
         try:
-            self.logger.info(f"获取资产列表: {asset_type.value}")
+            logger.info(f"获取资产列表: {asset_type.value}")
 
             # 优先使用TET模式
             if self.unified_data_manager.tet_enabled:
@@ -159,7 +156,7 @@ class AssetService:
             return self.unified_data_manager._legacy_get_asset_list(asset_type, market)
 
         except Exception as e:
-            self.logger.error(f"获取资产列表失败 {asset_type.value}: {e}")
+            logger.error(f"获取资产列表失败 {asset_type.value}: {e}")
             return []
 
     def get_real_time_data(self, symbols: List[str],
@@ -239,7 +236,7 @@ class AssetService:
                                 markets.extend(source_markets)
 
                     except Exception as e:
-                        self.logger.debug(f"获取 {at.value} 市场列表失败: {e}")
+                        logger.debug(f"获取 {at.value} 市场列表失败: {e}")
 
                 return markets
 
@@ -247,7 +244,7 @@ class AssetService:
             return self._get_default_markets(asset_type)
 
         except Exception as e:
-            self.logger.error(f"获取市场列表失败: {e}")
+            logger.error(f"获取市场列表失败: {e}")
             return self._get_default_markets(asset_type)
 
     def _standardize_asset_list(self, raw_data: Any, asset_type: AssetType) -> List[Dict[str, Any]]:
@@ -289,7 +286,7 @@ class AssetService:
                         })
 
         except Exception as e:
-            self.logger.error(f"标准化资产列表失败: {e}")
+            logger.error(f"标准化资产列表失败: {e}")
 
         return standardized
 
@@ -357,7 +354,7 @@ class AssetService:
                             types = source.plugin.get_supported_asset_types()
                             supported_types.update(types)
                         except Exception as e:
-                            self.logger.debug(f"获取 {source_id} 支持的资产类型失败: {e}")
+                            logger.debug(f"获取 {source_id} 支持的资产类型失败: {e}")
 
                 return list(supported_types)
 
@@ -365,7 +362,7 @@ class AssetService:
             return [AssetType.STOCK_A, AssetType.INDEX, AssetType.FUND]
 
         except Exception as e:
-            self.logger.error(f"获取支持的资产类型失败: {e}")
+            logger.error(f"获取支持的资产类型失败: {e}")
             return [AssetType.STOCK_A]
 
     def get_provider_info(self, asset_type: AssetType = None) -> List[Dict[str, Any]]:
@@ -406,7 +403,7 @@ class AssetService:
                             providers.append(provider_info)
 
                         except Exception as e:
-                            self.logger.debug(f"获取 {source_id} 提供商信息失败: {e}")
+                            logger.debug(f"获取 {source_id} 提供商信息失败: {e}")
 
             return providers
 
@@ -421,43 +418,77 @@ class AssetService:
         Returns:
             Dict[str, Any]: 健康状态信息
         """
-        status = {
-            'service_name': 'AssetService',
-            'status': 'healthy',
-            'tet_enabled': self.unified_data_manager.tet_enabled,
-            'supported_asset_types': [t.value for t in self.get_supported_asset_types()],
-            'provider_count': 0,
-            'issues': []
-        }
-
         try:
-            # 检查TET管道状态
-            if not self.unified_data_manager.tet_enabled:
-                status['issues'].append('TET数据管道未启用')
+            logger.info(f"健康检查: {self.__class__.__name__}")
+            
+            status = {
+                'service_name': 'AssetService',
+                'status': 'healthy',
+                'tet_enabled': self.unified_data_manager.tet_enabled,
+                'supported_asset_types': [t.value for t in self.get_supported_asset_types()],
+                'provider_count': 0,
+                'issues': []
+            }
 
-            # 检查提供商状态
-            providers = self.get_provider_info()
-            status['provider_count'] = len(providers)
+            try:
+                # 检查TET管道状态
+                if not self.unified_data_manager.tet_enabled:
+                    status['issues'].append('TET数据管道未启用')
 
-            active_providers = [p for p in providers if p['status'] == 'active']
-            if len(active_providers) == 0:
-                status['issues'].append('没有活跃的数据提供商')
-                status['status'] = 'warning'
+                # 检查提供商状态
+                providers = self.get_provider_info()
+                status['provider_count'] = len(providers)
 
-            # 检查核心服务
-            if not self.stock_service:
-                status['issues'].append('股票服务不可用')
+                active_providers = [p for p in providers if p['status'] == 'active']
+                if len(active_providers) == 0:
+                    status['issues'].append('没有活跃的数据提供商')
+                    status['status'] = 'warning'
+
+                # 检查核心服务
+                if not self.stock_service:
+                    status['issues'].append('股票服务不可用')
+                    status['status'] = 'error'
+
+                if not self.unified_data_manager:
+                    status['issues'].append('统一数据管理器不可用')
+                    status['status'] = 'error'
+
+                # 检查各个子服务状态
+                service_states = {
+                    'unified_data_manager': self.unified_data_manager.health_check(),
+                    'stock_service': self.stock_service.health_check() if self.stock_service else False,
+                    'crypto_service': self.crypto_service.health_check() if self.crypto_service else False,
+                    'forex_service': self.forex_service.health_check() if self.forex_service else False,
+                    'fund_service': self.fund_service.health_check() if self.fund_service else False,
+                    'futures_service': self.futures_service.health_check() if self.futures_service else False
+                }
+
+                all_healthy = True
+                for service_name, state in service_states.items():
+                    if not state:
+                        logger.warning(f"服务 {service_name} 状态异常")
+                        all_healthy = False
+
+                if all_healthy:
+                    logger.info("所有资产服务健康状态正常")
+                else:
+                    logger.warning("部分资产服务状态异常")
+                    status['status'] = 'warning'
+
+            except Exception as e:
                 status['status'] = 'error'
+                status['issues'].append(f'健康检查异常: {str(e)}')
+                logger.error(f"健康检查失败: {e}")
 
-            if not self.unified_data_manager:
-                status['issues'].append('统一数据管理器不可用')
-                status['status'] = 'error'
+            return status
 
         except Exception as e:
-            status['status'] = 'error'
-            status['issues'].append(f'健康检查异常: {str(e)}')
-
-        return status
+            logger.error(f"健康检查失败: {e}")
+            return {
+                'service_name': 'AssetService',
+                'status': 'error',
+                'error': str(e)
+            }
 
 # 便捷函数
 

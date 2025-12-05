@@ -34,15 +34,15 @@ class FMPSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
             "name": "FMP社交情绪插件",
             "version": "1.0.0",
             "author": "FactorWeave-Quant  Team",
-            "email": "support@hikyuu.com",
+            "email": "support@factorweave.com",
             "website": "https://financialmodelingprep.com",
             "license": "MIT",
             "description": "基于Financial Modeling Prep API获取社交情绪、新闻情绪和股票趋势数据",
             "plugin_type": PluginType.DATA_SOURCE,
             "category": PluginCategory.CORE,
             "dependencies": ["requests>=2.25.0"],
-            "min_hikyuu_version": "1.0.0",
-            "max_hikyuu_version": "2.0.0",
+            "min_framework_version": "1.0.0",
+            "max_framework_version": "2.0.0",
             "documentation_url": "https://site.financialmodelingprep.com/developer/docs",
             "tags": ["sentiment", "fmp", "social", "news", "api"]
         }

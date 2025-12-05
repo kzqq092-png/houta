@@ -29,7 +29,6 @@ from core.services.unified_data_manager import UnifiedDataManager
 from core.services.asset_service import AssetService
 from core.plugin_types import AssetType
 
-logger = logger
 
 
 class LeftPanel(BasePanel):

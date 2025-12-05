@@ -1581,11 +1581,11 @@ class DataQualityControlCenter(QWidget):
             # 暂时返回一些默认的数据源配置
             return [
                 {
-                    'source_name': 'hikyuu_stock',
+                    'source_name': 'factorweave_stock',
                     'table_name': 'kdata',
                     'data_type': 'kline',
                     'connection_info': {
-                        'type': 'hikyuu',
+                        'type': 'factorweave',
                         'market': 'stock'
                     }
                 }
@@ -1599,7 +1599,7 @@ class DataQualityControlCenter(QWidget):
         try:
             # 这里应该根据数据源信息获取实际数据
             # 由于需要连接到真实的数据源，这里先返回None
-            # 在实际部署时，这里应该连接到HiKyuu或其他数据源
+            # 在实际部署时，这里应该连接到FactorWeave-Quant或其他数据源
             logger.info(f"尝试获取数据源数据: {data_source_info}")
             return None
         except Exception as e:

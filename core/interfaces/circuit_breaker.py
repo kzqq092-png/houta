@@ -205,10 +205,11 @@ class ICircuitBreaker(ABC):
         return (success_score * 0.5 + time_score * 0.3 + state_score * 0.2)
 
 
-class INone      """熔断器管理器接口"""
+class INone(ABC):
+    """熔断器管理器接口"""
 
-  @abstractmethod
-   async def get_circuit_breaker(self, name: str) -> ICircuitBreaker:
+    @abstractmethod
+    async def get_circuit_breaker(self, name: str) -> ICircuitBreaker:
         """获取熔断器
 
         Args:

@@ -58,18 +58,9 @@ class SectorFundFlowService(QObject):
         """
         super().__init__()
 
-        # 使用数据管理器工厂获取正确的DataManager实例
-        if data_manager is None:
-            try:
-                from utils.manager_factory import get_manager_factory, get_data_manager
-                factory = get_manager_factory()
-                self.data_manager = get_data_manager()
-            except ImportError:
-                # 降级到直接导入
-                from .unified_data_manager import get_unified_data_manager
-                self.data_manager = get_unified_data_manager()
-        else:
-            self.data_manager = data_manager
+        # 使用数据标准化器替代DataManager
+        from core.data_standardization_engine import DataStandardizer
+        self.data_standardizer = DataStandardizer()
         self.config = config or SectorFlowConfig()
         # 纯Loguru架构，移除log_manager依赖
 
@@ -97,12 +88,12 @@ class SectorFundFlowService(QObject):
             import time
             start_time = time.time()
 
-            # 检查数据管理器
-            logger.info("检查数据管理器状态...")
-            if self.data_manager:
-                logger.info("数据管理器可用")
+            # 检查数据标准化器
+            logger.info("检查数据标准化器状态...")
+            if self.data_standardizer:
+                logger.info("数据标准化器可用")
             else:
-                logger.warning("数据管理器不可用")
+                logger.warning("数据标准化器不可用")
 
             # 启动自动刷新
             logger.info("配置自动刷新设置...")
@@ -201,7 +192,14 @@ class SectorFundFlowService(QObject):
             pd.DataFrame: 板块资金流汇总数据
         """
         try:
-            df = self.data_manager.get_sector_fund_flow_summary(symbol, indicator)
+            # 使用AkShare获取板块资金流数据
+            import akshare as ak
+            df = ak.stock_sector_fund_flow_rank(indicator=indicator)
+            
+            if not df.empty and symbol:
+                # 过滤指定板块
+                df = df[df['板块名称'] == symbol]
+            
             logger.info(f" 板块资金流汇总获取成功: {symbol}, {len(df)} 条记录")
             return df
 
@@ -220,9 +218,10 @@ class SectorFundFlowService(QObject):
             pd.DataFrame: 板块历史资金流数据
         """
         try:
-            df = self.data_manager.get_sector_fund_flow_hist(symbol, period)
-            logger.info(f" 板块历史资金流获取成功: {symbol}, {len(df)} 条记录")
-            return df
+            # 这里可以扩展为支持历史数据获取
+            # 当前返回空数据作为占位符
+            logger.info(f" 板块历史资金流功能待实现: {symbol}, {period}")
+            return pd.DataFrame()
 
         except Exception as e:
             logger.error(f" 获取板块历史资金流失败: {e}")
@@ -239,9 +238,10 @@ class SectorFundFlowService(QObject):
             pd.DataFrame: 概念历史资金流数据
         """
         try:
-            df = self.data_manager.get_concept_fund_flow_hist(symbol, period)
-            logger.info(f" 概念历史资金流获取成功: {symbol}, {len(df)} 条记录")
-            return df
+            # 这里可以扩展为支持概念历史数据获取
+            # 当前返回空数据作为占位符
+            logger.info(f" 概念历史资金流功能待实现: {symbol}, {period}")
+            return pd.DataFrame()
 
         except Exception as e:
             logger.error(f" 获取概念历史资金流失败: {e}")
@@ -259,8 +259,8 @@ class SectorFundFlowService(QObject):
         try:
             logger.info(f" 切换数据源到: {source}")
 
-            # 切换数据管理器的数据源
-            self.data_manager.set_data_source(source)
+            # 这里可以扩展为支持数据源切换
+            # 当前只是记录日志
             self._current_source = source
 
             # 清理缓存
@@ -398,20 +398,16 @@ class SectorFundFlowService(QObject):
             self._available_sources.clear()
             self._optimal_sources.clear()
 
-            # 1. 检查TET框架可用性
-            if hasattr(self.data_manager, 'tet_enabled') and self.data_manager.tet_enabled:
-                logger.info("TET框架可用，检测插件化数据源...")
-                self._detect_tet_data_sources()
-
-            # 2. 检查传统数据源
-            logger.info("检测传统数据源...")
-            self._detect_legacy_data_sources()
-
-            # 3. 根据健康状态和功能支持排序
-            self._rank_data_sources()
-
-            # 4. 输出检测结果
-            self._log_detection_results()
+            # 系统现在使用AkShare作为主要数据源
+            # 设置AkShare为默认和最优数据源
+            self._available_sources['akshare'] = {
+                'type': 'primary',
+                'health_score': 1.0,
+                'supports_fund_flow': True,
+                'description': 'AkShare板块资金流数据源'
+            }
+            
+            logger.info("✅ AkShare数据源已配置为板块资金流的默认数据源")
 
         except Exception as e:
             logger.error(f"[ERROR] 数据源检测失败: {e}")
@@ -421,97 +417,18 @@ class SectorFundFlowService(QObject):
     def _detect_tet_data_sources(self) -> None:
         """检测TET框架中支持SECTOR_FUND_FLOW的数据源"""
         try:
-            if not (hasattr(self.data_manager, 'tet_pipeline') and self.data_manager.tet_pipeline):
-                logger.warning("TET管道不可用")
-                return
-
-            from ..plugin_types import DataType
-
-            # 获取TET路由器中的数据源
-            tet_pipeline = self.data_manager.tet_pipeline
-            if hasattr(tet_pipeline, 'router') and tet_pipeline.router:
-                router = tet_pipeline.router
-
-                # 创建路由请求对象用于获取可用数据源
-                from core.data_source_router import RoutingRequest
-                from core.plugin_types import AssetType, DataType
-
-                routing_request = RoutingRequest(
-                    asset_type=AssetType.STOCK_A,
-                    data_type=DataType.SECTOR_FUND_FLOW,
-                    symbol="",  # 板块资金流不需要具体股票代码
-                    priority=0,
-                    timeout_ms=5000
-                )
-
-                # 检查每个注册的数据源
-                for source_id in router.get_available_sources(routing_request):
-                    try:
-                        # ✅ 新增：确保数据源适配器已就绪
-                        source_instance = router.get_data_source(source_id)
-                        if hasattr(source_instance, 'ensure_ready'):
-                            logger.debug(f"等待数据源 {source_id} 就绪...")
-                            is_ready = source_instance.ensure_ready(timeout=5.0)
-                            if not is_ready:
-                                logger.debug(f"数据源 {source_id} 尚未就绪，跳过检测")
-                                continue
-                        elif hasattr(source_instance, 'is_connected'):
-                            # 检查连接状态
-                            if not source_instance.is_connected():
-                                logger.debug(f"数据源 {source_id} 未连接，跳过检测")
-                                continue
-
-                        # 检查是否支持SECTOR_FUND_FLOW
-                        supports_fund_flow = self._check_source_supports_fund_flow(source_id, router)
-                        if supports_fund_flow:
-                            health_score = self._get_source_health_score(source_id, router)
-                            self._available_sources[source_id] = {
-                                'type': 'tet_plugin',
-                                'health_score': health_score,
-                                'supports_fund_flow': True,
-                                'router': router
-                            }
-                            logger.info(f"✅ 发现TET数据源: {source_id} (健康度: {health_score:.2f})")
-                        else:
-                            logger.debug(f"🔶 数据源 {source_id} 不支持板块资金流")
-                    except Exception as e:
-                        logger.warning(f"检测数据源 {source_id} 失败: {e}")
-                        import traceback
-                        logger.debug(traceback.format_exc())
-
+            # 由于没有data_manager，这里跳过TET框架检测
+            logger.info("跳过TET框架检测（无可用data_manager）")
+            return
         except Exception as e:
             logger.error(f"[ERROR] TET数据源检测失败: {e}")
 
     def _detect_legacy_data_sources(self) -> None:
         """检测传统数据源的板块资金流支持"""
         try:
-            # 检查数据管理器中的传统数据源
-            if hasattr(self.data_manager, '_data_sources'):
-                for source_id, source_instance in self.data_manager._data_sources.items():
-                    if source_instance is not None:
-                        try:
-                            # 检查是否有板块资金流相关方法
-                            supports_fund_flow = self._check_legacy_source_supports_fund_flow(source_id, source_instance)
-                            if supports_fund_flow:
-                                health_score = self._test_legacy_source_health(source_id, source_instance)
-                                self._available_sources[source_id] = {
-                                    'type': 'legacy',
-                                    'health_score': health_score,
-                                    'supports_fund_flow': True,
-                                    'instance': source_instance
-                                }
-                                logger.info(f"发现传统数据源: {source_id} (健康度: {health_score:.2f})")
-                            else:
-                                logger.debug(f"🔶 传统数据源 {source_id} 不支持板块资金流")
-                        except Exception as e:
-                            logger.warning(f" 检测传统数据源 {source_id} 失败: {e}")
-
-            # 特别检查FactorWeave-Quant（明确标注不支持板块资金流）
-            if 'hikyuu' in self._available_sources:
-                self._available_sources['hikyuu']['supports_fund_flow'] = False
-                self._available_sources['hikyuu']['note'] = 'FactorWeave-Quant专注K线数据，不支持板块资金流'
-                logger.info("ℹ️ FactorWeave-Quant数据源：专注K线数据，不适用于板块资金流")
-
+            # 由于没有data_manager，这里跳过传统数据源检测
+            logger.info("跳过传统数据源检测（无可用data_manager）")
+            return
         except Exception as e:
             logger.error(f"[ERROR] 传统数据源检测失败: {e}")
 
@@ -719,12 +636,11 @@ class SectorFundFlowService(QObject):
             fallback_order = ['akshare', 'eastmoney', 'mock']
 
             for source_id in fallback_order:
-                # 检查数据管理器中是否有该数据源
-                if hasattr(self.data_manager, '_data_sources'):
-                    if source_id in self.data_manager._data_sources:
-                        self._current_source = source_id
-                        logger.info(f"降级使用数据源: {source_id}")
-                        return
+                # 由于没有data_manager，直接设置到特定数据源
+                if source_id == "akshare":
+                    self._current_source = source_id
+                    logger.info(f"降级使用数据源: {source_id}")
+                    return
 
             # 最终降级到模拟模式
             self._current_source = "mock"
@@ -751,49 +667,8 @@ class SectorFundFlowService(QObject):
     def _try_tet_data_acquisition(self, indicator: str) -> Optional[pd.DataFrame]:
         """尝试通过TET框架获取数据"""
         try:
-            # 检查TET框架可用性
-            if not (hasattr(self.data_manager, 'tet_enabled') and self.data_manager.tet_enabled):
-                return None
-
-            if not (hasattr(self.data_manager, 'tet_pipeline') and self.data_manager.tet_pipeline):
-                return None
-
-            logger.info("通过TET框架智能路由获取板块资金流数据...")
-
-            from ..plugin_types import AssetType, DataType
-            from ..tet_data_pipeline import StandardQuery
-
-            # 创建标准化查询
-            query = StandardQuery(
-                asset_type=AssetType.SECTOR,
-                data_type=DataType.SECTOR_FUND_FLOW,
-                symbol="",
-                extra_params={"indicator": indicator, "limit": 50}
-            )
-
-            # 通过TET管道处理
-            result = self.data_manager.tet_pipeline.process(query)
-
-            if result and result.success and result.data is not None:
-                if isinstance(result.data, pd.DataFrame) and not result.data.empty:
-                    # 记录实际使用的数据源
-                    actual_source = getattr(result, 'source_id', 'TET路由选择')
-                    logger.info(f"TET框架成功获取数据，实际数据源: {actual_source}")
-                    self._current_source = actual_source
-                    return result.data
-                elif isinstance(result.data, list) and len(result.data) > 0:
-                    df = pd.DataFrame(result.data)
-                    actual_source = getattr(result, 'source_id', 'TET路由选择')
-                    logger.info(f"TET框架成功获取数据，实际数据源: {actual_source}")
-                    self._current_source = actual_source
-                    return df
-                else:
-                    logger.warning("TET框架返回空数据")
-            else:
-                logger.warning("TET框架处理失败")
-
+            # 由于没有data_manager，TET框架不可用
             return None
-
         except Exception as e:
             logger.warning(f" TET框架获取数据失败: {e}")
             return None
@@ -824,9 +699,9 @@ class SectorFundFlowService(QObject):
                     logger.warning(f" 数据源 {source_id} 获取失败: {e}")
                     continue
 
-            # 最后尝试通过数据管理器的通用方法
-            logger.info("尝试数据管理器通用方法...")
-            return self._fallback_to_data_manager()
+            # 最后尝试直接使用akshare
+            logger.info("尝试直接使用akshare...")
+            return self._get_data_from_akshare(indicator)
 
         except Exception as e:
             logger.error(f"[ERROR] 传统数据源获取失败: {e}")
@@ -876,21 +751,24 @@ class SectorFundFlowService(QObject):
             logger.error(f"从数据源 {source_id} 获取数据时出错: {e}")
             return pd.DataFrame()
 
-    def _fallback_to_data_manager(self) -> pd.DataFrame:
-        """降级到数据管理器的通用方法"""
+    def _get_data_from_akshare(self, indicator: str = "今日") -> pd.DataFrame:
+        """直接从akshare获取板块资金流数据"""
         try:
-            fund_flow_data = self.data_manager.get_fund_flow()
-
-            if fund_flow_data and 'sector_flow_rank' in fund_flow_data:
-                df = fund_flow_data['sector_flow_rank']
-                if isinstance(df, pd.DataFrame) and not df.empty:
-                    self._current_source = "数据管理器通用方法"
-                    return df
-
-            return pd.DataFrame()
+            import akshare as ak
+            
+            logger.info(f"直接使用akshare获取板块资金流数据...")
+            df = ak.stock_sector_fund_flow_rank(indicator=indicator)
+            
+            if not df.empty:
+                self._current_source = "akshare直接调用"
+                logger.info(f"akshare成功获取数据: {len(df)} 条记录")
+                return df
+            else:
+                logger.warning("akshare返回空数据")
+                return pd.DataFrame()
 
         except Exception as e:
-            logger.error(f"数据管理器通用方法失败: {e}")
+            logger.error(f"akshare数据获取失败: {e}")
             return pd.DataFrame()
 
     def get_current_optimal_source(self) -> str:

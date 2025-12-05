@@ -36,9 +36,6 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 
-logger = logger
-
-
 class BacktestStatus(Enum):
     """回测状态"""
     PENDING = "pending"
@@ -61,7 +58,7 @@ class OptimizationStatus(Enum):
 class StrategyConfig:
     """策略配置"""
     strategy_id: str
-    plugin_type: str  # 'hikyuu', 'backtrader', 'custom'
+    plugin_type: str  # 'factorweave', 'backtrader', 'custom'
     parameters: Dict[str, Any]
     enabled: bool = True
     created_at: datetime = field(default_factory=datetime.now)
@@ -173,12 +170,13 @@ class StrategyService(BaseService):
     def _register_builtin_plugin_factories(self) -> None:
         """注册内置策略插件工厂"""
         try:
-            # FactorWeave-Quant策略插件
+            # FactorWeave策略插件（无hikyuu依赖）
             try:
-                from plugins.strategies.hikyuu_strategy_plugin import HikyuuStrategyPlugin
-                self._plugin_factories['hikyuu'] = lambda: HikyuuStrategyPlugin()
+                from plugins.strategies.adaptive_strategy import create_adaptive_pandas_strategy
+                self._plugin_factories['factorweave'] = lambda: create_adaptive_pandas_strategy()
+                # 移除'hikyuu'键，所有调用使用factorweave
             except ImportError:
-                logger.warning("FactorWeave-Quant策略插件不可用")
+                logger.warning("FactorWeave策略插件不可用")
 
             # Backtrader策略插件
             try:

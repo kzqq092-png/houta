@@ -13,7 +13,6 @@ from ..events import DataUpdateEvent
 from ..industry_manager import IndustryManager
 # 移除循环导入，在需要时动态导入
 
-logger = logger
 
 class IndustryService(CacheableService, ConfigurableService):
     """行业数据服务"""

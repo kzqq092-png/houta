@@ -22,7 +22,6 @@ from .data_source_extensions import IDataSourcePlugin, DataSourcePluginAdapter, 
 # NOTE: FieldMappingEngine使用延迟导入避免循环依赖
 # from .data.field_mapping_engine import FieldMappingEngine
 
-logger = logger
 
 
 @dataclass
@@ -88,8 +87,7 @@ class TETDataPipeline:
 
     def __init__(self, data_source_router: DataSourceRouter):
         self.router = data_source_router
-        self.logger = logger
-
+        
         # 插件管理
         self._plugins: Dict[str, IDataSourcePlugin] = {}
         self._adapters: Dict[str, DataSourcePluginAdapter] = {}

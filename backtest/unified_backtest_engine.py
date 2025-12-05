@@ -17,8 +17,6 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-logger = logger
-
 
 def safe_divide(numerator, denominator, default=0.0):
     """安全除法，避免除零错误"""
@@ -67,7 +65,6 @@ def safe_query_result(result, default=None):
 
 # 配置日志
 # Loguru配置在core.loguru_config中统一管理
-logger = logger
 
 
 class BacktestLevel(Enum):

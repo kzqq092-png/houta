@@ -20,6 +20,9 @@ from ..data.data_access import DataAccess
 
 @dataclass
 class Position:
+def __init__(self):
+        self.logger = logger.bind(module=self.__class__.__name__)
+    
     """持仓信息"""
     stock_code: str
     stock_name: str
@@ -60,7 +63,6 @@ class PortfolioManager:
     """投资组合管理器"""
 
     def __init__(self, data_access: DataAccess):
-        self.logger = logger
         self.data_access = data_access
         self._positions: Dict[str, Position] = {}  # 持仓字典
         self._cash_available = Decimal('100000.00')  # 初始可用资金10万

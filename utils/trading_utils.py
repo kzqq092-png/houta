@@ -1,5 +1,4 @@
 from utils.imports import np, pd
-from hikyuu import *
 from loguru import logger
 
 # 日志系统已迁移到Loguru

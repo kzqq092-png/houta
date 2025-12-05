@@ -15,7 +15,6 @@ from PyQt5.sip import wrappertype
 if TYPE_CHECKING:
     from core.coordinators.main_window_coordinator import MainWindowCoordinator
 
-logger = logger
 
 class QObjectMeta(wrappertype, type(ABC)):
     """解决QObject和ABC元类冲突的自定义元类"""

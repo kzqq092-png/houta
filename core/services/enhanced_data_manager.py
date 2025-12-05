@@ -31,7 +31,6 @@ from ..data.enhanced_models import (
     MacroEconomicData, DataQualityMetrics, generate_table_name
 )
 
-logger = logger
 
 
 @dataclass

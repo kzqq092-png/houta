@@ -39,7 +39,7 @@ class OptimizationController:
         self.db_manager = OptimizationDatabaseManager()
         self.ui_integration = UIIntegration(debug_mode)
 
-        print("HiKyuu 形态识别算法优化系统")
+        print("FactorWeave-Quant 形态识别算法优化系统")
         print("=" * 50)
 
     def run_command_line(self, args):
@@ -468,7 +468,7 @@ class OptimizationController:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="HiKyuu 形态识别算法优化系统",
+        description="FactorWeave-Quant 形态识别算法优化系统",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 

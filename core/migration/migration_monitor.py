@@ -39,12 +39,9 @@ except ImportError:
         return logging.getLogger(name)
 
     class AppMetricsService:
-        def __init__(self):
+        def __init__t__(self):
             pass
-
-        def record_metric(self, name, value, tags=None):
             pass
-
 
 class MigrationPhase(Enum):
     """迁移阶段枚举"""

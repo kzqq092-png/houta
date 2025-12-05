@@ -17,7 +17,6 @@ from .environment import WebGPUEnvironment, get_webgpu_environment, GPUSupportLe
 from .compatibility import GPUCompatibilityChecker, CompatibilityReport, CompatibilityLevel
 from .fallback import FallbackRenderer, RenderBackend
 
-logger = logger
 
 @dataclass
 class WebGPUConfig:

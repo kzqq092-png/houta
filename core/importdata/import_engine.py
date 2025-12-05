@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from queue import Queue, Empty
 import pandas as pd
 
-logger = logger
 
 @dataclass
 class ImportResult:

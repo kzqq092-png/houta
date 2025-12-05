@@ -10,8 +10,9 @@ import numpy as np
 from typing import Dict, Any, Optional, List, Union, Tuple
 from datetime import datetime, timedelta
 # FactorWeave-Quant已移除，使用TET框架和指标服务
-# from hikyuu.interactive import *
-# from hikyuu.indicator import *
+# # 注释掉的原始hikyuu导入，现已完全移除
+# # from hikyuu.interactive import *
+# # from hikyuu.indicator import *
 from core.services.unified_data_manager import UnifiedDataManager
 import json
 # 替换旧的指标系统导入

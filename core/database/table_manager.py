@@ -26,7 +26,6 @@ from ..plugin_types import DataType
 from .unified_table_name_generator import UnifiedTableNameGenerator, generate_table_name
 from ..plugin_types import AssetType
 
-logger = logger
 
 
 class TableType(Enum):

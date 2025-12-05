@@ -17,7 +17,6 @@ from threading import Timer, Event
 from .base_service import BaseService
 from db.models.alert_config_models import get_alert_config_database, AlertRule
 
-logger = logger
 
 
 class AlertRuleHotLoader(BaseService):

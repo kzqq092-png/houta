@@ -17,8 +17,6 @@ from core.metrics.app_metrics_service import measure
 # Cache将在需要时动态导入
 from core.containers import get_service_container
 
-logger = logger
-
 class ChartDataLoader(QThread):
     """异步图表数据加载器"""
 

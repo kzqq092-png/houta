@@ -19,7 +19,6 @@ from db.models.plugin_models import (
     PluginDatabaseManager, PluginRecord, PluginStatus, PluginType
 )
 
-logger = logger
 
 class PluginDatabaseService(QObject):
     """插件数据库服务"""

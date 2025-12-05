@@ -16,8 +16,6 @@ from pathlib import Path
 import time
 import threading
 
-logger = logger
-
 class WorkloadType(Enum):
     """工作负载类型"""
     OLAP = "olap"      # 分析型工作负载

@@ -61,8 +61,6 @@ except ImportError as e:
     LoggingConfig = dict
     Theme = dict
 
-logger = logger
-
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'factorweave_system.sqlite')
 
@@ -217,7 +215,7 @@ class ConfigService(BaseService):
                 'update_interval': 2000,
                 'cache_enabled': True,
                 'cache_size': 1000,
-                'data_sources': ['hikyuu', 'eastmoney']
+                'data_sources': ['eastmoney', 'tushare']
             },
             'trading': {
                 'commission_rate': 0.0003,

@@ -8,8 +8,8 @@ import numpy as np
 from typing import List, Dict, Tuple, Optional, Any
 from datetime import datetime
 import pandas as pd
-from hikyuu import *
-from core.data_manager import data_manager
+import talib as ta
+from core.services.unified_data_manager import get_unified_data_manager
 
 class TechnicalAnalyzer:
     """Technical analysis tools for trading system"""
@@ -30,6 +30,8 @@ class TechnicalAnalyzer:
         if isinstance(kdata, pd.DataFrame):
             df = kdata
         else:
+            # 暂时保留转换逻辑，后续会被DataStandardizer替代
+            data_manager = get_unified_data_manager()
             df = data_manager.kdata_to_df(kdata)
 
         trend_analysis = self.analyze_trend(df)
@@ -128,48 +130,70 @@ class TechnicalAnalyzer:
         try:
             if isinstance(kdata, pd.DataFrame):
                 closes = kdata['close'].values
-                # 已替换为新的导入
-                rsi = calc_rsi(kdata['close'], n=14)
-                macd, _, _ = calc_macd(kdata['close'], fast=12, slow=26, signal=9)
+                rsi = ta.RSI(closes, timeperiod=14)
+                macd, macd_signal, macd_hist = ta.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
             else:
                 closes = np.array([float(k.close) for k in kdata])
-                from hikyuu.indicator import RSI, MACD
-                close_ind = CLOSE(kdata)
-                rsi = RSI(close_ind, n=14)
-                macd = MACD(close_ind)
+                rsi = ta.RSI(closes, timeperiod=14)
+                macd, macd_signal, macd_hist = ta.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
+            
             roc = np.diff(closes) / closes[:-1] * 100
             return {
-                'rsi': rsi,
-                'macd': macd,
+                'rsi': rsi[-1] if len(rsi) > 0 else 0,
+                'macd': macd[-1] if len(macd) > 0 else 0,
+                'macd_signal': macd_signal[-1] if len(macd_signal) > 0 else 0,
+                'macd_histogram': macd_hist[-1] if len(macd_hist) > 0 else 0,
                 'roc': roc,
-                'momentum_score': self._calculate_momentum_score(rsi, macd, roc)
+                'momentum_score': self._calculate_momentum_score(rsi, macd, roc, closes)
             }
         except Exception as e:
             raise Exception(f"Momentum analysis failed: {str(e)}")
 
-    def _calculate_momentum_score(self, rsi, macd, roc) -> float:
+    def _calculate_momentum_score(self, rsi, macd, roc, closes) -> float:
         """Calculate overall momentum score
 
         Args:
             rsi: RSI indicator values
             macd: MACD indicator values
             roc: Rate of change values
+            closes: Close prices
 
         Returns:
             Float value representing momentum score
         """
         try:
+            # Handle NaN values and get last valid values
+            rsi_val = rsi[-1] if len(rsi) > 0 and not np.isnan(rsi[-1]) else 50
+            macd_val = macd[-1] if len(macd) > 0 and not np.isnan(macd[-1]) else 0
+            
             # Normalize indicators
-            rsi_norm = (rsi - 50) / 50  # Center around 0
-            macd_norm = (macd.macd - np.mean(macd.macd)) / np.std(macd.macd)
-            roc_norm = (roc - np.mean(roc)) / np.std(roc)
+            rsi_norm = (rsi_val - 50) / 50  # Center around 0
+            
+            # Calculate MACD normalization using recent values
+            macd_recent = macd[-10:] if len(macd) >= 10 else macd
+            macd_recent = macd_recent[~np.isnan(macd_recent)]  # Remove NaN values
+            if len(macd_recent) > 0:
+                macd_norm = (macd_val - np.mean(macd_recent)) / (np.std(macd_recent) + 1e-8)
+            else:
+                macd_norm = 0
+            
+            # Normalize ROC
+            if len(roc) > 0:
+                roc_recent = roc[-10:] if len(roc) >= 10 else roc
+                roc_recent = roc_recent[~np.isnan(roc_recent)]  # Remove NaN values
+                if len(roc_recent) > 0:
+                    roc_norm = (roc[-1] - np.mean(roc_recent)) / (np.std(roc_recent) + 1e-8)
+                else:
+                    roc_norm = 0
+            else:
+                roc_norm = 0
 
             # Calculate weighted score
-            score = (0.4 * rsi_norm[-1] +
-                     0.4 * macd_norm[-1] +
-                     0.2 * roc_norm[-1])
+            score = (0.4 * rsi_norm +
+                     0.4 * macd_norm +
+                     0.2 * roc_norm)
 
-            return score
+            return np.clip(score, -1, 1)  # Limit to [-1, 1] range
 
         except Exception as e:
             raise Exception(f"Momentum score calculation failed: {str(e)}")

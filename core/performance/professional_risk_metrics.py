@@ -16,7 +16,6 @@ import scipy.stats as stats
 from typing import Dict, List, Optional, Union, Tuple
 import warnings
 
-logger = logger
 
 class ProfessionalRiskMetrics:
     """

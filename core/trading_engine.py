@@ -14,8 +14,6 @@ from enum import Enum
 from .events import EventBus
 from .containers import ServiceContainer
 
-logger = logger
-
 class SignalType(Enum):
     """信号类型"""
     BUY = "buy"

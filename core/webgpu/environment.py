@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 
-logger = logger
 
 class GPUSupportLevel(Enum):
     """GPU支持级别"""

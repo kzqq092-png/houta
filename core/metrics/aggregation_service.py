@@ -11,7 +11,6 @@ from .events import SystemResourceUpdated, ApplicationMetricRecorded
 from .repository import MetricsRepository
 from loguru import logger
 
-logger = logger
 
 class MetricsAggregationService:
     """

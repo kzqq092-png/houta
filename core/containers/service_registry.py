@@ -10,7 +10,6 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 import threading
 
-logger = logger
 
 class ServiceScope(Enum):
     """

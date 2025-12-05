@@ -58,8 +58,8 @@ class PluginMetadata:
     plugin_type: PluginType          # 插件类型
     category: PluginCategory         # 插件分类
     dependencies: List[str]          # 依赖列表
-    min_hikyuu_version: str          # 最低FactorWeave-Quant版本要求
-    max_hikyuu_version: str          # 最高FactorWeave-Quant版本要求
+    min_framework_version: str       # 最低框架版本要求
+    max_framework_version: str       # 最高框架版本要求
     tags: List[str]                  # 标签
     icon_path: Optional[str] = None  # 图标路径
     documentation_url: Optional[str] = None  # 文档地址

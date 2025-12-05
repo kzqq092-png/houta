@@ -64,15 +64,15 @@ class CompleteDatabaseInitializer:
         logger.info("初始化SQLite数据库...")
 
         # 初始化主系统数据库
-        self._init_hikyuu_system_db()
+        self._init_factorweave_system_db()
 
         # 初始化FactorWeave系统数据库
         self._init_factorweave_system_db()
 
         logger.info("SUCCESS SQLite数据库初始化完成")
 
-    def _init_hikyuu_system_db(self):
-        """初始化FactorWeave-Quant系统数据库"""
+    def _init_factorweave_system_db(self):
+        """初始化FactorWeave-Quant系统数据库（已移除hikyuu依赖）"""
         logger.info("创建FactorWeave-Quant系统数据库表...")
 
         with sqlite3.connect(self.sqlite_db_path) as conn:

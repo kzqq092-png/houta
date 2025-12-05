@@ -373,27 +373,93 @@ class StrategyWidget(QWidget):
                 self.results_table.setItem(row, 5, QTableWidgetItem(signal_time))
 
     def _display_backtest_results(self, results: Dict[str, Any]):
-        """显示回测结果"""
+        """显示回测结果 - 支持专业级回测指标"""
         if not results:
             return
 
+        # 基础信息
+        strategy_name = results.get('strategy_name', self.strategy_combo.currentText())
+        symbols = results.get('symbols', [])
+        initial_capital = results.get('initial_capital', 0)
+        engine_info = results.get('backtest_engine', 'Unknown')
+        calculation_time = results.get('calculation_time', 'N/A')
+        level = results.get('level', 'Unknown')
+
+        # 收益指标
+        total_return = results.get('total_return', 0)
+        annualized_return = results.get('annualized_return', 0)
+
+        # 风险指标
+        volatility = results.get('volatility', 0)
+        max_drawdown = results.get('max_drawdown', 0)
+        max_drawdown_duration = results.get('max_drawdown_duration', 0)
+
+        # 风险调整收益
+        sharpe_ratio = results.get('sharpe_ratio', 0)
+        sortino_ratio = results.get('sortino_ratio', 0)
+        calmar_ratio = results.get('calmar_ratio', 0)
+
+        # 风险度量
+        var_95 = results.get('var_95', 0)
+        var_99 = results.get('var_99', 0)
+
+        # 交易统计
+        total_trades = results.get('total_trades', 0)
+        win_trades = results.get('win_trades', 0)
+        loss_trades = results.get('loss_trades', 0)
+        win_rate = results.get('win_rate', 0)
+        profit_factor = results.get('profit_factor', 0)
+
+        # Alpha/Beta
+        alpha = results.get('alpha', 0)
+        beta = results.get('beta', 1.0)
+        information_ratio = results.get('information_ratio', 0)
+
+        # 信号统计
+        signal_summary = results.get('signal_summary', {})
+        note = results.get('note', '')
+
+        # 构建详细消息
         message = f"""
-回测结果：
-====================
-策略: {self.strategy_combo.currentText()}
-股票数: {len(results.get('symbols', []))}
-初始资金: ¥{results.get('initial_capital', 0):,.2f}
-最终资金: ¥{results.get('final_capital', 0):,.2f}
-总收益率: {results.get('total_return', 0):.2%}
-总交易次数: {results.get('total_trades', 0)}
-盈利次数: {results.get('win_count', 0)}
-胜率: {results.get('win_rate', 0):.1%}
-====================
+专业回测结果：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 回测引擎: {engine_info} | 级别: {level} | 计算时间: {calculation_time}
+🎯 策略: {strategy_name}
+📈 股票数量: {len(symbols)} | 股票列表: {', '.join(symbols[:3])}{'...' if len(symbols) > 3 else ''}
+💰 初始资金: ¥{initial_capital:,.2f}
+
+📈 收益指标
+   总收益率: {total_return:+.2%}     年化收益率: {annualized_return:+.2%}
+   
+📉 风险指标  
+   波动率: {volatility:.2%}        最大回撤: {max_drawdown:.2%}
+   回撤持续: {max_drawdown_duration}天
+   
+🎯 风险调整收益
+   夏普比率: {sharpe_ratio:.3f}     Sortino比率: {sortino_ratio:.3f}     Calmar比率: {calmar_ratio:.3f}
+   
+⚠️ 风险度量
+   VaR(95%): {var_95:.2%}        VaR(99%): {var_99:.2%}
+   
+📊 交易统计
+   总交易: {total_trades}次        盈利交易: {win_trades}次        亏损交易: {loss_trades}次
+   胜率: {win_rate:.1%}          盈亏比: {profit_factor:.2f}:1
+   
+🎯 基准表现
+   Alpha: {alpha:.3f}            Beta: {beta:.3f}            信息比率: {information_ratio:.3f}
+   
+📋 信号分析
+   总信号: {signal_summary.get('total_signals', 0)}个       买入信号: {signal_summary.get('buy_signals', 0)}个
+   卖出信号: {signal_summary.get('sell_signals', 0)}个       信号密度: {signal_summary.get('signal_density', 0):.3f}
+
+{note if note else ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         """
 
         self._log_message(message, is_success=True)
 
-        QMessageBox.information(self, "回测结果", message)
+        # 在日志中显示成功完成的回测结果
+        QMessageBox.information(self, "专业回测结果", message)
 
     def _log_message(self, message: str, is_error: bool = False, is_success: bool = False):
         """记录日志"""

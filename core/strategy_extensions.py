@@ -17,7 +17,6 @@ from datetime import datetime
 # Import AssetType from plugin_types instead of redefining it
 from .plugin_types import AssetType
 
-logger = logger
 
 class StrategyType(Enum):
     """策略类型"""
@@ -317,12 +316,14 @@ class IStrategyPlugin(ABC):
         return True, ""
 
 class StrategyPluginAdapter:
+    def __init__(self):
+        self.logger = logger.bind(module=self.__class__.__name__)
+
     """策略插件适配器"""
 
     def __init__(self, plugin: IStrategyPlugin, plugin_id: str):
         self.plugin = plugin
         self.plugin_id = plugin_id
-        self.logger = logger
 
         # 性能统计
         self._signal_count = 0
@@ -331,6 +332,11 @@ class StrategyPluginAdapter:
         self._total_trade_time = 0.0
         self._error_count = 0
         self._last_activity = None
+    
+    @property
+    def logger(self):
+        """获取日志记录器"""
+        return logger
 
     def get_strategy_info(self) -> StrategyInfo:
         """获取策略信息"""

@@ -10,7 +10,6 @@ from typing import Dict, Any, Optional
 import json
 import os
 
-logger = logger
 
 def get_config() -> Dict[str, Any]:
     """

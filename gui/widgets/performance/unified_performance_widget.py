@@ -634,7 +634,6 @@ class ModernUnifiedPerformanceWidget(QWidget):
                     # 从数据质量监控系统获取真实数据
                     try:
                         from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
-                        from plugins.data_sources.hikyuu_data_plugin import HikyuuDataPlugin
                         from core.data_source_extensions import HealthCheckResult
 
                         quality_metrics = {}
@@ -664,17 +663,18 @@ class ModernUnifiedPerformanceWidget(QWidget):
 
                         # 尝试从FactorWeave-Quant插件获取健康检查数据
                         try:
-                            hikyuu_plugin = HikyuuDataPlugin()
-                            if hikyuu_plugin.is_connected():
-                                health_result = hikyuu_plugin.health_check()
-                                if health_result.is_healthy:
-                                    quality_metrics['数据完整性'] = 95.0
-                                    quality_metrics['数据准确性'] = 98.0
-                                    quality_metrics['数据及时性'] = 90.0
-
-                                # 获取延迟信息
-                                if hasattr(health_result, 'response_time_ms'):
-                                    quality_metrics['延迟水平'] = health_result.response_time_ms
+                            # 从统一数据管理器获取插件数据
+                            from core.services.uni_plugin_data_manager import UniPluginDataManager
+                            plugin_manager = UniPluginDataManager()
+                            # 检查所有插件的健康状态
+                            health_results = plugin_manager.get_all_health_status()
+                            if health_results:
+                                healthy_count = sum(1 for result in health_results.values() if result.get('healthy', False))
+                                total_count = len(health_results)
+                                if total_count > 0:
+                                    quality_metrics['数据完整性'] = (healthy_count / total_count) * 95.0
+                                    quality_metrics['数据准确性'] = (healthy_count / total_count) * 98.0
+                                    quality_metrics['数据及时性'] = (healthy_count / total_count) * 90.0
 
                         except Exception as e:
                             logger.debug(f"FactorWeave-Quant插件质量数据获取失败: {e}")

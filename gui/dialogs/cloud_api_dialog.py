@@ -105,7 +105,7 @@ class CloudApiDialog(QDialog):
         server_layout = QFormLayout(server_group)
 
         self.api_url_edit = QLineEdit()
-        self.api_url_edit.setPlaceholderText("https://api.hikyuu.com")
+        self.api_url_edit.setPlaceholderText("https://api.factorweave.com")
         server_layout.addRow("API地址:", self.api_url_edit)
 
         self.api_key_edit = QLineEdit()
@@ -403,7 +403,7 @@ class CloudApiDialog(QDialog):
         """加载默认配置"""
         self.api_configs = {
             'default': {
-                'url': 'https://api.hikyuu.com',
+                'url': 'https://api.factorweave.com',
                 'key': '',
                 'version': 'v2',
                 'timeout': 30

@@ -20,8 +20,6 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
-logger = logger
-
 class ProgressStatus(Enum):
     """进度状态"""
     PENDING = "pending"  # 待开始

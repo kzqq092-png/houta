@@ -4,7 +4,7 @@ from loguru import logger
 
 """
 指标计算服务（统一版）
-基于统一数据库hikyuu_system.db的指标计算服务，提供完整的指标计算功能
+基于统一数据库的指标计算服务，提供完整的指标计算功能
 """
 
 import atexit

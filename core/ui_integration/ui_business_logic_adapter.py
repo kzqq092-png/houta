@@ -1084,7 +1084,6 @@ class UIBusinessLogicAdapter(QObject):
             task_manager = self._get_service('task_status_manager')
             if task_manager and hasattr(task_manager, 'get_current_user_id'):
                 return task_manager.get_current_user_id()
-            
             # 返回默认用户ID
             return "default_user"
         except Exception as e:

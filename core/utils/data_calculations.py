@@ -20,8 +20,6 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, date
 import warnings
 
-logger = logger
-
 # 抑制pandas性能警告
 warnings.filterwarnings('ignore', category=pd.errors.PerformanceWarning)
 

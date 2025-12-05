@@ -46,16 +46,13 @@ import numba
 import json
 from utils.theme import get_theme_manager
 from utils.config_manager import ConfigManager
-from hikyuu.indicator import *
-from hikyuu import sm
-from hikyuu import Query
-# 替换旧的指标系统导入
+# 已移除 hikyuu 依赖 - 替换为新指标系统导入
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 from utils.cache import Cache
 import requests
 from bs4 import BeautifulSoup
 from analysis.pattern_recognition import PatternRecognizer
-from core.data_manager import data_manager
+from core.services.unified_data_manager import get_unified_data_manager
 # 移除旧的形态特征导入
 # 定义ALL_PATTERN_TYPES常量
 ALL_PATTERN_TYPES = [

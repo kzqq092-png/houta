@@ -21,8 +21,6 @@ from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QPointF, QRectF
 from PyQt5.QtGui import QMouseEvent, QPainter, QPen, QColor, QFont, QFontMetrics
 from PyQt5.QtWidgets import QWidget
 
-logger = logger
-
 class CrosshairStyle(Enum):
     """十字光标样式"""
     SOLID = "solid"           # 实线

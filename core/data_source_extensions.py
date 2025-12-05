@@ -14,8 +14,6 @@ from datetime import datetime
 # Import AssetType and DataType from plugin_types instead of redefining them
 from .plugin_types import AssetType, DataType
 
-logger = logger
-
 
 @dataclass
 class PluginInfo:
@@ -370,8 +368,7 @@ class DataSourcePluginAdapter:
         """
         self.plugin = plugin
         self.plugin_id = plugin_id
-        self.logger = logger
-        self._connection_info = None
+        self.        self._connection_info = None
         self._last_health_check = None
 
     def connect(self, **kwargs) -> bool:

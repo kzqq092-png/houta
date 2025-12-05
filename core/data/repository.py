@@ -15,7 +15,6 @@ from dataclasses import dataclass
 # 导入必要的数据模型
 from .models import StockInfo, KlineData, MarketData, QueryParams
 
-logger = logger
 
 # 废弃的DataManager类已删除，功能已集成到UnifiedDataManager
 # 请使用: from core.services.unified_data_manager import UnifiedDataManager
@@ -25,7 +24,7 @@ class BaseRepository(ABC):
     """数据仓库基类"""
 
     def __init__(self):
-        self.logger = logger
+        self.logger = logger.bind(module=self.__class__.__name__)
 
     @abstractmethod
     def connect(self) -> bool:
@@ -618,7 +617,7 @@ class FallbackDataManager:
     """备用数据管理器 - 提供基本的数据获取功能"""
 
     def __init__(self):
-        self.logger = logger
+        self.logger = logger.bind(module=self.__class__.__name__)
         self.logger.info("FallbackDataManager初始化")
 
     def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
@@ -645,7 +644,7 @@ class MinimalDataManager:
     """最小数据管理器 - 最后的备用方案"""
 
     def __init__(self):
-        self.logger = logger
+        self.logger = logger.bind(module=self.__class__.__name__)
         self.logger.info("MinimalDataManager初始化")
 
     def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:

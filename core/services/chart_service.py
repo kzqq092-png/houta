@@ -8,12 +8,13 @@ from loguru import logger
 import pandas as pd
 import uuid
 import asyncio
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 from .base_service import CacheableService, ConfigurableService
 from ..events import ChartUpdateEvent, StockSelectedEvent, EventBus
-from .unified_data_manager import UnifiedDataManager
+from ..utils.data_standardizer import DataStandardizer
 
-logger = logger
+if TYPE_CHECKING:
+    from .unified_data_manager import UnifiedDataManager
 
 # 错误类型枚举
 class ErrorType:
@@ -111,10 +112,10 @@ class ChartService(CacheableService, ConfigurableService):
     """
 
     def __init__(self,
-                 unified_data_manager: UnifiedDataManager,
                  event_bus: EventBus,
                  config: Optional[Dict[str, Any]] = None,
                  cache_size: int = 100,
+                 unified_data_manager: Optional["UnifiedDataManager"] = None,
                  **kwargs):
         """
         初始化图表服务
@@ -130,7 +131,12 @@ class ChartService(CacheableService, ConfigurableService):
         super().__init__(**kwargs)
         ConfigurableService.__init__(self, config=config, **kwargs)
 
-        self.data_manager = unified_data_manager
+        # 移除对unified_data_manager的依赖，改为使用data_standardizer
+        try:
+            self.data_standardizer = DataStandardizer()
+        except Exception as e:
+            logger.warning(f"DataStandardizer初始化失败: {e}")
+            self.data_standardizer = None
 
         self._current_chart_type = 'candlestick'
         self._current_period = 'D'
@@ -587,10 +593,12 @@ class ChartService(CacheableService, ConfigurableService):
             logger.info(f"为 {stock_code} 预加载 {len(related_stocks)} 个相关股票的数据...")
             preload_tasks = []
             for related_code, related_name in related_stocks[:5]:  # 最多预加载5个
-                task = self.data_manager.preload_data(
-                    stock_code=related_code,
-                    data_type='kdata',
-                    freq=freq
+                task = asyncio.create_task(
+                    self.data_standardizer.get_stock_data_async(
+                        stock_code=related_code,
+                        frequency=freq,
+                        count=365
+                    )
                 )
                 preload_tasks.append(task)
 
@@ -602,12 +610,9 @@ class ChartService(CacheableService, ConfigurableService):
             logger.error(f"预加载 {stock_code} 的相关股票时出错: {e}", exc_info=True)
 
     def _get_data_manager(self):
-        """获取数据管理器"""
-        try:
-            return self.service_container.resolve_by_name('unified_data_manager')
-        except Exception as e:
-            logger.error(f"Failed to resolve data manager: {e}")
-            return None
+        """获取数据管理器（已弃用）"""
+        # 返回data_standardizer而不是data_manager
+        return getattr(self, 'data_standardizer', None)
 
     def _get_industry_service(self):
         """获取行业服务，处理服务容器可能不存在的情况"""

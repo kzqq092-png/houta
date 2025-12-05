@@ -10,7 +10,9 @@ from loguru import logger
     sklearn_metrics
 )
 
-from hikyuu import *
+# 移除hikyuu依赖，使用pandas和matplotlib
+import numpy as np
+import pandas as pd
 
 from .chart_utils import ChartUtils
 from .indicators import TechnicalIndicators

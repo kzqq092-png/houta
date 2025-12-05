@@ -10,7 +10,6 @@ from PyQt5.QtGui import QTextCursor, QFont, QColor, QPen, QBrush, QTextCharForma
 from PyQt5.QtWidgets import QWidget
 from typing import Dict, Any, List
 
-logger = logger
 
 def init_qt_types():
     """

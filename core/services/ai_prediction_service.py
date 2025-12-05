@@ -41,8 +41,6 @@ try:
 except ImportError:  # noqa: F401
     IncrementalTrainingModel = None
 
-logger = logger
-
 # 添加模型类型映射字典
 MODEL_TYPE_DISPLAY_NAMES = {
     'deep_learning': '深度学习',

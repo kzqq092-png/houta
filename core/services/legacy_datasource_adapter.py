@@ -33,8 +33,7 @@ class LegacyDataSourceAdapter(IDataSourcePlugin):
         """
         self.legacy_source = legacy_source
         self.source_id = source_id
-        self.logger = logger
-
+        self.
         # 映射传统数据源类型到新的资产类型
         self._asset_type_mapping = {
             'eastmoney': [AssetType.STOCK_A],

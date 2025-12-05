@@ -9,7 +9,6 @@ import time
 from threading import Lock
 from loguru import logger
 
-logger = logger
 
 # 获取项目根目录的绝对路径
 try:

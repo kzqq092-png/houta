@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from datetime import datetime
 import warnings
 
-logger = logger
 
 
 @dataclass
@@ -536,7 +535,7 @@ def get_algorithm_validator() -> FinancialAlgorithmValidator:
     return _validator_instance
 
 
-def validate_hikyuu_metrics(returns: pd.Series,
+def validate_factorweave_metrics(returns: pd.Series,
                             calculated_metrics: Dict[str, float]) -> Dict[str, bool]:
     """
     便捷函数：验证FactorWeave-Quant计算的指标

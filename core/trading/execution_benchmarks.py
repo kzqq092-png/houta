@@ -15,7 +15,12 @@ class ExecutionBenchmarks:
     """交易执行基准计算器"""
 
     def __init__(self):
-        self.logger = logger
+        self.logger = logger.bind(module=self.__class__.__name__)
+    
+    @property
+    def logger(self):
+        """获取日志记录器"""
+        return logger
 
     def calculate_twap(self, kdata: pd.DataFrame, start_time: datetime,
                        end_time: datetime) -> float:

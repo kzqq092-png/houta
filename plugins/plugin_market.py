@@ -46,7 +46,7 @@ except ImportError:
         try:
             # 尝试使用项目根目录路径
             sys.path.append(str(project_root))
-            from hikyuu_ui.plugins.plugin_interface import PluginMetadata, PluginType, PluginCategory
+            from plugins.plugin_interface import PluginMetadata, PluginType, PluginCategory
             logger.info("成功通过项目路径导入加载插件接口")
         except ImportError as e:
             # 如果仍然失败，尝试直接从文件加载

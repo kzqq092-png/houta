@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from enum import Enum
 from .environment import GPUSupportLevel, GPUCapabilities
 
-logger = logger
 
 class CompatibilityLevel(Enum):
     """兼容性级别"""

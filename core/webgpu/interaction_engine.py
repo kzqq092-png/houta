@@ -21,7 +21,6 @@ from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QPropertyAnimation, QEasin
 from PyQt5.QtGui import QWheelEvent, QMouseEvent
 from PyQt5.QtWidgets import QWidget
 
-logger = logger
 
 class InteractionType(Enum):
     """交互类型"""

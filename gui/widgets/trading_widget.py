@@ -1804,7 +1804,8 @@ class TradingWidget(QWidget):
 
             #  降级到传统data_manager
             try:
-                from core.data_manager import data_manager
+                from core.services.unified_data_manager import get_unified_data_manager
+                data_manager = get_unified_data_manager()
                 realtime_data = data_manager.get_realtime_quotes([self.current_stock])
 
                 if realtime_data and self.current_stock in realtime_data:

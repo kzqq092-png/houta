@@ -25,8 +25,6 @@ import json
 from .duckdb_manager import DuckDBConnectionManager, get_connection_manager
 from .table_manager import DynamicTableManager, TableType, get_table_manager
 
-logger = logger
-
 
 @dataclass
 class QueryResult:

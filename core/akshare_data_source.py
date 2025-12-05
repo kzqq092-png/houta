@@ -8,14 +8,16 @@ from loguru import logger
 class AkshareDataSource(DataSource):
     """Akshare数据源"""
 
-    def __init__(self):
+    def __init__t__(self):
         super().__init__(DataSourceType.LOCAL)
-        self.logger = logger
-
+        self.super().__init__(DataSourceType.LOCAL)
+    self.logger = logger.bind(module=self.__class__.__name__)
+        self.
     def connect(self) -> bool:
         return True
 
     def disconnect(self) -> None:
+        pass
         pass
 
     def subscribe(self, symbols: List[str], data_types: List[MarketDataType]) -> bool:

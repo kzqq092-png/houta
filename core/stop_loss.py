@@ -1,89 +1,106 @@
-from hikyuu import *
-from hikyuu.trade_sys import StoplossBase
+from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 from loguru import logger
+from typing import Optional, Dict, Any, Tuple
+from core.enhanced_indicator_service import EnhancedIndicatorService
+from utils.data_standardizer import DataStandardizer
 
-class AdaptiveStopLoss(StoplossBase):
+class StopLossStrategy(ABC):
+    """止损策略抽象基类"""
+    
+    def __init__(self, name: str):
+        self.name = name
+        self._indicator_service = EnhancedIndicatorService()
+        self._data_standardizer = DataStandardizer()
+    
+    @abstractmethod
+    def calculate_stop_price(self, data: pd.DataFrame, current_price: float,
+                           position_info: Optional[Dict[str, Any]] = None) -> float:
+        """计算止损价格"""
+        pass
+    
+    def get_param(self, key: str, default: Any = None) -> Any:
+        """获取参数"""
+        return getattr(self, f"_{key}", default)
+    
+    def set_param(self, key: str, value: Any) -> None:
+        """设置参数"""
+        setattr(self, f"_{key}", value)
+
+class AdaptiveStopLoss(StopLossStrategy):
     """
     自适应止损策略
-    继承Hikyuu的StoplossBase类创建自定义止损策略
+    基于技术指标和风险控制的智能止损系统
     """
 
     def __init__(self, params=None):
         super(AdaptiveStopLoss, self).__init__("AdaptiveStopLoss")
 
         # 设置默认参数
-        self.set_param("atr_period", 14)         # ATR周期
-        self.set_param("atr_multiplier", 2)      # ATR倍数
-        self.set_param("ma_period", 20)          # 均线周期
-        self.set_param("volatility_period", 20)  # 波动率计算周期
-        self.set_param("min_stop_loss", 0.02)    # 最小止损比例
-        self.set_param("max_stop_loss", 0.1)     # 最大止损比例
-        self.set_param("trailing_stop", 0.03)    # 跟踪止损比例
-        self.set_param("profit_lock", 0.05)      # 盈利锁定比例
-        self.set_param("volatility_factor", 0.5)  # 波动率因子
-        self.set_param("trend_factor", 0.3)      # 趋势因子
-        self.set_param("market_factor", 0.2)     # 市场因子
+        self._atr_period = 14         # ATR周期
+        self._atr_multiplier = 2      # ATR倍数
+        self._ma_period = 20          # 均线周期
+        self._volatility_period = 20  # 波动率计算周期
+        self._min_stop_loss = 0.02    # 最小止损比例
+        self._max_stop_loss = 0.1     # 最大止损比例
+        self._trailing_stop = 0.03    # 跟踪止损比例
+        self._profit_lock = 0.05      # 盈利锁定比例
+        self._volatility_factor = 0.5  # 波动率因子
+        self._trend_factor = 0.3      # 趋势因子
+        self._market_factor = 0.2     # 市场因子
+
+        if params is not None and isinstance(params, dict):
+            for key, value in params.items():
+                self.set_param(key, value)
 
         # 初始化持仓信息
         self.positions = {}  # 记录每个持仓的止损信息
 
-    def _reset(self):
-        """重置状态"""
-        self.positions = {}
-
-    def _clone(self):
-        return AdaptiveStopLoss()
-
-    def _calculate(self, datetime, stock, price, risk, part_from):
+    def calculate_stop_price(self, data: pd.DataFrame, current_price: float,
+                           position_info: Optional[Dict[str, Any]] = None) -> float:
         """计算止损价格"""
         try:
-            # 1. 获取持仓信息
-            position = self._get_position_info(stock)
-            if not position:
+            # 1. 检查数据有效性
+            if data.empty or current_price <= 0:
                 return 0.0
 
-            # 2. 获取市场数据
-            k = stock.get_kdata(Query(datetime - 30, datetime))
-            if len(k) <= 0:
-                return 0.0
-
-            df = k.to_df()
+            # 2. 获取或初始化持仓信息
+            position = position_info or {}
 
             # 3. 计算技术指标
-            atr = self._calculate_atr(df)
-            ma = self._calculate_ma(df)
-            volatility = self._calculate_volatility(df)
-            trend = self._calculate_trend(df)
+            atr = self._calculate_atr(data)
+            ma = self._calculate_ma(data)
+            volatility = self._calculate_volatility(data)
+            trend = self._calculate_trend(data)
 
             # 4. 计算不同类型的止损价格
             stops = {
-                'atr': self._calculate_atr_stop(price, atr, trend),
-                'ma': self._calculate_ma_stop(price, ma),
-                'trailing': self._calculate_trailing_stop(price, position),
-                'volatility': self._calculate_volatility_stop(price, volatility),
-                'fixed': self._calculate_fixed_stop(price)
+                'atr': self._calculate_atr_stop(current_price, atr, trend),
+                'ma': self._calculate_ma_stop(current_price, ma),
+                'trailing': self._calculate_trailing_stop(current_price, position),
+                'volatility': self._calculate_volatility_stop(current_price, volatility),
+                'fixed': self._calculate_fixed_stop(current_price)
             }
 
             # 5. 选择最终的止损价格
-            stop_price = self._select_stop_price(price, stops, position, trend)
+            stop_price = self._select_stop_price(current_price, stops, position, trend)
 
             # 6. 更新持仓信息
-            self._update_position_info(stock, price, stop_price, datetime)
+            self._update_position_info(current_price, stop_price, position)
 
             return stop_price
 
         except Exception as e:
-            logger.info(f"止损价格计算错误: {str(e)}")
+            logger.error(f"止损价格计算错误: {str(e)}")
             return 0.0
 
-    def _calculate_atr(self, df):
+    def _calculate_atr(self, data: pd.DataFrame) -> float:
         """计算ATR"""
         try:
-            high = df['high'].values
-            low = df['low'].values
-            close = df['close'].values
+            high = data['high'].values
+            low = data['low'].values
+            close = data['close'].values
 
             tr = np.maximum(
                 high[1:] - low[1:],
@@ -96,58 +113,54 @@ class AdaptiveStopLoss(StoplossBase):
             return np.mean(tr[-self.get_param("atr_period"):])
 
         except Exception as e:
-            logger.info(f"ATR计算错误: {str(e)}")
+            logger.error(f"ATR计算错误: {str(e)}")
             return 0.0
 
-    def _calculate_ma(self, df):
+    def _calculate_ma(self, data: pd.DataFrame) -> float:
         """计算移动平均"""
         try:
-            return df['close'].rolling(window=self.get_param("ma_period")).mean().iloc[-1]
+            return data['close'].rolling(window=self.get_param("ma_period")).mean().iloc[-1]
         except Exception as e:
-            logger.info(f"MA计算错误: {str(e)}")
+            logger.error(f"MA计算错误: {str(e)}")
             return 0.0
 
-    def _calculate_volatility(self, df):
+    def _calculate_volatility(self, data: pd.DataFrame) -> float:
         """计算波动率"""
         try:
-            returns = df['close'].pct_change()
+            returns = data['close'].pct_change()
             return returns.rolling(window=self.get_param("volatility_period")).std().iloc[-1]
         except Exception as e:
-            logger.info(f"波动率计算错误: {str(e)}")
+            logger.error(f"波动率计算错误: {str(e)}")
             return 0.0
 
-    def _calculate_trend(self, df):
+    def _calculate_trend(self, data: pd.DataFrame) -> int:
         """计算趋势"""
         try:
-            ma = df['close'].rolling(window=self.get_param("ma_period")).mean()
-            return 1 if df['close'].iloc[-1] > ma.iloc[-1] else -1
+            ma = data['close'].rolling(window=self.get_param("ma_period")).mean()
+            return 1 if data['close'].iloc[-1] > ma.iloc[-1] else -1
         except Exception as e:
-            logger.info(f"趋势计算错误: {str(e)}")
+            logger.error(f"趋势计算错误: {str(e)}")
             return 0
 
-    def _get_position_info(self, stock):
+    def _get_position_info(self, position_key: str) -> Dict[str, Any]:
         """获取持仓信息"""
         try:
-            position = self.tm.get_position(stock)
-            if not position:
-                return None
-
-            if stock.market_code not in self.positions:
-                self.positions[stock.market_code] = {
-                    'entry_price': position.buy_price,
-                    'highest_price': position.buy_price,
-                    'lowest_price': position.buy_price,
+            if position_key not in self.positions:
+                self.positions[position_key] = {
+                    'entry_price': 0.0,
+                    'highest_price': 0.0,
+                    'lowest_price': 0.0,
                     'last_stop_price': 0.0,
-                    'last_update': position.buy_datetime
+                    'last_update': None
                 }
 
-            return self.positions[stock.market_code]
+            return self.positions[position_key]
 
         except Exception as e:
-            logger.info(f"获取持仓信息错误: {str(e)}")
-            return None
+            logger.error(f"获取持仓信息错误: {str(e)}")
+            return {}
 
-    def _calculate_atr_stop(self, price, atr, trend):
+    def _calculate_atr_stop(self, price: float, atr: float, trend: int) -> float:
         """计算ATR止损价格"""
         try:
             stop_distance = atr * self.get_param("atr_multiplier")
@@ -156,50 +169,50 @@ class AdaptiveStopLoss(StoplossBase):
             else:
                 return price + stop_distance
         except Exception as e:
-            logger.info(f"ATR止损计算错误: {str(e)}")
+            logger.error(f"ATR止损计算错误: {str(e)}")
             return 0.0
 
-    def _calculate_ma_stop(self, price, ma):
+    def _calculate_ma_stop(self, price: float, ma: float) -> float:
         """计算均线止损价格"""
         try:
             return ma
         except Exception as e:
-            logger.info(f"均线止损计算错误: {str(e)}")
+            logger.error(f"均线止损计算错误: {str(e)}")
             return 0.0
 
-    def _calculate_trailing_stop(self, price, position):
+    def _calculate_trailing_stop(self, price: float, position: Dict[str, Any]) -> float:
         """计算跟踪止损价格"""
         try:
-            if price > position['highest_price']:
+            if price > position.get('highest_price', price):
                 position['highest_price'] = price
 
-            stop_distance = position['highest_price'] * \
-                self.get_param("trailing_stop")
-            return position['highest_price'] - stop_distance
+            highest_price = position.get('highest_price', price)
+            stop_distance = highest_price * self.get_param("trailing_stop")
+            return highest_price - stop_distance
 
         except Exception as e:
-            logger.info(f"跟踪止损计算错误: {str(e)}")
+            logger.error(f"跟踪止损计算错误: {str(e)}")
             return 0.0
 
-    def _calculate_volatility_stop(self, price, volatility):
+    def _calculate_volatility_stop(self, price: float, volatility: float) -> float:
         """计算波动率止损价格"""
         try:
-            stop_distance = price * volatility * \
-                self.get_param("volatility_factor")
+            stop_distance = price * volatility * self.get_param("volatility_factor")
             return price - stop_distance
         except Exception as e:
-            logger.info(f"波动率止损计算错误: {str(e)}")
+            logger.error(f"波动率止损计算错误: {str(e)}")
             return 0.0
 
-    def _calculate_fixed_stop(self, price):
+    def _calculate_fixed_stop(self, price: float) -> float:
         """计算固定止损价格"""
         try:
             return price * (1 - self.get_param("min_stop_loss"))
         except Exception as e:
-            logger.info(f"固定止损计算错误: {str(e)}")
+            logger.error(f"固定止损计算错误: {str(e)}")
             return 0.0
 
-    def _select_stop_price(self, price, stops, position, trend):
+    def _select_stop_price(self, price: float, stops: Dict[str, float], 
+                          position: Dict[str, Any], trend: int) -> float:
         """选择最终的止损价格"""
         try:
             # 1. 根据趋势选择止损策略
@@ -224,33 +237,35 @@ class AdaptiveStopLoss(StoplossBase):
             stop_price = max(min_stop, min(stop_price, max_stop))
 
             # 3. 如果已经盈利，使用更宽松的止损
-            if price > position['entry_price']:
-                profit_ratio = (
-                    price - position['entry_price']) / position['entry_price']
+            entry_price = position.get('entry_price', price)
+            if price > entry_price:
+                profit_ratio = (price - entry_price) / entry_price
                 if profit_ratio > self.get_param("profit_lock"):
                     # 锁定部分利润
-                    lock_price = position['entry_price'] * \
-                        (1 + self.get_param("profit_lock"))
+                    lock_price = entry_price * (1 + self.get_param("profit_lock"))
                     stop_price = max(stop_price, lock_price)
 
             return stop_price
 
         except Exception as e:
-            logger.info(f"选择止损价格错误: {str(e)}")
+            logger.error(f"选择止损价格错误: {str(e)}")
             return 0.0
 
-    def _update_position_info(self, stock, price, stop_price, datetime):
+    def _update_position_info(self, current_price: float, stop_price: float, 
+                            position: Dict[str, Any]) -> None:
         """更新持仓信息"""
         try:
-            if stock.market_code in self.positions:
-                position = self.positions[stock.market_code]
-                position['last_stop_price'] = stop_price
-                position['last_update'] = datetime
+            if not position.get('entry_price'):
+                position['entry_price'] = current_price
+                position['highest_price'] = current_price
+                position['lowest_price'] = current_price
 
-                if price > position['highest_price']:
-                    position['highest_price'] = price
-                if price < position['lowest_price']:
-                    position['lowest_price'] = price
+            position['last_stop_price'] = stop_price
+
+            if current_price > position.get('highest_price', current_price):
+                position['highest_price'] = current_price
+            if current_price < position.get('lowest_price', current_price):
+                position['lowest_price'] = current_price
 
         except Exception as e:
-            logger.info(f"更新持仓信息错误: {str(e)}")
+            logger.error(f"更新持仓信息错误: {str(e)}")

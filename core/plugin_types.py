@@ -140,8 +140,8 @@ class DataSourceProvider(Enum):
 
     标识数据源的提供商，用于插件分类和识别。
     """
-    # 现有提供商
-    HIKYUU = "hikyuu"
+    # 现有数据源提供商
+    FACTORWEAVE = "factorweave"
     AKSHARE = "akshare"
     EASTMONEY = "eastmoney"
     SINA = "sina"
@@ -422,8 +422,8 @@ def get_default_provider_for_asset_type(asset_type: AssetType) -> DataSourceProv
         DataSourceProvider: 默认数据源提供商
     """
     provider_mapping = {
-        AssetType.STOCK_A: DataSourceProvider.HIKYUU,  # ✅ 使用STOCK_A替代STOCK
-        AssetType.INDEX: DataSourceProvider.HIKYUU,
+        AssetType.STOCK_A: DataSourceProvider.FACTORWEAVE,  # ✅ 使用FACTORWEAVE替代已废弃的HIKYUU
+        AssetType.INDEX: DataSourceProvider.FACTORWEAVE,
         AssetType.FUND: DataSourceProvider.AKSHARE,
         AssetType.FUTURES: DataSourceProvider.CTP,
         AssetType.COMMODITY: DataSourceProvider.MYSTEEL,

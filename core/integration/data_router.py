@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from enum import Enum
 import pandas as pd
 
-logger = logger
 
 class StorageBackend(Enum):
     """存储后端类型"""
@@ -36,7 +35,7 @@ class DataRouter:
     """
 
     def __init__(self):
-        self.logger = logger
+        self.logger = logger.bind(module=self.__class__.__name__)
         self.routing_rules: List[RoutingRule] = []
         self._setup_default_rules()
 

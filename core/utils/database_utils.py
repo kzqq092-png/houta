@@ -24,8 +24,6 @@ import json
 
 from ..plugin_types import DataType, AssetType
 
-logger = logger
-
 def generate_table_name(plugin_name: str, data_type: Union[DataType, str],
                         period: Optional[str] = None) -> str:
     """

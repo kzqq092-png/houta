@@ -16,8 +16,6 @@ from datetime import datetime, timedelta
 import numpy as np
 import time
 
-logger = logger
-
 # 移除MockDataManager，使用真正的FactorWeave-Quant数据管理器
 
 

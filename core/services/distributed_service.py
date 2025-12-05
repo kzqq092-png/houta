@@ -31,9 +31,6 @@ except ImportError:
     logger.warning("httpx未安装，分布式HTTP调用功能不可用，将使用本地执行模式")
     HTTP_CLIENT_AVAILABLE = False
 
-logger = logger
-
-
 @dataclass
 class NodeInfo:
     """节点信息"""

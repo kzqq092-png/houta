@@ -18,8 +18,6 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple, Any, Set, Callable
 import weakref
 
-logger = logger
-
 class RenderPriority(Enum):
     """渲染优先级"""
     IMMEDIATE = 0   # 立即渲染

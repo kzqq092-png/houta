@@ -135,15 +135,16 @@ class StockScreenerWidget(BaseAnalysisPanel):
         self.init_ui()
         self.load_templates()
         # 主动拉取一次股票列表并刷新结果表，确保初始有数据展示
-        if self.data_manager and hasattr(self.data_manager, 'get_stock_list'):
-            try:
-                df = self.data_manager.get_stock_list()
-                if not df.empty:
-                    # 只显示前100条
-                    data = df.head(100).values.tolist()
-                    self.paged_table.set_data(data)
-            except Exception as e:
-                logger.warning(f"初始化拉取股票列表失败: {str(e)}")
+        try:
+            from utils.data_standardizer import DataStandardizer
+            data_standardizer = DataStandardizer()
+            stock_list = data_standardizer.get_stock_list()
+            if not stock_list.empty:
+                # 只显示前100条
+                data = stock_list.head(100).values.tolist()
+                self.paged_table.set_data(data)
+        except Exception as e:
+            logger.warning(f"初始化拉取股票列表失败: {str(e)}")
 
     def init_ui(self):
         """Initialize UI components"""
@@ -1144,7 +1145,9 @@ class StockScreenerWidget(BaseAnalysisPanel):
             progress.setAutoReset(True)
 
             # 获取所有股票列表
-            stock_list = self.data_manager.get_stock_list()
+            from utils.data_standardizer import DataStandardizer
+            data_standardizer = DataStandardizer()
+            stock_list = data_standardizer.get_stock_list()
             total_stocks = len(stock_list)
             progress.setMaximum(total_stocks)
 
@@ -1160,7 +1163,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 progress.setLabelText(
                     f"正在筛选股票: {stock['code']} - {stock['name']}")
                 # 获取股票数据
-                stock_data = self.data_manager.get_stock_data(stock['code'])
+                stock_data = data_standardizer.get_stock_data(stock['code'])
                 if stock_data.empty:
                     continue
                 # 检查是否满足所有条件
@@ -1228,26 +1231,20 @@ class StockScreenerWidget(BaseAnalysisPanel):
                             return res.iloc[-1]
                     except Exception:
                         return None
-                # 内置指标全部用ta-lib封装
+                # 内置指标全部用ta-lib封装（已移除hikyuu依赖）
                 if ind.startswith('MA'):
                     period = int(ind[2:]) if len(
                         ind) > 2 and ind[2:].isdigit() else 5
                     close_data = stock_data['close']
-                    if isinstance(close_data, pd.Series):
-                        return calc_ma(close_data, period).iloc[-1]
-                    else:
-                        from hikyuu.indicator import MA
-                        return MA(close_data, n=period)[-1]
+                    # 统一使用新的指标系统（FactorWeave-Quant）
+                    close_series = pd.Series(close_data) if not isinstance(close_data, pd.Series) else close_data
+                    return calc_ma(close_series, period).iloc[-1]
                 if ind == 'MACD':
                     close_data = stock_data['close']
-                    if isinstance(close_data, pd.Series):
-                        macd, _, _ = calc_macd(
-                            close_data, fast=12, slow=26, signal=9)
-                        return macd.iloc[-1]
-                    else:
-                        from hikyuu.indicator import MACD
-                        macd = MACD(close_data, n1=12, n2=26, n3=9)
-                        return macd.dif[-1] if hasattr(macd, 'dif') else macd[-1]
+                    # 使用新的指标系统（FactorWeave-Quant）
+                    close_series = pd.Series(close_data) if not isinstance(close_data, pd.Series) else close_data
+                    macd, _, _ = calc_macd(close_series, fast=12, slow=26, signal=9)
+                    return macd.iloc[-1]
                 if ind == 'RSI':
                     return calc_rsi(stock_data['close'], n=6).iloc[-1]
                 if ind == 'KDJ':
@@ -1259,27 +1256,31 @@ class StockScreenerWidget(BaseAnalysisPanel):
                         _, upper, lower = calc_boll(close_data, n=20, p=2)
                         return upper.iloc[-1]
                     else:
-                        from hikyuu.indicator import BOLL
-                        boll = BOLL(close_data, n=20, width=2)
-                        return boll.upper[-1] if hasattr(boll, 'upper') else boll[-1]
+                        # 对于非Series数据，也转换为Series处理
+                        close_series = pd.Series(close_data)
+                        _, upper, lower = calc_boll(close_series, n=20, p=2)
+                        return upper.iloc[-1]
                 if ind == 'ATR':
                     if isinstance(stock_data['close'], pd.Series):
                         return calc_atr(stock_data, n=14).iloc[-1]
                     else:
-                        from hikyuu.indicator import ATR
-                        return ATR(stock_data, n=14)[-1]
+                        # 对于非Series数据，也转换为DataFrame处理
+                        stock_df = pd.DataFrame(stock_data)
+                        return calc_atr(stock_df, n=14).iloc[-1]
                 if ind == 'OBV':
                     if isinstance(stock_data['close'], pd.Series):
                         return calc_obv(stock_data).iloc[-1]
                     else:
-                        from hikyuu.indicator import OBV
-                        return OBV(stock_data)[-1]
+                        # 对于非Series数据，也转换为DataFrame处理
+                        stock_df = pd.DataFrame(stock_data)
+                        return calc_obv(stock_df).iloc[-1]
                 if ind == 'CCI':
                     if isinstance(stock_data['close'], pd.Series):
                         return calc_cci(stock_data, n=14).iloc[-1]
                     else:
-                        from hikyuu.indicator import CCI
-                        return CCI(stock_data, n=14)[-1]
+                        # 对于非Series数据，也转换为DataFrame处理
+                        stock_df = pd.DataFrame(stock_data)
+                        return calc_cci(stock_df, n=14).iloc[-1]
                 return None
             v1 = get_value(ind1)
             v2 = get_value(ind2)
@@ -1347,7 +1348,9 @@ class StockScreenerWidget(BaseAnalysisPanel):
         """检查消息面条件"""
         try:
             # 获取股票新闻数据
-            news_data = self.data_manager.get_stock_news(stock_code)
+            from utils.data_standardizer import DataStandardizer
+            data_standardizer = DataStandardizer()
+            news_data = data_standardizer.get_stock_news(stock_code)
 
             # 检查是否包含关键词
             keywords = condition_params.split(',')
@@ -1598,7 +1601,9 @@ class StockScreenerWidget(BaseAnalysisPanel):
         # 示例：遍历所有分类和指标，实际可按params指定分类/指标筛选
         for stock in stock_list:
             try:
-                kdata = self.data_manager.get_kdata(stock)
+                from utils.data_standardizer import DataStandardizer
+                data_standardizer = DataStandardizer()
+                kdata = data_standardizer.get_kdata(stock)
                 if kdata.empty:
                     continue
                 for cat, inds in categories.items():
@@ -1614,7 +1619,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     kdata['close'], fast=12, slow=26, signal=9)
                 rsi = calc_rsi(kdata['close'], n=6)
                 if ma_short.iloc[-1] > ma_long.iloc[-1] and macd.iloc[-1] > 0 and rsi.iloc[-1] > params.get('rsi_value', 50):
-                    info = self.data_manager.get_stock_info(stock)
+                    info = data_standardizer.get_stock_info(stock)
                     results.append({
                         'code': stock,
                         'name': info['name'],
@@ -1933,10 +1938,12 @@ class StockScreenerWidget(BaseAnalysisPanel):
         try:
             from features.feature_selection import integrate_enhanced_features, enhanced_feature_selection, select_features_pca
             # 获取股票数据
-            stock_list = self.data_manager.get_stock_list()
+            from utils.data_standardizer import DataStandardizer
+            data_standardizer = DataStandardizer()
+            stock_list = data_standardizer.get_stock_list()
             dfs = []
             for code in stock_list['code']:
-                df = self.data_manager.get_kdata(code)
+                df = data_standardizer.get_kdata(code)
                 if not df.empty:
                     df = integrate_enhanced_features(df)
                     df['code'] = code
@@ -2087,8 +2094,10 @@ class StockScreenerWidget(BaseAnalysisPanel):
         self.set_status_message("参数校验通过，正在分析...", error=False)
         try:
             logger.info("on_screener_analyze 开始分析 - 选股")
-            if hasattr(self.data_manager, 'get_screener_results'):
-                data = self.data_manager.get_screener_results()
+            from utils.data_standardizer import DataStandardizer
+            data_standardizer = DataStandardizer()
+            if hasattr(data_standardizer, 'get_screener_results'):
+                data = data_standardizer.get_screener_results()
                 if data:
                     self.update_screener_results(data)
                     self.set_status_message("分析完成", error=False)

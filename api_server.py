@@ -40,7 +40,7 @@ def read_root():
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "healthy", "service": "hikyuu-api"}
+    return {"status": "healthy", "service": "FactorWeave-Quant UI API"}
 
 
 @app.get("/api/stock/list", response_model=List[Dict[str, Any]])

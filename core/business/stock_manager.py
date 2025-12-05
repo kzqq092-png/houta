@@ -19,11 +19,10 @@ class StockManager:
     """股票管理器"""
 
     def __init__(self, data_access: DataAccess):
-        self.logger = logger
         self.data_access = data_access
         self._favorites = set()  # 自选股列表
         self._industry_cache = {}  # 行业缓存
-
+        self.logger = logger.bind(module=self.__class__.__name__)
     def get_stock_info(self, stock_code: str) -> Optional[StockInfo]:
         """
         获取股票基本信息

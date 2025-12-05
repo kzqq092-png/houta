@@ -25,7 +25,6 @@ from core.services.unified_chart_service import get_unified_chart_service, creat
 from optimization.progressive_loading_manager import get_progressive_loader, LoadingStage
 from optimization.update_throttler import get_update_throttler
 
-logger = logger
 
 # 导入性能监控
 try:

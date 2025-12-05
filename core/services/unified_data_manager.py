@@ -3,7 +3,7 @@ from loguru import logger
 统一数据管理器
 
 负责协调各服务的数据加载请求，避免重复数据加载，提供统一的数据访问接口。
-集成了原DataManager和HikyuuDataManager的所有功能。
+集成FactorWeave-Quant数据管理功能，基于TET框架和插件架构。
 """
 
 import threading

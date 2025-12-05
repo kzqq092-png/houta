@@ -27,7 +27,6 @@ from .unified_monitor import (
 )
 from ..database.factorweave_analytics_db import get_analytics_db
 
-logger = logger
 
 
 @dataclass

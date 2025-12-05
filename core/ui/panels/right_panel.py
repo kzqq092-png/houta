@@ -95,7 +95,6 @@ except ImportError as e:
 if TYPE_CHECKING:
     from core.services import AnalysisService
 
-logger = logger
 
 
 class RightPanel(BasePanel):
@@ -1232,18 +1231,25 @@ class RightPanel(BasePanel):
     def _update_backtest_results_safe(self, backtest_data: Dict[str, Any]) -> None:
         """安全更新回测结果"""
         try:
+            # 判断是否为专业回测结果格式
+            is_professional = backtest_data.get('is_professional', False)
+            
             # 更新回测结果表格
             backtest_table = self.get_widget('backtest_table')
             if backtest_table:
                 backtest_table.setRowCount(0)
 
-                results = backtest_data.get('results', {})
-                for metric_name, metric_value in results.items():
-                    row = backtest_table.rowCount()
-                    backtest_table.insertRow(row)
-                    backtest_table.setItem(row, 0, QTableWidgetItem(metric_name))
-                    backtest_table.setItem(
-                        row, 1, QTableWidgetItem(str(metric_value)))
+                if is_professional:
+                    # 专业回测结果 - 按类别分组显示
+                    self._populate_professional_backtest_table(backtest_table, backtest_data)
+                else:
+                    # 传统回测结果 - 直接显示所有指标
+                    results = backtest_data.get('results', {})
+                    for metric_name, metric_value in results.items():
+                        row = backtest_table.rowCount()
+                        backtest_table.insertRow(row)
+                        backtest_table.setItem(row, 0, QTableWidgetItem(metric_name))
+                        backtest_table.setItem(row, 1, QTableWidgetItem(str(metric_value)))
 
             # 更新交易记录表格
             trade_table = self.get_widget('trade_table')
@@ -1273,6 +1279,78 @@ class RightPanel(BasePanel):
 
         except Exception as e:
             logger.error(f"Failed to update backtest results: {e}")
+
+    def _populate_professional_backtest_table(self, table: QTableWidget, backtest_data: Dict[str, Any]) -> None:
+        """填充专业回测结果表格"""
+        try:
+            # 基础信息
+            basic_info = backtest_data.get('basic_info', {})
+            if basic_info:
+                # 添加分组标题
+                self._add_table_section(table, "📊 回测信息")
+                self._add_table_row(table, "回测引擎", basic_info.get('engine', 'N/A'))
+                self._add_table_row(table, "计算时间", basic_info.get('timestamp', 'N/A'))
+                self._add_table_row(table, "回测期间", basic_info.get('period_days', 0))
+                
+                # 收益指标
+                returns = backtest_data.get('returns', {})
+                self._add_table_section(table, "📈 收益指标")
+                self._add_table_row(table, "总收益率", f"{returns.get('total_return', 0):.2%}")
+                self._add_table_row(table, "年化收益率", f"{returns.get('annualized_return', 0):.2%}")
+
+                # 风险指标
+                risks = backtest_data.get('risks', {})
+                self._add_table_section(table, "📉 风险指标")
+                self._add_table_row(table, "波动率", f"{risks.get('volatility', 0):.2%}")
+                self._add_table_row(table, "最大回撤", f"{risks.get('max_drawdown', 0):.2%}")
+
+                # 风险调整收益
+                risk_adjusted = backtest_data.get('risk_adjusted', {})
+                self._add_table_section(table, "🎯 风险调整收益")
+                self._add_table_row(table, "夏普比率", f"{risk_adjusted.get('sharpe_ratio', 0):.3f}")
+                self._add_table_row(table, "Sortino比率", f"{risk_adjusted.get('sortino_ratio', 0):.3f}")
+                self._add_table_row(table, "Calmar比率", f"{risk_adjusted.get('calmar_ratio', 0):.3f}")
+
+                # 交易统计
+                trading = backtest_data.get('trading_stats', {})
+                self._add_table_section(table, "📊 交易统计")
+                self._add_table_row(table, "总交易次数", trading.get('total_trades', 0))
+                self._add_table_row(table, "胜率", f"{trading.get('win_rate', 0):.1%}")
+                self._add_table_row(table, "盈亏比", f"{trading.get('profit_factor', 0):.2f}:1")
+
+                # Alpha/Beta
+                benchmark = backtest_data.get('benchmark', {})
+                self._add_table_section(table, "🎯 基准表现")
+                self._add_table_row(table, "Alpha", f"{benchmark.get('alpha', 0):.3f}")
+                self._add_table_row(table, "Beta", f"{benchmark.get('beta', 1.0):.3f}")
+                
+        except Exception as e:
+            logger.error(f"填充专业回测表格失败: {e}")
+            # 降级到简单显示
+            results = backtest_data.get('results', {})
+            for metric_name, metric_value in results.items():
+                row = table.rowCount()
+                table.insertRow(row)
+                table.setItem(row, 0, QTableWidgetItem(metric_name))
+                table.setItem(row, 1, QTableWidgetItem(str(metric_value)))
+
+    def _add_table_section(self, table: QTableWidget, section_title: str) -> None:
+        """在表格中添加分组标题"""
+        row = table.rowCount()
+        table.insertRow(row)
+        section_item = QTableWidgetItem(section_title)
+        section_item.setBackground(QColor('#e9ecef'))
+        section_item.setFont(QFont("Arial", 9, QFont.Bold))
+        table.setItem(row, 0, section_item)
+        # 合并单元格
+        table.setSpan(row, 0, 1, 2)
+
+    def _add_table_row(self, table: QTableWidget, name: str, value: str) -> None:
+        """在表格中添加数据行"""
+        row = table.rowCount()
+        table.insertRow(row)
+        table.setItem(row, 0, QTableWidgetItem(name))
+        table.setItem(row, 1, QTableWidgetItem(value))
 
     def _update_status(self, message: str) -> None:
         """更新状态"""

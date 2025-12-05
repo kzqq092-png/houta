@@ -25,8 +25,6 @@ from collections import defaultdict, deque
 from .plugin_types import AssetType, DataType
 from .data_source_extensions import DataSourcePluginAdapter, HealthCheckResult
 
-logger = logger
-
 
 class RoutingStrategy(Enum):
     """路由策略枚举"""

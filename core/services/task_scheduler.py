@@ -21,8 +21,6 @@ from pathlib import Path
 import re
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
-logger = logger
-
 class TaskType(Enum):
     """任务类型"""
     ONE_TIME = "one_time"  # 一次性任务

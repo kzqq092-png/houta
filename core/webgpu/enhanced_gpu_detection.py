@@ -16,8 +16,6 @@ from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
-logger = logger
-
 class GPUType(Enum):
     """GPU类型"""
     INTEGRATED = "integrated"    # 集成显卡

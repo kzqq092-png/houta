@@ -17,8 +17,6 @@ from threading import Lock
 from ..events import EventBus
 from .events import ApplicationMetricRecorded
 
-logger = logger
-
 @dataclass
 class OperationMetrics:
     """操作指标数据类"""

@@ -14,8 +14,6 @@ from datetime import datetime
 from ..events import EventBus, get_event_bus
 
 
-logger = logger
-
 
 class BaseService(ABC):
     """

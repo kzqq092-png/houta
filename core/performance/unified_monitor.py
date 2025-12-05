@@ -39,8 +39,6 @@ try:
 except ImportError:
     PSUTIL_AVAILABLE = False
 
-logger = logger
-
 
 class PerformanceCategory(Enum):
     """性能监控类别"""

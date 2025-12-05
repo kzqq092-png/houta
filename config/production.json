@@ -3,13 +3,13 @@
   "debug": false,
   "logging": {
     "level": "INFO",
-    "file": "logs/hikyuu_ui.log",
+    "file": "logs/factorweave_ui.log",
     "max_size": "100MB",
     "backup_count": 5
   },
   "database": {
     "type": "duckdb",
-    "path": "data/hikyuu_production.duckdb",
+    "path": "data/factorweave_production.duckdb",
     "pool_size": 10,
     "timeout": 30
   },

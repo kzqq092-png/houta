@@ -8,8 +8,8 @@ import numpy as np
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 import pandas as pd
-from core.data_manager import data_manager
-from hikyuu import Datetime, Query, KData
+from core.services.unified_data_manager import get_unified_data_manager
+# 移除hikyuu依赖，使用pandas DataFrame
 from talib import HT_TRENDLINE, MA
 try:
     talib = importlib.import_module('talib')
@@ -36,10 +36,15 @@ class WaveAnalyzer:
         """
         try:
             if isinstance(kdata, pd.DataFrame):
-                kdata = data_manager.df_to_kdata(kdata)
-            closes = np.array([float(k.close) for k in kdata])
-            highs = np.array([float(k.high) for k in kdata])
-            lows = np.array([float(k.low) for k in kdata])
+                # 直接使用DataFrame进行分析
+                closes = kdata['close'].values
+                highs = kdata['high'].values
+                lows = kdata['low'].values
+            else:
+                # 假设kdata是其他格式，转换为numpy数组
+                closes = np.array([float(k.close) for k in kdata])
+                highs = np.array([float(k.high) for k in kdata])
+                lows = np.array([float(k.low) for k in kdata])
 
             # Get trend using HT_TRENDLINE
             trend = talib.HT_TRENDLINE(closes)
@@ -108,10 +113,15 @@ class WaveAnalyzer:
         """
         try:
             if isinstance(kdata, pd.DataFrame):
-                kdata = data_manager.df_to_kdata(kdata)
-            closes = np.array([float(k.close) for k in kdata])
-            highs = np.array([float(k.high) for k in kdata])
-            lows = np.array([float(k.low) for k in kdata])
+                # 直接使用DataFrame进行分析
+                closes = kdata['close'].values
+                highs = kdata['high'].values
+                lows = kdata['low'].values
+            else:
+                # 假设kdata是其他格式，转换为numpy数组
+                closes = np.array([float(k.close) for k in kdata])
+                highs = np.array([float(k.high) for k in kdata])
+                lows = np.array([float(k.low) for k in kdata])
 
             # Calculate Gann angles
             angles = [15, 30, 45, 60, 75]  # Main Gann angles
@@ -179,7 +189,8 @@ class WaveAnalyzer:
         """
         try:
             if isinstance(kdata, pd.DataFrame):
-                kdata = data_manager.df_to_kdata(kdata)
+                # DataStandardizer已经提供DataFrame原生支持，不需要转换
+                pass  # 直接使用DataFrame进行分析
             # Get Elliott Wave analysis
             elliott = self.analyze_elliott_waves(kdata)
 

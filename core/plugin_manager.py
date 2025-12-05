@@ -28,8 +28,6 @@ if str(project_root) not in sys.path:
 
 # 导入统一的插件类型定义
 
-logger = logger
-
 # 尝试从plugins包导入接口定义
 IPlugin = None
 PluginMetadata = None
@@ -335,7 +333,7 @@ class PluginManager(QObject):
         # 数据源插件需要加载真实实例
         data_source_keywords = [
             'akshare', 'wind', 'tushare', 'yahoo', 'bond', 'forex',
-            'mysteel', 'wenhua', 'tongdaxin', 'custom_data', 'hikyuu_data',
+            'mysteel', 'wenhua', 'tongdaxin', 'custom_data', 'factorweave_data',
             'eastmoney', 'sina'  # 添加eastmoney和sina关键字
         ]
 
@@ -437,8 +435,8 @@ class PluginManager(QObject):
                 possible_class_names.extend(['WenhuaDataPlugin', 'WenhuaPlugin'])
             elif 'custom_data' in plugin_name.lower():
                 possible_class_names.extend(['CustomDataPlugin', 'CustomPlugin'])
-            elif 'hikyuu_data' in plugin_name.lower():
-                possible_class_names.extend(['HikyuuDataPlugin', 'HikyuuPlugin'])
+            elif 'factorweave_data' in plugin_name.lower():
+                possible_class_names.extend(['FactorWeaveDataPlugin', 'FactorWeavePlugin'])
 
             # 通用模式
             possible_class_names.extend(['Plugin', 'DataPlugin', 'DataSource'])
@@ -2149,8 +2147,8 @@ class PluginManager(QObject):
                     'plugin_type': metadata_obj.plugin_type.value if hasattr(metadata_obj.plugin_type, 'value') else str(metadata_obj.plugin_type),
                     'category': metadata_obj.category.value if hasattr(metadata_obj.category, 'value') else str(metadata_obj.category),
                     'dependencies': metadata_obj.dependencies,
-                    'min_hikyuu_version': getattr(metadata_obj, 'min_hikyuu_version', '1.0.0'),
-                    'max_hikyuu_version': getattr(metadata_obj, 'max_hikyuu_version', '2.0.0'),
+                    'min_framework_version': getattr(metadata_obj, 'min_framework_version', '1.0.0'),
+                    'max_framework_version': getattr(metadata_obj, 'max_framework_version', '2.0.0'),
                     'tags': getattr(metadata_obj, 'tags', []),
                     'icon_path': getattr(metadata_obj, 'icon_path', None),
                     'documentation_url': getattr(metadata_obj, 'documentation_url', None),
@@ -2173,8 +2171,8 @@ class PluginManager(QObject):
                 'plugin_type': 'unknown',  # 默认为unknown
                 'category': 'unknown',
                 'dependencies': getattr(plugin_class, 'dependencies', []),
-                'min_hikyuu_version': '1.0.0',
-                'max_hikyuu_version': '2.0.0',
+                'min_framework_version': '1.0.0',
+                'max_framework_version': '2.0.0',
                 'tags': [],
                 'icon_path': None,
                 'documentation_url': None,

@@ -44,7 +44,7 @@ class Environment(Enum):
 class DatabaseConfig:
     """数据库配置"""
     # DuckDB配置
-    duckdb_path: str = field(default_factory=lambda: os.getenv('DUCKDB_PATH', './data/hikyuu.duckdb'))
+    duckdb_path: str = field(default_factory=lambda: os.getenv('DUCKDB_PATH', './data/factorweave.duckdb'))
     duckdb_memory_limit: str = field(default_factory=lambda: os.getenv('DUCKDB_MEMORY_LIMIT', '4GB'))
     duckdb_threads: int = field(default_factory=lambda: int(os.getenv('DUCKDB_THREADS', '4')))
     duckdb_max_memory: str = field(default_factory=lambda: os.getenv('DUCKDB_MAX_MEMORY', '8GB'))
@@ -90,7 +90,7 @@ class CacheConfig:
     redis_port: int = field(default_factory=lambda: int(os.getenv('REDIS_PORT', '6379')))
     redis_password: Optional[str] = field(default_factory=lambda: os.getenv('REDIS_PASSWORD'))
     redis_db: int = field(default_factory=lambda: int(os.getenv('REDIS_DB', '0')))
-    redis_key_prefix: str = field(default_factory=lambda: os.getenv('REDIS_KEY_PREFIX', 'hikyuu:'))
+    redis_key_prefix: str = field(default_factory=lambda: os.getenv('REDIS_KEY_PREFIX', 'factorweave:'))
     redis_default_ttl: int = field(default_factory=lambda: int(os.getenv('REDIS_DEFAULT_TTL', '3600')))
 
     # 缓存监控
@@ -147,7 +147,7 @@ class LoggingConfig:
 
     # 文件日志
     file_enabled: bool = field(default_factory=lambda: os.getenv('LOG_FILE_ENABLED', 'true').lower() == 'true')
-    file_path: str = field(default_factory=lambda: os.getenv('LOG_FILE_PATH', './logs/hikyuu.log'))
+    file_path: str = field(default_factory=lambda: os.getenv('LOG_FILE_PATH', './logs/factorweave.log'))
     file_rotation: str = field(default_factory=lambda: os.getenv('LOG_FILE_ROTATION', '100 MB'))
     file_retention: str = field(default_factory=lambda: os.getenv('LOG_FILE_RETENTION', '30 days'))
     file_compression: str = field(default_factory=lambda: os.getenv('LOG_FILE_COMPRESSION', 'gz'))

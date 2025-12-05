@@ -249,8 +249,7 @@ class BottomPanel(BasePanel):
 
         # Loguru配置在core.loguru_config中统一管理
         # 不需要单独的格式化器和处理器设置
-        # root_logger = logger
-        # root_logger.addHandler(self.log_handler)
+        # root_        # root_logger.addHandler(self.log_handler)
         # root_# Loguru自动管理日志级别
 
         # 添加一些测试日志
@@ -337,7 +336,7 @@ class BottomPanel(BasePanel):
             from datetime import datetime
 
             # 获取保存路径
-            default_filename = f"hikyuu_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            default_filename = f"factorweave_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             filename, _ = QFileDialog.getSaveFileName(
                 self._root_frame,
                 "导出日志",

@@ -17,7 +17,6 @@ import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-logger = logger
 
 
 class ImportMode(Enum):

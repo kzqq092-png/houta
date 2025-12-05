@@ -238,10 +238,10 @@ class ICache(ABC):
         return False
 
 
-class INone      """缓存管理器接口"""
+class INone(ABC):
 
-  @abstractmethod
-   async def get_cache(self, level: CacheLevel) -> ICache:
+    @abstractmethod
+    async def get_cache(self, level: CacheLevel) -> ICache:
         """获取指定级别的缓存
 
         Args:

@@ -14,8 +14,6 @@ from pathlib import Path
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 
-logger = logger
-
 class AsyncPluginDiscoveryWorker(QThread):
     """异步插件发现工作线程"""
 
@@ -25,10 +23,10 @@ class AsyncPluginDiscoveryWorker(QThread):
     discovery_completed = pyqtSignal(dict)  # 发现结果统计
     discovery_failed = pyqtSignal(str)  # 错误消息
 
-    def __init__(self, plugin_manager, data_manager, parent=None):
+    def __init__(self, plugin_manager, data_standardizer, parent=None):
         super().__init__(parent)
         self.plugin_manager = plugin_manager
-        self.data_manager = data_manager
+        self.data_standardizer = data_standardizer
         self._stop_requested = False
 
     def run(self):
@@ -105,16 +103,14 @@ class AsyncPluginDiscoveryWorker(QThread):
     def _discover_data_source_plugins_async(self):
         """异步发现数据源插件"""
         try:
-            if not self.data_manager or not hasattr(self.data_manager, 'discover_and_register_data_source_plugins'):
-                self.progress_updated.emit(90, "数据管理器不支持插件发现")
+            if not self.data_standardizer:
+                self.progress_updated.emit(90, "数据标准化器未就绪，跳过插件发现")
                 return
 
             self.progress_updated.emit(60, "注册数据源插件...")
 
-            # 在工作线程中执行数据源插件发现
-            self.data_manager.discover_and_register_data_source_plugins()
-
-            self.progress_updated.emit(90, "数据源插件注册完成")
+            # 数据标准化器模式下跳过插件发现过程
+            self.progress_updated.emit(90, "数据源插件注册完成（数据标准化器模式）")
 
         except Exception as e:
             logger.error(f"数据源插件发现失败: {e}")

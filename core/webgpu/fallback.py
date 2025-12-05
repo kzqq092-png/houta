@@ -18,7 +18,6 @@ import pandas as pd
 from .environment import GPUSupportLevel
 from .compatibility import CompatibilityReport
 
-logger = logger
 
 class RenderBackend(Enum):
     """渲染后端类型"""

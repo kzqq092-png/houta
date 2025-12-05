@@ -23,7 +23,6 @@ from .enhanced_models import (
     calculate_financial_ratios
 )
 
-logger = logger
 
 class DataValidationError(Exception):
     """数据验证错误"""

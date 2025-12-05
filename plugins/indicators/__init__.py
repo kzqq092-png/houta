@@ -10,11 +10,7 @@
 所有插件都实现统一的IIndicatorPlugin接口，确保兼容性和可扩展性。
 """
 
-# 可选导入，如果依赖不存在则跳过
-try:
-    from .hikyuu_indicators_plugin import HikyuuIndicatorsPlugin
-except ImportError:
-    HikyuuIndicatorsPlugin = None
+# 已移除 hikyuu 指标插件导入
 
 try:
     from .talib_indicators_plugin import TALibIndicatorsPlugin
@@ -32,7 +28,6 @@ except ImportError:
     CustomIndicatorsPlugin = None
 
 __all__ = [
-    'HikyuuIndicatorsPlugin',
     'TALibIndicatorsPlugin',
     'PandasTAIndicatorsPlugin',
     'CustomIndicatorsPlugin'

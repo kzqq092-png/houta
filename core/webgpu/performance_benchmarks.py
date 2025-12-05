@@ -26,7 +26,6 @@ from enum import Enum
 from pathlib import Path
 import numpy as np
 
-logger = logger
 
 
 class BenchmarkType(Enum):

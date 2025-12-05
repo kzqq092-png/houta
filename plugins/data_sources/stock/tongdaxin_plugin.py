@@ -1167,7 +1167,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                 self.current_server = self.server_list[0]
 
     def _test_connection(self) -> bool:
-        """测试连接（借鉴Hikyuu的稳定测试方法）"""
+        """测试连接（借鉴FactorWeave的稳定测试方法）"""
         try:
             with self.connection_lock:
                 if not self.api_client:
@@ -1223,7 +1223,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         return False
 
     def _test_data_access(self) -> bool:
-        """测试数据访问（借鉴Hikyuu的数据验证方法）"""
+        """测试数据访问（借鉴FactorWeave的数据验证方法）"""
         try:
             # 尝试获取一只知名股票的数据来验证连接
             # 使用平安银行(000001)作为测试股票
@@ -1260,7 +1260,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             return False
 
     def _ensure_connection(self) -> bool:
-        """确保连接可用 - 增强版（借鉴Hikyuu的稳定连接机制）"""
+        """确保连接可用 - 增强版（借鉴FactorWeave的稳定连接机制）"""
         try:
             with self.connection_lock:
                 if not self.api_client:

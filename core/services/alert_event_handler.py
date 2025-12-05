@@ -15,7 +15,6 @@ from core.services.alert_deduplication_service import (
     get_alert_deduplication_service, AlertMessage, AlertLevel
 )
 
-logger = logger
 
 
 class AlertEventHandler:

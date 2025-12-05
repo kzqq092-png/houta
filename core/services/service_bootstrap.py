@@ -42,8 +42,6 @@ from core.metrics.resource_service import SystemResourceService
 from core.metrics.app_metrics_service import ApplicationMetricsService, initialize_app_metrics_service
 from core.metrics.aggregation_service import MetricsAggregationService
 
-logger = logger
-
 
 class ServiceBootstrap:
     """

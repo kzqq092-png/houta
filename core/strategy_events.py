@@ -16,9 +16,11 @@ from .strategy_extensions import (
     StrategyContext, StrategyLifecycle
 )
 
-logger = logger
 
 class EventType(Enum):
+def __init__(self):
+        self.logger = logger.bind(module=self.__class__.__name__)
+    
     """事件类型"""
     STRATEGY_STARTED = "strategy_started"
     STRATEGY_STOPPED = "strategy_stopped"
@@ -191,8 +193,7 @@ class EventBus:
         self._global_handlers: List[IEventHandler] = []
         self._event_history: List[BaseEvent] = []
         self._max_history_size = 1000
-        self.logger = logger
-
+        self.
     def subscribe(self, event_type: EventType, handler: IEventHandler) -> None:
         """
         订阅事件
@@ -349,8 +350,7 @@ class LoggingEventHandler(IEventHandler):
     """日志事件处理器"""
 
     def __init__(self, log_level: str = "INFO"):
-        self.logger = logger
-        self.log_level = log_level
+        self.        self.log_level = log_level
 
     def handle_event(self, event: BaseEvent) -> None:
         """处理事件并记录日志"""

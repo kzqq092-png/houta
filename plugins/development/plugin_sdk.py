@@ -46,8 +46,8 @@ from ..plugin_interface import (
     plugin_type=PluginType.{plugin_type_enum},
     category=PluginCategory.{category_enum},
     dependencies={dependencies},
-    min_hikyuu_version="2.0.0",
-    max_hikyuu_version="3.0.0",
+    min_framework_version="2.0.0",
+    max_framework_version="3.0.0",
     tags={tags}
 )
 @register_plugin(PluginType.{plugin_type_enum})
@@ -109,8 +109,8 @@ class {class_name}(I{plugin_type}Plugin):
         "plugin_type": "{plugin_type}",
         "category": "{category}",
         "dependencies": [],
-        "min_hikyuu_version": "2.0.0",
-        "max_hikyuu_version": "3.0.0",
+        "min_framework_version": "2.0.0",
+        "max_framework_version": "3.0.0",
         "tags": [],
         "main_module": "{main_module}",
         "main_class": "{main_class}"

@@ -21,8 +21,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 
-logger = logger
-
 class PluginCache:
     """插件缓存管理器"""
 
@@ -235,10 +233,10 @@ class EnhancedAsyncPluginDiscoveryWorker(QThread):
     discovery_failed = pyqtSignal(str)  # 错误消息
     performance_stats = pyqtSignal(dict)  # 性能统计
 
-    def __init__(self, plugin_manager, data_manager, config: dict = None, parent=None):
+    def __init__(self, plugin_manager, data_standardizer, config: dict = None, parent=None):
         super().__init__(parent)
         self.plugin_manager = plugin_manager
-        self.data_manager = data_manager
+        self.data_standardizer = data_standardizer
         self._stop_requested = False
 
         # 配置参数
@@ -368,16 +366,14 @@ class EnhancedAsyncPluginDiscoveryWorker(QThread):
     def _discover_data_source_plugins_async(self):
         """异步发现数据源插件"""
         try:
-            if not self.data_manager or not hasattr(self.data_manager, 'discover_and_register_data_source_plugins'):
-                self.progress_updated.emit(90, "数据管理器不支持插件发现")
+            if not self.data_standardizer:
+                self.progress_updated.emit(90, "数据标准化器未就绪，跳过插件发现")
                 return
 
             self.progress_updated.emit(60, "注册数据源插件...")
 
-            # 在工作线程中执行数据源插件发现
-            self.data_manager.discover_and_register_data_source_plugins()
-
-            self.progress_updated.emit(90, "数据源插件注册完成")
+            # 数据标准化器模式下跳过插件发现过程
+            self.progress_updated.emit(90, "数据源插件注册完成（数据标准化器模式）")
 
         except Exception as e:
             logger.error(f"数据源插件发现失败: {e}")
@@ -471,7 +467,7 @@ class EnhancedAsyncPluginDiscoveryService(QObject):
         """配置服务参数"""
         self.config.update(config)
 
-    def start_discovery(self, plugin_manager, data_manager):
+    def start_discovery(self, plugin_manager, data_standardizer):
         """开始增强版异步插件发现"""
         if self.is_discovering:
             logger.warning("增强版插件发现已在进行中")
@@ -482,7 +478,7 @@ class EnhancedAsyncPluginDiscoveryService(QObject):
 
             # 创建工作线程
             self.worker = EnhancedAsyncPluginDiscoveryWorker(
-                plugin_manager, data_manager, self.config
+                plugin_manager, data_standardizer, self.config
             )
 
             # 连接信号

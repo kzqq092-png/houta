@@ -533,7 +533,7 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
             import pandas as pd
             import numpy as np
 
-            # HIkyuu已移除，使用TET框架获取真实股票数据
+            # FactorWeave-Quant已移除，使用TET框架获取真实股票数据
             try:
                 from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
                 udm = get_unified_data_manager()
@@ -555,9 +555,9 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
                         continue
 
             except ImportError:
-                logger.debug("HIkyuu模块不可用，使用备用数据源")
+                logger.debug("FactorWeave-Quant模块不可用，使用备用数据源")
 
-            # 如果HIkyuu不可用，尝试使用其他数据源
+            # 如果FactorWeave-Quant不可用，尝试使用其他数据源
             try:
                 from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
                 data_manager = get_unified_data_manager()

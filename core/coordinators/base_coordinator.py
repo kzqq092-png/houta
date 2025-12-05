@@ -7,10 +7,9 @@ from loguru import logger
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
-from ..events import EventBus, get_event_bus, BaseEvent
-from ..containers import ServiceContainer, get_service_container
+from core.events import EventBus, get_event_bus, BaseEvent
+from core.containers import ServiceContainer, get_service_container
 
-logger = logger
 
 class BaseCoordinator(ABC):
     """

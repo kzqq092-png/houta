@@ -24,8 +24,6 @@ from queue import Queue, Empty
 import json
 import os
 
-logger = logger
-
 
 @dataclass
 class DuckDBConfig:

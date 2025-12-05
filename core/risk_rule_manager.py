@@ -15,6 +15,9 @@ from loguru import logger
 
 @dataclass
 class RiskRule:
+def __init__(self):
+        self.logger = logger.bind(module=self.__class__.__name__)
+    
     """风险规则数据类"""
     id: Optional[int] = None
     name: str = ""
@@ -71,8 +74,7 @@ class RiskRuleManager:
     def __init__(self, db_path: str = 'data/factorweave_system.sqlite'):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.logger = logger
-        self._init_tables()
+        self.        self._init_tables()
         self._active_alerts = {}  # 活跃告警缓存
         self._last_check_time = {}  # 上次检查时间
 

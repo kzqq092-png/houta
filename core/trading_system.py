@@ -14,8 +14,6 @@ from dataclasses import asdict
 from .containers import ServiceContainer
 from core.performance import measure_performance as monitor_performance
 
-logger = logger
-
 class TradingSystem:
     """
     交易系统类 - 重构版本

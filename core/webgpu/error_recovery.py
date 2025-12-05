@@ -21,7 +21,6 @@ from typing import Dict, List, Optional, Any, Callable, Union, Type
 from enum import Enum
 from abc import ABC, abstractmethod
 
-logger = logger
 
 
 class ErrorCategory(Enum):

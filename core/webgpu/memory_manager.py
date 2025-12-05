@@ -19,7 +19,6 @@ from typing import Dict, List, Optional, Tuple, Any, Set
 import gc
 import psutil
 
-logger = logger
 
 class MemoryType(Enum):
     """GPU内存类型"""

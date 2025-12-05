@@ -1740,36 +1740,104 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             backtest_result = results['backtest_result']
             risk_metrics = results.get('risk_metrics', {})
+            pattern_analysis = results.get('pattern_analysis', {})
+            
+            # 回测基础信息
+            total_days = len(backtest_result) if hasattr(backtest_result, '__len__') else 0
+            
+            # 收益指标
+            total_return = 0
+            if 'total_return' in backtest_result.columns and not backtest_result['total_return'].empty:
+                total_return = backtest_result['total_return'].iloc[-1] if not backtest_result.empty else 0
+            
+            # 风险指标
+            max_drawdown = risk_metrics.get('max_drawdown', 0)
+            volatility = risk_metrics.get('volatility', 0)
+            
+            # 风险调整收益
+            sharpe_ratio = risk_metrics.get('sharpe_ratio', 0)
+            sortino_ratio = risk_metrics.get('sortino_ratio', 0)
+            calmar_ratio = risk_metrics.get('calmar_ratio', 0)
+            
+            # 交易统计
+            win_rate = risk_metrics.get('win_rate', 0)
+            total_trades = risk_metrics.get('total_trades', 0)
+            winning_trades = risk_metrics.get('winning_trades', 0)
+            losing_trades = risk_metrics.get('losing_trades', 0)
+            profit_factor = risk_metrics.get('profit_factor', 0)
+            avg_win = risk_metrics.get('avg_win', 0)
+            avg_loss = risk_metrics.get('avg_loss', 0)
+            
+            # Alpha/Beta
+            alpha = risk_metrics.get('alpha', 0)
+            beta = risk_metrics.get('beta', 1.0)
+            
+            # 形态分析
+            pattern_count = pattern_analysis.get('pattern_count', 0)
+            total_signals = pattern_analysis.get('total_signals', 0)
+            successful_signals = pattern_analysis.get('successful_signals', 0)
+            pattern_success_rate = pattern_analysis.get('success_rate', 0)
+            
+            # 构建专业回测结果文本
+            result_text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 形态分析专业回测报告
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-            # 构建结果文本
-            result_text = "=== 形态分析回测报告 ===\n\n"
-            result_text += f"回测时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            result_text += f"回测期间: {len(backtest_result)} 个交易日\n\n"
+🎯 回测信息
+   回测引擎: 形态分析专业引擎
+   计算时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+   回测期间: {total_days} 个交易日
+   分析形态: {pattern_count} 个
+   有效信号: {total_signals} 个
+   成功信号: {successful_signals} 个
 
-            # 基本指标
-            if 'total_return' in backtest_result.columns:
-                final_return = backtest_result['total_return'].iloc[-1] if not backtest_result['total_return'].empty else 0
-                result_text += f"总收益率: {final_return:.2%}\n"
+📈 收益指标
+   总收益率: {total_return:+.2%}
+   年化收益率: {total_return * 365 / total_days:+.2%} (估算)
 
-            if 'max_drawdown' in risk_metrics:
-                result_text += f"最大回撤: {risk_metrics['max_drawdown']:.2%}\n"
+📉 风险指标
+   波动率: {volatility:.2%}
+   最大回撤: {max_drawdown:.2%}
+   
+🎯 风险调整收益
+   夏普比率: {sharpe_ratio:.3f}
+   Sortino比率: {sortino_ratio:.3f}
+   Calmar比率: {calmar_ratio:.3f}
 
-            if 'sharpe_ratio' in risk_metrics:
-                result_text += f"夏普比率: {risk_metrics['sharpe_ratio']:.2f}\n"
+📊 交易统计
+   总交易次数: {total_trades}次
+   盈利交易: {winning_trades}次
+   亏损交易: {losing_trades}次
+   胜率: {win_rate:.1%}
+   盈亏比: {profit_factor:.2f}:1
 
-            if 'win_rate' in risk_metrics:
-                result_text += f"胜率: {risk_metrics['win_rate']:.2%}\n"
+🎯 形态效果
+   形态成功率: {pattern_success_rate:.1%}
+   平均盈利: {avg_win:.2f}
+   平均亏损: {avg_loss:.2f}
+
+🎯 基准表现
+   Alpha: {alpha:.3f}
+   Beta: {beta:.3f}
+
+✅ 专业回测完成 | 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
             # 显示结果
             if hasattr(self, 'backtest_text'):
                 self.backtest_text.setPlainText(result_text)
             else:
-                QMessageBox.information(self, "回测结果", result_text)
+                QMessageBox.information(self, "专业回测结果", result_text)
 
-            logger.info("专业回测结果显示完成")
+            logger.info("形态分析专业回测结果显示完成")
 
         except Exception as e:
             logger.error(f"显示回测结果失败: {e}")
+            # 降级到简单显示
+            if hasattr(self, 'backtest_text'):
+                self.backtest_text.setPlainText("回测结果展示失败，请查看日志")
+            else:
+                QMessageBox.warning(self, "警告", "回测结果展示失败")
 
     def _display_simplified_results(self, results):
         """显示简化回测结果"""

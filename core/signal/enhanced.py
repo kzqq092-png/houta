@@ -1,23 +1,56 @@
+"""
+增强的交易信号系统 - 无 hikyuu 依赖
+
+完全基于 pandas 和 TA-Lib 实现，支持多因子、机器学习、信号权重、
+技术/基本面/量价等多维度因子的综合信号系统。
+"""
+
 import numpy as np
 import pandas as pd
-from hikyuu import *
-from hikyuu.trade_sys import SignalBase
-from hikyuu.indicator import MA, MACD, RSI, KDJ, CLOSE, VOL, ATR, CCI, OBV, DMI
-# 已替换为新的导入
+from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime
+from dataclasses import dataclass, field
 
-from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+from .base import BaseSignal, Signal
+from core.enhanced_indicator_service import EnhancedIndicatorService
 from loguru import logger
 
-class EnhancedSignal(SignalBase):
+
+@dataclass
+class SignalStrength:
+    """信号强度组件"""
+    trend: float = 0.0
+    momentum: float = 0.0
+    volume: float = 0.0
+    volatility: float = 0.0
+    ml: float = 0.0
+    total: float = 0.0
+    
+    def to_dict(self) -> Dict[str, float]:
+        """转换为字典"""
+        return {
+            'trend': self.trend,
+            'momentum': self.momentum,
+            'volume': self.volume,
+            'volatility': self.volatility,
+            'ml': self.ml,
+            'total': self.total
+        }
+
+
+class EnhancedSignal(BaseSignal):
     """
-    增强的交易信号系统（唯一实现）
-    支持多因子、机器学习、信号权重、技术/基本面/量价等多维度因子
+    增强的交易信号系统 - 无 hikyuu 依赖
+    
+    支持多因子、机器学习、信号权重、技术/基本面/量价等多维度因子。
+    完全基于 pandas 和 TA-Lib 实现，替代原有的 hikyuu SignalBase 继承。
     """
 
-    def __init__(self, params=None):
-        super(EnhancedSignal, self).__init__("EnhancedSignal")
+    def __init__(self, name: str = "EnhancedSignal", params: Optional[Dict[str, Any]] = None):
+        super().__init__(name)
+        
         # 默认参数
-        self.params = {
+        default_params = {
             "n_fast": 12,              # 快速均线周期
             "n_slow": 26,              # 慢速均线周期
             "n_signal": 9,             # 信号线周期
@@ -52,15 +85,23 @@ class EnhancedSignal(SignalBase):
                 "ml": 0.2
             }
         }
+        
+        # 更新参数
         if params is not None and isinstance(params, dict):
-            self.params.update(params)
-        for key, value in self.params.items():
+            default_params.update(params)
+        
+        for key, value in default_params.items():
             self.set_param(key, value)
-        self.signal_history = []  # 用于存储历史信号
+        
+        # 增强信号特有属性
+        self.signal_history: List[Tuple[datetime, int]] = []  # 历史信号
         self.last_signal = 0      # 上一个信号
         self.market_regime = "neutral"  # 市场状态
         self.volatility = 0.0     # 市场波动率
         self.ml_model = None      # 机器学习模型
+        self._enhanced_indicator_service = EnhancedIndicatorService()
+        
+        # 加载机器学习模型
         if self.get_param("enable_ml") and self.get_param("ml_model_path"):
             self._load_ml_model()
 
@@ -68,203 +109,322 @@ class EnhancedSignal(SignalBase):
         """加载机器学习模型"""
         try:
             import joblib
-            self.ml_model = joblib.load(self.get_param("ml_model_path"))
+            model_path = self.get_param("ml_model_path")
+            if model_path:
+                self.ml_model = joblib.load(model_path)
+                logger.info(f"成功加载机器学习模型: {model_path}")
         except Exception as e:
-            logger.info(f"加载机器学习模型失败: {str(e)}")
+            logger.warning(f"加载机器学习模型失败: {str(e)}")
             self.ml_model = None
 
-    def _calculate_ml_signal(self, k):
+    def _calculate_ml_signal(self, data: pd.DataFrame) -> float:
         """计算机器学习信号"""
         if not self.ml_model or not self.get_param("enable_ml"):
-            return 0
+            return 0.0
+        
         try:
-            features = self._prepare_ml_features(k)
-            if features is None:
-                return 0
-            prediction = self.ml_model.predict_proba(features)[:, 1]
-            return prediction[-1] if prediction[-1] > self.get_param("ml_threshold") else 0
+            features = self._prepare_ml_features(data)
+            if features is None or len(features) == 0:
+                return 0.0
+            
+            # 获取最后一个时间点的预测
+            latest_features = features[-1:] if len(features) > 1 else features
+            prediction = self.ml_model.predict_proba(latest_features)[:, 1]
+            
+            return prediction[-1] if prediction[-1] > self.get_param("ml_threshold") else 0.0
+            
         except Exception as e:
-            logger.info(f"机器学习信号计算错误: {str(e)}")
-            return 0
+            logger.warning(f"机器学习信号计算错误: {str(e)}")
+            return 0.0
 
-    def _prepare_ml_features(self, k):
+    def _prepare_ml_features(self, data: pd.DataFrame) -> Optional[np.ndarray]:
         """准备机器学习特征"""
         try:
             features = []
-            for feature_name in self.get_param("ml_features"):
+            ml_features = self.get_param("ml_features", [])
+            
+            if not ml_features:
+                # 默认特征
+                ml_features = ["close", "volume", "rsi"]
+            
+            for feature_name in ml_features:
                 if feature_name == "close":
-                    features.append(CLOSE(k))
-                elif feature_name == "volume":
-                    features.append(VOL(k))
+                    features.append(data['close'].values)
+                elif feature_name == "volume" and 'volume' in data.columns:
+                    features.append(data['volume'].values)
                 elif feature_name == "rsi":
-                    features.append(
-                        RSI(CLOSE(k), n=self.get_param("rsi_window")))
+                    rsi = self._enhanced_indicator_service.calculate_indicator(
+                        'RSI', data, {'period': self.get_param("rsi_window")}
+                    )
+                    if rsi is not None and not rsi.empty:
+                        features.append(rsi.values)
                 # 可扩展更多特征
+            
             if not features:
                 return None
+                
+            # 确保所有特征长度一致
+            min_length = min(len(f) for f in features)
+            features = [f[:min_length] for f in features]
+            
             return np.column_stack(features)
+            
         except Exception as e:
-            logger.info(f"准备机器学习特征失败: {str(e)}")
+            logger.warning(f"准备机器学习特征失败: {str(e)}")
             return None
 
-    def _clone(self):
-        return EnhancedSignal(params=self.params)
+    def clone(self) -> 'EnhancedSignal':
+        """克隆增强信号实例"""
+        cloned = EnhancedSignal(name=self.name)
+        cloned._params = self._params.copy()
+        cloned._cache = self._cache.copy()
+        cloned.signal_history = self.signal_history.copy()
+        cloned.last_signal = self.last_signal
+        cloned.market_regime = self.market_regime
+        cloned.volatility = self.volatility
+        cloned.ml_model = self.ml_model
+        return cloned
 
-    def _calculate(self, k, record):
+    def _calculate(self, data: pd.DataFrame, record) -> float:
+        """基于pandas数据的计算逻辑"""
         try:
-            indicators = {}
-            talib_list = get_talib_indicator_list()
-            category_map = get_all_indicators_by_category()
-            for name in talib_list:
-                try:
-                    val = calc_talib_indicator(name, k)
-                    if isinstance(val, pd.DataFrame):
-                        for col in val.columns:
-                            indicators[f"{name}_{col}".upper()] = val[col]
-                    else:
-                        indicators[name.upper()] = val
-                except Exception:
-                    continue
-            close_data = k['close']
-            n_fast = self.get_param("n_fast")
-            n_slow = self.get_param("n_slow")
-            if isinstance(close_data, pd.Series):
-                ma_fast = indicators.get('MA', calculate_indicator(
-                    'MA', k, {'timeperiod': n_fast}))
-                ma_slow = indicators.get('EMA', calculate_indicator(
-                    'EMA', k, {'timeperiod': n_slow}))
-                macd = indicators.get(
-                    'MACD_1', None) or indicators.get('MACD', None)
-                if macd is None:
-                    macd = calculate_indicator(
-                        'MACD', k, {'fast': n_fast, 'slow': n_slow, 'signal': self.get_param('n_signal')})
-                rsi = indicators.get('RSI', None) or calculate_indicator(
-                    'RSI', k, {'timeperiod': self.get_param("rsi_window")})
-                volume_data = k['volume'] if 'volume' in k else None
-                if volume_data is not None and isinstance(volume_data, pd.Series):
-                    volume_ma = volume_data.rolling(
-                        window=self.get_param("volume_ma")).mean()
-                else:
-                    volume_ma = None
+            if data.empty:
+                return 0.0
+                
+            # 计算技术指标
+            indicators = self._calculate_indicators(data)
+            
+            # 基础信号计算
+            base_signal = self._calculate_base_signals(data, indicators)
+            
+            # 机器学习信号
+            ml_signal = self._calculate_ml_signal(data)
+            
+            # 综合信号
+            signal_strength = self._calculate_final_signal(base_signal, ml_signal)
+            
+            # 更新市场状态
+            self.market_regime = self._detect_market_regime(data, indicators)
+            self.volatility = self._calculate_volatility_pandas(data)
+            
+            # 更新历史记录和最后信号
+            if hasattr(data.index, 'tolist') and len(data) > 0:
+                timestamp = data.index[-1]
             else:
-                ma_fast = indicators.get('MA', MA(close_data, n=n_fast))
-                ma_slow = indicators.get('EMA', MA(close_data, n=n_slow))
-                from hikyuu.indicator import MACD, RSI, VOL, MA
-                macd = indicators.get(
-                    'MACD_1', None) or indicators.get('MACD', None)
-                if macd is None:
-                    macd = MACD(close_data, n1=n_fast, n2=n_slow, n3=9)
-                rsi = indicators.get('RSI', None) or RSI(
-                    close_data, n=self.get_param("rsi_window"))
-                volume_ma = MA(VOL(k), n=self.get_param("volume_ma"))
-            kdj = calculate_indicator('KDJ', k, {'n': self.get_param("kdj_n")})
-            # --- 类型安全指标计算 ---
-            # BOLL
-            if isinstance(k['close'], pd.Series):
-                boll = calculate_indicator('BOLL', k, {'timeperiod': self.get_param(
-                    "boll_n"), 'width': self.get_param("boll_width")})
-            else:
-                from hikyuu.indicator import BOLL
-                close_ind = CLOSE(k) if hasattr(k, 'to_df') else k['close']
-                boll = BOLL(close_ind, n=self.get_param("boll_n"),
-                            width=self.get_param("boll_width"))
-            # ATR
-            if hasattr(k, 'to_df'):
-                atr = calculate_indicator(
-                    'ATR', k, {'timeperiod': self.get_param("atr_period")})
-            else:
-                from hikyuu.indicator import ATR
-                atr = ATR(k, n=self.get_param("atr_period"))
-            # CCI
-            if hasattr(k, 'to_df'):
-                cci = calculate_indicator(
-                    'CCI', k, {'timeperiod': self.get_param("cci_period")})
-            else:
-                from hikyuu.indicator import CCI
-                cci = CCI(k, n=self.get_param("cci_period"))
-            # OBV
-            if hasattr(k, 'to_df'):
-                obv = calculate_indicator('OBV', k, {})
-            else:
-                from hikyuu.indicator import OBV
-                obv = OBV(k)
-            obv_ma = MA(obv, n=self.get_param("obv_ma"))
-            dmi = DMI(k, n=self.get_param("dmi_period"))
-            self.market_regime = self._detect_market_regime(
-                k, ma_fast, ma_slow)
-            self.volatility = self._calculate_volatility(k, atr)
-            ml_signal = self._calculate_ml_signal(k)
-            n = len(k)
-            for i in range(2, n):
-                signal_strength = {
-                    "trend": 0,
-                    "momentum": 0,
-                    "volume": 0,
-                    "volatility": 0,
-                    "ml": ml_signal
-                }
-                trend_up = ma_fast[i] > ma_slow[i] and ma_fast[i -
-                                                               1] <= ma_slow[i-1]
-                trend_down = ma_fast[i] < ma_slow[i] and ma_fast[i -
-                                                                 1] >= ma_slow[i-1]
-                if trend_up:
-                    signal_strength["trend"] += 1
-                elif trend_down:
-                    signal_strength["trend"] -= 1
-                macd_up = macd[i] > 0 and macd[i-1] <= 0
-                macd_down = macd[i] < 0 and macd[i-1] >= 0
-                if macd_up:
-                    signal_strength["momentum"] += 1
-                elif macd_down:
-                    signal_strength["momentum"] -= 1
-                volume_confirm = VOL(k)[i] > volume_ma[i] * \
-                    self.get_param("volume_ratio")
-                if volume_confirm:
-                    signal_strength["volume"] += 1
-                if self.volatility > self.get_param("volatility_threshold"):
-                    signal_strength["volatility"] -= 1
-                total_strength = sum(
-                    strength * self.get_param("signal_weights")[category]
-                    for category, strength in signal_strength.items()
-                )
-                if self.market_regime == "bullish":
-                    total_strength *= 1.2
-                elif self.market_regime == "bearish":
-                    total_strength *= 0.8
-                if total_strength >= self.get_param("min_signal_strength"):
-                    if self.last_signal <= 0:
-                        record.add_buy_signal(k[i].datetime)
-                        self.last_signal = 1
-                        self.signal_history.append((k[i].datetime, 1))
-                elif total_strength <= -self.get_param("min_signal_strength"):
-                    if self.last_signal >= 0:
-                        record.add_sell_signal(k[i].datetime)
-                        self.last_signal = -1
-                        self.signal_history.append((k[i].datetime, -1))
-                if len(self.signal_history) > self.get_param("signal_confirm_window"):
-                    self.signal_history.pop(0)
+                timestamp = datetime.now()
+                
+            if signal_strength >= self.get_param("min_signal_strength", 2):
+                if self.last_signal <= 0:
+                    if hasattr(record, 'add_buy_signal'):
+                        record.add_buy_signal(timestamp)
+                    self.last_signal = 1
+                    self.signal_history.append((timestamp, 1))
+            elif signal_strength <= -self.get_param("min_signal_strength", 2):
+                if self.last_signal >= 0:
+                    if hasattr(record, 'add_sell_signal'):
+                        record.add_sell_signal(timestamp)
+                    self.last_signal = -1
+                    self.signal_history.append((timestamp, -1))
+                    
+            # 保持历史记录长度
+            if len(self.signal_history) > self.get_param("signal_confirm_window", 3):
+                self.signal_history.pop(0)
+                
+            return signal_strength
+            
         except Exception as e:
-            logger.info(f"信号计算错误: {str(e)}")
-            return
-
-    def _detect_market_regime(self, k, ma_fast, ma_slow):
+            logger.warning(f"EnhancedSignal计算错误: {str(e)}")
+            return 0.0
+            
+    def _calculate_indicators(self, data: pd.DataFrame) -> Dict[str, float]:
+        """计算技术指标"""
+        indicators = {}
+        
+        try:
+            # 移动平均线
+            n_fast = self.get_param("n_fast", 12)
+            n_slow = self.get_param("n_slow", 26)
+            
+            ma_fast = data['close'].rolling(window=n_fast).mean()
+            ma_slow = data['close'].rolling(window=n_slow).mean()
+            
+            indicators['ma_fast'] = ma_fast.iloc[-1] if not pd.isna(ma_fast.iloc[-1]) else 0.0
+            indicators['ma_slow'] = ma_slow.iloc[-1] if not pd.isna(ma_slow.iloc[-1]) else 0.0
+            
+            # MACD
+            ema_fast = data['close'].ewm(span=n_fast).mean()
+            ema_slow = data['close'].ewm(span=n_slow).mean()
+            macd_line = ema_fast - ema_slow
+            signal_line = macd_line.ewm(span=self.get_param("n_signal", 9)).mean()
+            
+            indicators['macd'] = macd_line.iloc[-1] if not pd.isna(macd_line.iloc[-1]) else 0.0
+            indicators['macd_signal'] = signal_line.iloc[-1] if not pd.isna(signal_line.iloc[-1]) else 0.0
+            
+            # RSI
+            delta = data['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            indicators['rsi'] = rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else 50.0
+            
+            # 成交量均线
+            if 'volume' in data.columns:
+                volume_ma = data['volume'].rolling(window=self.get_param("volume_ma", 20)).mean()
+                indicators['volume_ma'] = volume_ma.iloc[-1] if not pd.isna(volume_ma.iloc[-1]) else 0.0
+            
+            return indicators
+            
+        except Exception as e:
+            logger.warning(f"计算技术指标错误: {str(e)}")
+            return {}
+    
+    def _calculate_base_signals(self, data: pd.DataFrame, indicators: Dict[str, float]) -> float:
+        """计算基础信号"""
+        signal = 0.0
+        
+        try:
+            # 趋势信号
+            if indicators.get('ma_fast', 0) > indicators.get('ma_slow', 0):
+                signal += 0.3
+            else:
+                signal -= 0.1
+                
+            # MACD信号
+            if indicators.get('macd', 0) > indicators.get('macd_signal', 0):
+                signal += 0.3
+            else:
+                signal -= 0.1
+                
+            # RSI信号
+            rsi = indicators.get('rsi', 50)
+            if rsi < self.get_param("rsi_buy_threshold", 30):
+                signal += 0.2
+            elif rsi > self.get_param("rsi_sell_threshold", 70):
+                signal -= 0.2
+                
+            return signal
+            
+        except Exception as e:
+            logger.warning(f"计算基础信号错误: {str(e)}")
+            return 0.0
+    
+    def _calculate_final_signal(self, base_signal: float, ml_signal: float) -> float:
+        """计算最终信号"""
+        weights = self.get_param("signal_weights", {
+            "trend": 0.3, "momentum": 0.2, "volume": 0.15, "volatility": 0.15, "ml": 0.2
+        })
+        
+        # 综合信号计算
+        final_signal = base_signal * (1 - weights.get('ml', 0.2)) + ml_signal * weights.get('ml', 0.2)
+        
+        # 根据市场状态调整
+        if self.market_regime == "bullish":
+            final_signal *= 1.2
+        elif self.market_regime == "bearish":
+            final_signal *= 0.8
+            
+        return final_signal
+        
+    def _detect_market_regime(self, data: pd.DataFrame, indicators: Dict[str, float]) -> str:
         """检测市场状态"""
         try:
-            trend_strength = (ma_fast[-1] - ma_slow[-1]) / ma_slow[-1]
-            if trend_strength > self.get_param("trend_strength"):
-                return "bullish"
-            elif trend_strength < -self.get_param("trend_strength"):
-                return "bearish"
-            else:
-                return "neutral"
-        except Exception as e:
-            logger.info(f"市场状态检测错误: {str(e)}")
+            trend_strength = self.get_param("trend_strength", 0.02)
+            ma_fast = indicators.get('ma_fast', 0)
+            ma_slow = indicators.get('ma_slow', 0)
+            
+            if ma_slow != 0:
+                relative_strength = (ma_fast - ma_slow) / ma_slow
+                if relative_strength > trend_strength:
+                    return "bullish"
+                elif relative_strength < -trend_strength:
+                    return "bearish"
+            
             return "neutral"
-
-    def _calculate_volatility(self, k, atr):
+        except Exception as e:
+            logger.warning(f"市场状态检测错误: {str(e)}")
+            return "neutral"
+    
+    def _calculate_volatility_pandas(self, data: pd.DataFrame) -> float:
         """计算市场波动率"""
         try:
-            return atr[-1] / CLOSE(k)[-1]
-        except Exception as e:
-            logger.info(f"波动率计算错误: {str(e)}")
+            returns = data['close'].pct_change().dropna()
+            if len(returns) >= self.get_param("atr_period", 14):
+                volatility = returns.rolling(window=self.get_param("atr_period", 14)).std().iloc[-1]
+                return volatility if not pd.isna(volatility) else 0.0
             return 0.0
+        except Exception as e:
+            logger.warning(f"波动率计算错误: {str(e)}")
+            return 0.0
+
+    def _detect_market_regime(self, data: pd.DataFrame, indicators: Dict[str, float]) -> str:
+        """检测市场状态"""
+        try:
+            trend_strength = self.get_param("trend_strength", 0.02)
+            current_price = data['close'].iloc[-1]
+            ma_slow_value = indicators.get('ma_slow', 0)
+            
+            if ma_slow_value != 0:
+                relative_strength = (current_price - ma_slow_value) / ma_slow_value
+                if relative_strength > trend_strength:
+                    return "bullish"
+                elif relative_strength < -trend_strength:
+                    return "bearish"
+            return "neutral"
+        except Exception as e:
+            logger.warning(f"市场状态检测错误: {str(e)}")
+            return "neutral"
+
+    def _calculate_volatility(self, data: pd.DataFrame, atr_values: Optional[np.ndarray] = None) -> float:
+        """计算市场波动率"""
+        try:
+            if atr_values is not None and len(atr_values) > 0:
+                current_atr = atr_values[-1]
+                current_price = data['close'].iloc[-1]
+                if current_price != 0:
+                    return current_atr / current_price
+            
+            # 使用pandas直接计算波动率
+            returns = data['close'].pct_change().dropna()
+            if len(returns) >= 14:
+                volatility = returns.rolling(window=14).std().iloc[-1]
+                return volatility if not pd.isna(volatility) else 0.01
+            return 0.01
+        except Exception as e:
+            logger.warning(f"波动率计算错误: {str(e)}")
+            return 0.01
+
+    def calculate_signal(self, data: pd.DataFrame) -> Dict[str, Any]:
+        """主计算接口"""
+        try:
+            if data.empty:
+                return {"signal": 0.0, "info": {"error": "Empty data"}}
+                
+            signal_value = self._calculate(data)
+            
+            signal_info = self.get_signal_info()
+            signal_info.update({
+                "current_signal": signal_value,
+                "timestamp": data.index[-1] if hasattr(data.index, 'tolist') else datetime.now(),
+                "data_points": len(data)
+            })
+            
+            return {
+                "signal": signal_value,
+                "info": signal_info
+            }
+            
+        except Exception as e:
+            logger.warning(f"EnhancedSignal计算信号错误: {str(e)}")
+            return {"signal": 0.0, "info": {"error": str(e)}}
+
+    def update_params(self, **params):
+        """更新参数"""
+        for key, value in params.items():
+            self._params[key] = value
+            
+        # 重新加载模型如果需要
+        if "ml_model_path" in params or "enable_ml" in params:
+            self._load_ml_model()
+            
+        logger.info(f"EnhancedSignal参数已更新: {list(params.keys())}")

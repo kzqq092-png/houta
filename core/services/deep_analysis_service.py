@@ -13,7 +13,6 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 import threading
 
-logger = logger
 
 @dataclass
 class PerformanceMetric:

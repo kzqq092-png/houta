@@ -19,8 +19,6 @@ from .events import BaseEvent, RealtimeDataEvent, TickDataEvent, OrderBookEvent,
 # 为兼容性提供Event别名
 Event = BaseEvent
 
-logger = logger
-
 class SimpleEventHandler:
     """简单的事件处理器包装"""
 

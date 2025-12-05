@@ -25,8 +25,7 @@ class SystemResourceService:
             'monitoring.resource_interval', 1.0)
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
-        self.logger = logger
-
+        self.logger = logger.bind(module=self.__class__.__name__)
     def start(self):
         """启动后台监控线程。"""
         if self._thread is not None and self._thread.is_alive():

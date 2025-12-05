@@ -12,9 +12,11 @@ from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime
 
-logger = logger
 
 class IndicatorCategory(Enum):
+def __init__(self):
+        self.logger = logger.bind(module=self.__class__.__name__)
+    
     """指标分类"""
     TREND = "trend"                    # 趋势指标
     MOMENTUM = "momentum"              # 动量指标
@@ -337,8 +339,7 @@ class IndicatorPluginAdapter:
         """
         self.plugin = plugin
         self.plugin_id = plugin_id
-        self.logger = logger
-
+        self.
         # 缓存
         self._metadata_cache = {}
         self._parameters_cache = {}

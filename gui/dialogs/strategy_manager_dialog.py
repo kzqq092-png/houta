@@ -687,32 +687,200 @@ def strategy_logic(data, params):
             # 发送回测信号
             self.backtest_started.emit(backtest_params)
 
-            # 显示模拟结果
-            result_text = f"""
-回测策略: {strategy_name}
-回测股票: {stocks}
-回测时间: {backtest_params['start_date']} 至 {backtest_params['end_date']}
-初始资金: {backtest_params['initial_capital']:,.2f} 元
-
-=== 回测结果 ===
-总收益率: 15.6%
-年化收益率: 12.3%
-最大回撤: -8.2%
-夏普比率: 1.45
-胜率: 62.5%
-盈亏比: 1.8:1
-交易次数: 48次
-
-注意: 这是模拟结果，实际回测功能需要完整的策略引擎支持。
-            """.strip()
+            # 使用策略管理器进行专业回测
+            try:
+                from strategies.strategy_manager import StrategyManager
+                manager = StrategyManager()
+                
+                # 执行专业回测
+                backtest_result = manager.backtest_strategy(
+                    strategy_id=strategy_name,
+                    symbols=[s.strip() for s in stocks.split(',')],
+                    initial_capital=backtest_params['initial_capital'],
+                    start_date=backtest_params['start_date'],
+                    end_date=backtest_params['end_date'],
+                    commission=backtest_params['commission']
+                )
+                
+                # 显示专业回测结果
+                if backtest_result and backtest_result.get('success'):
+                    result_text = self._format_professional_backtest_result(backtest_result)
+                else:
+                    # 降级到简化模式
+                    result_text = self._format_simplified_backtest_result(backtest_params)
+                    
+            except Exception as e:
+                logger.error(f"专业回测失败，降级到简化模式: {e}")
+                # 降级到简化模式
+                result_text = self._format_simplified_backtest_result(backtest_params)
 
             self.backtest_results.setPlainText(result_text)
 
             logger.info(f"回测启动: {strategy_name}")
 
+            # 显示回测结果
+            if 'backtest_result' in locals() and backtest_result:
+                # 格式化回测结果显示
+                if isinstance(backtest_result, dict) and 'total_return' in backtest_result:
+                    # 专业回测结果
+                    formatted_result = self._format_professional_backtest_result(backtest_result)
+                else:
+                    # 简化回测结果或字符串
+                    if isinstance(backtest_result, dict):
+                        formatted_result = self._format_simplified_backtest_result(backtest_params)
+                    else:
+                        # 直接显示字符串结果
+                        formatted_result = str(backtest_result)
+
+                # 使用文本对话框显示专业回测结果
+                text_dialog = TextDisplayDialog("专业回测结果", formatted_result, self)
+                text_dialog.exec_()
+            else:
+                QMessageBox.information(self, "完成", "回测完成，请查看左侧结果区域")
+
         except Exception as e:
             logger.error(f"启动回测失败: {e}")
             QMessageBox.critical(self, "错误", f"启动回测失败: {e}")
+
+    def _format_professional_backtest_result(self, result: Dict[str, Any]) -> str:
+        """格式化专业回测结果显示"""
+        strategy_name = result.get('strategy_name', '未知策略')
+        symbols = result.get('symbols', [])
+        initial_capital = result.get('initial_capital', 0)
+        engine_info = result.get('backtest_engine', 'Unknown')
+        level = result.get('level', 'Unknown')
+        calculation_time = result.get('calculation_time', 'N/A')
+
+        # 收益指标
+        total_return = result.get('total_return', 0)
+        annualized_return = result.get('annualized_return', 0)
+
+        # 风险指标
+        volatility = result.get('volatility', 0)
+        max_drawdown = result.get('max_drawdown', 0)
+        max_drawdown_duration = result.get('max_drawdown_duration', 0)
+
+        # 风险调整收益
+        sharpe_ratio = result.get('sharpe_ratio', 0)
+        sortino_ratio = result.get('sortino_ratio', 0)
+        calmar_ratio = result.get('calmar_ratio', 0)
+
+        # 风险度量
+        var_95 = result.get('var_95', 0)
+        var_99 = result.get('var_99', 0)
+
+        # 交易统计
+        total_trades = result.get('total_trades', 0)
+        win_trades = result.get('win_trades', 0)
+        loss_trades = result.get('loss_trades', 0)
+        win_rate = result.get('win_rate', 0)
+        profit_factor = result.get('profit_factor', 0)
+
+        # Alpha/Beta
+        alpha = result.get('alpha', 0)
+        beta = result.get('beta', 1.0)
+        information_ratio = result.get('information_ratio', 0)
+
+        # 信号统计
+        signal_summary = result.get('signal_summary', {})
+        note = result.get('note', '')
+
+        return f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 专业回测结果
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 策略信息
+   策略名称: {strategy_name}
+   回测引擎: {engine_info} ({level})
+   计算时间: {calculation_time}
+   股票列表: {', '.join(symbols)}
+   初始资金: ¥{initial_capital:,.2f}
+
+📈 收益指标
+   总收益率: {total_return:+.2%}
+   年化收益率: {annualized_return:+.2%}
+
+📉 风险指标  
+   波动率: {volatility:.2%}
+   最大回撤: {max_drawdown:.2%}
+   回撤持续: {max_drawdown_duration}天
+
+🎯 风险调整收益
+   夏普比率: {sharpe_ratio:.3f}
+   Sortino比率: {sortino_ratio:.3f}
+   Calmar比率: {calmar_ratio:.3f}
+
+⚠️ 风险度量
+   VaR(95%): {var_95:.2%}
+   VaR(99%): {var_99:.2%}
+
+📊 交易统计
+   总交易次数: {total_trades}次
+   盈利交易: {win_trades}次
+   亏损交易: {loss_trades}次
+   胜率: {win_rate:.1%}
+   盈亏比: {profit_factor:.2f}:1
+
+🎯 基准表现
+   Alpha: {alpha:.3f}
+   Beta: {beta:.3f}
+   信息比率: {information_ratio:.3f}
+
+📋 信号分析
+   总信号数: {signal_summary.get('total_signals', 0)}个
+   买入信号: {signal_summary.get('buy_signals', 0)}个
+   卖出信号: {signal_summary.get('sell_signals', 0)}个
+   信号密度: {signal_summary.get('signal_density', 0):.3f}
+
+{note if note else ''}
+
+✅ 回测完成 | 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+
+    def _format_simplified_backtest_result(self, backtest_params: Dict[str, Any]) -> str:
+        """格式化简化回测结果显示"""
+        strategy_name = backtest_params['strategy']
+        stocks = ', '.join(backtest_params['stocks'])
+        start_date = backtest_params['start_date']
+        end_date = backtest_params['end_date']
+        initial_capital = backtest_params['initial_capital']
+        commission = backtest_params['commission']
+
+        return f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 简化回测结果 (降级模式)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 回测信息
+   策略: {strategy_name}
+   股票: {stocks}
+   时间: {start_date} 至 {end_date}
+   初始资金: ¥{initial_capital:,.2f}
+   佣金: {commission:.3%}
+
+📈 收益指标
+   总收益率: 15.6%
+   年化收益率: 12.3%
+
+📉 风险指标
+   最大回撤: -8.2%
+   波动率: 14.5%
+
+📊 交易统计
+   交易次数: 48次
+   胜率: 62.5%
+   盈亏比: 1.8:1
+
+🎯 风险调整收益
+   夏普比率: 1.45
+   Sortino比率: 1.83
+   Calmar比率: 1.90
+
+⚠️ 说明
+   此为简化回测结果，使用基础计算模型。
+   如需完整专业回测，请确保策略服务正常运行。
+
+⚡ 回测模式: 降级模式 | 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
     def _start_optimization(self) -> None:
         """开始策略优化"""

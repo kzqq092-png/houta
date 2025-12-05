@@ -45,8 +45,6 @@ from ..events.enhanced_event_bus import get_enhanced_event_bus, EventPriority, E
 from ..async_management.enhanced_async_manager import get_enhanced_async_manager, TaskPriority, ResourceRequirement
 from ..performance.cache_manager import MultiLevelCacheManager, CacheLevel
 
-logger = logger
-
 
 @dataclass
 class WriteTask:

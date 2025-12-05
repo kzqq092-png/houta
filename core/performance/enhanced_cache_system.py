@@ -621,7 +621,7 @@ class DistributedCache:
             raise ImportError("Redis not available. Install redis-py to use distributed cache.")
 
         self.redis_client = redis.Redis(**redis_config)
-        self.key_prefix = redis_config.get('key_prefix', 'hikyuu_cache:')
+        self.key_prefix = redis_config.get('key_prefix', 'factorweave_cache:')
         self.default_ttl = redis_config.get('default_ttl', 3600)
 
         try:

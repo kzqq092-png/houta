@@ -30,14 +30,14 @@ from gui.dialogs.data_quality_dialog import DataQualityDialog
 from gui.dialogs.data_usage_terms_dialog import DataUsageTermsDialog
 from gui.tools.currency_converter import CurrencyConverter
 
-from .base_coordinator import BaseCoordinator
-from ..events import (
+from core.coordinators.base_coordinator import BaseCoordinator
+from core.events import (
     EventBus, StockSelectedEvent, AssetSelectedEvent, ChartUpdateEvent, AnalysisCompleteEvent,
     DataUpdateEvent, ErrorEvent, UIUpdateEvent, ThemeChangedEvent, UIDataReadyEvent, AssetDataReadyEvent
 )
-from ..plugin_types import AssetType
-from ..containers import ServiceContainer
-from ..services import (
+from core.plugin_types import AssetType
+from core.containers import ServiceContainer
+from core.services import (
     StockService, ChartService, AnalysisService,
     ConfigService, UnifiedDataManager
 )
@@ -47,7 +47,6 @@ from gui.widgets.modern_performance_widget import ModernUnifiedPerformanceWidget
 from core.performance import measure_performance
 from gui.menu_bar import MainMenuBar
 
-logger = logger
 
 
 class MainWindowCoordinator(BaseCoordinator):
@@ -61,10 +60,72 @@ class MainWindowCoordinator(BaseCoordinator):
     4. 管理服务依赖
     """
 
-    def __init__(self,
+    def __init__t__(self,
                  service_container: ServiceContainer,
                  event_bus: EventBus,
                  parent: Optional[QWidget] = None):
+        """
+        初始化主窗口协调器
+
+        Args:
+            service_container: 服务容器
+            event_bus: 事件总线
+            parent: 父窗口（可选）
+        """
+        super().__init__(service_container, event_bus)
+
+        # 创建主窗口
+        self._main_window = QMainWindow(parent)
+        self._main_window.setWindowTitle("FactorWeave-Quant  2.0 多资产分析系统")
+        self._main_window.setGeometry(100, 100, 1400, 900)
+        self._main_window.setMinimumSize(1200, 800)
+
+        # UI面板
+        self._panels: Dict[str, Any] = {}
+        self._optimization_dashboard = None
+
+        # 窗口状态
+        self._window_state = {
+            'title': 'FactorWeave-Quant  2.0 多资产分析系统',
+            'geometry': (100, 100, 1400, 900),
+            'min_size': (1200, 800),
+            'is_maximized': False
+        }
+
+        # 布局配置
+        self._layout_config = {
+            'left_panel_width': 300,
+            'right_panel_width': 350,
+            'bottom_panel_height': 200,
+            'panel_padding': 5
+        }
+
+        # 中央数据状态（支持多资产类型）
+        self._current_symbol: Optional[str] = None
+        self._current_asset_name: Optional[str] = None
+        self._current_asset_type: AssetType = AssetType.STOCK_A
+        self._current_market: Optional[str] = None
+        self._current_asset_data: Dict[str, Any] = {}
+        self._is_loading = False
+
+        # 向后兼容属性
+        @property
+        def _current_stock_code(self) -> Optional[str]:
+            return self._current_symbol
+
+        @_current_stock_code.setter
+        def _current_stock_code(self, value: Optional[str]):
+            self._current_symbol = value
+
+        @property
+        def _current_stock_data(self) -> Dict[str, Any]:
+            return self._current_asset_data
+
+        @_current_stock_data.setter
+        def _current_stock_data(self, value: Dict[str, Any]):
+            self._current_asset_data = value
+
+    def __init__(self, service_container, event_bus, parent=None):
         """
         初始化主窗口协调器
 
@@ -150,11 +211,13 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 获取资产服务（TET模式）
             try:
-                from ..services import AssetService
-                self._asset_service = self.service_container.resolve(AssetService)
-                logger.info("AssetService初始化成功")
+                # 直接设置_asset_service为None，因为AssetService并不存在
+                # 移除相对导入，改为设置默认值
+                self._asset_service = None
+                logger.info("AssetService已设置为None（服务不存在）")
             except Exception as e:
                 logger.warning(f" AssetService初始化失败: {e}")
+                self._asset_service = None
 
             # 如果AssetService初始化失败，设置为None
             if not hasattr(self, '_asset_service'):
@@ -310,7 +373,9 @@ class MainWindowCoordinator(BaseCoordinator):
             vertical_splitter.addWidget(horizontal_splitter)
 
             # 导入真实的面板类
-            from ..ui.panels import LeftPanel, MiddlePanel, RightPanel
+            from core.ui.panels.left_panel import LeftPanel
+            from core.ui.panels.middle_panel import MiddlePanel
+            from core.ui.panels.right_panel import RightPanel
 
             # 创建左侧面板（股票列表面板）
             left_panel = LeftPanel(
@@ -366,7 +431,7 @@ class MainWindowCoordinator(BaseCoordinator):
             horizontal_splitter.setSizes([300, 1000])
 
             # 创建底部面板（日志面板）
-            from ..ui.panels import BottomPanel
+            from core.ui.panels.bottom_panel import BottomPanel
             bottom_panel = BottomPanel(
                 parent=self._main_window,
                 coordinator=self

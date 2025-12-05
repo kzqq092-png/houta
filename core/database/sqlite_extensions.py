@@ -23,8 +23,6 @@ import threading
 
 from .table_manager import TableType
 
-logger = logger
-
 
 @dataclass
 class PluginTableMapping:

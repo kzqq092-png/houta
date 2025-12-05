@@ -17,7 +17,6 @@ import hashlib
 import hmac
 import base64
 
-logger = logger
 
 @dataclass
 class CloudConfig:

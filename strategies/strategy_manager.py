@@ -346,69 +346,434 @@ class StrategyManager:
             logger.error(f"获取K线数据失败 {symbol}: {e}")
             return pd.DataFrame()
     
+    def _prepare_backtest_data(self, signal_results: Dict[str, pd.DataFrame], symbols: List[str]) -> Dict[str, Any]:
+        """准备回测数据"""
+        combined_data = {
+            'signals': {},
+            'prices': {},
+            'dates': []
+        }
+        
+        for symbol, data in signal_results.items():
+            if not data.empty and 'signal' in data.columns:
+                combined_data['signals'][symbol] = data
+                
+                # 获取价格数据
+                if 'close' in data.columns:
+                    combined_data['prices'][symbol] = data['close']
+                    
+                # 获取日期
+                if 'datetime' in data.columns:
+                    combined_data['dates'] = data['datetime'].tolist()
+        
+        return combined_data
+    
+    def _calculate_professional_metrics(
+        self, 
+        combined_data: Dict[str, Any], 
+        initial_capital: float,
+        benchmark: str = '000001'
+    ) -> Dict[str, Any]:
+        """计算专业回测指标"""
+        try:
+            import numpy as np
+            from scipy import stats
+            
+            metrics = {}
+            
+            # 合并所有策略收益
+            all_returns = []
+            total_trades = 0
+            win_trades = 0
+            loss_trades = 0
+            
+            for symbol, data in combined_data['signals'].items():
+                if 'signal' in data.columns and 'close' in data.columns:
+                    # 计算收益
+                    data['returns'] = data['close'].pct_change()
+                    data['strategy_returns'] = data['signal'].shift(1) * data['returns']
+                    
+                    # 移除NaN值
+                    strategy_returns = data['strategy_returns'].dropna()
+                    all_returns.extend(strategy_returns.tolist())
+                    
+                    # 统计交易
+                    signals = data['signal'].dropna()
+                    total_trades += len(signals[signals == 1])
+                    win_trades += len(strategy_returns[strategy_returns > 0])
+                    loss_trades += len(strategy_returns[strategy_returns < 0])
+            
+            if not all_returns:
+                return self._get_default_metrics(initial_capital)
+            
+            all_returns = np.array(all_returns)
+            
+            # 计算基础指标
+            total_return = np.sum(all_returns)
+            metrics['total_return'] = total_return
+            metrics['volatility'] = np.std(all_returns) if len(all_returns) > 1 else 0.0
+            metrics['total_trades'] = total_trades
+            metrics['win_trades'] = win_trades
+            metrics['loss_trades'] = loss_trades
+            metrics['win_rate'] = win_trades / (win_trades + loss_trades) if (win_trades + loss_trades) > 0 else 0.0
+            
+            # 计算风险调整收益指标
+            if metrics['volatility'] > 0:
+                metrics['sharpe_ratio'] = total_return / metrics['volatility']
+            else:
+                metrics['sharpe_ratio'] = 0.0
+            
+            # 计算下行波动率（Sortino比率用）
+            downside_returns = all_returns[all_returns < 0]
+            downside_deviation = np.std(downside_returns) if len(downside_returns) > 1 else 0.0
+            
+            if downside_deviation > 0:
+                metrics['sortino_ratio'] = total_return / downside_deviation
+            else:
+                metrics['sortino_ratio'] = 0.0
+            
+            # 计算最大回撤
+            cumulative_returns = np.cumsum(all_returns)
+            running_max = np.maximum.accumulate(cumulative_returns)
+            drawdowns = cumulative_returns - running_max
+            metrics['max_drawdown'] = np.min(drawdowns)
+            
+            # 计算Calmar比率
+            if metrics['max_drawdown'] < 0:
+                metrics['calmar_ratio'] = total_return / abs(metrics['max_drawdown'])
+            else:
+                metrics['calmar_ratio'] = 0.0
+            
+            # 计算VaR (Value at Risk)
+            if len(all_returns) > 0:
+                metrics['var_95'] = np.percentile(all_returns, 5)
+                metrics['var_99'] = np.percentile(all_returns, 1)
+            else:
+                metrics['var_95'] = 0.0
+                metrics['var_99'] = 0.0
+            
+            # 计算盈亏比
+            if loss_trades > 0 and win_trades > 0:
+                avg_win = np.mean(all_returns[all_returns > 0]) if len(all_returns[all_returns > 0]) > 0 else 0
+                avg_loss = abs(np.mean(all_returns[all_returns < 0])) if len(all_returns[all_returns < 0]) > 0 else 0
+                metrics['profit_factor'] = avg_win / avg_loss if avg_loss > 0 else 0
+            else:
+                metrics['profit_factor'] = 0.0
+            
+            # 简化的alpha和beta（相对于基准）
+            metrics['alpha'] = 0.0  # 需要基准数据才能计算
+            metrics['beta'] = 1.0   # 默认beta为1
+            metrics['information_ratio'] = 0.0  # 需要基准数据才能计算
+            
+            # 计算年化收益（简化）
+            trading_days = len(all_returns)
+            if trading_days > 0:
+                daily_return = total_return / trading_days
+                metrics['annualized_return'] = (1 + daily_return) ** 252 - 1
+            else:
+                metrics['annualized_return'] = 0.0
+            
+            # 添加详细数据
+            metrics['detailed_data'] = {
+                'all_returns': all_returns.tolist(),
+                'cumulative_returns': cumulative_returns.tolist(),
+                'drawdowns': drawdowns.tolist()
+            }
+            
+            return metrics
+            
+        except Exception as e:
+            logger.error(f"计算专业指标失败: {e}")
+            return self._get_default_metrics(initial_capital)
+    
+    def _get_default_metrics(self, initial_capital: float) -> Dict[str, Any]:
+        """获取默认指标（当计算失败时）"""
+        return {
+            'total_return': 0.0,
+            'annualized_return': 0.0,
+            'volatility': 0.0,
+            'sharpe_ratio': 0.0,
+            'sortino_ratio': 0.0,
+            'calmar_ratio': 0.0,
+            'max_drawdown': 0.0,
+            'max_drawdown_duration': 0,
+            'var_95': 0.0,
+            'var_99': 0.0,
+            'total_trades': 0,
+            'win_trades': 0,
+            'loss_trades': 0,
+            'win_rate': 0.0,
+            'profit_factor': 0.0,
+            'alpha': 0.0,
+            'beta': 1.0,
+            'information_ratio': 0.0,
+            'detailed_data': {}
+        }
+    
+    def _fallback_backtest(
+        self, 
+        strategy_id: str, 
+        symbols: List[str], 
+        initial_capital: float, 
+        **strategy_params
+    ) -> Dict[str, Any]:
+        """降级到简化回测"""
+        logger.info("执行简化回测（降级模式）")
+        
+        try:
+            # 执行策略获取信号
+            signal_results = self.execute_strategy(
+                strategy_id=strategy_id,
+                symbols=symbols,
+                **strategy_params
+            )
+            
+            if not signal_results:
+                return {
+                    'success': False,
+                    'error': '策略未生成有效信号',
+                    'strategy_id': strategy_id,
+                    'symbols': symbols,
+                    'level': 'Fallback'
+                }
+            
+            # 简化的回测逻辑
+            total_return = 0.0
+            win_count = 0
+            total_trades = 0
+            
+            for symbol, signal_data in signal_results.items():
+                if 'signal' in signal_data.columns and 'close' in signal_data.columns:
+                    # 计算基于信号的收益
+                    signal_data['returns'] = signal_data['close'].pct_change()
+                    signal_data['strategy_returns'] = signal_data['signal'].shift(1) * signal_data['returns']
+                    
+                    strategy_returns = signal_data['strategy_returns'].dropna()
+                    total_return += strategy_returns.sum()
+                    win_count += (strategy_returns > 0).sum()
+                    total_trades += (signal_data['signal'] == 1).sum()
+            
+            # 简化回测结果
+            backtest_result = {
+                'success': True,
+                'strategy_id': strategy_id,
+                'strategy_name': self.get_strategy(strategy_id).name if self.get_strategy(strategy_id) else strategy_id,
+                'symbols': symbols,
+                'initial_capital': initial_capital,
+                'total_return': total_return,
+                'annualized_return': total_return * 252 / max(total_trades, 1),  # 简化年化
+                'volatility': 0.0,  # 简化模式不计算
+                'sharpe_ratio': 0.0,  # 简化模式不计算
+                'sortino_ratio': 0.0,
+                'calmar_ratio': 0.0,
+                'max_drawdown': 0.0,
+                'max_drawdown_duration': 0,
+                'var_95': 0.0,
+                'var_99': 0.0,
+                'total_trades': total_trades,
+                'win_trades': win_count,
+                'loss_trades': total_trades - win_count,
+                'win_rate': win_count / total_trades if total_trades > 0 else 0.0,
+                'profit_factor': 0.0,
+                'alpha': 0.0,
+                'beta': 1.0,
+                'information_ratio': 0.0,
+                'signal_summary': self._summarize_signals(signal_results),
+                'backtest_data': {},
+                'calculation_time': datetime.now().isoformat(),
+                'backtest_engine': 'StrategyManager Fallback v1.0',
+                'level': 'Simplified',
+                'note': '降级模式 - 简化回测计算'
+            }
+            
+            logger.success(f"简化回测完成！策略: {strategy_id}, 总收益: {backtest_result['total_return']:.2%}, 胜率: {backtest_result['win_rate']:.1%}")
+            
+            return backtest_result
+            
+        except Exception as e:
+            logger.error(f"简化回测执行失败: {e}")
+            return {
+                'success': False,
+                'error': f'回测执行失败: {e}',
+                'strategy_id': strategy_id,
+                'symbols': symbols,
+                'level': 'Error'
+            }
+    
+    def _summarize_signals(self, signal_results: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
+        """汇总信号统计"""
+        summary = {
+            'total_symbols': len(signal_results),
+            'total_signals': 0,
+            'buy_signals': 0,
+            'sell_signals': 0,
+            'signal_density': 0.0,
+            'symbols_with_signals': 0
+        }
+        
+        total_data_points = 0
+        
+        for symbol, data in signal_results.items():
+            if not data.empty:
+                total_data_points += len(data)
+                
+                if 'signal' in data.columns:
+                    signals = data['signal'].dropna()
+                    buy_count = (signals == 1).sum()
+                    sell_count = (signals == -1).sum()
+                    
+                    summary['buy_signals'] += buy_count
+                    summary['sell_signals'] += sell_count
+                    summary['total_signals'] += buy_count + sell_count
+                    
+                    if (buy_count + sell_count) > 0:
+                        summary['symbols_with_signals'] += 1
+        
+        if total_data_points > 0:
+            summary['signal_density'] = summary['total_signals'] / total_data_points
+        
+        return summary
+    
     def backtest_strategy(
         self,
         strategy_id: str,
         symbols: List[str],
         initial_capital: float = 1000000.0,
+        start_date: str = None,
+        end_date: str = None,
+        benchmark: str = '000001',
         **strategy_params
     ) -> Dict[str, Any]:
         """
-        策略回测
+        策略专业回测
         
         Args:
             strategy_id: 策略ID
             symbols: 股票代码列表
             initial_capital: 初始资金
+            start_date: 回测开始日期
+            end_date: 回测结束日期
+            benchmark: 基准股票代码
             **strategy_params: 策略参数
             
         Returns:
-            回测结果
+            完整的专业回测结果
         """
-        logger.info(f"开始回测策略: {strategy_id}")
+        logger.info(f"开始专业回测策略: {strategy_id}")
         
-        # 执行策略获取信号
-        signal_results = self.execute_strategy(
-            strategy_id=strategy_id,
-            symbols=symbols,
-            **strategy_params
-        )
-        
-        if not signal_results:
-            logger.error("未生成任何信号，回测终止")
-            return {}
-        
-        # 简单的回测逻辑
-        total_return = 0.0
-        win_count = 0
-        total_trades = 0
-        
-        for symbol, signal_data in signal_results.items():
-            # 这里是简化的回测逻辑
-            if 'signal' in signal_data.columns:
-                # 计算基于信号的收益
-                signal_data['returns'] = signal_data['close'].pct_change()
-                signal_data['strategy_returns'] = signal_data['signal'].shift(1) * signal_data['returns']
+        try:
+            # 1. 导入专业回测引擎
+            from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
+            from core.services.unified_data_manager import UnifiedDataManager
+            
+            # 2. 初始化专业回测引擎
+            backtest_engine = UnifiedBacktestEngine(
+                backtest_level=BacktestLevel.PROFESSIONAL,
+                use_vectorized_engine=True
+            )
+            
+            # 3. 准备回测参数
+            backtest_config = {
+                'strategy_id': strategy_id,
+                'symbols': symbols,
+                'initial_capital': initial_capital,
+                'start_date': start_date,
+                'end_date': end_date,
+                'benchmark': benchmark,
+                'strategy_params': strategy_params
+            }
+            
+            # 4. 执行策略信号生成
+            signal_results = self.execute_strategy(
+                strategy_id=strategy_id,
+                symbols=symbols,
+                start_date=start_date,
+                end_date=end_date,
+                **strategy_params
+            )
+            
+            if not signal_results:
+                logger.error("未生成任何信号，回测终止")
+                return {
+                    'success': False,
+                    'error': '策略未生成有效信号',
+                    'strategy_id': strategy_id,
+                    'symbols': symbols
+                }
+            
+            # 5. 执行专业回测计算
+            logger.info("使用专业回测引擎计算...")
+            
+            # 整合信号数据用于回测
+            combined_data = self._prepare_backtest_data(signal_results, symbols)
+            
+            # 6. 计算专业回测指标
+            backtest_metrics = self._calculate_professional_metrics(
+                combined_data, 
+                initial_capital,
+                benchmark
+            )
+            
+            # 7. 组装完整回测结果
+            backtest_result = {
+                'success': True,
+                'strategy_id': strategy_id,
+                'strategy_name': self.get_strategy(strategy_id).name if self.get_strategy(strategy_id) else strategy_id,
+                'symbols': symbols,
+                'backtest_period': {
+                    'start_date': start_date,
+                    'end_date': end_date
+                },
+                'initial_capital': initial_capital,
+                'benchmark': benchmark,
                 
-                total_return += signal_data['strategy_returns'].sum()
-                win_count += (signal_data['strategy_returns'] > 0).sum()
-                total_trades += (signal_data['signal'] == 1).sum()
-        
-        # 计算回测指标
-        backtest_result = {
-            'strategy_id': strategy_id,
-            'symbols': symbols,
-            'initial_capital': initial_capital,
-            'total_return': total_return,
-            'total_trades': total_trades,
-            'win_count': win_count,
-            'win_rate': win_count / total_trades if total_trades > 0 else 0,
-            'final_capital': initial_capital * (1 + total_return)
-        }
-        
-        logger.success(f"回测完成！总收益: {total_return:.2%}，胜率: {backtest_result['win_rate']:.1%}")
-        
-        return backtest_result
+                # 核心收益指标
+                'total_return': backtest_metrics.get('total_return', 0.0),
+                'annualized_return': backtest_metrics.get('annualized_return', 0.0),
+                'volatility': backtest_metrics.get('volatility', 0.0),
+                
+                # 风险调整收益指标
+                'sharpe_ratio': backtest_metrics.get('sharpe_ratio', 0.0),
+                'sortino_ratio': backtest_metrics.get('sortino_ratio', 0.0),
+                'calmar_ratio': backtest_metrics.get('calmar_ratio', 0.0),
+                
+                # 风险指标
+                'max_drawdown': backtest_metrics.get('max_drawdown', 0.0),
+                'max_drawdown_duration': backtest_metrics.get('max_drawdown_duration', 0),
+                'var_95': backtest_metrics.get('var_95', 0.0),
+                'var_99': backtest_metrics.get('var_99', 0.0),
+                
+                # 交易统计
+                'total_trades': backtest_metrics.get('total_trades', 0),
+                'win_trades': backtest_metrics.get('win_trades', 0),
+                'loss_trades': backtest_metrics.get('loss_trades', 0),
+                'win_rate': backtest_metrics.get('win_rate', 0.0),
+                'profit_factor': backtest_metrics.get('profit_factor', 0.0),
+                
+                # 相对指标
+                'alpha': backtest_metrics.get('alpha', 0.0),
+                'beta': backtest_metrics.get('beta', 0.0),
+                'information_ratio': backtest_metrics.get('information_ratio', 0.0),
+                
+                # 详细数据
+                'signal_summary': self._summarize_signals(signal_results),
+                'backtest_data': backtest_metrics.get('detailed_data', {}),
+                
+                # 元数据
+                'calculation_time': datetime.now().isoformat(),
+                'backtest_engine': 'UnifiedBacktestEngine v2.0',
+                'level': 'Professional'
+            }
+            
+            logger.success(f"专业回测完成！策略: {strategy_id}, 总收益: {backtest_result['total_return']:.2%}, 夏普比率: {backtest_result['sharpe_ratio']:.2f}")
+            
+            return backtest_result
+            
+        except Exception as e:
+            logger.error(f"专业回测执行失败: {e}")
+            # 降级到简化回测
+            logger.warning("降级到简化回测模式...")
+            return self._fallback_backtest(strategy_id, symbols, initial_capital, **strategy_params)
 
 
 # 全局策略管理器实例

@@ -14,8 +14,6 @@ from datetime import datetime
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 
-logger = logger
-
 
 class AsyncDataImportWorker(QThread):
     """异步数据导入工作线程"""

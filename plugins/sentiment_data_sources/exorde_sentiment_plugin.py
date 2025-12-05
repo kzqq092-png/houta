@@ -40,15 +40,15 @@ class ExordeSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
             "name": "Exorde情绪光谱插件",
             "version": "1.0.0",
             "author": "FactorWeave-Quant  Team",
-            "email": "support@hikyuu.com",
+            "email": "support@factorweave.com",
             "website": "https://developers.exorde.io",
             "license": "MIT",
             "description": "基于Exorde API获取27种情绪分析数据，提供全面的市场情绪光谱分析",
             "plugin_type": PluginType.DATA_SOURCE,
             "category": PluginCategory.CORE,
             "dependencies": ["requests>=2.25.0"],
-            "min_hikyuu_version": "1.0.0",
-            "max_hikyuu_version": "2.0.0",
+            "min_framework_version": "1.0.0",
+            "max_framework_version": "2.0.0",
             "documentation_url": "https://developers.exorde.io",
             "tags": ["sentiment", "exorde", "emotion", "27emotions", "api"]
         }

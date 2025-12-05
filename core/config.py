@@ -16,8 +16,6 @@ from utils import (
     LoggingConfig
 )
 
-logger = logger
-
 __all__ = [
     'ConfigManager',
     'ThemeConfig',

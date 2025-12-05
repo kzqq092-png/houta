@@ -232,7 +232,7 @@ class SmartRecommendationEngine:
                 # 标记需要重新训练
                 self._model_trained = False
 
-            logger.info(f"内容项已添加: {item.item_id}")
+            # logger.info(f"内容项已添加: {item.item_id}")
 
         except Exception as e:
             logger.error(f"添加内容项失败: {e}")

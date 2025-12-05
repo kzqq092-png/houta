@@ -369,7 +369,7 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         self.current_pattern = None
         self.performance_history = {}
 
-        self.setWindowTitle("HiKyuu 形态识别优化仪表板")
+        self.setWindowTitle("FactorWeave-Quant 形态识别优化仪表板")
         self.setGeometry(100, 100, 1400, 900)
         self.init_ui()
         self._subscribe_to_events()

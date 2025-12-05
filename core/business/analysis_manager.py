@@ -1,4 +1,5 @@
 from loguru import logger
+
 """
 分析管理业务逻辑
 
@@ -21,7 +22,7 @@ from ..data.data_access import DataAccess
 
 @dataclass
 class TechnicalSignal:
-    """技术分析信号"""
+
     signal_type: str  # 信号类型：'buy', 'sell', 'hold'
     strength: float  # 信号强度 0-1
     indicator: str  # 指标名称
@@ -49,9 +50,9 @@ class AnalysisManager:
     """分析管理器"""
 
     def __init__(self, data_access: DataAccess):
-        self.logger = logger
         self.data_access = data_access
         self._analysis_cache = {}  # 分析结果缓存
+        self.logger = logger.bind(module=self.__class__.__name__)
 
     def _technical_analysis(self, stock_code: str, stock_info: StockInfo) -> Optional[AnalysisResult]:
         """技术分析"""

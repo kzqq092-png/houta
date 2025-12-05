@@ -13,7 +13,6 @@ from .models import StockInfo, KlineData, MarketData, QueryParams
 from .repository import StockRepository, KlineRepository, MarketRepository
 from core.services.uni_plugin_data_manager import UniPluginDataManager
 
-logger = logger
 
 class DataAccess:
     """
@@ -30,8 +29,9 @@ class DataAccess:
             data_manager: 数据管理器实例（可选，向后兼容）
             uni_plugin_manager: 统一插件数据管理器（优先使用）
         """
-        self.logger = logger
-
+        # 设置数据管理器
+        self.data_manager = data_manager
+        
         # 优先使用UniPluginDataManager
         self.uni_plugin_manager = uni_plugin_manager
 
@@ -42,7 +42,9 @@ class DataAccess:
 
         # 连接状态
         self._connected = False
-
+        
+        # 初始化logger
+        self.logger = logger.bind(module=self.__class__.__name__)
     def connect(self) -> bool:
         """连接所有数据源"""
         try:

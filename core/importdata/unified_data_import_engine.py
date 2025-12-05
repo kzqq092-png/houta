@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-from core.services.unified_data_manager import get_unified_data_manager
 统一数据导入引擎
 
 整合所有数据导入功能，提供统一的接口和专业级功能
 对标Bloomberg Terminal、Wind万得等专业金融软件
 """
+
+# 导入核心服务
+from core.services.unified_data_manager import get_unified_data_manager
 
 import asyncio
 import threading

@@ -35,8 +35,6 @@ from ..utils.database_utils import (
 from ..plugin_types import DataType, AssetType
 from ..data_source_router import DataSourceRouter
 
-logger = logger
-
 
 class SystemIntegrationManager:
     """
@@ -53,8 +51,6 @@ class SystemIntegrationManager:
             config: 系统配置字典
         """
         self.config = config
-        self.logger = logger
-
         # 核心组件
         self.tet_pipeline: Optional[TETDataPipeline] = None
         self.field_mapping_engine: Optional[FieldMappingEngine] = None
@@ -78,6 +74,9 @@ class SystemIntegrationManager:
 
         # 初始化标志
         self._initialized = False
+        
+        # 初始化logger
+        self.logger = logger.bind(module=self.__class__.__name__)
 
     async def initialize(self) -> bool:
         """

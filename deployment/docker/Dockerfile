@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建非root用户
-RUN groupadd -r hikyuu && useradd -r -g hikyuu hikyuu
+RUN groupadd -r factorweave && useradd -r -g factorweave factorweave
 
 # 安装Python依赖
 COPY requirements.txt requirements-prod.txt ./
@@ -34,15 +34,15 @@ RUN pip install --no-cache-dir -r requirements-prod.txt
 COPY . .
 
 # 设置权限
-RUN chown -R hikyuu:hikyuu /app && \
+RUN chown -R factorweave:factorweave /app && \
     chmod +x /app/deployment/scripts/*.sh
 
 # 创建必要的目录
 RUN mkdir -p /app/data /app/logs /app/cache /app/backups && \
-    chown -R hikyuu:hikyuu /app/data /app/logs /app/cache /app/backups
+    chown -R factorweave:factorweave /app/data /app/logs /app/cache /app/backups
 
 # 切换到非root用户
-USER hikyuu
+USER factorweave
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

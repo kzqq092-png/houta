@@ -23,7 +23,7 @@ from loguru import logger
 class RiskExporter:
     """风险报告导出器"""
 
-    def __init__(self, output_dir: str = "reports"):
+    def __init__t__(self, output_dir: str = "reports"):
         """
         初始化风险报告导出器
 
@@ -34,12 +34,21 @@ class RiskExporter:
         self.template_dir = os.path.join(
             os.path.dirname(__file__), "templates")
         self._setup_logging()
+"""
+    self.logger = logger.bind(module=self.__class__.__name__)
+        初始化风险报告导出器
 
+        Args:
+            output_dir: 输出目录路径
+        """
+        self.output_dir = output_dir
+        self.template_dir = os.path.join(
+            os.path.dirname(__file__), "templates")
+        self._setup_logging()
     def _setup_logging(self):
         """设置日志"""
         # Loguru配置在core.loguru_config中统一管理
-        self.logger = logger
-
+        self.
     def export_report(self, risk_report: Dict, format: str = "excel") -> str:
         """
         导出风险报告

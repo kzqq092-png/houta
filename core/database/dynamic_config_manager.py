@@ -20,7 +20,6 @@ from core.database.duckdb_performance_optimizer import (
     DuckDBPerformanceOptimizer, WorkloadType
 )
 
-logger = logger
 
 
 class DynamicConfigManager:

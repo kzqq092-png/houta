@@ -19,7 +19,6 @@ from core.tet_data_pipeline import StandardQuery
 from gui.widgets.signal_aggregator import SignalAggregator, AggregatedAlert
 from gui.widgets.signal_detectors.base_detector import SignalDetectorRegistry
 
-logger = logger
 
 
 class TETDataProvider:
@@ -28,8 +27,7 @@ class TETDataProvider:
     def __init__(self, unified_data_manager: UnifiedDataManager, asset_service: AssetService):
         self.unified_data_manager = unified_data_manager
         self.asset_service = asset_service
-        self.logger = logger
-
+        self.logger = logger.bind(module=self.__class__.__name__)
     async def get_multi_source_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK_A) -> Dict[str, Any]:
         """
         通过TET框架获取多源数据

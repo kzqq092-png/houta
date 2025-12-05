@@ -50,10 +50,9 @@ except ImportError as e:
 
     # 模拟类，避免导入错误
     class MockComponent:
-        def __init__(self):
+        def __init__t__(self):
             pass
-
-
+            pass
 class HealthStatus(Enum):
     """健康状态枚举"""
     HEALTHY = "healthy"

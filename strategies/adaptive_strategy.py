@@ -3,12 +3,12 @@ from loguru import logger
 """
 自适应策略模块
 
-使用统一的策略管理系统框架，集成FactorWeave-Quant原生组件
+使用统一的策略管理系统框架，完全基于pandas和TA-Lib实现，无hikyuu依赖
 """
 
-from hikyuu import *
 from typing import List, Dict, Any
 import pandas as pd
+import numpy as np
 from datetime import datetime
 
 # 导入统一策略管理系统
@@ -17,26 +17,32 @@ from core.strategy import register_strategy
 from core.stop_loss import AdaptiveStopLoss
 from core.take_profit import AdaptiveTakeProfit
 
+# 技术指标库
+import talib
+
+logger = logger.bind(module=__name__)
+
 
 @register_strategy("AdaptiveFactorWeave", metadata={
     "description": "基于FactorWeave框架的自适应止损止盈策略",
     "author": "FactorWeave 团队",
-    "version": "2.0.0",
-    "category": "adaptive"
+    "version": "3.0.0",
+    "category": "adaptive",
+    "dependencies": ["talib", "pandas"]
 })
 class AdaptiveFactorWeaveStrategy(BaseStrategy):
-    """自适应FactorWeave策略"""
+    """自适应FactorWeave策略（无hikyuu依赖版本）"""
 
     def __init__(self, name: str = "AdaptiveFactorWeave"):
         super().__init__(name, StrategyType.CUSTOM)
         self._init_default_parameters()
-        self._system = None
+        self._signal_cache = {}  # 信号缓存
 
     def _init_default_parameters(self):
         """初始化默认参数"""
         # 资金管理参数
         self.add_parameter("init_cash", 100000, int, "初始资金", 10000, 1000000)
-        self.add_parameter("fixed_count", 100, int, "固定股数", 10, 1000)
+        self.add_parameter("position_size", 100, int, "仓位大小", 10, 1000)
 
         # 止损参数
         self.add_parameter("atr_period", 14, int, "ATR周期", 5, 30)
@@ -62,131 +68,316 @@ class AdaptiveFactorWeaveStrategy(BaseStrategy):
 
     def generate_signals(self, data: pd.DataFrame) -> List[StrategySignal]:
         """
-        生成交易信号
-
-        注意：这个策略主要用于系统配置，实际信号生成由HIkyuu系统处理
+        生成交易信号（基于TA-Lib技术指标）
         """
         signals = []
 
-        # 创建HIkyuu系统
-        system = self._create_hikyuu_system()
-
-        if system is None:
+        if data is None or data.empty or len(data) < 50:
             return signals
 
-        # 这里可以添加基于HIkyuu系统的信号生成逻辑
-        # 由于HIkyuu系统的复杂性，这里提供一个简化的示例
-
         try:
-            # 简化的信号生成逻辑
-            if len(data) > 20:
-                # 计算简单的移动平均信号
-                ma_period = self.get_parameter("ma_period")
-                data_copy = data.copy()
-                data_copy['ma'] = data_copy['close'].rolling(
-                    window=ma_period).mean()
+            # 数据预处理
+            clean_data = self._prepare_data(data)
+            if clean_data is None:
+                return signals
 
-                for i in range(ma_period, len(data_copy)):
-                    current = data_copy.iloc[i]
-                    prev = data_copy.iloc[i-1]
+            # 获取参数
+            ma_period = self.get_parameter("ma_period")
+            atr_period = self.get_parameter("atr_period")
+            atr_multiplier = self.get_parameter("atr_multiplier")
+            volatility_factor = self.get_parameter("volatility_factor")
 
-                    # 简单的金叉死叉信号
-                    if current['close'] > current['ma'] and prev['close'] <= prev['ma']:
-                        signals.append(StrategySignal(
-                            timestamp=data_copy.index[i],
-                            signal_type=SignalType.BUY,
-                            price=current['close'],
-                            confidence=0.7,
-                            strategy_name=self.name,
-                            reason=f"价格突破{ma_period}日移动平均线",
-                            stop_loss=current['close'] *
-                            (1 - self.get_parameter("fixed_stop_loss")),
-                            take_profit=current['close'] *
-                            (1 + self.get_parameter("min_take_profit"))
-                        ))
+            # 计算技术指标
+            indicators = self._calculate_indicators(clean_data, ma_period, atr_period)
 
-                    elif current['close'] < current['ma'] and prev['close'] >= prev['ma']:
-                        signals.append(StrategySignal(
-                            timestamp=data_copy.index[i],
-                            signal_type=SignalType.SELL,
-                            price=current['close'],
-                            confidence=0.7,
-                            strategy_name=self.name,
-                            reason=f"价格跌破{ma_period}日移动平均线",
-                            stop_loss=current['close'] *
-                            (1 + self.get_parameter("fixed_stop_loss")),
-                            take_profit=current['close'] *
-                            (1 - self.get_parameter("min_take_profit"))
-                        ))
+            if indicators is None:
+                return signals
+
+            # 生成信号
+            signals = self._generate_adaptive_signals(clean_data, indicators, atr_multiplier, volatility_factor)
 
         except Exception as e:
-            logger.info(f"HIkyuu自适应策略信号生成失败: {e}")
+            logger.error(f"自适应策略信号生成失败: {e}")
 
         return signals
 
-    def _create_hikyuu_system(self):
-        """创建HIkyuu交易系统"""
+    def _prepare_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        """数据预处理和验证"""
         try:
-            # 创建交易管理对象
-            tm = crtTM(init_cash=self.get_parameter("init_cash"))
+            # 复制数据
+            clean_data = data.copy()
+            
+            # 确保必要的列存在
+            required_cols = ['open', 'high', 'low', 'close', 'volume']
+            missing_cols = [col for col in required_cols if col not in clean_data.columns]
+            if missing_cols:
+                logger.warning(f"缺少必要的数据列: {missing_cols}")
+                return None
 
-            # 创建资金管理策略
-            mm = MM_FixedCount(self.get_parameter("fixed_count"))
-
-            # 创建信号指示器
-            ev = EV_Bool(False)
-
-            # 创建系统有效条件
-            cn = CN_Bool(True)
-
-            # 创建自适应止损策略
-            sl_params = {
-                'atr_period': self.get_parameter("atr_period"),
-                'atr_multiplier': self.get_parameter("atr_multiplier"),
-                'volatility_factor': self.get_parameter("volatility_factor"),
-                'trend_factor': self.get_parameter("trend_factor"),
-                'market_factor': self.get_parameter("market_factor"),
-                'min_stop_loss': self.get_parameter("min_stop_loss"),
-                'max_stop_loss': self.get_parameter("max_stop_loss"),
-                'fixed_stop_loss': self.get_parameter("fixed_stop_loss")
-            }
-            sl = AdaptiveStopLoss(params=sl_params)
-
-            # 创建自适应盈利目标策略
-            pg_params = {
-                'atr_period': self.get_parameter("atr_period"),
-                'atr_multiplier': self.get_parameter("atr_multiplier"),
-                'ma_period': self.get_parameter("ma_period"),
-                'volatility_period': self.get_parameter("volatility_period"),
-                'min_take_profit': self.get_parameter("min_take_profit"),
-                'max_take_profit': self.get_parameter("max_take_profit"),
-                'trailing_profit': self.get_parameter("trailing_profit"),
-                'profit_lock': self.get_parameter("profit_lock"),
-                'volatility_factor': self.get_parameter("volatility_factor"),
-                'trend_factor': self.get_parameter("trend_factor"),
-                'market_factor': self.get_parameter("market_factor")
-            }
-            pg = AdaptiveTakeProfit(params=pg_params)
-
-            # 创建滑点算法
-            sp = SP_FixedPercent(self.get_parameter("slippage_percent"))
-
-            # 创建系统
-            system = SYS_Simple(tm=tm, mm=mm, ev=ev,
-                                cn=cn, sl=sl, pg=pg, sp=sp)
-
-            self._system = system
-            return system
-
+            # 处理缺失值
+            clean_data = clean_data.fillna(method='ffill').fillna(method='bfill')
+            
+            # 确保数据类型正确
+            for col in required_cols:
+                clean_data[col] = pd.to_numeric(clean_data[col], errors='coerce')
+            
+            # 移除无效数据
+            clean_data = clean_data.dropna()
+            
+            if len(clean_data) < 50:
+                logger.warning(f"有效数据不足，需要至少50条记录，当前只有{len(clean_data)}条")
+                return None
+                
+            return clean_data
+            
         except Exception as e:
-            logger.info(f"创建HIkyuu系统失败: {e}")
+            logger.error(f"数据预处理失败: {e}")
             return None
 
-    def get_hikyuu_system(self):
-        """获取HIkyuu系统实例"""
-        if self._system is None:
-            self._system = self._create_hikyuu_system()
-        return self._system
+    def _calculate_indicators(self, data: pd.DataFrame, ma_period: int, atr_period: int) -> Dict:
+        """计算技术指标"""
+        try:
+            indicators = {}
+            
+            # 移动平均线
+            indicators['sma'] = talib.SMA(data['close'].values, timeperiod=ma_period)
+            indicators['ema'] = talib.EMA(data['close'].values, timeperiod=ma_period)
+            
+            # ATR指标
+            indicators['atr'] = talib.ATR(data['high'].values, data['low'].values, 
+                                       data['close'].values, timeperiod=atr_period)
+            
+            # MACD指标
+            indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = talib.MACD(
+                data['close'].values, fastperiod=12, slowperiod=26, signalperiod=9)
+            
+            # RSI指标
+            indicators['rsi'] = talib.RSI(data['close'].values, timeperiod=14)
+            
+            # 布林带
+            indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = talib.BBANDS(
+                data['close'].values, timeperiod=20, nbdevup=2, nbdevdn=2)
+            
+            return indicators
+            
+        except Exception as e:
+            logger.error(f"技术指标计算失败: {e}")
+            return None
+
+    def _generate_adaptive_signals(self, data: pd.DataFrame, indicators: Dict, 
+                                 atr_multiplier: float, volatility_factor: float) -> List[StrategySignal]:
+        """生成自适应交易信号"""
+        signals = []
+        
+        try:
+            # 从指标周期之后开始生成信号
+            start_idx = max(20, 50)  # 确保有足够的指标数据
+            
+            for i in range(start_idx, len(data)):
+                current_data = data.iloc[i]
+                prev_data = data.iloc[i-1] if i > 0 else current_data
+                
+                # 跳过缺失指标值的索引
+                current_sma = indicators['sma'][i]
+                current_rsi = indicators['rsi'][i]
+                current_macd = indicators['macd'][i]
+                current_macd_signal = indicators['macd_signal'][i]
+                current_atr = indicators['atr'][i]
+                
+                if np.isnan(current_sma) or np.isnan(current_rsi) or np.isnan(current_macd):
+                    continue
+                
+                # 自适应止损价格
+                stop_loss_price = current_data['close'] * (1 - self.get_parameter("fixed_stop_loss"))
+                take_profit_price = current_data['close'] * (1 + self.get_parameter("min_take_profit"))
+                
+                # 动态置信度计算
+                confidence = self._calculate_dynamic_confidence(
+                    indicators, i, volatility_factor)
+                
+                # 买入信号逻辑
+                buy_signal = (
+                    # 价格上涨突破SMA
+                    current_data['close'] > current_sma and 
+                    prev_data['close'] <= indicators['sma'][i-1] if i > 0 else False and
+                    # RSI不过度买入
+                    30 < current_rsi < 70 and
+                    # MACD金叉
+                    current_macd > current_macd_signal and
+                    (indicators['macd'][i-1] <= indicators['macd_signal'][i-1] if i > 0 else False)
+                )
+                
+                if buy_signal:
+                    signals.append(StrategySignal(
+                        timestamp=current_data.name if hasattr(current_data, 'name') else i,
+                        signal_type=SignalType.BUY,
+                        price=current_data['close'],
+                        confidence=confidence,
+                        strategy_name=self.name,
+                        reason=f"SMA突破 + MACD金叉，RSI:{current_rsi:.2f}",
+                        stop_loss=stop_loss_price,
+                        take_profit=take_profit_price
+                    ))
+                
+                # 卖出信号逻辑
+                sell_signal = (
+                    # 价格跌破SMA或RSI超买
+                    (current_data['close'] < current_sma and 
+                     prev_data['close'] >= indicators['sma'][i-1] if i > 0 else False) or
+                    current_rsi > 80 or
+                    # MACD死叉
+                    (current_macd < current_macd_signal and
+                     indicators['macd'][i-1] >= indicators['macd_signal'][i-1] if i > 0 else False)
+                )
+                
+                if sell_signal:
+                    signals.append(StrategySignal(
+                        timestamp=current_data.name if hasattr(current_data, 'name') else i,
+                        signal_type=SignalType.SELL,
+                        price=current_data['close'],
+                        confidence=confidence,
+                        strategy_name=self.name,
+                        reason=f"SMA跌破或超买信号，RSI:{current_rsi:.2f}",
+                        stop_loss=stop_loss_price,
+                        take_profit=take_profit_price
+                    ))
+        
+        except Exception as e:
+            logger.error(f"自适应信号生成失败: {e}")
+            
+        return signals
+
+    def _calculate_dynamic_confidence(self, indicators: Dict, index: int, volatility_factor: float) -> float:
+        """动态计算信号置信度"""
+        try:
+            base_confidence = 0.6
+            
+            # 基于RSI调整置信度
+            rsi = indicators['rsi'][index]
+            if not np.isnan(rsi):
+                if 30 <= rsi <= 70:  # 正常范围
+                    rsi_factor = 1.0
+                else:  # 超买超卖
+                    rsi_factor = 0.8
+            else:
+                rsi_factor = 0.7
+            
+            # 基于ATR(波动率)调整置信度
+            atr = indicators['atr'][index]
+            if not np.isnan(atr) and len(indicators['atr']) > 20:
+                avg_atr = np.nanmean(indicators['atr'][max(0, index-20):index])
+                if avg_atr > 0:
+                    atr_ratio = atr / avg_atr
+                    if atr_ratio < 1.2:  # 较低波动率，置信度较高
+                        atr_factor = 1.1
+                    elif atr_ratio > 2.0:  # 高波动率，置信度较低
+                        atr_factor = 0.8
+                    else:
+                        atr_factor = 1.0
+                else:
+                    atr_factor = 1.0
+            else:
+                atr_factor = 1.0
+            
+            # 合成置信度
+            confidence = base_confidence * rsi_factor * atr_factor * volatility_factor
+            return max(0.1, min(0.95, confidence))
+            
+        except Exception as e:
+            logger.error(f"置信度计算失败: {e}")
+            return 0.5
+
+    def _calculate_position_size(self, data: pd.DataFrame, atr: np.ndarray) -> float:
+        """基于ATR和风险参数计算仓位大小"""
+        try:
+            # 获取参数
+            init_cash = self.get_parameter("init_cash")
+            fixed_stop_loss = self.get_parameter("fixed_stop_loss")
+            max_risk_per_trade = self.get_parameter("max_risk_per_trade", 0.02)  # 2%最大风险
+            
+            if data.empty or len(atr) == 0:
+                return 1.0  # 默认1手
+            
+            current_atr = atr[-1]
+            current_price = data['close'].iloc[-1]
+            
+            if np.isnan(current_atr) or current_atr <= 0 or current_price <= 0:
+                return 1.0
+            
+            # 基于ATR计算风险
+            atr_risk = current_atr * self.get_parameter("atr_multiplier", 2.0)
+            risk_amount = current_price * atr_risk
+            
+            # 基于资金管理计算仓位
+            max_risk_amount = init_cash * max_risk_per_trade
+            position_size = max_risk_amount / risk_amount if risk_amount > 0 else 1.0
+            
+            # 确保仓位在合理范围内
+            position_size = max(0.1, min(10.0, position_size))
+            
+            return position_size
+            
+        except Exception as e:
+            logger.error(f"仓位大小计算失败: {e}")
+            return 1.0
+
+    def _calculate_stop_loss(self, data: pd.DataFrame, atr: np.ndarray, is_long: bool) -> float:
+        """计算止损价格"""
+        try:
+            current_price = data['close'].iloc[-1]
+            current_atr = atr[-1]
+            
+            if np.isnan(current_atr) or current_atr <= 0:
+                # 如果没有ATR数据，使用固定百分比
+                fixed_stop_loss = self.get_parameter("fixed_stop_loss")
+                return current_price * (1 - fixed_stop_loss) if is_long else current_price * (1 + fixed_stop_loss)
+            
+            atr_multiplier = self.get_parameter("atr_multiplier", 2.0)
+            atr_stop = current_atr * atr_multiplier
+            
+            if is_long:
+                return current_price - atr_stop
+            else:
+                return current_price + atr_stop
+                
+        except Exception as e:
+            logger.error(f"止损价格计算失败: {e}")
+            return data['close'].iloc[-1] * 0.95  # 默认5%止损
+
+    def _calculate_take_profit(self, data: pd.DataFrame, atr: np.ndarray, stop_loss: float, is_long: bool) -> float:
+        """计算止盈价格"""
+        try:
+            current_price = data['close'].iloc[-1]
+            min_take_profit = self.get_parameter("min_take_profit")
+            max_take_profit = self.get_parameter("max_take_profit")
+            
+            # 基于最小和最大盈利目标计算
+            if is_long:
+                min_profit = current_price * (1 + min_take_profit)
+                max_profit = current_price * (1 + max_take_profit)
+            else:
+                min_profit = current_price * (1 - min_take_profit)
+                max_profit = current_price * (1 - max_take_profit)
+            
+            # 基于ATR动态调整
+            if not np.isnan(atr[-1]) and atr[-1] > 0:
+                atr_profit = atr[-1] * self.get_parameter("atr_multiplier", 2.0)
+                if is_long:
+                    atr_target = current_price + atr_profit
+                else:
+                    atr_target = current_price - atr_profit
+                
+                # 在固定目标和ATR目标之间选择合适的
+                final_target = max(min_profit, atr_target) if is_long else min(min_profit, atr_target)
+            else:
+                final_target = min_profit
+            
+            return final_target
+            
+        except Exception as e:
+            logger.error(f"止盈价格计算失败: {e}")
+            current_price = data['close'].iloc[-1]
+            return current_price * 1.05 if is_long else current_price * 0.95
 
     def calculate_confidence(self, data: pd.DataFrame, signal_index: int) -> float:
         """计算信号置信度"""
@@ -198,36 +389,24 @@ class AdaptiveFactorWeaveStrategy(BaseStrategy):
         return ['open', 'high', 'low', 'close', 'volume']
 
     def get_strategy_info(self) -> Dict[str, Any]:
-        """获取策略信息"""
+        """获取策略信息（基于TA-Lib无hikyuu版本）"""
         info = super().get_strategy_info()
         info.update({
-            "hikyuu_system": self._system is not None,
-            "system_components": {
-                "trade_manager": "crtTM",
-                "money_manager": "MM_FixedCount",
-                "stop_loss": "AdaptiveStopLoss",
-                "take_profit": "AdaptiveTakeProfit",
-                "slippage": "SP_FixedPercent"
-            }
+            "version": "3.0.0",
+            "dependencies": ["pandas", "numpy", "talib"],
+            "indicators": ["SMA", "EMA", "ATR", "MACD", "RSI", "Bollinger Bands"],
+            "signal_generation": "基于多指标组合的自适应信号生成",
+            "risk_management": "基于ATR的动态止损止盈",
+            "confidence_calculation": "基于RSI和ATR波动的动态置信度",
+            "no_hikyuu_dependency": True,
+            "signal_cache": "已从系统实例缓存改为信号缓存"
         })
         return info
 
 
 def create_adaptive_strategy():
-    """创建自适应止损策略（向后兼容函数）"""
-    strategy = AdaptiveHikuuStrategy()
-    return strategy.get_hikyuu_system()
-
-# 向后兼容的工厂函数
+    """创建自适应策略（无hikyuu版本）"""
+    return AdaptiveHikuuStrategy()
 
 
-def create_adaptive_hikyuu_strategy(name: str = "AdaptiveHikyuu", **kwargs) -> AdaptiveHikuuStrategy:
-    """创建自适应HIkyuu策略实例"""
-    strategy = AdaptiveHikuuStrategy(name)
-
-    # 设置参数
-    for param_name, param_value in kwargs.items():
-        if strategy.get_parameter(param_name) is not None:
-            strategy.set_parameter(param_name, param_value)
-
-    return strategy
+# 已废弃：create_adaptive_hikyuu_strategy函数已被移除，请使用create_adaptive_strategy

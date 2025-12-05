@@ -1,36 +1,48 @@
-from hikyuu import *
-from hikyuu.trade_sys import EnvironmentBase
 import numpy as np
 import pandas as pd
 
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 from loguru import logger
 
-class MarketEnvironment(EnvironmentBase):
+class MarketEnvironment:
     """
     市场环境判断模块
-    继承Hikyuu的EnvironmentBase类，实现市场环境分析
+    完全脱离 hikyuu 依赖，实现市场环境分析
     """
 
     def __init__(self, params=None):
-        super(MarketEnvironment, self).__init__("MarketEnvironment")
-
         # 设置默认参数
-        self.set_param("ma_short", 5)           # 短期均线周期
-        self.set_param("ma_mid", 20)            # 中期均线周期
-        self.set_param("ma_long", 60)           # 长期均线周期
-        self.set_param("volatility_window", 20)  # 波动率计算窗口
-        self.set_param("trend_window", 50)      # 趋势计算窗口
-        self.set_param("volume_ma", 20)         # 成交量均线周期
-        self.set_param("rsi_period", 14)        # RSI周期
-        self.set_param("macd_fast", 12)         # MACD快线周期
-        self.set_param("macd_slow", 26)         # MACD慢线周期
-        self.set_param("macd_signal", 9)        # MACD信号线周期
-        self.set_param("boll_period", 20)       # 布林带周期
-        self.set_param("boll_width", 2)         # 布林带宽度
-        self.set_param("volatility_threshold", 0.02)  # 波动率阈值
-        self.set_param("trend_threshold", 0.02)       # 趋势强度阈值
-        self.set_param("volume_threshold", 1.5)       # 成交量阈值
+        self.params = {
+            "ma_short": 5,           # 短期均线周期
+            "ma_mid": 20,            # 中期均线周期
+            "ma_long": 60,           # 长期均线周期
+            "volatility_window": 20,  # 波动率计算窗口
+            "trend_window": 50,      # 趋势计算窗口
+            "volume_ma": 20,         # 成交量均线周期
+            "rsi_period": 14,        # RSI周期
+            "macd_fast": 12,         # MACD快线周期
+            "macd_slow": 26,         # MACD慢线周期
+            "macd_signal": 9,        # MACD信号线周期
+            "boll_period": 20,       # 布林带周期
+            "boll_width": 2,         # 布林带宽度
+            "atr_period": 14,        # ATR周期
+            "cci_period": 14,        # CCI周期
+            "volatility_threshold": 0.02,  # 波动率阈值
+            "trend_threshold": 0.02,       # 趋势强度阈值
+            "volume_threshold": 1.5        # 成交量阈值
+        }
+        
+        # 更新用户提供的参数
+        if params:
+            self.params.update(params)
+        
+    def set_param(self, name, value):
+        """设置参数"""
+        self.params[name] = value
+        
+    def get_param(self, name, default=None):
+        """获取参数"""
+        return self.params.get(name, default)
 
         # 初始化市场状态
         self.market_state = {
@@ -41,24 +53,22 @@ class MarketEnvironment(EnvironmentBase):
             'regime': 'normal'       # 市场状态：bull/bear/neutral
         }
 
-    def _reset(self):
-        """重置状态"""
-        self.market_state = {
-            'trend': 'neutral',
-            'volatility': 'normal',
-            'volume': 'normal',
-            'strength': 0.0,
-            'regime': 'normal'
-        }
-
-    def _clone(self):
-        return MarketEnvironment()
-
-    def _calculate(self, k):
-        """计算市场环境"""
+    def analyze(self, data):
+        """分析市场环境
+        
+        Args:
+            data: pandas DataFrame 包含 OHLCV 数据
+            
+        Returns:
+            bool: 是否适合交易
+        """
         try:
             # 1. 计算技术指标
-            indicators = self._calculate_indicators(k)
+            indicators = self._calculate_indicators(data)
+
+            if not indicators:
+                logger.warning("指标计算失败，返回默认状态")
+                return True
 
             # 2. 分析市场状态
             self._analyze_trend(indicators)
@@ -70,82 +80,74 @@ class MarketEnvironment(EnvironmentBase):
             return self._judge_market_environment()
 
         except Exception as e:
-            logger.info(f"市场环境分析错误: {str(e)}")
+            logger.error(f"市场环境分析错误: {str(e)}")
             return True
 
-    def _calculate_indicators(self, k):
-        """计算技术指标"""
+    def _calculate_indicators(self, data):
+        """计算技术指标
+        
+        Args:
+            data: pandas DataFrame 包含 OHLCV 数据
+        """
         try:
-            df = k.to_df()
+            if not isinstance(data, pd.DataFrame) or 'close' not in data.columns:
+                logger.error("数据格式不正确，需要包含 OHLCV 字段的 DataFrame")
+                return {}
+                
             # 计算移动平均线
-            if isinstance(df['close'], pd.Series):
-                # 已替换为新的导入
-                ma_short = calculate_indicator(
-                    'MA', df, {'timeperiod': self.get_param("ma_short")})
-                ma_mid = calculate_indicator(
-                    'MA', df, {'timeperiod': self.get_param("ma_mid")})
-                ma_long = calculate_indicator(
-                    'MA', df, {'timeperiod': self.get_param("ma_long")})
-                macd = calculate_indicator('MACD', df, {'fast': self.get_param("macd_fast"),
-                                           'slow': self.get_param("macd_slow"), 'signal': self.get_param("macd_signal")})
-                rsi = calculate_indicator(
-                    'RSI', df, {'timeperiod': self.get_param("rsi_period")})
-                boll = calculate_indicator('BOLL', df, {'timeperiod': self.get_param(
-                    "boll_period"), 'width': self.get_param("boll_width")})
-                atr = calculate_indicator(
-                    'ATR', df, {'timeperiod': self.get_param("atr_period")})
-                obv = calculate_indicator('OBV', df, {})
-                cci = calculate_indicator(
-                    'CCI', df, {'timeperiod': self.get_param("cci_period")})
-            else:
-                from hikyuu.indicator import MA, MACD, RSI, BOLL, VOL
-                close_ind = CLOSE(k)
-                ma_short = MA(close_ind, n=self.get_param("ma_short"))
-                ma_mid = MA(close_ind, n=self.get_param("ma_mid"))
-                ma_long = MA(close_ind, n=self.get_param("ma_long"))
-                macd = MACD(close_ind, n1=self.get_param("macd_fast"), n2=self.get_param(
-                    "macd_slow"), n3=self.get_param("macd_signal"))
-                rsi = RSI(close_ind, n=self.get_param("rsi_period"))
-                boll = BOLL(close_ind, n=self.get_param(
-                    "boll_period"), width=self.get_param("boll_width"))
-                # 波动率
-                returns = None  # hikyuu Indicator不直接支持pct_change
-                volatility = None
-                volume_ma = MA(VOL(k), n=self.get_param("volume_ma"))
-                close = close_ind
-                volume = VOL(k)
-            # --- 类型安全指标计算 ---
-            if isinstance(df['close'], pd.Series):
-                # 已替换为新的导入
-                boll = calculate_indicator('BOLL', df, {'timeperiod': self.get_param(
-                    "boll_period"), 'width': self.get_param("boll_width")})
-                atr = calculate_indicator(
-                    'ATR', df, {'timeperiod': self.get_param("atr_period")})
-                obv = calculate_indicator('OBV', df, {})
-                cci = calculate_indicator(
-                    'CCI', df, {'timeperiod': self.get_param("cci_period")})
-            else:
-                from hikyuu.indicator import BOLL, ATR, OBV, CCI, CLOSE
-                close_ind = CLOSE(k)
-                boll = BOLL(close_ind, n=self.get_param(
-                    "boll_period"), width=self.get_param("boll_width"))
-                atr = ATR(k, n=self.get_param("atr_period"))
-                obv = OBV(k)
-                cci = CCI(k, n=self.get_param("cci_period"))
+            ma_short = calculate_indicator('MA', data, {'timeperiod': self.get_param("ma_short")})
+            ma_mid = calculate_indicator('MA', data, {'timeperiod': self.get_param("ma_mid")})
+            ma_long = calculate_indicator('MA', data, {'timeperiod': self.get_param("ma_long")})
+            
+            # 计算 MACD
+            macd = calculate_indicator('MACD', data, {
+                'fast': self.get_param("macd_fast"),
+                'slow': self.get_param("macd_slow"), 
+                'signal': self.get_param("macd_signal")
+            })
+            
+            # 计算 RSI
+            rsi = calculate_indicator('RSI', data, {'timeperiod': self.get_param("rsi_period")})
+            
+            # 计算布林带
+            boll = calculate_indicator('BOLL', data, {
+                'timeperiod': self.get_param("boll_period"), 
+                'width': self.get_param("boll_width")
+            })
+            
+            # 计算 ATR
+            atr = calculate_indicator('ATR', data, {'timeperiod': self.get_param("atr_period", 14)})
+            
+            # 计算 OBV
+            obv = calculate_indicator('OBV', data, {})
+            
+            # 计算 CCI
+            cci = calculate_indicator('CCI', data, {'timeperiod': self.get_param("cci_period", 14)})
+            
+            # 计算成交量移动平均线
+            volume_ma = calculate_indicator('MA', data[['volume']], {'timeperiod': self.get_param("volume_ma")})
+            
+            # 计算波动率 (基于收盘价变化率)
+            returns = data['close'].pct_change().rolling(window=self.get_param("volatility_window", 20)).std()
+            volatility = returns * np.sqrt(252)  # 年化波动率
+            
             return {
                 'ma_short': ma_short,
                 'ma_mid': ma_mid,
                 'ma_long': ma_long,
                 'macd': macd,
                 'rsi': rsi,
-                'boll': boll if 'boll' in locals() else None,
+                'boll': boll,
+                'atr': atr,
                 'volatility': volatility,
                 'volume_ma': volume_ma,
-                'close': close,
-                'volume': volume
+                'close': data['close'],
+                'volume': data['volume'],
+                'obv': obv,
+                'cci': cci
             }
         except Exception as e:
-            logger.info(f"技术指标计算错误: {str(e)}")
+            logger.error(f"技术指标计算错误: {str(e)}")
             return {}
 
     def _analyze_trend(self, indicators):
@@ -156,90 +158,179 @@ class MarketEnvironment(EnvironmentBase):
             ma_mid = indicators['ma_mid']
             ma_long = indicators['ma_long']
 
-            # 短期趋势
-            short_trend = (ma_short[-1] - ma_short[-5]) / ma_short[-5]
-            # 中期趋势
-            mid_trend = (ma_mid[-1] - ma_mid[-5]) / ma_mid[-5]
-            # 长期趋势
-            long_trend = (ma_long[-1] - ma_long[-5]) / ma_long[-5]
-
-            # 综合趋势强度
-            trend_strength = (short_trend + mid_trend + long_trend) / 3
-
-            # 判断趋势方向
-            if trend_strength > self.get_param("trend_threshold"):
-                self.market_state['trend'] = 'up'
-            elif trend_strength < -self.get_param("trend_threshold"):
-                self.market_state['trend'] = 'down'
-            else:
+            # 确保数据有效性
+            if len(ma_short) < 5 or len(ma_mid) < 5 or len(ma_long) < 5:
+                logger.warning("数据长度不足，使用默认趋势")
                 self.market_state['trend'] = 'neutral'
+                self.market_state['strength'] = 0.0
+                return
 
-            self.market_state['strength'] = abs(trend_strength)
+            # 短期趋势 (使用最后几个有效数据点)
+            recent_short = ma_short.dropna().tail(5)
+            recent_mid = ma_mid.dropna().tail(5)
+            recent_long = ma_long.dropna().tail(5)
+            
+            if len(recent_short) >= 2 and len(recent_mid) >= 2 and len(recent_long) >= 2:
+                # 短期趋势
+                short_trend = (recent_short.iloc[-1] - recent_short.iloc[0]) / recent_short.iloc[0]
+                # 中期趋势
+                mid_trend = (recent_mid.iloc[-1] - recent_mid.iloc[0]) / recent_mid.iloc[0]
+                # 长期趋势
+                long_trend = (recent_long.iloc[-1] - recent_long.iloc[0]) / recent_long.iloc[0]
+
+                # 综合趋势强度
+                trend_strength = (short_trend + mid_trend + long_trend) / 3
+
+                # 判断趋势方向
+                threshold = self.get_param("trend_threshold")
+                if trend_strength > threshold:
+                    self.market_state['trend'] = 'up'
+                elif trend_strength < -threshold:
+                    self.market_state['trend'] = 'down'
+                else:
+                    self.market_state['trend'] = 'neutral'
+
+                self.market_state['strength'] = abs(trend_strength)
+            else:
+                logger.warning("有效数据不足，设置默认趋势")
+                self.market_state['trend'] = 'neutral'
+                self.market_state['strength'] = 0.0
 
         except Exception as e:
-            logger.info(f"趋势分析错误: {str(e)}")
+            logger.error(f"趋势分析错误: {str(e)}")
+            self.market_state['trend'] = 'neutral'
+            self.market_state['strength'] = 0.0
 
     def _analyze_volatility(self, indicators):
         """分析波动率"""
         try:
-            volatility = indicators['volatility'].iloc[-1]
+            volatility = indicators['volatility']
+            
+            # 获取最新的有效波动率值
+            volatility_clean = volatility.dropna()
+            if len(volatility_clean) == 0:
+                logger.warning("波动率数据为空，使用默认值")
+                self.market_state['volatility'] = 'normal'
+                return
+                
+            current_volatility = volatility_clean.iloc[-1]
 
-            if volatility > self.get_param("volatility_threshold") * 1.5:
+            threshold = self.get_param("volatility_threshold")
+            if current_volatility > threshold * 1.5:
                 self.market_state['volatility'] = 'high'
-            elif volatility < self.get_param("volatility_threshold") * 0.5:
+            elif current_volatility < threshold * 0.5:
                 self.market_state['volatility'] = 'low'
             else:
                 self.market_state['volatility'] = 'normal'
 
         except Exception as e:
-            logger.info(f"波动率分析错误: {str(e)}")
+            logger.error(f"波动率分析错误: {str(e)}")
+            self.market_state['volatility'] = 'normal'
 
     def _analyze_volume(self, indicators):
         """分析成交量"""
         try:
-            volume = indicators['volume'][-1]
-            volume_ma = indicators['volume_ma'][-1]
-            volume_ratio = volume / volume_ma
+            volume = indicators['volume']
+            volume_ma = indicators['volume_ma']
+            
+            # 获取最新的有效数据
+            volume_clean = volume.dropna()
+            volume_ma_clean = volume_ma.dropna()
+            
+            if len(volume_clean) == 0 or len(volume_ma_clean) == 0:
+                logger.warning("成交量数据为空，使用默认值")
+                self.market_state['volume'] = 'normal'
+                return
+                
+            current_volume = volume_clean.iloc[-1]
+            current_volume_ma = volume_ma_clean.iloc[-1]
+            
+            if current_volume_ma == 0:
+                logger.warning("成交量均值为零，使用默认值")
+                self.market_state['volume'] = 'normal'
+                return
+                
+            volume_ratio = current_volume / current_volume_ma
 
-            if volume_ratio > self.get_param("volume_threshold"):
+            threshold = self.get_param("volume_threshold")
+            if volume_ratio > threshold:
                 self.market_state['volume'] = 'high'
-            elif volume_ratio < 1/self.get_param("volume_threshold"):
+            elif volume_ratio < 1/threshold:
                 self.market_state['volume'] = 'low'
             else:
                 self.market_state['volume'] = 'normal'
 
         except Exception as e:
-            logger.info(f"成交量分析错误: {str(e)}")
+            logger.error(f"成交量分析错误: {str(e)}")
+            self.market_state['volume'] = 'normal'
 
     def _analyze_market_regime(self, indicators):
         """分析市场状态"""
         try:
             # 1. 获取各项指标
-            rsi = indicators['rsi'][-1]
-            macd = indicators['macd']
-            boll = indicators['boll']
-            close = indicators['close'][-1]
+            rsi_series = indicators['rsi']
+            macd_series = indicators['macd']
+            boll_series = indicators['boll']
+            close_series = indicators['close']
+
+            # 获取最新的有效数据
+            rsi_clean = rsi_series.dropna()
+            macd_clean = macd_series.dropna() if hasattr(macd_series, 'dropna') else macd_series
+            boll_clean = boll_series.dropna() if hasattr(boll_series, 'dropna') else boll_series
+            close_clean = close_series.dropna()
+
+            if (len(rsi_clean) == 0 or len(macd_clean) == 0 or 
+                len(boll_clean) == 0 or len(close_clean) == 0):
+                logger.warning("市场状态指标数据不足，使用默认值")
+                self.market_state['regime'] = 'neutral'
+                return
+
+            current_rsi = rsi_clean.iloc[-1]
+            current_close = close_clean.iloc[-1]
 
             # 2. 计算市场状态得分
             score = 0
 
             # RSI得分
-            if rsi > 70:
-                score -= 1
-            elif rsi < 30:
-                score += 1
+            if current_rsi > 70:
+                score -= 1  # 超买，可能下跌
+            elif current_rsi < 30:
+                score += 1  # 超卖，可能上涨
 
             # MACD得分
-            if macd.diff[-1] > 0 and macd.dea[-1] > 0:
-                score += 1
-            elif macd.diff[-1] < 0 and macd.dea[-1] < 0:
-                score -= 1
+            if hasattr(macd_clean, 'diff') and hasattr(macd_clean, 'dea'):
+                # MACD是DataFrame格式
+                if (len(macd_clean) >= 2 and 
+                    macd_clean['diff'].iloc[-1] > 0 and macd_clean['dea'].iloc[-1] > 0):
+                    score += 1  # 金叉向上
+                elif (len(macd_clean) >= 2 and
+                      macd_clean['diff'].iloc[-1] < 0 and macd_clean['dea'].iloc[-1] < 0):
+                    score -= 1  # 死叉向下
+            elif isinstance(macd_clean, pd.Series):
+                # MACD是Series格式（金叉死叉需要更复杂的计算）
+                if len(macd_clean) >= 2 and macd_clean.iloc[-1] > 0:
+                    score += 1
+                elif len(macd_clean) >= 2 and macd_clean.iloc[-1] < 0:
+                    score -= 1
 
             # 布林带得分
-            if close > boll.upper[-1]:
-                score -= 1
-            elif close < boll.lower[-1]:
-                score += 1
+            if hasattr(boll_clean, 'upper') and hasattr(boll_clean, 'lower'):
+                # 布林带是DataFrame格式
+                if (len(boll_clean) >= 1 and 
+                    current_close > boll_clean['upper'].iloc[-1]):
+                    score -= 1  # 突破上轨，可能超买
+                elif (len(boll_clean) >= 1 and
+                      current_close < boll_clean['lower'].iloc[-1]):
+                    score += 1  # 突破下轨，可能超卖
+            elif isinstance(boll_clean, pd.Series):
+                # 布林带是Series格式
+                if len(boll_clean) >= 2:
+                    upper_band = current_close * 1.02  # 简化判断
+                    lower_band = current_close * 0.98
+                    if current_close > upper_band:
+                        score -= 1
+                    elif current_close < lower_band:
+                        score += 1
 
             # 3. 判断市场状态
             if score >= 2:
@@ -250,7 +341,8 @@ class MarketEnvironment(EnvironmentBase):
                 self.market_state['regime'] = 'neutral'
 
         except Exception as e:
-            logger.info(f"市场状态分析错误: {str(e)}")
+            logger.error(f"市场状态分析错误: {str(e)}")
+            self.market_state['regime'] = 'neutral'
 
     def _judge_market_environment(self):
         """综合判断市场环境"""
