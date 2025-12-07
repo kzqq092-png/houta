@@ -17,12 +17,14 @@ from loguru import logger
 
 import threading
 import warnings
+import time
 from typing import Optional, Dict, Any
 from functools import lru_cache
 from core.industry_manager import IndustryManager
 from core.services.unified_data_manager import UnifiedDataManager, get_unified_data_manager
 from utils.theme import ThemeManager
 from utils.config_manager import ConfigManager
+from core.performance.unified_monitor import UnifiedPerformanceMonitor
 
 # 全局锁，确保线程安全
 _factory_lock = threading.Lock()
@@ -199,6 +201,91 @@ class ManagerFactory:
                 f"行业管理器获取完成 - 类型: {type(self._instances[cache_key]).__name__}")
 
             return self._instances[cache_key]
+
+    def get_performance_monitor(self, force_new: bool = False) -> 'UnifiedPerformanceMonitor':
+        """
+        获取统一性能监控器实例（单例）
+
+        Args:
+            force_new: 是否强制创建新实例
+
+        Returns:
+            UnifiedPerformanceMonitor实例
+        """
+        cache_key = 'performance_monitor_singleton'
+
+        with self._lock:
+            if force_new or cache_key not in self._instances:
+                try:
+                    self._instances[cache_key] = UnifiedPerformanceMonitor()
+                    logger.info("性能监控器实例创建成功")
+                except ImportError as e:
+                    logger.warning(f"无法导入UnifiedPerformanceMonitor: {e}")
+                    self._instances[cache_key] = self._create_simple_performance_monitor()
+                except Exception as e:
+                    logger.error(f"创建UnifiedPerformanceMonitor失败: {e}")
+                    self._instances[cache_key] = self._create_simple_performance_monitor()
+
+            return self._instances[cache_key]
+
+    def _create_simple_performance_monitor(self):
+        """创建简化版性能监控器"""
+        try:
+            logger.info("创建简化版性能监控器")
+
+            class SimplePerformanceMonitor:
+                """简化版性能监控器，提供基础功能"""
+                def __init__(self):
+                    self.stats = {}
+                    self.metrics = {}
+                    self.start_time = time.time()
+
+                def record_metric(self, name, value, category=None, metric_type=None, description=""):
+                    """记录指标"""
+                    if name not in self.metrics:
+                        self.metrics[name] = []
+                    self.metrics[name].append({
+                        'value': value,
+                        'timestamp': time.time(),
+                        'category': category,
+                        'description': description
+                    })
+
+                def get_metric_history(self, name):
+                    """获取指标历史"""
+                    return self.metrics.get(name, [])
+
+                def get_system_metrics(self):
+                    """获取系统指标"""
+                    return {
+                        'cpu_usage': 0.0,
+                        'memory_usage': 0.0,
+                        'disk_usage': 0.0,
+                        'network_latency': 0.0
+                    }
+
+                def start_monitoring(self):
+                    """开始监控"""
+                    return True
+
+                def stop_monitoring(self):
+                    """停止监控"""
+                    return True
+
+                def reset_stats(self):
+                    """重置统计"""
+                    self.stats = {}
+                    self.metrics = {}
+
+                def get_uptime(self):
+                    """获取运行时间"""
+                    return time.time() - self.start_time
+
+            return SimplePerformanceMonitor()
+
+        except Exception as e:
+            logger.error(f"创建简化版性能监控器失败: {e}")
+            return None
 
     def _check_pyqt5_environment(self) -> dict:
         """检查PyQt5环境状态"""
@@ -540,6 +627,19 @@ def get_industry_manager(force_new: bool = False) -> 'IndustryManager':
         IndustryManager实例
     """
     return get_manager_factory().get_industry_manager(force_new)
+
+@lru_cache(maxsize=1)
+def get_performance_monitor(force_new: bool = False) -> 'UnifiedPerformanceMonitor':
+    """
+    获取统一性能监控器实例
+
+    Args:
+        force_new: 是否强制创建新实例
+
+    Returns:
+        UnifiedPerformanceMonitor实例
+    """
+    return get_manager_factory().get_performance_monitor(force_new)
 
 def clear_manager_cache(manager_type: Optional[str] = None):
     """

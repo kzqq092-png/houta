@@ -164,6 +164,9 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             self.renderer.render_complete.connect(self._on_render_complete)
             self.renderer.render_error.connect(self._on_render_error)
 
+            # 9. 初始化性能优化器
+            self._init_performance_optimizer()
+
             # 7. 应用初始主题
             self._apply_initial_theme()
 
@@ -374,6 +377,97 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
         """处理后端切换"""
         if True:  # 使用Loguru日志
             logger.info(f"渲染后端切换: {old_backend} → {new_backend}")
+
+    def _init_performance_optimizer(self):
+        """初始化性能优化器"""
+        try:
+            # 导入性能优化模块
+            from core.advanced_optimization.performance.performance_optimization_integration import (
+                PerformanceOptimizer, RenderOptimizationConfig, RenderOptimizationLevel
+            )
+            from core.advanced_optimization.performance.unified_performance_coordinator import (
+                UnifiedPerformanceCoordinator
+            )
+            from core.advanced_optimization.performance.advanced_performance_analytics import (
+                AdvancedPerformanceAnalytics
+            )
+            
+            # 创建性能监控组件
+            self.performance_coordinator = UnifiedPerformanceCoordinator()
+            
+            # 初始化监控器
+            if self.performance_coordinator.initialize_monitors():
+                logger.info("性能监控器初始化成功")
+                
+                # 启动性能监控
+                self.performance_coordinator.start_monitoring(interval=1.0)
+                
+                # 创建高级性能分析器
+                self.performance_analytics = AdvancedPerformanceAnalytics(self.performance_coordinator)
+                
+                # 创建性能优化器
+                self.performance_optimizer = PerformanceOptimizer(
+                    coordinator=self.performance_coordinator,
+                    analytics=self.performance_analytics,
+                    config=RenderOptimizationConfig(
+                        optimization_level=RenderOptimizationLevel.BALANCED,
+                        target_fps=60,
+                        enable_adaptive_quality=True,
+                        enable_predictive_optimization=True,
+                        enable_anomaly_response=True
+                    )
+                )
+                
+                # 注册渲染参数更新回调
+                self.performance_optimizer.add_render_parameters_callback(
+                    self._on_render_parameters_updated
+                )
+                
+                # 启动性能优化
+                self.performance_optimizer.start_optimization()
+                
+                logger.info("性能优化器集成成功")
+            else:
+                logger.warning("性能监控器初始化失败，跳过性能优化器")
+                self.performance_optimizer = None
+                self.performance_analytics = None
+                self.performance_coordinator = None
+                
+        except ImportError as e:
+            logger.warning(f"性能优化模块不可用，跳过性能优化器集成: {e}")
+            self.performance_optimizer = None
+            self.performance_analytics = None
+            self.performance_coordinator = None
+        except Exception as e:
+            logger.error(f"性能优化器初始化失败: {e}")
+            self.performance_optimizer = None
+            self.performance_analytics = None
+            self.performance_coordinator = None
+
+    def _on_render_parameters_updated(self, parameters, quality: str, fps_limit: int):
+        """处理渲染参数更新回调"""
+        try:
+            logger.info(f"渲染参数已更新: 质量={quality}, FPS限制: {fps_limit}")
+            
+            # 通知渲染器更新参数
+            if hasattr(self, 'renderer') and self.renderer:
+                if hasattr(self.renderer, 'update_render_parameters'):
+                    self.renderer.update_render_parameters(parameters)
+            
+            # 更新ChartWidget的状态
+            self._current_render_quality = quality
+            self._current_fps_limit = fps_limit
+            
+            # 发出参数更新信号
+            self.chart_updated.emit({
+                'type': 'render_parameters_updated',
+                'quality': quality,
+                'fps_limit': fps_limit,
+                'parameters': parameters.__dict__ if hasattr(parameters, '__dict__') else str(parameters)
+            })
+            
+        except Exception as e:
+            logger.error(f"处理渲染参数更新失败: {e}")
 
         # 可以在这里添加UI提示用户后端已切换
 

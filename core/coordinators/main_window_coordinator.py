@@ -841,7 +841,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 3. 存储到中央数据状态 - 增强数据验证和日志
             logger.info(f"=== 准备中央数据状态 ===")
-            logger.info(f"K线数据类型: {type(kline_data)}")
+            logger.info(f"K线数据类型: {type(kline_data).__name__}")
             if hasattr(kline_data, 'shape'):
                 logger.info(f"K线数据形状: {kline_data.shape}")
             elif hasattr(kline_data, '__len__'):
@@ -1106,9 +1106,24 @@ class MainWindowCoordinator(BaseCoordinator):
 
     @pyqtSlot(UIDataReadyEvent)
     def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
-        """处理UI数据就绪事件，更新主窗口状态栏"""
+        """处理UI数据就绪事件，更新主窗口状态栏并重新渲染图表"""
         try:
-            kdata = event.ui_data.get('kline_data')
+            # 兼容两种事件格式：ui_data.kline_data 和 直接的 kline_data
+            kdata = None
+            ui_data = {}
+            
+            # 尝试从 event.ui_data 获取数据（新型事件格式）
+            if hasattr(event, 'ui_data') and event.ui_data:
+                kdata = event.ui_data.get('kline_data')
+                ui_data = event.ui_data
+                logger.debug(f"从event.ui_data获取K线数据: {type(kdata)}")
+            
+            # 如果没有从 ui_data 获取到，尝试从 event.kline_data 获取（传统事件格式）
+            if kdata is None and hasattr(event, 'kline_data') and event.kline_data is not None:
+                kdata = event.kline_data
+                ui_data = {'kline_data': kdata}
+                logger.debug(f"从event.kline_data获取K线数据: {type(kdata)}")
+            
             if kdata is not None and not kdata.empty:
                 # 更新状态标签显示加载数量
                 self._status_label.setText(f"已加载 ({len(kdata)})")
@@ -1120,13 +1135,62 @@ class MainWindowCoordinator(BaseCoordinator):
                 else:
                     time_str = str(latest_date)
                 self._data_time_label.setText(f"数据时间: {time_str}")
+                
+                # 🔧 修复技术指标刷新问题：触发图表更新以重新渲染指标
+                self._trigger_chart_update_with_indicators(ui_data, event.stock_code)
             else:
                 self._status_label.setText("已加载 (0)")
                 self._data_time_label.setText("数据时间: -")
+                logger.warning("未获取到有效的K线数据，无法更新图表")
         except Exception as e:
             logger.error(f"更新主窗口状态栏失败: {e}", exc_info=True)
             self._status_label.setText("状态更新失败")
             self._data_time_label.setText("数据时间: -")
+            
+    def _trigger_chart_update_with_indicators(self, ui_data: dict, stock_code: str) -> None:
+        """触发图表更新并重新渲染指标"""
+        try:
+            # 获取中间面板的图表控件
+            middle_panel = self._panels.get('middle')
+            if not middle_panel or not hasattr(middle_panel, 'chart_widget'):
+                logger.warning("中间面板或图表控件不存在，跳过指标刷新")
+                return
+                
+            chart_widget = middle_panel.chart_widget
+            if not chart_widget:
+                logger.warning("图表控件不存在，跳过指标刷新")
+                return
+            
+            # 🔧 确保在数据更新前保留当前指标状态
+            current_indicators = getattr(chart_widget, 'active_indicators', None)
+            if current_indicators:
+                logger.info(f"保留当前指标状态: {[ind.get('name', 'unknown') for ind in current_indicators]}")
+                
+            # 构建更新数据，确保包含指标数据
+            update_data = {
+                'kline_data': ui_data.get('kline_data'),
+                'stock_code': stock_code,
+                'title': getattr(chart_widget, 'current_stock', stock_code)
+            }
+            
+            # 如果有指标数据，也传递过去
+            indicators_data = ui_data.get('indicators_data', {})
+            if indicators_data:
+                update_data['indicators_data'] = indicators_data
+                logger.info(f"传递指标数据到图表: {list(indicators_data.keys())}")
+            
+            # 🔧 如果没有通过indicators_data传递指标，则通过active_indicators字段传递
+            if not indicators_data and current_indicators:
+                update_data['active_indicators'] = current_indicators
+                logger.info(f"通过active_indicators字段传递指标: {[ind.get('name', 'unknown') for ind in current_indicators]}")
+            
+            # 触发图表更新，这将重新渲染所有指标
+            logger.info(f"触发图表更新，股票代码: {stock_code}")
+            chart_widget.update_chart(update_data)
+            logger.info("✅ 图表更新完成，指标将重新渲染")
+            
+        except Exception as e:
+            logger.error(f"触发图表更新失败: {e}", exc_info=True)
 
     def _on_chart_updated(self, event: ChartUpdateEvent) -> None:
         """处理图表更新事件"""

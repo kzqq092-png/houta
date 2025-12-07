@@ -306,13 +306,7 @@ class PerformanceService(BaseService):
             "application": self._collect_application_metrics()
         }
 
-        # 如果有GPU，收集GPU指标
-        try:
-            gpu_metrics = self._collect_gpu_metrics()
-            if gpu_metrics:
-                metrics["gpu"] = gpu_metrics
-        except Exception:
-            pass  # GPU监控可选
+        # GPU监控功能已移除
 
         return metrics
 
@@ -476,43 +470,7 @@ class PerformanceService(BaseService):
 
         return metrics
 
-    def _collect_gpu_metrics(self) -> Optional[Dict[str, Any]]:
-        """收集GPU指标（如果可用）"""
-        try:
-            # 尝试使用nvidia-ml-py收集GPU指标
-            import pynvml
-            pynvml.nvmlInit()
 
-            device_count = pynvml.nvmlDeviceGetCount()
-            gpu_metrics = {}
-
-            for i in range(device_count):
-                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
-                name = pynvml.nvmlDeviceGetName(handle).decode('utf-8')
-
-                # 内存信息
-                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-
-                # 利用率
-                util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-
-                gpu_metrics[f"gpu_{i}"] = {
-                    "name": name,
-                    "memory_total": mem_info.total / (1024**3),  # GB
-                    "memory_used": mem_info.used / (1024**3),  # GB
-                    "memory_percent": (mem_info.used / mem_info.total) * 100,
-                    "gpu_utilization": util.gpu,
-                    "memory_utilization": util.memory
-                }
-
-            return gpu_metrics
-
-        except ImportError:
-            logger.debug("pynvml not available, skipping GPU metrics")
-            return None
-        except Exception as e:
-            logger.debug(f"Error collecting GPU metrics: {e}")
-            return None
 
     def _check_thresholds(self, metrics: Dict[str, Any]) -> None:
         """检查性能阈值并生成警报"""
@@ -523,24 +481,27 @@ class PerformanceService(BaseService):
             current_time = datetime.now()
             new_alerts = []
 
+            # 动态阈值计算 - 基于历史数据调整阈值
+            adjusted_thresholds = self._calculate_dynamic_thresholds(thresholds)
+
             # 检查CPU阈值
             cpu_usage = metrics.get("system", {}).get("cpu_usage", 0)
-            if cpu_usage > thresholds["cpu_usage"]["critical"]:
+            if cpu_usage > adjusted_thresholds["cpu_usage"]["critical"]:
                 alert = PerformanceAlert(
                     alert_id=f"cpu_critical_{int(current_time.timestamp())}",
                     metric_name="cpu_usage",
                     current_value=cpu_usage,
-                    threshold_value=thresholds["cpu_usage"]["critical"],
+                    threshold_value=adjusted_thresholds["cpu_usage"]["critical"],
                     severity="critical",
                     message=f"CPU usage critical: {cpu_usage:.1f}%"
                 )
                 new_alerts.append(alert)
-            elif cpu_usage > thresholds["cpu_usage"]["warning"]:
+            elif cpu_usage > adjusted_thresholds["cpu_usage"]["warning"]:
                 alert = PerformanceAlert(
                     alert_id=f"cpu_warning_{int(current_time.timestamp())}",
                     metric_name="cpu_usage",
                     current_value=cpu_usage,
-                    threshold_value=thresholds["cpu_usage"]["warning"],
+                    threshold_value=adjusted_thresholds["cpu_usage"]["warning"],
                     severity="warning",
                     message=f"CPU usage high: {cpu_usage:.1f}%"
                 )
@@ -548,22 +509,22 @@ class PerformanceService(BaseService):
 
             # 检查内存阈值
             memory_usage = metrics.get("system", {}).get("memory_usage", 0)
-            if memory_usage > thresholds["memory_usage"]["critical"]:
+            if memory_usage > adjusted_thresholds["memory_usage"]["critical"]:
                 alert = PerformanceAlert(
                     alert_id=f"memory_critical_{int(current_time.timestamp())}",
                     metric_name="memory_usage",
                     current_value=memory_usage,
-                    threshold_value=thresholds["memory_usage"]["critical"],
+                    threshold_value=adjusted_thresholds["memory_usage"]["critical"],
                     severity="critical",
                     message=f"Memory usage critical: {memory_usage:.1f}%"
                 )
                 new_alerts.append(alert)
-            elif memory_usage > thresholds["memory_usage"]["warning"]:
+            elif memory_usage > adjusted_thresholds["memory_usage"]["warning"]:
                 alert = PerformanceAlert(
                     alert_id=f"memory_warning_{int(current_time.timestamp())}",
                     metric_name="memory_usage",
                     current_value=memory_usage,
-                    threshold_value=thresholds["memory_usage"]["warning"],
+                    threshold_value=adjusted_thresholds["memory_usage"]["warning"],
                     severity="warning",
                     message=f"Memory usage high: {memory_usage:.1f}%"
                 )

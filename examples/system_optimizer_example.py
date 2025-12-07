@@ -8,7 +8,7 @@ from loguru import logger
 
 from gui.panels.system_optimizer_panel import SystemOptimizerPanel
 from gui.dialogs import show_system_optimizer_dialog
-from system_optimizer import SystemOptimizerService, OptimizationLevel
+from core.services.system_optimizer import SystemOptimizerService, OptimizationLevel
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton, QHBoxLayout
 import sys

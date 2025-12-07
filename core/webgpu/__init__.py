@@ -12,27 +12,32 @@ WebGPU硬件加速渲染模块
 
 from .environment import WebGPUEnvironment, get_webgpu_environment, initialize_webgpu_environment
 from .compatibility import GPUCompatibilityChecker
-from .fallback import FallbackRenderer, WebGPURenderer, RenderBackend
-from .manager import WebGPUManager, get_webgpu_manager, WebGPUConfig
-from .interaction_engine import GPUInteractionEngine, ViewportState, InteractionType
+from .fallback import FallbackRenderer, RenderBackend
+from .manager import WebGPUManager, get_webgpu_manager, WebGPUConfig, render_chart_webgpu, initialize_webgpu_manager
 from .crosshair_engine import GPUCrosshairEngine, CrosshairState, CrosshairStyle, CrosshairConfig
+from .webgpu_renderer import GPURendererConfig, WebGPUContext, GPUResourcePool, create_webgpu_renderer, create_optimized_gpu_config, GPUBackend, WebGPURenderer as OptimizedWebGPURenderer
 
 __all__ = [
     'WebGPUEnvironment',
     'get_webgpu_environment',
     'initialize_webgpu_environment',
-    'WebGPURenderer',
     'GPUCompatibilityChecker',
     'FallbackRenderer',
     'RenderBackend',
     'WebGPUManager',
     'get_webgpu_manager',
     'WebGPUConfig',
-    'GPUInteractionEngine',
-    'ViewportState',
-    'InteractionType',
+    'render_chart_webgpu',
+    'initialize_webgpu_manager',
     'GPUCrosshairEngine',
     'CrosshairState',
     'CrosshairStyle',
-    'CrosshairConfig'
+    'CrosshairConfig',
+    'GPURendererConfig',
+    'WebGPUContext',
+    'GPUResourcePool',
+    'GPUBackend',
+    'OptimizedWebGPURenderer',
+    'create_webgpu_renderer',
+    'create_optimized_gpu_config'
 ]
