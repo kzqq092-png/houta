@@ -418,6 +418,9 @@ class KlineRepository(BaseRepository):
                     kline_df = self.asset_service.get_historical_data(
                         symbol=params.stock_code,
                         asset_type=asset_type,  # ✅ 不再硬编码
+                        start_date=params.start_date,
+                        end_date=params.end_date,
+                        count=params.count,
                         period=params.period
                     )
 

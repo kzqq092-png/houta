@@ -11,9 +11,6 @@ import psutil
 
 
 class OptimizationLevel(Enum):
-def __init__(self):
-        self.logger = logger.bind(module=self.__class__.__name__)
-    
     """优化级别枚举"""
     BASIC = "basic"              # 基础优化
     STANDARD = "standard"        # 标准优化
@@ -34,8 +31,9 @@ class ProfessionalPerformanceOptimizer:
         Args:
             optimization_level: 优化级别
         """
+        self.logger = logger.bind(module=self.__class__.__name__)
         self.optimization_level = optimization_level
-        self.        
+        
         # 性能阈值配置
         self.thresholds = self._get_thresholds()
         # 性能统计

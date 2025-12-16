@@ -18,6 +18,59 @@ import pandas as pd
 from loguru import logger
 
 
+def _is_repeat_string(value: Any) -> bool:
+    """检测是否为重复字符串模式"""
+    try:
+        if not isinstance(value, str):
+            return False
+            
+        # 如果字符串长度小于等于10，不是重复模式
+        if len(value) <= 10:
+            return False
+        
+        # 检查是否为基础字符串的重复模式
+        for i in range(1, min(len(value), 20)):
+            unit = value[:i]
+            if len(value) % len(unit) == 0:
+                repeated = unit * (len(value) // len(unit))
+                if value == repeated:
+                    logger.debug(f"检测到重复字符串模式: 单元='{unit}', 长度={i}, 重复次数={len(value) // i}")
+                    return True
+        
+        return False
+        
+    except Exception as e:
+        logger.debug(f"重复字符串检测失败: {e}")
+        return False
+
+def _clean_repeat_strings_dataframe(df: pd.DataFrame, context: str = "") -> pd.DataFrame:
+    """清理DataFrame中的重复字符串"""
+    try:
+        cleaned_df = df.copy()
+        repeat_count = 0
+        
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                repeat_mask = cleaned_df[col].astype(str).apply(_is_repeat_string)
+                if repeat_mask.any():
+                    repeat_count += repeat_mask.sum()
+                    cleaned_df.loc[repeat_mask, col] = np.nan
+                    
+                    # 记录检测到的重复字符串
+                    repeat_strings = cleaned_df.loc[repeat_mask, col].unique()
+                    logger.warning(f"{context}列{col}检测到{repeat_count}个重复字符串: {[s[:20]+'...' if len(str(s))>20 else s for s in repeat_strings[:3]]}")
+        
+        if repeat_count > 0:
+            logger.info(f"{context}DataFrame清理完成: 共清理{repeat_count}个重复字符串")
+        else:
+            logger.debug(f"{context}DataFrame无需清理: 未检测到重复字符串")
+            
+        return cleaned_df
+        
+    except Exception as e:
+        logger.error(f"{context}DataFrame字符串清理失败: {e}")
+        return df
+
 def safe_divide(numerator, denominator, default=0.0):
     """安全除法，避免除零错误"""
     try:
@@ -689,6 +742,9 @@ class UnifiedBacktestEngine:
 
         # 检查价格数据合理性和类型
         try:
+            # 先清理重复字符串
+            data = _clean_repeat_strings_dataframe(data, "backtest_engine")
+            
             # 确保价格列是数值类型
             if data[price_col].dtype == 'object':
                 self.logger.warning(f"价格列 {price_col} 为对象类型，尝试转换为数值类型")
@@ -1435,15 +1491,15 @@ class UnifiedBacktestEngine:
 # 便利函数
 
 
-def create_unified_backtest_engine(level: str = "professional", use_vectorized: bool = True,
-                                   auto_select: bool = True) -> UnifiedBacktestEngine:
+def create_unified_backtest_engine(level: str = "professional", use_vectorized_engine: bool = True,
+                                   auto_select_engine: bool = True) -> UnifiedBacktestEngine:
     """
     创建统一回测引擎
 
     Args:
         level: 回测级别 ("basic", "professional", "institutional", "investment_bank")
-        use_vectorized: 是否使用向量化引擎（默认True，提升3-5倍性能）
-        auto_select: 是否自动选择最优引擎（默认True，智能选择）
+        use_vectorized_engine: 是否使用向量化引擎（默认True，提升3-5倍性能）
+        auto_select_engine: 是否自动选择最优引擎（默认True，智能选择）
 
     Returns:
         UnifiedBacktestEngine实例
@@ -1458,8 +1514,8 @@ def create_unified_backtest_engine(level: str = "professional", use_vectorized: 
     backtest_level = level_map.get(level.lower(), BacktestLevel.PROFESSIONAL)
     return UnifiedBacktestEngine(
         backtest_level=backtest_level,
-        use_vectorized_engine=use_vectorized,
-        auto_select_engine=auto_select
+        use_vectorized_engine=use_vectorized_engine,
+        auto_select_engine=auto_select_engine
     )
 
 

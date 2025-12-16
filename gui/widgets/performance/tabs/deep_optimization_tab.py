@@ -492,6 +492,74 @@ class DeepOptimizationControlTab(QWidget):
         layout.addWidget(apply_button)
         
         layout.addStretch()
+        
+    def apply_settings(self):
+        """应用设置"""
+        try:
+            # 收集所有设置值
+            settings = {
+                'smart_cache': self.smart_cache_check.isChecked(),
+                'component_virtualization': self.component_virt_check.isChecked(),
+                'realtime_data_processing': self.realtime_data_check.isChecked(),
+                'ai_recommendation': self.ai_recommend_check.isChecked(),
+                'cache_size_mb': self.cache_size_spin.value(),
+                'update_interval_seconds': self.update_interval_spin.value(),
+                'optimization_strength': self.optimization_strength.value()
+            }
+            
+            # 验证设置
+            if not self._validate_settings(settings):
+                return
+            
+            # 应用设置到优化服务
+            self._apply_to_service(settings)
+            
+            # 显示成功消息
+            QMessageBox.information(self, "设置应用", "优化设置已成功应用！")
+            logger.info(f"深度优化设置已应用: {settings}")
+            
+        except Exception as e:
+            error_msg = f"应用设置时发生错误: {str(e)}"
+            logger.error(error_msg)
+            QMessageBox.critical(self, "错误", error_msg)
+    
+    def _validate_settings(self, settings: dict) -> bool:
+        """验证设置"""
+        # 缓存大小验证
+        if settings['cache_size_mb'] < 64 or settings['cache_size_mb'] > 2048:
+            QMessageBox.warning(self, "设置验证", "缓存大小应在64-2048MB范围内")
+            return False
+            
+        # 更新频率验证
+        if settings['update_interval_seconds'] < 1 or settings['update_interval_seconds'] > 60:
+            QMessageBox.warning(self, "设置验证", "更新频率应在1-60秒范围内")
+            return False
+            
+        # 优化强度验证
+        if settings['optimization_strength'] < 1 or settings['optimization_strength'] > 10:
+            QMessageBox.warning(self, "设置验证", "优化强度应在1-10范围内")
+            return False
+            
+        return True
+    
+    def _apply_to_service(self, settings: dict):
+        """将设置应用到优化服务"""
+        try:
+            # 如果优化服务存在且有更新配置的方法，则应用设置
+            if hasattr(self.optimization_service, 'update_config'):
+                self.optimization_service.update_config(settings)
+            elif hasattr(self.optimization_service, 'config'):
+                # 直接更新配置属性
+                for key, value in settings.items():
+                    if hasattr(self.optimization_service.config, key):
+                        setattr(self.optimization_service.config, key, value)
+            else:
+                # 如果没有配置接口，记录设置但不应用
+                logger.warning("优化服务不支持配置更新，设置已记录但未应用")
+                
+        except Exception as e:
+            logger.error(f"应用设置到服务失败: {e}")
+            raise Exception(f"应用设置到服务失败: {e}")
 
 
 class DeepOptimizationMetricsTab(QWidget):

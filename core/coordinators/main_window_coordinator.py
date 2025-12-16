@@ -1797,6 +1797,98 @@ FactorWeave-Quant  2.0 (重构版本)
             QMessageBox.critical(self._main_window, "错误",
                                  f"打开批量分析对话框失败: {str(e)}")
 
+    def _on_intelligent_model_selection(self) -> None:
+        """智能模型选择"""
+        # 防止重复打开 - 检查是否已有智能模型选择对话框实例
+        if hasattr(self, '_intelligent_model_selection_dialog') and self._intelligent_model_selection_dialog is not None:
+            if self._intelligent_model_selection_dialog.isVisible():
+                self._intelligent_model_selection_dialog.raise_()
+                self._intelligent_model_selection_dialog.activateWindow()
+                logger.info("智能模型选择对话框已存在，激活现有窗口")
+                return
+            else:
+                self._intelligent_model_selection_dialog = None
+
+        try:
+            from gui.dialogs.intelligent_model_selection_dialog import IntelligentModelSelectionDialog
+
+            # 创建智能模型选择对话框实例并保存引用
+            self._intelligent_model_selection_dialog = IntelligentModelSelectionDialog(
+                self._main_window, 
+                service_container=self.service_container
+            )
+
+            # 连接对话框的关闭信号
+            self._intelligent_model_selection_dialog.finished.connect(self._on_intelligent_model_selection_dialog_closed)
+
+            # 设置对话框居中显示
+            self.center_dialog(self._intelligent_model_selection_dialog)
+
+            # 显示对话框
+            self._intelligent_model_selection_dialog.exec_()
+
+        except ImportError as e:
+            # 如果对话框不存在，尝试使用控制面板直接创建
+            logger.warning(f"智能模型选择对话框导入失败: {e}，尝试使用控制面板")
+            self._show_intelligent_model_selection_panel()
+        except Exception as e:
+            logger.error(f"智能模型选择失败: {e}")
+            logger.error(traceback.format_exc())
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开智能模型选择失败: {str(e)}")
+
+    def _show_intelligent_model_selection_panel(self) -> None:
+        """显示智能模型选择面板"""
+        try:
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QDialogButtonBox
+            from gui.widgets.intelligent_model_selection.control_panel import IntelligentModelControlPanel
+            from core.ai.intelligent_selection import IntelligentModelSelector
+
+            # 创建对话框
+            dialog = QDialog(self._main_window)
+            dialog.setWindowTitle("智能模型选择")
+            dialog.setMinimumSize(500, 700)
+            
+            # 创建布局
+            layout = QVBoxLayout(dialog)
+            
+            # 创建智能模型选择控制面板
+            control_panel = IntelligentModelControlPanel()
+            layout.addWidget(control_panel)
+            
+            # 尝试创建智能选择器
+            try:
+                intelligent_selector = IntelligentSelector()
+                control_panel.set_intelligent_selector(intelligent_selector)
+                logger.info("智能选择器创建成功")
+            except Exception as e:
+                logger.warning(f"智能选择器创建失败: {e}")
+            
+            # 创建按钮框
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+            )
+            button_box.accepted.connect(dialog.accept)
+            button_box.rejected.connect(dialog.reject)
+            layout.addWidget(button_box)
+            
+            # 设置对话框居中显示
+            self.center_dialog(dialog)
+            
+            # 显示对话框
+            dialog.exec_()
+
+        except Exception as e:
+            logger.error(f"显示智能模型选择面板失败: {e}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开智能模型选择面板失败: {str(e)}")
+
+    def _on_intelligent_model_selection_dialog_closed(self):
+        """智能模型选择对话框关闭时的回调"""
+        logger.info("智能模型选择对话框已关闭，清理引用")
+        if hasattr(self, '_intelligent_model_selection_dialog'):
+            self._intelligent_model_selection_dialog = None
+
     def _on_strategy_management(self) -> None:
         """策略管理"""
         # 防止重复打开 - 检查是否已有策略管理对话框实例
@@ -3036,8 +3128,8 @@ FactorWeave-Quant  2.0 (重构版本)
                 default_params = {
                     'professional_level': 'PROFESSIONAL',
                     'engine_type': 'unified',
-                    'use_vectorized': True,
-                    'auto_select': True,
+                    'use_vectorized_engine': True,
+                    'auto_select_engine': True,
                     'monitoring_level': 'STANDARD'
                 }
                 self._backtest_widget.start_backtest(default_params)
@@ -3133,7 +3225,7 @@ FactorWeave-Quant  2.0 (重构版本)
             self._standalone_backtest_window.setGeometry(x, y, window_width, window_height)
 
             # 设置最小窗口大小
-            self._standalone_backtest_window.setMinimumSize(1000, 700)
+            self._standalone_backtest_window.setMinimumSize(1000, 800)
 
             # 设置窗口标志，支持放大缩小和关闭
             self._standalone_backtest_window.setWindowFlags(
@@ -3505,8 +3597,7 @@ FactorWeave-Quant  2.0 (重构版本)
             # 导入增强UI组件
             import_start = time.time()
             from gui.widgets.enhanced_ui import (
-                Level2DataPanel, OrderBookWidget, FundamentalAnalysisTab,
-                DataQualityMonitorTab, SmartRecommendationPanel
+                Level2DataPanel, OrderBookWidget, FundamentalAnalysisTab, SmartRecommendationPanel
             )
             import_time = time.time() - import_start
             logger.info(f"模块导入耗时: {import_time:.3f}秒")

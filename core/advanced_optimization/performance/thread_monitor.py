@@ -110,9 +110,12 @@ class ThreadMetrics:
 class ThreadMonitor:
     """线程性能监控器"""
     
-    def __init__(self):
+    def __init__(self, interval: float = 1.0):
         self.webgpu_renderer = None
         self.thread_pools: Dict[str, concurrent.futures.ThreadPoolExecutor] = {}
+        
+        # 保存默认监控间隔
+        self._default_interval = interval
         
         # 监控状态
         self.thread_metrics = ThreadMetrics()
@@ -139,12 +142,12 @@ class ThreadMonitor:
         
         # 获取CPU核心数用于动态调整
         try:
-            self.cpu_cores = psutil.cpu_count(logical=True)
+            self.cpu_cores = psutil.cpu_count(logical=True) * 2
             # 根据CPU核心数动态调整活跃线程阈值
-            self.alert_thresholds['active_threads_max'] = max(100, self.cpu_cores * 4)
+            self.alert_thresholds['active_threads_max'] = max(400, self.cpu_cores * 4)
         except:
-            self.cpu_cores = 4  # 默认值
-            self.alert_thresholds['active_threads_max'] = 100
+            self.cpu_cores = 24  # 默认值
+            self.alert_thresholds['active_threads_max'] = 400
         
         # 统计信息
         self.stats = {
@@ -178,10 +181,10 @@ class ThreadMonitor:
         
         # 监控间隔动态调整
         self._monitoring_intervals = {
-            'normal': interval,
-            'high_load': max(0.1, interval / 2),
-            'low_load': min(5.0, interval * 2),
-            'current': interval
+            'normal': self._default_interval,
+            'high_load': max(0.1, self._default_interval / 2),
+            'low_load': min(5.0, self._default_interval * 2),
+            'current': self._default_interval
         }
         
         logger.info("线程监控器初始化完成")
@@ -360,7 +363,7 @@ class ThreadMonitor:
             
             # 获取CPU信息
             cpu_percent = psutil.cpu_percent(interval=None)
-            cpu_count = psutil.cpu_count()
+            cpu_cores = psutil.cpu_count()  # 统一使用 cpu_cores 变量名
             
             # 获取系统上下文切换信息
             # 注意: psutil 在某些平台上可能不支持此信息

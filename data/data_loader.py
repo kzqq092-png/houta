@@ -30,6 +30,153 @@ class DataLoadError(Exception):
     """数据加载错误"""
     pass
 
+class DataSourceValidator:
+    """数据源验证器 - 预防重复字符串生成"""
+    
+    @staticmethod
+    def validate_and_clean_data(df: pd.DataFrame, context: str = "") -> pd.DataFrame:
+        """验证和清理数据源数据"""
+        logger.info(f"{context}开始数据源验证...")
+        
+        # 增强的重复字符串检测 - 更严格的检查
+        repeat_strings = DataSourceValidator._detect_repeat_strings(df)
+        if repeat_strings:
+            logger.warning(f"{context}检测到重复字符串: {repeat_strings}")
+            df = DataSourceValidator._clean_repeat_strings(df, context)
+            
+            # 再次验证确保清理成功
+            remaining_strings = DataSourceValidator._detect_repeat_strings(df)
+            if remaining_strings:
+                logger.error(f"{context}重复字符串清理失败，仍存在: {remaining_strings}")
+                # 强制转换为数值类型
+                df = DataSourceValidator._force_numeric_conversion(df, context)
+        
+        # 验证数据格式
+        df = DataSourceValidator._validate_data_format(df, context)
+        
+        # 数据去重
+        df = DataSourceValidator._remove_duplicates(df, context)
+        
+        # 额外的字符串安全检查 - 特别针对'000158'等问题
+        df = DataSourceValidator._check_specific_problematic_strings(df, context)
+        
+        return df
+    
+    @staticmethod
+    def _detect_repeat_strings(df: pd.DataFrame) -> List[str]:
+        """检测重复字符串"""
+        repeat_strings = []
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                for value in df[col].unique():
+                    str_val = str(value)
+                    if len(str_val) > 10 and DataSourceValidator._is_repeat_pattern(str_val):
+                        repeat_strings.append(str_val)
+        return repeat_strings
+    
+    @staticmethod
+    def _is_repeat_pattern(value: str) -> bool:
+        """检查是否为重复模式"""
+        for i in range(1, min(len(value), 20)):
+            unit = value[:i]
+            if len(value) % len(unit) == 0:
+                repeated = unit * (len(value) // len(unit))
+                if value == repeated:
+                    return True
+        return False
+    
+    @staticmethod
+    def _clean_repeat_strings(df: pd.DataFrame, context: str) -> pd.DataFrame:
+        """清理重复字符串"""
+        cleaned_df = df.copy()
+        cleaned_count = 0
+        
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                repeat_mask = cleaned_df[col].astype(str).apply(
+                    lambda x: DataSourceValidator._is_repeat_pattern(x) if len(str(x)) > 10 else False
+                )
+                if repeat_mask.any():
+                    cleaned_count += repeat_mask.sum()
+                    cleaned_df.loc[repeat_mask, col] = np.nan
+                    logger.warning(f"{context}列{col}清理了{repeat_mask.sum()}个重复字符串")
+        
+        logger.info(f"{context}数据源验证完成: 共清理{cleaned_count}个重复字符串")
+        return cleaned_df
+    
+    @staticmethod
+    def _validate_data_format(df: pd.DataFrame, context: str) -> pd.DataFrame:
+        """验证数据格式"""
+        # 确保数值列为正确类型
+        numeric_columns = ['open', 'high', 'low', 'close', 'volume']
+        for col in numeric_columns:
+            if col in df.columns:
+                if df[col].dtype == 'object':
+                    # 尝试转换为数值
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    logger.debug(f"{context}列{col}已转换为数值类型")
+        
+        return df
+    
+    @staticmethod
+    def _remove_duplicates(df: pd.DataFrame, context: str) -> pd.DataFrame:
+        """去除重复数据"""
+        original_count = len(df)
+        df = df.drop_duplicates()
+        removed_count = original_count - len(df)
+        
+        if removed_count > 0:
+            logger.info(f"{context}去除了{removed_count}个重复行")
+        
+        return df
+    
+    @staticmethod
+    def _check_specific_problematic_strings(df: pd.DataFrame, context: str) -> pd.DataFrame:
+        """检查并修复已知的特定问题字符串（如'000158'等）"""
+        try:
+            cleaned_df = df.copy()
+            problem_strings = ['000158', '000001', '000002', '600000', '600036', '000858', '000725']
+            
+            # 检查所有字符串列
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    # 检查是否包含已知问题字符串的重复模式
+                    for problem_str in problem_strings:
+                        # 构建重复模式
+                        repeat_patterns = [problem_str * i for i in range(2, 11)]  # 2倍到10倍重复
+                        
+                        # 检查并修复这些模式
+                        for pattern in repeat_patterns:
+                            mask = cleaned_df[col].astype(str) == pattern
+                            if mask.any():
+                                cleaned_df.loc[mask, col] = np.nan
+                                logger.warning(f"{context}列{col}检测并修复了重复字符串: {problem_str}*{len(pattern)//len(problem_str)}")
+            
+            return cleaned_df
+            
+        except Exception as e:
+            logger.error(f"{context}检查问题字符串失败: {str(e)}")
+            return df
+    
+    @staticmethod
+    def _force_numeric_conversion(df: pd.DataFrame, context: str) -> pd.DataFrame:
+        """强制将数据转换为数值类型，处理无法转换的值"""
+        try:
+            cleaned_df = df.copy()
+            numeric_columns = ['open', 'high', 'low', 'close', 'volume', 'amount']
+            
+            for col in numeric_columns:
+                if col in cleaned_df.columns:
+                    # 尝试直接转换为数值
+                    cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+                    logger.debug(f"{context}列{col}已强制转换为数值类型")
+            
+            return cleaned_df
+            
+        except Exception as e:
+            logger.error(f"{context}强制数值转换失败: {str(e)}")
+            return df
+
 # 创建全局缓存实例
 data_cache = Cache(cache_dir=".cache/data", default_ttl=30*60)
 
@@ -73,6 +220,9 @@ def fetch_fundamental_data(stock, use_cache: bool = True) -> pd.DataFrame:
 
         # 获取数据
         df = create_simulated_fundamental_data()
+        
+        # 使用数据源验证器预防重复字符串
+        df = DataSourceValidator.validate_and_clean_data(df, "基本面数据")
 
         # 验证数据
         validation = validate_fundamental_data(df)
@@ -168,6 +318,9 @@ def fetch_macroeconomic_data(use_cache: bool = True) -> pd.DataFrame:
 
         # 获取数据
         df = create_simulated_macroeconomic_data()
+        
+        # 使用数据源验证器预防重复字符串
+        df = DataSourceValidator.validate_and_clean_data(df, "宏观经济数据")
 
         # 验证数据
         validation = validate_macroeconomic_data(df)
@@ -244,6 +397,9 @@ def integrate_multiple_data_sources(df_kdata: pd.DataFrame,
                 df_kdata = df_kdata.set_index('date')
             else:
                 raise ValueError("K线数据缺少日期索引")
+        
+        # 使用数据源验证器对K线数据进行验证和清理
+        df_kdata = DataSourceValidator.validate_and_clean_data(df_kdata, "K线数据整合")
 
         # 使用线程池处理数据对齐
         with ThreadPoolExecutor() as executor:
@@ -267,14 +423,20 @@ def integrate_multiple_data_sources(df_kdata: pd.DataFrame,
 
             # 合并基本面数据
             if aligned_fundamental is not None:
+                # 使用数据源验证器验证和清理基本面数据
+                aligned_fundamental = DataSourceValidator.validate_and_clean_data(aligned_fundamental, "基本面数据整合")
                 chunk = merge_chunk_data(chunk, aligned_fundamental, 'fund_')
 
             # 合并宏观数据
             if aligned_macro is not None:
+                # 使用数据源验证器验证和清理宏观数据
+                aligned_macro = DataSourceValidator.validate_and_clean_data(aligned_macro, "宏观数据整合")
                 chunk = merge_chunk_data(chunk, aligned_macro, 'macro_')
 
             # 合并情绪数据
             if aligned_sentiment is not None:
+                # 使用数据源验证器验证和清理情绪数据
+                aligned_sentiment = DataSourceValidator.validate_and_clean_data(aligned_sentiment, "情绪数据整合")
                 chunk = merge_chunk_data(chunk, aligned_sentiment, 'sent_')
 
             result_chunks.append(chunk)

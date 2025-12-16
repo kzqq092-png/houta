@@ -11,7 +11,15 @@ from datetime import datetime
 from .base_service import CacheableService, ConfigurableService
 from ..events import DataUpdateEvent
 from ..industry_manager import IndustryManager
-# 移除循环导入，在需要时动态导入
+
+# 直接导入管理器工厂以避免动态导入问题
+try:
+    from utils.manager_factory import get_industry_manager
+    IMPORT_SUCCESS = True
+except ImportError as e:
+    logger.warning(f"无法导入 get_industry_manager: {e}")
+    get_industry_manager = None
+    IMPORT_SUCCESS = False
 
 
 class IndustryService(CacheableService, ConfigurableService):
@@ -41,8 +49,11 @@ class IndustryService(CacheableService, ConfigurableService):
     def _do_initialize(self) -> None:
         """初始化行业服务"""
         try:
-            # 获取行业管理器实例 - 动态导入避免循环依赖
-            from utils.manager_factory import get_industry_manager
+            # 检查导入状态
+            if not IMPORT_SUCCESS or get_industry_manager is None:
+                logger.warning("get_industry_manager 导入失败，使用备用模式")
+                self._create_fallback_manager()
+                return
             
             # 添加健康检查和重试机制
             self._industry_manager = self._get_industry_manager_with_retry()

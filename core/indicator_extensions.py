@@ -14,9 +14,6 @@ from datetime import datetime
 
 
 class IndicatorCategory(Enum):
-def __init__(self):
-        self.logger = logger.bind(module=self.__class__.__name__)
-    
     """指标分类"""
     TREND = "trend"                    # 趋势指标
     MOMENTUM = "momentum"              # 动量指标
@@ -80,14 +77,106 @@ class StandardKlineData:
     @classmethod
     def from_dataframe(cls, df: pd.DataFrame) -> 'StandardKlineData':
         """从DataFrame创建标准K线数据"""
+        logger.debug("开始从DataFrame创建StandardKlineData...")
+        
+        # 复制DataFrame以避免修改原始数据
+        cleaned_df = df.copy()
+        
+        # 清理重复字符串
+        cleaned_df = cls._clean_repeat_strings_in_dataframe(cleaned_df, "StandardKlineData")
+        
+        # 确保数值列是数值类型，处理重复字符串
+        for col in ['open', 'high', 'low', 'close']:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cls._safe_convert_to_numeric_series(cleaned_df[col], col)
+        
+        if 'volume' in cleaned_df.columns:
+            cleaned_df['volume'] = cls._safe_convert_to_numeric_series(cleaned_df['volume'], 'volume')
+        
+        logger.debug("StandardKlineData创建完成")
+        
         return cls(
-            open=df['open'],
-            high=df['high'],
-            low=df['low'],
-            close=df['close'],
-            volume=df.get('volume', pd.Series(index=df.index)),
-            datetime_index=df.index if isinstance(df.index, pd.DatetimeIndex) else pd.to_datetime(df.index)
+            open=cleaned_df['open'],
+            high=cleaned_df['high'],
+            low=cleaned_df['low'],
+            close=cleaned_df['close'],
+            volume=cleaned_df.get('volume', pd.Series(index=cleaned_df.index)),
+            datetime_index=cleaned_df.index if isinstance(cleaned_df.index, pd.DatetimeIndex) else pd.to_datetime(cleaned_df.index)
         )
+    
+    @classmethod
+    def _clean_repeat_strings_in_dataframe(cls, df: pd.DataFrame, context: str = "") -> pd.DataFrame:
+        """清理DataFrame中的重复字符串"""
+        try:
+            cleaned_df = df.copy()
+            repeat_count = 0
+            
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    repeat_mask = cleaned_df[col].astype(str).apply(cls._is_repeat_string)
+                    if repeat_mask.any():
+                        repeat_count += repeat_mask.sum()
+                        cleaned_df.loc[repeat_mask, col] = np.nan
+                        
+                        # 记录检测到的重复字符串
+                        repeat_strings = cleaned_df.loc[repeat_mask, col].unique()
+                        logger.warning(f"{context}列{col}检测到{repeat_count}个重复字符串: {[s[:20]+'...' if len(str(s))>20 else s for s in repeat_strings[:3]]}")
+            
+            if repeat_count > 0:
+                logger.info(f"{context}DataFrame清理完成: 共清理{repeat_count}个重复字符串")
+            else:
+                logger.debug(f"{context}DataFrame无需清理: 未检测到重复字符串")
+                
+            return cleaned_df
+            
+        except Exception as e:
+            logger.error(f"{context}DataFrame字符串清理失败: {e}")
+            return df
+    
+    @classmethod
+    def _safe_convert_to_numeric_series(cls, series: pd.Series, col_name: str) -> pd.Series:
+        """安全地转换Series为数值类型"""
+        try:
+            # 先检查重复字符串
+            repeat_mask = series.astype(str).apply(cls._is_repeat_string)
+            if repeat_mask.any():
+                logger.warning(f"列{col_name}检测到{repeat_mask.sum()}个重复字符串，将转换为NaN")
+                series = series.copy()
+                series.loc[repeat_mask] = np.nan
+            
+            # 转换为数值类型
+            numeric_series = pd.to_numeric(series, errors='coerce')
+            return numeric_series
+            
+        except Exception as e:
+            logger.error(f"列{col_name}数值转换失败: {e}")
+            return series
+    
+    @classmethod
+    def _is_repeat_string(cls, value: Any) -> bool:
+        """检测是否为重复字符串模式"""
+        try:
+            if not isinstance(value, str):
+                return False
+                
+            # 如果字符串长度小于等于10，不是重复模式
+            if len(value) <= 10:
+                return False
+            
+            # 检查是否为基础字符串的重复模式
+            for i in range(1, min(len(value), 20)):
+                unit = value[:i]
+                if len(value) % len(unit) == 0:
+                    repeated = unit * (len(value) // len(unit))
+                    if value == repeated:
+                        logger.debug(f"检测到重复字符串模式: 单元='{unit}', 长度={i}, 重复次数={len(value) // i}")
+                        return True
+            
+            return False
+            
+        except Exception as e:
+            logger.debug(f"重复字符串检测失败: {e}")
+            return False
 
     def to_dataframe(self) -> pd.DataFrame:
         """转换为DataFrame"""
@@ -339,7 +428,7 @@ class IndicatorPluginAdapter:
         """
         self.plugin = plugin
         self.plugin_id = plugin_id
-        self.
+        self.logger = logger.bind(module=self.__class__.__name__)
         # 缓存
         self._metadata_cache = {}
         self._parameters_cache = {}

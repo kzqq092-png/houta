@@ -28,9 +28,6 @@ from ..plugin_types import DataType
 
 
 class FieldType(Enum):
-def __init__(self):
-        self.logger = logger.bind(module=self.__class__.__name__)
-    
     """字段类型枚举"""
     NUMERIC = "numeric"          # 数值类型
     PERCENTAGE = "percentage"    # 百分比类型
@@ -269,7 +266,7 @@ class FieldMappingEngine:
         Args:
             field_mappings: 预定义的字段映射配置
         """
-        self.
+        self.logger = logger.bind(module=self.__class__.__name__)
         # 基础映射规则
         self.base_mappings = field_mappings or {}
 

@@ -368,8 +368,9 @@ class DataSourcePluginAdapter:
         """
         self.plugin = plugin
         self.plugin_id = plugin_id
-        self.        self._connection_info = None
+        self._connection_info = None
         self._last_health_check = None
+        self.logger = logger.bind(module=self.__class__.__name__)
 
     def connect(self, **kwargs) -> bool:
         """连接数据源"""

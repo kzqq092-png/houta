@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from core.enhanced_indicator_service import EnhancedIndicatorService
+from core.services.enhanced_indicator_service import EnhancedIndicatorService
 from core.utils.data_standardizer import DataStandardizer
 from loguru import logger
 

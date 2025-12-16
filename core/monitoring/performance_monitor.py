@@ -158,26 +158,30 @@ class PerformanceAnalyzer:
         recommendations = []
         
         # 分析最近10分钟的渲染时间
-        volume_stats = self.get_performance_summary('volume', 10)['statistics'].get('render_time', {})
-        if volume_stats.get('p95', 0) > 100:  # 95%分位数超过100ms
-            recommendations.append({
-                'priority': 'high',
-                'category': 'volume_rendering',
-                'issue': f'成交量渲染95%分位数达到 {volume_stats["p95"]:.1f}ms',
-                'recommendation': '启用虚拟滚动和数据采样优化',
-                'expected_improvement': '50-80%的性能提升'
-            })
+        volume_summary = self.get_performance_summary('volume', 10)
+        if 'statistics' in volume_summary:
+            volume_stats = volume_summary['statistics'].get('render_time', {})
+            if volume_stats.get('p95', 0) > 100:  # 95%分位数超过100ms
+                recommendations.append({
+                    'priority': 'high',
+                    'category': 'volume_rendering',
+                    'issue': f'成交量渲染95%分位数达到 {volume_stats["p95"]:.1f}ms',
+                    'recommendation': '启用虚拟滚动和数据采样优化',
+                    'expected_improvement': '50-80%的性能提升'
+                })
         
         # 分析内存使用
-        memory_stats = self.get_performance_summary('chart', 10)['statistics'].get('memory_usage', {})
-        if memory_stats.get('max', 0) > 1000:  # 最大内存使用超过1GB
-            recommendations.append({
-                'priority': 'medium',
-                'category': 'memory_management',
-                'issue': f'最大内存使用达到 {memory_stats["max"]:.0f}MB',
-                'recommendation': '启用图表缓存清理和内存优化',
-                'expected_improvement': '20-40%的内存节省'
-            })
+        chart_summary = self.get_performance_summary('chart', 10)
+        if 'statistics' in chart_summary:
+            memory_stats = chart_summary['statistics'].get('memory_usage', {})
+            if memory_stats.get('max', 0) > 1000:  # 最大内存使用超过1GB
+                recommendations.append({
+                    'priority': 'medium',
+                    'category': 'memory_management',
+                    'issue': f'最大内存使用达到 {memory_stats["max"]:.0f}MB',
+                    'recommendation': '启用图表缓存清理和内存优化',
+                    'expected_improvement': '20-40%的内存节省'
+                })
         
         return recommendations
 

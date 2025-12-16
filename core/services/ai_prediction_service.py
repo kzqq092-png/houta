@@ -35,6 +35,13 @@ except ImportError:
     DL_AVAILABLE = False
     TENSORFLOW_AVAILABLE = False
 
+# 尝试导入TensorFlow GPU管理器
+try:
+    from core.services.tensorflow_gpu_manager import TensorFlowGPUManager, auto_configure_gpu, get_device_for_training
+    GPU_MANAGER_AVAILABLE = True
+except ImportError:
+    GPU_MANAGER_AVAILABLE = False
+
 from core.services.base_service import BaseService
 try:
     from core.services.model_training_service import IncrementalTrainingModel
@@ -185,8 +192,74 @@ class AIPredictionService(BaseService):
         # 缓存ML库导入状态
         self._ml_libs_cache = None
 
+        # GPU管理器初始化
+        self._gpu_manager = None
+        self._gpu_enabled = False
+        self._gpu_configured = False
+        self._initialize_gpu_manager()
+
         # 初始化模型
         self._initialize_models()
+
+    def _initialize_gpu_manager(self):
+        """初始化GPU管理器"""
+        if not GPU_MANAGER_AVAILABLE:
+            logger.info("TensorFlow GPU管理器不可用，使用CPU模式")
+            return
+        
+        try:
+            logger.info("=== 初始化TensorFlow GPU管理器 ===")
+            
+            # 创建GPU管理器实例
+            self._gpu_manager = TensorFlowGPUManager()
+            
+            # 自动配置GPU
+            gpu_success = self._gpu_manager.auto_detect_and_configure()
+            self._gpu_configured = gpu_success
+            
+            if gpu_success:
+                self._gpu_enabled = True
+                device = self._gpu_manager.get_device_strategy()
+                logger.info(f"✅ GPU配置成功，设备策略: {device}")
+            else:
+                self._gpu_enabled = False
+                logger.warning("⚠️ GPU配置失败，回退到CPU模式")
+            
+            # 记录GPU状态信息
+            status_info = self._gpu_manager.get_status_info()
+            logger.info(f"GPU状态详情: {status_info}")
+            
+        except Exception as e:
+            logger.error(f"❌ GPU管理器初始化失败: {e}")
+            self._gpu_enabled = False
+            self._gpu_configured = False
+            self._gpu_manager = None
+
+    def get_gpu_status(self) -> Dict[str, Any]:
+        """获取GPU状态信息"""
+        if not self._gpu_manager:
+            return {
+                'enabled': False,
+                'configured': False,
+                'device_strategy': '/CPU:0',
+                'gpu_info': {},
+                'tensorflow_info': {}
+            }
+        
+        return {
+            'enabled': self._gpu_enabled,
+            'configured': self._gpu_configured,
+            'device_strategy': self._gpu_manager.get_device_strategy(),
+            'gpu_info': self._gpu_manager.get_status_info().get('gpu_info', {}),
+            'tensorflow_info': self._gpu_manager.get_status_info().get('tensorflow_info', {})
+        }
+
+    def get_device_for_prediction(self) -> str:
+        """获取预测用设备"""
+        if self._gpu_manager:
+            return self._gpu_manager.get_device_strategy()
+        else:
+            return '/CPU:0'
 
     def _should_warn(self, prediction_type: str) -> bool:
         """检查是否应该输出警告（避免重复警告）"""
@@ -766,6 +839,7 @@ class AIPredictionService(BaseService):
 
             if DL_AVAILABLE:
                 logger.info("深度学习模块可用，初始化AI预测模型")
+                logger.info(f"GPU状态: {'启用' if self._gpu_enabled else '禁用'}")
                 self._load_or_create_models()
             else:
                 logger.warning("深度学习模块不可用，使用统计模型")
@@ -1409,22 +1483,47 @@ class AIPredictionService(BaseService):
     def _predict_with_deep_learning(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """深度学习模型预测"""
         logger.info("=== 深度学习模型预测开始 ===")
+        
+        # 获取GPU设备策略
+        device = self.get_device_for_prediction()
+        logger.info(f"使用设备: {device}")
 
         try:
             # 提取特征
             features = self._extract_pattern_features(kdata)
             logger.info(f" 特征提取完成，特征数量: {len(features)}")
 
-            # 模拟深度学习预测（实际项目中这里会调用真实的DL模型）
-            prediction_strength = np.mean([
-                features.get('price_momentum', 0.5),
-                features.get('volume_strength', 0.5),
-                features.get('volatility_signal', 0.5)
-            ])
-
-            # 添加一些随机性模拟神经网络的复杂性
-            random_factor = np.random.normal(0, 0.1)
-            adjusted_strength = np.clip(prediction_strength + random_factor, 0, 1)
+            # 准备特征数据
+            if TENSORFLOW_AVAILABLE:
+                import tensorflow as tf
+                # 将特征转换为TensorFlow张量并在指定设备上计算
+                with tf.device(device):
+                    # 创建特征张量
+                    feature_values = np.array([
+                        features.get('price_momentum', 0.5),
+                        features.get('volume_strength', 0.5),
+                        features.get('volatility_signal', 0.5),
+                        features.get('pattern_strength', 0.5),
+                        features.get('support_resistance', 0.5)
+                    ])
+                    
+                    feature_tensor = tf.constant(feature_values.reshape(1, -1), dtype=tf.float32)
+                    
+                    # 模拟深度学习预测（在GPU上）
+                    prediction_strength = tf.reduce_mean(feature_tensor).numpy()
+                    
+                    # 添加一些随机性模拟神经网络的复杂性
+                    random_factor = tf.random.normal([1], 0, 0.1).numpy()[0]
+                    adjusted_strength = np.clip(prediction_strength + random_factor, 0, 1)
+            else:
+                # 回退到CPU计算
+                prediction_strength = np.mean([
+                    features.get('price_momentum', 0.5),
+                    features.get('volume_strength', 0.5),
+                    features.get('volatility_signal', 0.5)
+                ])
+                random_factor = np.random.normal(0, 0.1)
+                adjusted_strength = np.clip(prediction_strength + random_factor, 0, 1)
 
             if adjusted_strength > 0.6:
                 direction = "上涨"
@@ -1440,6 +1539,8 @@ class AIPredictionService(BaseService):
                 'direction': direction,
                 'confidence': confidence,
                 'model_type': 'deep_learning',
+                'device_used': device,
+                'gpu_enabled': self._gpu_enabled,
                 'prediction_type': PredictionType.PATTERN,
                 'features_used': len(features),
                 'dl_strength': prediction_strength,

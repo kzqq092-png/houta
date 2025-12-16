@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 from typing import Optional, Dict, Any, Tuple
-from core.enhanced_indicator_service import EnhancedIndicatorService
-from utils.data_standardizer import DataStandardizer
+from core.services.enhanced_indicator_service import EnhancedIndicatorService
+from core.utils.data_standardizer import DataStandardizer
 
 class MoneyManagerStrategy(ABC):
     """资金管理策略抽象基类"""
@@ -164,3 +164,7 @@ class EnhancedMoneyManager(MoneyManagerStrategy):
         except Exception as e:
             logger.info(f"ATR计算错误: {str(e)}")
             return 0.0
+
+
+# 兼容性别名 - 为了保持向后兼容
+MoneyManager = EnhancedMoneyManager

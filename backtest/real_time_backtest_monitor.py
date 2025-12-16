@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Any, Callable, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from enum import Enum
-import json
+import psutil
 import sqlite3
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -283,6 +283,16 @@ class RealTimeBacktestMonitor:
         """上下文管理器出口"""
         self.stop_monitoring()
 
+    def get_latest_metrics(self) -> Optional[RealTimeMetrics]:
+        """获取最新的监控指标"""
+        if self.metrics_history:
+            return self.metrics_history[-1]
+        return None
+
+    def get_data_queue(self) -> queue.Queue:
+        """获取数据队列，用于实时数据获取"""
+        return self.data_queue
+
     def _monitor_loop(self, backtest_engine: Any, data: pd.DataFrame, **kwargs):
         """监控循环"""
         thread_name = threading.current_thread().name
@@ -304,9 +314,17 @@ class RealTimeBacktestMonitor:
                 end_row = min(processed_rows + chunk_size, len(data))
                 chunk_data = data.iloc[:end_row].copy()
 
+                # 过滤掉run_backtest不支持的参数
+                filtered_kwargs = {
+                    k: v for k, v in kwargs.items() 
+                    if k in ['signal_col', 'price_col', 'initial_capital', 'position_size', 
+                             'commission_pct', 'slippage_pct', 'min_commission', 'stop_loss_pct', 
+                             'take_profit_pct', 'max_holding_periods', 'enable_compound', 'benchmark_data']
+                }
+                
                 # 运行回测
-                result = backtest_engine.run_professional_backtest(
-                    chunk_data, **kwargs)
+                result = backtest_engine.run_backtest(
+                    chunk_data, **filtered_kwargs)
 
                 # 再次检查停止信号
                 if not self.is_monitoring:
@@ -362,23 +380,95 @@ class RealTimeBacktestMonitor:
         finally:
             self.is_monitoring = False
 
-    def _calculate_real_time_metrics(self, backtest_result: Dict[str, Any], start_time: float) -> RealTimeMetrics:
+    def _calculate_real_time_metrics(self, backtest_result: Any, start_time: float) -> RealTimeMetrics:
         """计算实时指标"""
         try:
-            result_df = backtest_result['backtest_result']
-            risk_metrics = backtest_result['risk_metrics']
-            trade_stats = backtest_result['trade_statistics']
-
-            # 获取最新数据
-            latest_return = result_df['returns'].iloc[-1] if len(
-                result_df) > 0 else 0
-            cumulative_return = risk_metrics.total_return
-
-            # 计算当前回撤
-            cumulative_series = (1 + result_df['returns']).cumprod()
-            running_max = cumulative_series.cummax()
-            current_drawdown = (
-                (cumulative_series.iloc[-1] - running_max.iloc[-1]) / running_max.iloc[-1]) if len(cumulative_series) > 0 else 0
+            # 处理不同的结果格式
+            if isinstance(backtest_result, pd.DataFrame):
+                # 如果是DataFrame格式（直接返回）
+                result_df = backtest_result
+                
+                # 计算累计收益
+                if 'returns' in result_df.columns:
+                    cumulative_series = (1 + result_df['returns']).cumprod()
+                    cumulative_return = cumulative_series.iloc[-1] - 1 if len(cumulative_series) > 0 else 0
+                else:
+                    cumulative_return = 0.0
+                
+                # 计算当前回撤
+                current_drawdown = 0.0
+                if 'returns' in result_df.columns and len(result_df) > 0:
+                    cumulative_series = (1 + result_df['returns']).cumprod()
+                    running_max = cumulative_series.cummax()
+                    current_drawdown = (
+                        (cumulative_series.iloc[-1] - running_max.iloc[-1]) / running_max.iloc[-1]) if running_max.iloc[-1] != 0 else 0
+                
+                # 从DataFrame计算其他指标
+                if 'position' in result_df.columns:
+                    position_count = int((result_df['position'] != 0).sum())
+                else:
+                    position_count = 0
+                
+                # 获取最新的单期收益
+                if 'returns' in result_df.columns and len(result_df) > 0:
+                    latest_return = result_df['returns'].iloc[-1]
+                else:
+                    latest_return = 0.0
+                
+                # 创建默认的风险指标
+                from backtest.unified_backtest_engine import UnifiedRiskMetrics
+                risk_metrics = UnifiedRiskMetrics(
+                    total_return=cumulative_return,
+                    max_drawdown=abs(current_drawdown),
+                    annualized_return=cumulative_return * 12 if len(result_df) >= 12 else cumulative_return,
+                    sharpe_ratio=0.0, sortino_ratio=0.0, volatility=0.0,
+                    var_95=0.0, win_rate=0.0, profit_factor=0.0
+                )
+                trade_stats = {'total_trades': 0}
+                
+            elif isinstance(backtest_result, dict):
+                # 如果是字典格式
+                result_df = backtest_result.get('backtest_result', pd.DataFrame())
+                risk_metrics = backtest_result.get('risk_metrics', None)
+                trade_stats = backtest_result.get('trade_statistics', {'total_trades': 0})
+                
+                # 确保我们有所有必要的数据
+                if risk_metrics is None:
+                    from backtest.unified_backtest_engine import UnifiedRiskMetrics
+                    risk_metrics = UnifiedRiskMetrics()
+                
+                # 计算累计收益
+                if 'returns' in result_df.columns and len(result_df) > 0:
+                    cumulative_series = (1 + result_df['returns']).cumprod()
+                    cumulative_return = cumulative_series.iloc[-1] - 1
+                else:
+                    cumulative_return = risk_metrics.total_return
+                
+                # 计算当前回撤
+                current_drawdown = risk_metrics.current_drawdown if hasattr(risk_metrics, 'current_drawdown') else 0.0
+                
+                # 获取最新的单期收益
+                if 'returns' in result_df.columns and len(result_df) > 0:
+                    latest_return = result_df['returns'].iloc[-1]
+                else:
+                    latest_return = 0.0
+                
+                # 仓位计数
+                if 'position' in result_df.columns:
+                    position_count = int((result_df['position'] != 0).sum())
+                else:
+                    position_count = 0
+                    
+            else:
+                # 默认情况，创建空DataFrame
+                result_df = pd.DataFrame()
+                from backtest.unified_backtest_engine import UnifiedRiskMetrics
+                risk_metrics = UnifiedRiskMetrics()
+                trade_stats = {'total_trades': 0}
+                cumulative_return = 0.0
+                current_drawdown = 0.0
+                latest_return = 0.0
+                position_count = 0
 
             # 性能指标
             execution_time = time.time() - start_time
@@ -394,8 +484,7 @@ class RealTimeBacktestMonitor:
                 sharpe_ratio=risk_metrics.sharpe_ratio,
                 volatility=risk_metrics.volatility,
                 var_95=risk_metrics.var_95,
-                position_count=int((result_df['position'] != 0).sum()) if len(
-                    result_df) > 0 else 0,
+                position_count=position_count,
                 trade_count=trade_stats.get('total_trades', 0),
                 win_rate=risk_metrics.win_rate,
                 profit_factor=risk_metrics.profit_factor,
@@ -417,7 +506,6 @@ class RealTimeBacktestMonitor:
     def _get_memory_usage(self) -> float:
         """获取内存使用率"""
         try:
-            import psutil
             return psutil.virtual_memory().percent
         except Exception:
             return 0.0

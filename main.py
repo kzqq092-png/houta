@@ -50,17 +50,8 @@ except ImportError as e:
     logger.info("请安装PyQt5: pip install PyQt5")
     QEventLoop = None
 
-# WebGPU硬件加速渲染初始化
-try:
-    from optimization.webgpu_chart_renderer import initialize_webgpu_chart_renderer
-    # 初始化WebGPU图表渲染器（包含自动降级功能）
-    initialize_webgpu_chart_renderer(max_workers=os.cpu_count(), enable_progressive=True)
-    logger.info("WebGPU硬件加速渲染系统初始化成功")
-except ImportError:
-    logger.warning("WebGPU模块导入失败，将使用标准渲染")
-    logger.warning("如需WebGPU硬件加速，请确保已安装相关依赖")
-except Exception as e:
-    logger.error(f"WebGPU初始化失败: {e}")
+# WebGPU硬件加速渲染初始化将在QApplication创建后进行
+# 这样可以避免QObject::startTimer: Timers can only be used with threads started with QThread错误
 
 
 class FactorWeaveQuantApplication:
@@ -388,6 +379,24 @@ def main():
             app = QApplication(sys.argv)
             event_loop = QEventLoop(app)
             asyncio.set_event_loop(event_loop)
+            
+            # WebGPU硬件加速渲染初始化（在QApplication创建后进行）
+            try:
+                from optimization.webgpu_chart_renderer import get_webgpu_chart_renderer
+                # 初始化WebGPU图表渲染器（包含自动降级功能）
+                webgpu_renderer = get_webgpu_chart_renderer(
+                    enable_webgpu=True,
+                    enable_progressive=True,
+                    max_workers=os.cpu_count()
+                )
+                logger.info("WebGPU硬件加速渲染系统初始化成功")
+            except ImportError:
+                logger.warning("WebGPU模块导入失败，将使用标准渲染")
+                logger.warning("如需WebGPU硬件加速，请确保已安装相关依赖")
+                webgpu_renderer = None
+            except Exception as e:
+                logger.error(f"WebGPU初始化失败: {e}")
+                webgpu_renderer = None
 
             factorweave_app = FactorWeaveQuantApplication()
             factorweave_app.app = app  # Pass app instance
@@ -403,7 +412,7 @@ def main():
 
             factorweave_app._cleanup()
             logger.info("Application shutdown complete.")
-            # sys.exit(0) # Let the application exit naturally
+            sys.exit(0) # Let the application exit naturally
 
         else:
             # Fallback for systems without qasync

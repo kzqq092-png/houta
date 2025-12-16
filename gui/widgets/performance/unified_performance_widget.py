@@ -34,7 +34,7 @@ from core.performance.unified_monitor import UnifiedPerformanceMonitor
 # 深度优化模块导入
 try:
     from core.advanced_optimization.unified_optimization_service import UnifiedOptimizationService
-    from core.services.service_container import ServiceContainer
+    from core.containers.service_container import ServiceContainer
     DEEP_OPTIMIZATION_AVAILABLE = True
 except ImportError:
     DEEP_OPTIMIZATION_AVAILABLE = False

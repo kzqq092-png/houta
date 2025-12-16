@@ -15,9 +15,6 @@ from loguru import logger
 
 @dataclass
 class RiskRule:
-def __init__(self):
-        self.logger = logger.bind(module=self.__class__.__name__)
-    
     """风险规则数据类"""
     id: Optional[int] = None
     name: str = ""

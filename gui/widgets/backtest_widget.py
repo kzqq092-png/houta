@@ -782,14 +782,14 @@ class ControlPanel(QWidget):
         # 解析引擎选择
         engine_type_text = self.engine_type.currentText()
         if engine_type_text == "自动选择（推荐）":
-            use_vectorized = self.use_vectorized.isChecked()
-            auto_select = True
+            use_vectorized_engine = self.use_vectorized.isChecked()
+            auto_select_engine = True
         elif engine_type_text == "向量化引擎":
-            use_vectorized = True
-            auto_select = False
+            use_vectorized_engine = True
+            auto_select_engine = False
         else:  # 标准引擎
-            use_vectorized = False
-            auto_select = False
+            use_vectorized_engine = False
+            auto_select_engine = False
 
         params = {
             'initial_capital': self.initial_capital.value(),
@@ -797,8 +797,8 @@ class ControlPanel(QWidget):
             'commission_pct': self.commission_pct.value() / 100,
             'professional_level': self.professional_level.currentText(),
             'performance_level': self.performance_level.currentText(),
-            'use_vectorized_engine': use_vectorized,
-            'auto_select_engine': auto_select
+            'use_vectorized_engine': use_vectorized_engine,
+            'auto_select_engine': auto_select_engine
         }
 
         self.start_backtest.emit(params)
@@ -1427,64 +1427,112 @@ class ProfessionalBacktestWidget(QWidget):
         if self.is_monitoring:
             self.stop_backtest()
 
-        # 使用资源管理器管理监控线程
-        from backtest.resource_manager import managed_backtest_resources
-
+        # 创建真实的回测监控器（不使用资源管理器）
+        from backtest.real_time_backtest_monitor import RealTimeBacktestMonitor, MonitoringLevel
+        from backtest.unified_backtest_engine import UnifiedBacktestEngine
+        
         def monitoring_loop():
-            """监控循环"""
-            with managed_backtest_resources() as resource_manager:
-                # 注册监控线程到资源管理器
-                resource_manager.register_thread(threading.current_thread())
-
+            """真实的回测监控循环"""
+            thread_name = threading.current_thread().name
+            logger.info(f"真实回测监控循环开始 - 线程: {thread_name}")
+            
+            try:
+                # 获取当前回测数据
+                if hasattr(self, 'current_data') and self.current_data is not None:
+                    data = self.current_data
+                else:
+                    # 如果没有当前数据，生成基本测试数据用于演示
+                    data = self._generate_demo_data()
+                
+                # 创建真实回测引擎
+                from backtest.unified_backtest_engine import BacktestLevel
+                backtest_engine = UnifiedBacktestEngine(
+                    backtest_level=BacktestLevel.PROFESSIONAL,
+                    use_vectorized_engine=True,
+                    auto_select_engine=True
+                )
+                
+                # 创建真实监控器
+                monitor = RealTimeBacktestMonitor(monitoring_level=MonitoringLevel.REAL_TIME)
+                
+                # 启动监控
+                monitor.start_monitoring(
+                    backtest_engine=backtest_engine,
+                    data=data,
+                    initial_capital=100000,
+                    engine_type="unified"
+                )
+                
+                # 监控循环：等待监控器数据并更新UI
                 iteration = 0
-                thread_name = threading.current_thread().name
-                logger.info(f"回测监控循环开始 - 线程: {thread_name}")
-
-                try:
-                    while self.is_monitoring:
+                while self.is_monitoring:
+                    try:
                         # 检查停止信号
                         if not self.is_monitoring:
                             logger.info(f"收到停止信号，退出监控循环 - 线程: {thread_name}")
                             break
-
-                        try:
-                            # 生成模拟监控数据
-                            monitoring_data = self._generate_monitoring_data(iteration)
-
-                            # 更新图表
-                            self.chart_widget.add_data(monitoring_data)
-
-                            # 更新指标面板
-                            QTimer.singleShot(
-                                0, lambda: self.metrics_panel.update_metrics(monitoring_data))
-
-                            # 检查预警
-                            self._check_alerts(monitoring_data)
-
-                            # 存储监控数据
-                            self.monitoring_data.append(monitoring_data)
-
-                            # 限制数据长度
-                            if len(self.monitoring_data) > 1000:
-                                self.monitoring_data = self.monitoring_data[-1000:]
-
-                            iteration += 1
-
-                            # 短暂休眠，允许更快响应停止信号
-                            for _ in range(20):  # 2秒分成20个0.1秒
-                                if not self.is_monitoring:
-                                    break
-                                time.sleep(0.1)
-
-                        except Exception as e:
-                            logger.error(f"监控循环异常: {e}")
-                            break
-
+                        
+                        # 等待监控数据
+                        time.sleep(0.5)  # 500ms间隔
+                        
+                        # 从监控器获取最新指标数据
+                        if hasattr(monitor, 'get_latest_metrics'):
+                            latest_metrics = monitor.get_latest_metrics()
+                            if latest_metrics:
+                                # 转换为UI友好的格式
+                                ui_data = {
+                                    'timestamp': latest_metrics.timestamp,
+                                    'current_return': latest_metrics.current_return,
+                                    'cumulative_return': latest_metrics.cumulative_return,
+                                    'current_drawdown': latest_metrics.current_drawdown,
+                                    'max_drawdown': latest_metrics.max_drawdown,
+                                    'sharpe_ratio': latest_metrics.sharpe_ratio,
+                                    'volatility': latest_metrics.volatility,
+                                    'var_95': latest_metrics.var_95,
+                                    'total_return': latest_metrics.cumulative_return,
+                                    'annualized_return': latest_metrics.cumulative_return * 252,
+                                    'win_rate': latest_metrics.win_rate,
+                                    'profit_factor': latest_metrics.profit_factor,
+                                    'execution_time': latest_metrics.execution_time
+                                }
+                                
+                                # 安全的UI更新（使用信号槽机制）
+                                self._safe_update_ui(ui_data)
+                                
+                                # 存储监控数据
+                                self.monitoring_data.append(ui_data)
+                                
+                                # 限制数据长度
+                                if len(self.monitoring_data) > 1000:
+                                    self.monitoring_data = self.monitoring_data[-1000:]
+                        
+                        iteration += 1
+                        
+                        # 检查预警
+                        if hasattr(monitor, 'get_latest_alerts') and monitor.alerts_history:
+                            latest_alerts = monitor.get_latest_alerts()
+                            if latest_alerts:
+                                for alert in latest_alerts:
+                                    QTimer.singleShot(0, lambda a=alert: self._safe_add_alert(a))
+                        
+                    except Exception as e:
+                        logger.error(f"监控循环处理异常: {e}")
+                        # 继续运行，不要因为单个错误而退出
+                        time.sleep(1.0)
+                        continue
+                        
+            except Exception as e:
+                logger.error(f"监控线程异常: {e}")
+            finally:
+                # 停止监控器
+                try:
+                    if 'monitor' in locals():
+                        monitor.stop_monitoring()
                 except Exception as e:
-                    logger.error(f"监控线程异常: {e}")
-                finally:
-                    logger.info(f"监控循环结束 - 线程: {thread_name}")
-                    self.is_monitoring = False
+                    logger.error(f"停止监控器失败: {e}")
+                
+                logger.info(f"监控循环结束 - 线程: {thread_name}")
+                self.is_monitoring = False
 
         # 启动监控线程（非守护线程，确保可以正确停止）
         self.is_monitoring = True
@@ -1585,6 +1633,104 @@ class ProfessionalBacktestWidget(QWidget):
 
         except Exception as e:
             logger.error(f"检查预警失败: {e}")
+
+    def _safe_update_ui(self, data: Dict):
+        """安全的UI更新方法 - 在主线程中执行UI更新"""
+        try:
+            # 确保在主线程中更新UI
+            if threading.current_thread() != threading.main_thread():
+                # 如果不在主线程，使用信号槽机制延迟到主线程执行
+                QTimer.singleShot(0, lambda: self._update_ui_main_thread(data))
+            else:
+                # 如果已经在主线程，直接更新
+                self._update_ui_main_thread(data)
+        except Exception as e:
+            logger.error(f"安全UI更新失败: {e}")
+
+    def _update_ui_main_thread(self, data: Dict):
+        """在主线程中更新UI的具体实现"""
+        try:
+            # 更新图表数据
+            if hasattr(self, 'chart_widget') and self.chart_widget:
+                self.chart_widget.add_data(data)
+            
+            # 更新指标面板
+            if hasattr(self, 'metrics_panel') and self.metrics_panel:
+                self.metrics_panel.update_metrics(data)
+            
+            # 更新关键指标标签
+            if hasattr(self, 'total_return_label'):
+                total_return = data.get('total_return', 0)
+                self.total_return_label.setText(f"{total_return:.2%}")
+                
+                # 设置颜色
+                color = "red" if total_return < 0 else "green"
+                self.total_return_label.setStyleSheet(f"color: {color};")
+            
+            if hasattr(self, 'sharpe_ratio_label'):
+                sharpe = data.get('sharpe_ratio', 0)
+                self.sharpe_ratio_label.setText(f"{sharpe:.3f}")
+                
+                # 设置颜色
+                color = "red" if sharpe < 0 else "green"
+                self.sharpe_ratio_label.setStyleSheet(f"color: {color};")
+            
+            if hasattr(self, 'max_drawdown_label'):
+                max_dd = data.get('max_drawdown', 0)
+                self.max_drawdown_label.setText(f"{max_dd:.2%}")
+                self.max_drawdown_label.setStyleSheet("color: red;")
+            
+            if hasattr(self, 'win_rate_label'):
+                win_rate = data.get('win_rate', 0)
+                self.win_rate_label.setText(f"{win_rate:.2%}")
+                
+                # 设置颜色
+                color = "red" if win_rate < 0.5 else "green"
+                self.win_rate_label.setStyleSheet(f"color: {color};")
+            
+            if hasattr(self, 'profit_factor_label'):
+                pf = data.get('profit_factor', 0)
+                self.profit_factor_label.setText(f"{pf:.3f}")
+                
+                # 设置颜色
+                color = "red" if pf < 1.0 else "green"
+                self.profit_factor_label.setStyleSheet(f"color: {color};")
+                
+        except Exception as e:
+            logger.error(f"主线程UI更新失败: {e}")
+
+    def _safe_add_alert(self, alert_data):
+        """安全的添加预警方法 - 在主线程中执行"""
+        try:
+            # 确保在主线程中更新UI
+            if threading.current_thread() != threading.main_thread():
+                # 如果不在主线程，使用信号槽机制延迟到主线程执行
+                QTimer.singleShot(0, lambda: self._add_alert_main_thread(alert_data))
+            else:
+                # 如果已经在主线程，直接添加
+                self._add_alert_main_thread(alert_data)
+        except Exception as e:
+            logger.error(f"安全添加预警失败: {e}")
+
+    def _add_alert_main_thread(self, alert_data):
+        """在主线程中添加预警的具体实现"""
+        try:
+            if hasattr(self, 'alerts_panel') and self.alerts_panel:
+                # 处理不同格式的预警数据
+                if isinstance(alert_data, dict):
+                    level = alert_data.get('level', 'info')
+                    message = alert_data.get('message', str(alert_data))
+                else:
+                    # 如果不是字典格式，直接作为消息处理
+                    level = 'info'
+                    message = str(alert_data)
+                
+                self.alerts_panel.add_alert(level, message)
+            else:
+                logger.warning("预警面板不可用")
+                
+        except Exception as e:
+            logger.error(f"主线程添加预警失败: {e}")
 
     def set_kdata(self, kdata):
         """设置K线数据"""

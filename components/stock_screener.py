@@ -136,7 +136,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
         self.load_templates()
         # 主动拉取一次股票列表并刷新结果表，确保初始有数据展示
         try:
-            from utils.data_standardizer import DataStandardizer
+            from core.utils.data_standardizer import DataStandardizer
             data_standardizer = DataStandardizer()
             stock_list = data_standardizer.get_stock_list()
             if not stock_list.empty:
@@ -1145,7 +1145,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             progress.setAutoReset(True)
 
             # 获取所有股票列表
-            from utils.data_standardizer import DataStandardizer
+            from core.utils.data_standardizer import DataStandardizer
             data_standardizer = DataStandardizer()
             stock_list = data_standardizer.get_stock_list()
             total_stocks = len(stock_list)
@@ -1348,7 +1348,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
         """检查消息面条件"""
         try:
             # 获取股票新闻数据
-            from utils.data_standardizer import DataStandardizer
+            from core.utils.data_standardizer import DataStandardizer
             data_standardizer = DataStandardizer()
             news_data = data_standardizer.get_stock_news(stock_code)
 
@@ -1601,7 +1601,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
         # 示例：遍历所有分类和指标，实际可按params指定分类/指标筛选
         for stock in stock_list:
             try:
-                from utils.data_standardizer import DataStandardizer
+                from core.utils.data_standardizer import DataStandardizer
                 data_standardizer = DataStandardizer()
                 kdata = data_standardizer.get_kdata(stock)
                 if kdata.empty:
@@ -1938,7 +1938,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
         try:
             from features.feature_selection import integrate_enhanced_features, enhanced_feature_selection, select_features_pca
             # 获取股票数据
-            from utils.data_standardizer import DataStandardizer
+            from core.utils.data_standardizer import DataStandardizer
             data_standardizer = DataStandardizer()
             stock_list = data_standardizer.get_stock_list()
             dfs = []
@@ -2094,7 +2094,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
         self.set_status_message("参数校验通过，正在分析...", error=False)
         try:
             logger.info("on_screener_analyze 开始分析 - 选股")
-            from utils.data_standardizer import DataStandardizer
+            from core.utils.data_standardizer import DataStandardizer
             data_standardizer = DataStandardizer()
             if hasattr(data_standardizer, 'get_screener_results'):
                 data = data_standardizer.get_screener_results()

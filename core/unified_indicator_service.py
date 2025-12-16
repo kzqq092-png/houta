@@ -1002,11 +1002,11 @@ class UnifiedIndicatorService:
 
             for presult in pattern_results:
                 # 根据信号类型设置值
-                signal_type = presult.get('signal_type', 'neutral')
+                signal_type = presult.signal_type.value if hasattr(presult, 'signal_type') else 'neutral'
                 if signal_type == 'buy':
-                    signal.iloc[presult['index']] = 1
+                    signal.iloc[presult.index] = 1
                 elif signal_type == 'sell':
-                    signal.iloc[presult['index']] = -1
+                    signal.iloc[presult.index] = -1
 
             result[name] = signal
             return result

@@ -63,7 +63,7 @@ class IndicatorResult:
     error_message: Optional[str] = None
 
 
-class TalibIndicatorService:
+class EnhancedIndicatorService:
     """TA-Lib指标服务
     
     提供完整的技术指标计算功能，完全脱离hikyuu
@@ -564,7 +564,7 @@ def calculate_talib_indicators(data: Union[pd.DataFrame, Dict[str, np.ndarray]],
     Returns:
         计算结果字典
     """
-    service = TalibIndicatorService()
+    service = EnhancedIndicatorService()
     results = service.batch_calculate_indicators(indicators, data)
     
     # 提取成功的结果

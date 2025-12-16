@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 from typing import Optional, Dict, Any, Tuple
-from core.enhanced_indicator_service import EnhancedIndicatorService
-from utils.data_standardizer import DataStandardizer
+from core.services.enhanced_indicator_service import EnhancedIndicatorService
+from core.utils.data_standardizer import DataStandardizer
 
 class StopLossStrategy(ABC):
     """止损策略抽象基类"""

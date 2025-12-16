@@ -48,12 +48,15 @@ except ImportError as e:
     _performance_monitor = None
 
 from .compatibility import CompatibilityReport
+from .environment import GPUSupportLevel
+from .webgpu_renderer import WebGPURenderer
 
 
 class RenderBackend(Enum):
     """渲染后端类型"""
     OPENGL = "opengl"
     WEBGL = "webgl"
+    WEBGPU = "webgpu"
     CANVAS2D = "canvas2d"
     MATPLOTLIB = "matplotlib"
 
@@ -669,21 +672,21 @@ class FallbackRenderer:
         self._current_renderer = None
         self._fallback_chain = []
         self._failure_count = {}
+        self._compatibility_report = None  # 保存兼容性报告
 
         # 创建所有渲染器实例
         self._create_renderers()
 
     def _create_renderers(self):
-        """创建所有渲染器实例"""
+        """创建所有渲染器实例（WebGPU渲染器由WebGPUManager单独管理，避免重复创建）"""
         self._renderers = {
-            RenderBackend.WEBGPU: WebGPURenderer(),
             RenderBackend.OPENGL: OpenGLRenderer(),
             RenderBackend.CANVAS2D: Canvas2DRenderer(),
             RenderBackend.MATPLOTLIB: MatplotlibRenderer()
         }
 
-        # 初始化失败计数
-        for backend in RenderBackend:
+        # 初始化失败计数（只针对实际创建的渲染器）
+        for backend in self._renderers.keys():
             self._failure_count[backend] = 0
 
     def initialize(self, compatibility_report: CompatibilityReport, context: Optional[Any] = None) -> bool:
@@ -693,28 +696,41 @@ class FallbackRenderer:
         Args:
             compatibility_report: 兼容性报告
             context: 渲染上下文
-
+            
         Returns:
             是否初始化成功
         """
         logger.info("初始化多层降级渲染器...")
+
+        # 保存兼容性报告以供后续使用
+        self._compatibility_report = compatibility_report
 
         # 确定降级链
         self._fallback_chain = self._determine_fallback_chain(compatibility_report)
 
         # 尝试按照降级链初始化渲染器
         for backend in self._fallback_chain:
+            # 跳过WebGPU后端，因为它由WebGPUManager单独管理
+            if backend == RenderBackend.WEBGPU:
+                continue
+                
+            # 检查渲染器是否存在
+            if backend not in self._renderers:
+                logger.warning(f"渲染器 {backend.value} 不存在，跳过初始化")
+                continue
+                
             renderer = self._renderers[backend]
 
             logger.info(f"尝试初始化 {backend.value} 渲染器...")
 
-            if renderer.initialize(context):
-                self._current_renderer = renderer
-                logger.info(f"使用 {backend.value} 渲染器")
-                return True
-            else:
-                logger.warning(f"{backend.value} 渲染器初始化失败")
-                self._failure_count[backend] += 1
+            if hasattr(renderer, 'initialize'):
+                if renderer.initialize(context):
+                    self._current_renderer = renderer
+                    logger.info(f"使用 {backend.value} 渲染器")
+                    return True
+                else:
+                    logger.warning(f"{backend.value} 渲染器初始化失败")
+                    self._failure_count[backend] += 1
 
         logger.error("所有渲染器初始化失败")
         return False
@@ -722,8 +738,11 @@ class FallbackRenderer:
     def _determine_fallback_chain(self, compatibility_report: CompatibilityReport) -> List[RenderBackend]:
         """确定降级链"""
 
-        # 根据推荐后端确定起始点
-        recommended = compatibility_report.recommended_backend
+        # 如果兼容性报告为None或无效，创建默认推荐后端
+        if compatibility_report is None:
+            recommended = GPUSupportLevel.WEBGPU
+        else:
+            recommended = compatibility_report.recommended_backend
 
         if recommended == GPUSupportLevel.WEBGPU:
             return [RenderBackend.WEBGPU, RenderBackend.OPENGL,
@@ -782,6 +801,16 @@ class FallbackRenderer:
         # 尝试后续的渲染器
         for i in range(current_index + 1, len(self._fallback_chain)):
             backend = self._fallback_chain[i]
+            
+            # 跳过WebGPU后端，因为它由WebGPUManager单独管理
+            if backend == RenderBackend.WEBGPU:
+                continue
+                
+            # 检查渲染器是否存在
+            if backend not in self._renderers:
+                logger.warning(f"渲染器 {backend.value} 不存在，跳过降级")
+                continue
+                
             renderer = self._renderers[backend]
 
             logger.info(f"降级到 {backend.value} 渲染器")

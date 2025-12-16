@@ -83,7 +83,7 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             chart_id: 唯一的图表ID
         """
         try:
-            # 1. 初始化父类和基础属性
+            # 1. 初始化父类和基础属性（包括所有Mixin）
             super().__init__(parent)
             self.setAcceptDrops(True)  # 确保控件能接收拖拽
 
@@ -114,7 +114,12 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             self.init_ui()
             logger.info("ChartWidget __init__: init_ui() 调用完成。")
 
-            # 5. 在UI元素创建后，再初始化依赖它们的Mixin
+            # 5. 在UI元素创建后，显式初始化RenderingMixin（用于修复性能优化器初始化问题）
+            logger.info("ChartWidget __init__: 正在初始化 RenderingMixin...")
+            self.__class__.__bases__[3].__init__(self)  # RenderingMixin.__init__(self)
+            logger.info("ChartWidget __init__: RenderingMixin 初始化完成")
+
+            # 6. 在UI元素创建后，再初始化依赖它们的Mixin
             # 直接调用Mixin的__init__是错误的，应该由super()自动处理
             # CrosshairMixin.__init__(self)
             # InteractionMixin.__init__(self)
@@ -379,7 +384,7 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             logger.info(f"渲染后端切换: {old_backend} → {new_backend}")
 
     def _init_performance_optimizer(self):
-        """初始化性能优化器"""
+        """初始化高级性能优化器"""
         try:
             # 导入性能优化模块
             from core.advanced_optimization.performance.performance_optimization_integration import (
@@ -405,8 +410,8 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                 # 创建高级性能分析器
                 self.performance_analytics = AdvancedPerformanceAnalytics(self.performance_coordinator)
                 
-                # 创建性能优化器
-                self.performance_optimizer = PerformanceOptimizer(
+                # 创建高级性能优化器（使用不同的属性名避免冲突）
+                self._advanced_performance_optimizer = PerformanceOptimizer(
                     coordinator=self.performance_coordinator,
                     analytics=self.performance_analytics,
                     config=RenderOptimizationConfig(
@@ -419,28 +424,28 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                 )
                 
                 # 注册渲染参数更新回调
-                self.performance_optimizer.add_render_parameters_callback(
+                self._advanced_performance_optimizer.add_render_parameters_callback(
                     self._on_render_parameters_updated
                 )
                 
                 # 启动性能优化
-                self.performance_optimizer.start_optimization()
+                self._advanced_performance_optimizer.start_optimization()
                 
-                logger.info("性能优化器集成成功")
+                logger.info("高级性能优化器集成成功")
             else:
                 logger.warning("性能监控器初始化失败，跳过性能优化器")
-                self.performance_optimizer = None
+                self._advanced_performance_optimizer = None
                 self.performance_analytics = None
                 self.performance_coordinator = None
                 
         except ImportError as e:
             logger.warning(f"性能优化模块不可用，跳过性能优化器集成: {e}")
-            self.performance_optimizer = None
+            self._advanced_performance_optimizer = None
             self.performance_analytics = None
             self.performance_coordinator = None
         except Exception as e:
             logger.error(f"性能优化器初始化失败: {e}")
-            self.performance_optimizer = None
+            self._advanced_performance_optimizer = None
             self.performance_analytics = None
             self.performance_coordinator = None
 

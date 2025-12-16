@@ -12,7 +12,7 @@ from datetime import datetime
 from dataclasses import dataclass, field
 
 from .base import BaseSignal, Signal
-from core.enhanced_indicator_service import EnhancedIndicatorService
+from core.services.enhanced_indicator_service import EnhancedIndicatorService
 from loguru import logger
 
 

@@ -13,10 +13,10 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem,
     QFrame, QPushButton, QComboBox, QSlider, QTextEdit, QScrollArea,
     QGroupBox, QGridLayout, QProgressBar, QSplitter, QTabWidget,
-    QListWidget, QListWidgetItem, QCheckBox, QSpinBox
+    QListWidget, QListWidgetItem, QCheckBox, QSpinBox, QDialog, QMessageBox
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot, QSize
-from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap, QIcon, QPainter
+from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap, QIcon, QPainter, QMovie
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -26,6 +26,49 @@ from loguru import logger
 
 from core.services.smart_recommendation_engine import SmartRecommendationEngine
 from core.services.recommendation_model_trainer import RecommendationModelTrainer
+from core.agents.bettafish_agent import BettaFishAgent
+from core.services.bettafish_monitoring_service import BettaFishMonitoringService
+from gui.widgets.enhanced_ui.hybrid_recommendation_workers import (
+    HybridRecommendationWorker, CacheWarmupWorker, CacheClearWorker, CacheStatsWorker
+)
+from gui.widgets.bettafish_dashboard import BettaFishDashboard
+from core.services.config_service import ConfigService
+
+
+class SimpleConfigManager:
+    """简单的配置管理器，作为ConfigService的后备方案"""
+    
+    def __init__(self):
+        self._config_data = {}
+    
+    def get(self, key: str, default=None):
+        """获取配置值"""
+        try:
+            keys = key.split('.')
+            current = self._config_data
+            for k in keys:
+                if isinstance(current, dict) and k in current:
+                    current = current[k]
+                else:
+                    return default
+            return current
+        except Exception as e:
+            logger.warning(f"获取配置 {key} 失败: {e}")
+            return default
+    
+    def set(self, key: str, value):
+        """设置配置值"""
+        try:
+            keys = key.split('.')
+            current = self._config_data
+            for k in keys[:-1]:
+                if k not in current:
+                    current[k] = {}
+                current = current[k]
+            current[keys[-1]] = value
+            logger.debug(f"配置已设置: {key} = {value}")
+        except Exception as e:
+            logger.error(f"设置配置 {key} 失败: {e}")
 
 
 class RecommendationCard(QFrame):
@@ -301,11 +344,19 @@ class SmartRecommendationPanel(QWidget):
     preferences_updated = pyqtSignal(dict)         # 偏好更新信号
 
     def __init__(self, parent=None, recommendation_engine: SmartRecommendationEngine = None,
-                 model_trainer: RecommendationModelTrainer = None):
+                 model_trainer: RecommendationModelTrainer = None, bettafish_agent: BettaFishAgent = None,
+                 monitoring_service: BettaFishMonitoringService = None):
         super().__init__(parent)
 
         self.recommendation_engine = recommendation_engine
         self.model_trainer = model_trainer
+        
+        # BettaFish相关组件
+        self._bettafish_agent = bettafish_agent
+        self._monitoring_service = monitoring_service
+
+        # 配置服务
+        self._config_service = None
 
         # 用户配置
         self.user_preferences = {}
@@ -317,12 +368,13 @@ class SmartRecommendationPanel(QWidget):
         self.recommendation_types = ['stock', 'strategy', 'indicator', 'news', 'analysis']
         self.update_interval = 30  # 分钟
 
-        # 定时器
-        self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self._update_recommendations)
-        self.update_timer.start(self.update_interval * 60 * 1000)
+        # 定时器将在UI初始化后创建，避免QObject::startTimer警告
+        self.update_timer = None
 
         self.init_ui()
+
+        # 创建定时器（确保在主Qt线程中）
+        self._create_update_timer()
 
         # 初始加载推荐
         self._load_initial_recommendations()
@@ -357,6 +409,10 @@ class SmartRecommendationPanel(QWidget):
         # 反馈管理标签页
         feedback_tab = self._create_feedback_tab()
         main_tabs.addTab(feedback_tab, "反馈管理")
+
+        # BettaFish仪表板标签页
+        bettafish_tab = self._create_bettafish_dashboard_tab()
+        main_tabs.addTab(bettafish_tab, "🐠 BettaFish仪表板")
 
         layout.addWidget(main_tabs)
 
@@ -420,6 +476,10 @@ class SmartRecommendationPanel(QWidget):
         # 推荐分类标签页
         rec_tabs = QTabWidget()
 
+        # 混合推荐
+        hybrid_tab = self._create_hybrid_recommendations_tab()
+        rec_tabs.addTab(hybrid_tab, "🚀 混合推荐")
+
         # 股票推荐
         stock_tab = self._create_stock_recommendations_tab()
         rec_tabs.addTab(stock_tab, "股票推荐")
@@ -439,6 +499,337 @@ class SmartRecommendationPanel(QWidget):
         layout.addWidget(rec_tabs)
 
         return widget
+
+    def _create_hybrid_recommendations_tab(self) -> QWidget:
+        """创建混合推荐标签页"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # API配置面板
+        api_config_panel = self._create_api_config_panel()
+        layout.addWidget(api_config_panel)
+
+        # 混合推荐控制面板
+        control_panel = QFrame()
+        control_layout = QHBoxLayout(control_panel)
+
+        # 混合推荐参数设置
+        layout.addWidget(control_panel)
+
+        # 缓存管理按钮
+        cache_buttons = QFrame()
+        cache_layout = QHBoxLayout(cache_buttons)
+
+        # 预热缓存按钮
+        self.warm_cache_btn = QPushButton("预热缓存")
+        self.warm_cache_btn.clicked.connect(self._warm_hybrid_cache)
+        cache_layout.addWidget(self.warm_cache_btn)
+
+        # 清空缓存按钮
+        self.clear_cache_btn = QPushButton("清空缓存")
+        self.clear_cache_btn.clicked.connect(self._clear_hybrid_cache)
+        cache_layout.addWidget(self.clear_cache_btn)
+
+        # 获取缓存统计按钮
+        self.cache_stats_btn = QPushButton("缓存统计")
+        self.cache_stats_btn.clicked.connect(self._get_cache_statistics)
+        cache_layout.addWidget(self.cache_stats_btn)
+
+        control_layout.addWidget(cache_buttons)
+
+        # 推荐卡片滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        # 混合推荐卡片容器
+        self.hybrid_cards_widget = QWidget()
+        from PyQt5.QtWidgets import QGridLayout
+        self.hybrid_cards_layout = QGridLayout(self.hybrid_cards_widget)
+        self.hybrid_cards_layout.setSpacing(10)
+        self.hybrid_cards_layout.setContentsMargins(5, 5, 5, 5)
+        self.hybrid_cards_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)  # 卡片靠上靠左对齐
+
+        scroll_area.setWidget(self.hybrid_cards_widget)
+        layout.addWidget(scroll_area)
+
+        # 加载混合推荐
+        self._load_hybrid_recommendations()
+
+        return widget
+
+    def _create_api_config_panel(self) -> QWidget:
+        """创建API配置面板（水平布局，单行显示）"""
+        panel = QFrame()
+        panel.setFrameStyle(QFrame.StyledPanel)
+        panel.setStyleSheet("""
+            QFrame {
+                background-color: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                padding: 8px;
+                margin: 2px;
+            }
+            QLabel {
+                font-size: 11px;
+                font-weight: bold;
+                color: #2E86AB;
+            }
+            QTextEdit {
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                padding: 2px;
+                font-size: 11px;
+            }
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 4px 8px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+        
+        # 水平布局，所有元素在同一行
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(8)
+        
+        # 标题
+        title_label = QLabel("🔧 API配置:")
+        layout.addWidget(title_label)
+        
+        # API地址
+        layout.addWidget(QLabel("地址:"))
+        self.api_address_input = QTextEdit()
+        self.api_address_input.setMaximumHeight(30)
+        self.api_address_input.setMaximumWidth(200)
+        self.api_address_input.setPlaceholderText("http://localhost")
+        self.api_address_input.textChanged.connect(self._on_api_config_changed)
+        layout.addWidget(self.api_address_input)
+        
+        # 端口
+        layout.addWidget(QLabel("端口:"))
+        self.api_port_input = QTextEdit()
+        self.api_port_input.setMaximumHeight(30)
+        self.api_port_input.setMaximumWidth(80)
+        self.api_port_input.setPlaceholderText("8000")
+        self.api_port_input.textChanged.connect(self._on_api_config_changed)
+        layout.addWidget(self.api_port_input)
+        
+        # 连接测试
+        self.test_connection_btn = QPushButton("测试")
+        self.test_connection_btn.clicked.connect(self._test_api_connection)
+        layout.addWidget(self.test_connection_btn)
+        
+        self.test_connection_status_label = QLabel("未测试")
+        self.test_connection_status_label.setStyleSheet("color: #666; font-style: italic; font-size: 10px;")
+        layout.addWidget(self.test_connection_status_label)
+        
+        # 保存按钮
+        self.save_api_config_btn = QPushButton("保存")
+        self.save_api_config_btn.clicked.connect(self._save_api_config)
+        self.save_api_config_btn.setEnabled(False)  # 初始禁用，只有修改后才启用
+        layout.addWidget(self.save_api_config_btn)
+        
+        layout.addStretch()  # 右侧弹性空间
+        
+        # 加载配置
+        self._load_api_config()
+        
+        return panel
+
+    def _load_api_config(self):
+        """加载API配置"""
+        try:
+            # 从配置服务加载API地址和端口
+            config_service = self._get_config_service()
+            if config_service:
+                api_url = config_service.get('hybrid_api.url', 'http://localhost:8000')
+                api_port = config_service.get('hybrid_api.port', '8000')
+                
+                # 解析URL获取地址和端口
+                if '://' in api_url:
+                    address_part = api_url.split('://', 1)[1]
+                    if ':' in address_part:
+                        address, port = address_part.rsplit(':', 1)
+                        self.api_address_input.setPlainText(f"http://{address}")
+                        self.api_port_input.setPlainText(port)
+                    else:
+                        self.api_address_input.setPlainText(api_url)
+                        self.api_port_input.setPlainText('8000')
+                else:
+                    self.api_address_input.setPlainText(api_url)
+                    self.api_port_input.setPlainText(str(api_port))
+                
+                logger.info(f"API配置已加载: {api_url}")
+            else:
+                # 默认配置
+                self.api_address_input.setPlainText("http://localhost")
+                self.api_port_input.setPlainText("8000")
+                logger.warning("配置服务不可用，使用默认API配置")
+                
+        except Exception as e:
+            logger.error(f"加载API配置失败: {e}")
+            # 加载失败时使用默认配置
+            self.api_address_input.setPlainText("http://localhost")
+            self.api_port_input.setPlainText("8000")
+
+    def _save_api_config(self):
+        """保存API配置"""
+        try:
+            api_address = self.api_address_input.toPlainText().strip()
+            api_port = self.api_port_input.toPlainText().strip()
+            
+            # 验证输入
+            if not api_address:
+                QMessageBox.warning(self, "配置错误", "API地址不能为空")
+                return
+                
+            if not api_port:
+                QMessageBox.warning(self, "配置错误", "端口不能为空")
+                return
+                
+            # 验证端口是否为数字
+            try:
+                port_num = int(api_port)
+                if port_num <= 0 or port_num > 65535:
+                    raise ValueError("端口范围无效")
+            except ValueError:
+                QMessageBox.warning(self, "配置错误", "端口必须是1-65535之间的数字")
+                return
+            
+            # 构建完整URL
+            if not api_address.startswith(('http://', 'https://')):
+                api_address = f"http://{api_address}"
+            
+            api_url = f"{api_address}:{api_port}"
+            
+            # 保存到配置服务
+            config_service = self._get_config_service()
+            if config_service:
+                config_service.set('hybrid_api.url', api_url)
+                config_service.set('hybrid_api.port', api_port)
+                logger.info(f"API配置已保存: {api_url}")
+                
+                # 更新混合推荐worker的API地址
+                try:
+                    from gui.widgets.enhanced_ui.hybrid_recommendation_workers import update_api_base_url
+                    update_api_base_url()
+                    logger.info("混合推荐worker API地址已更新")
+                except Exception as e:
+                    logger.warning(f"更新worker API地址失败: {e}")
+                
+                # 显示成功消息
+                QMessageBox.information(self, "保存成功", f"API配置已保存:\n地址: {api_address}\n端口: {api_port}")
+                
+                # 更新保存按钮状态
+                self.save_api_config_btn.setEnabled(False)
+            else:
+                QMessageBox.warning(self, "保存失败", "配置服务不可用")
+                
+        except Exception as e:
+            logger.error(f"保存API配置失败: {e}")
+            QMessageBox.critical(self, "保存失败", f"保存配置时发生错误:\n{str(e)}")
+
+    def _test_api_connection(self):
+        """测试API连接"""
+        try:
+            api_address = self.api_address_input.toPlainText().strip()
+            api_port = self.api_port_input.toPlainText().strip()
+            
+            # 验证输入
+            if not api_address or not api_port:
+                self.test_connection_status_label.setText("请先输入完整配置")
+                self.test_connection_status_label.setStyleSheet("color: #E74C3C; font-style: italic;")
+                return
+            
+            # 构建测试URL
+            if not api_address.startswith(('http://', 'https://')):
+                api_address = f"http://{api_address}"
+            
+            test_url = f"{api_address}:{api_port}/api/hybrid/recommendation"
+            
+            # 禁用按钮并显示测试中
+            self.test_connection_btn.setEnabled(False)
+            self.test_connection_status_label.setText("测试中...")
+            self.test_connection_status_label.setStyleSheet("color: #F39C12; font-style: italic;")
+            
+            # 在后台线程中测试连接
+            from PyQt5.QtCore import QThread, pyqtSignal
+            from PyQt5.QtWidgets import QApplication
+            
+            class ConnectionTestWorker(QThread):
+                finished = pyqtSignal(bool, str)
+                
+                def __init__(self, test_url):
+                    super().__init__()
+                    self.test_url = test_url
+                    
+                def run(self):
+                    try:
+                        import requests
+                        response = requests.get(self.test_url, timeout=5)
+                        # 即使返回404，也说明服务器是可达的
+                        self.finished.emit(True, "连接成功")
+                    except requests.exceptions.ConnectionError:
+                        self.finished.emit(False, "连接被拒绝，请检查服务是否启动")
+                    except requests.exceptions.Timeout:
+                        self.finished.emit(False, "连接超时，请检查网络")
+                    except Exception as e:
+                        self.finished.emit(False, f"连接错误: {str(e)}")
+            
+            # 创建并启动测试线程
+            test_worker = ConnectionTestWorker(test_url)
+            test_worker.finished.connect(self._on_connection_test_finished)
+            test_worker.start()
+            
+        except Exception as e:
+            logger.error(f"启动连接测试失败: {e}")
+            self.test_connection_status_label.setText("测试失败")
+            self.test_connection_status_label.setStyleSheet("color: #E74C3C; font-style: italic;")
+            self.test_connection_btn.setEnabled(True)
+
+    def _on_connection_test_finished(self, success: bool, message: str):
+        """连接测试完成处理"""
+        # 恢复按钮状态
+        self.test_connection_btn.setEnabled(True)
+        
+        # 显示测试结果
+        if success:
+            self.test_connection_status_label.setText("✅ " + message)
+            self.test_connection_status_label.setStyleSheet("color: #27AE60; font-weight: bold;")
+        else:
+            self.test_connection_status_label.setText("❌ " + message)
+            self.test_connection_status_label.setStyleSheet("color: #E74C3C; font-weight: bold;")
+
+    def _on_api_config_changed(self):
+        """API配置变更处理"""
+        # 检查是否有修改
+        self.save_api_config_btn.setEnabled(True)
+
+    def _get_config_service(self):
+        """获取配置服务"""
+        try:
+            # 检查是否已经有配置服务实例
+            if hasattr(self, '_config_service') and self._config_service is not None:
+                return self._config_service
+                
+            # 尝试创建配置服务实例
+            self._config_service = ConfigService()
+            logger.info("配置服务初始化成功")
+            return self._config_service
+        except Exception as e:
+            logger.error(f"获取配置服务失败: {e}")
+            # 返回一个简单的配置管理器作为后备
+            return SimpleConfigManager()
 
     def _create_stock_recommendations_tab(self) -> QWidget:
         """创建股票推荐标签页"""
@@ -795,6 +1186,111 @@ class SmartRecommendationPanel(QWidget):
 
         return widget
 
+    def _create_bettafish_dashboard_tab(self) -> QWidget:
+        """创建BettaFish仪表板标签页"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        try:
+            # 创建BettaFish仪表板组件
+            if self._bettafish_agent:
+                self.bettafish_dashboard = BettaFishDashboard(
+                    parent=widget, 
+                    bettafish_agent=self._bettafish_agent
+                )
+            elif self._monitoring_service:
+                self.bettafish_dashboard = BettaFishDashboard(
+                    parent=widget, 
+                    monitoring_service=self._monitoring_service
+                )
+            else:
+                # 如果没有提供BettaFish相关组件，显示提示信息
+                info_frame = QFrame()
+                info_layout = QVBoxLayout(info_frame)
+                
+                info_label = QLabel("BettaFish多智能体系统未初始化")
+                info_label.setAlignment(Qt.AlignCenter)
+                info_label.setStyleSheet("font-size: 16px; color: #7F8C8D; padding: 50px;")
+                info_layout.addWidget(info_label)
+                
+                # 初始化按钮
+                init_button = QPushButton("初始化BettaFish系统")
+                init_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #3498DB;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        font-size: 14px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #2980B9;
+                    }
+                """)
+                init_button.clicked.connect(self._initialize_bettafish_system)
+                info_layout.addWidget(init_button)
+                
+                self.bettafish_dashboard = info_frame
+            
+            layout.addWidget(self.bettafish_dashboard)
+            
+        except Exception as e:
+            logger.error(f"创建BettaFish仪表板失败: {e}")
+            # 创建错误提示
+            error_frame = QFrame()
+            error_layout = QVBoxLayout(error_frame)
+            
+            error_label = QLabel(f"加载BettaFish仪表板失败:\n{str(e)}")
+            error_label.setAlignment(Qt.AlignCenter)
+            error_label.setStyleSheet("font-size: 14px; color: #E74C3C; padding: 30px;")
+            error_layout.addWidget(error_label)
+            
+            layout.addWidget(error_frame)
+            
+        return widget
+
+    def _initialize_bettafish_system(self):
+        """初始化BettaFish系统"""
+        try:
+            logger.info("正在初始化BettaFish系统...")
+            
+            # 创建BettaFish Agent
+            if not self._bettafish_agent:
+                self._bettafish_agent = BettaFishAgent()
+                logger.info("BettaFish Agent创建成功")
+            
+            # 创建监控服务
+            if not self._monitoring_service:
+                self._monitoring_service = BettaFishMonitoringService()
+                logger.info("BettaFish监控服务创建成功")
+            
+            # 重新创建仪表板
+            if hasattr(self, 'bettafish_dashboard'):
+                self.bettafish_dashboard.setParent(None)
+                
+            self.bettafish_dashboard = BettaFishDashboard(
+                parent=self,
+                bettafish_agent=self._bettafish_agent
+            )
+            
+            # 替换仪表板显示
+            main_layout = self.layout()
+            old_dashboard = None
+            for i in range(main_layout.count()):
+                widget = main_layout.itemAt(i).widget()
+                if widget and hasattr(widget, 'layout'):
+                    # 查找BettaFish仪表板标签页并替换
+                    pass
+            
+            # 简化处理：直接刷新标签页
+            QMessageBox.information(self, "成功", "BettaFish系统初始化成功！")
+            
+        except Exception as e:
+            logger.error(f"初始化BettaFish系统失败: {e}")
+            QMessageBox.critical(self, "错误", f"初始化失败: {str(e)}")
+
     def _apply_styles(self):
         """应用样式表"""
         self.setStyleSheet("""
@@ -876,6 +1372,701 @@ class SmartRecommendationPanel(QWidget):
                 background-color: transparent;
             }
         """)
+
+    def _load_hybrid_recommendations(self):
+        """加载混合推荐"""
+        try:
+            # 在UI中显示正在加载的状态
+            self._show_loading_message("正在加载混合推荐...")
+
+            # 获取当前用户ID和上下文信息
+            user_id = self._get_current_user_id()
+            context = {'category': 'all', 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            
+            # 创建推荐参数
+            params = {
+                'user_id': user_id,
+                'context': context,
+                'stock_codes': []
+            }
+            
+            # 创建后台任务加载混合推荐
+            from PyQt5.QtCore import QThreadPool
+            self.hybrid_worker = HybridRecommendationWorker(params)
+            self.hybrid_worker.signals.recommendations_ready.connect(self._display_hybrid_recommendations)
+            self.hybrid_worker.signals.error_occurred.connect(self._handle_hybrid_error)
+            self.hybrid_worker.signals.finished.connect(lambda: logger.info("混合推荐加载完成"))
+            
+            # 使用线程池执行任务
+            QThreadPool.globalInstance().start(self.hybrid_worker)
+
+        except Exception as e:
+            logger.error(f"加载混合推荐失败: {e}")
+            self._show_error_message(f"加载混合推荐失败: {str(e)}")
+
+    def _show_loading_message(self, message):
+        """显示加载消息"""
+        # 清空卡片容器
+        self._clear_layout(self.hybrid_cards_layout)
+        
+        # 创建加载消息卡片
+        loading_widget = QWidget()
+        loading_layout = QVBoxLayout(loading_widget)
+        loading_layout.setAlignment(Qt.AlignCenter)
+        
+        loading_label = QLabel(message)
+        loading_label.setAlignment(Qt.AlignCenter)
+        loading_label.setStyleSheet("font-size: 16px; color: #7F8C8D; font-weight: bold;")
+        
+        # 添加旋转动画效果
+        loading_movie = QMovie(":/loading.gif")
+        loading_movie.setScaledSize(QSize(50, 50))
+        loading_label.setMovie(loading_movie)
+        loading_movie.start()
+        
+        loading_layout.addWidget(loading_label)
+        self.hybrid_cards_layout.addWidget(loading_widget, 0, 0, Qt.AlignCenter)
+
+    def _show_error_message(self, message):
+        """显示错误消息"""
+        # 清空卡片容器
+        self._clear_layout(self.hybrid_cards_layout)
+        
+        # 创建错误消息卡片
+        error_widget = QWidget()
+        error_layout = QVBoxLayout(error_widget)
+        error_layout.setAlignment(Qt.AlignCenter)
+        
+        error_label = QLabel(f"❌ {message}")
+        error_label.setAlignment(Qt.AlignCenter)
+        error_label.setStyleSheet("font-size: 16px; color: #E74C3C; font-weight: bold;")
+        
+        # 添加重试按钮
+        retry_btn = QPushButton("重试")
+        retry_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498DB;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2980B9;
+            }
+        """)
+        retry_btn.clicked.connect(self._load_hybrid_recommendations)
+        
+        error_layout.addWidget(error_label)
+        error_layout.addWidget(retry_btn)
+        
+        self.hybrid_cards_layout.addWidget(error_widget, 0, 0, Qt.AlignCenter)
+
+    def _clear_layout(self, layout):
+        """清空布局"""
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+    def _display_hybrid_recommendations(self, recommendations):
+        """显示混合推荐结果"""
+        try:
+            # 清空之前的推荐卡片
+            self._clear_layout(self.hybrid_cards_layout)
+            
+            # 如果没有推荐结果，显示空状态
+            if not recommendations:
+                empty_widget = QWidget()
+                empty_layout = QVBoxLayout(empty_widget)
+                empty_layout.setAlignment(Qt.AlignCenter)
+                
+                empty_label = QLabel("暂无混合推荐结果")
+                empty_label.setAlignment(Qt.AlignCenter)
+                empty_label.setStyleSheet("font-size: 16px; color: #7F8C8D; font-weight: bold;")
+                
+                # 添加获取推荐按钮
+                get_recommendations_btn = QPushButton("获取推荐")
+                get_recommendations_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #3498DB;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #2980B9;
+                    }
+                """)
+                get_recommendations_btn.clicked.connect(self._load_hybrid_recommendations)
+                
+                empty_layout.addWidget(empty_label)
+                empty_layout.addWidget(get_recommendations_btn)
+                
+                self.hybrid_cards_layout.addWidget(empty_widget, 0, 0, Qt.AlignCenter)
+                return
+            
+            # 创建推荐卡片
+            row, col = 0, 0
+            for recommendation in recommendations:
+                # 转换推荐数据格式为卡片所需格式
+                card_data = {
+                    'title': recommendation.get('title', '未知推荐'),
+                    'description': recommendation.get('description', ''),
+                    'score': recommendation.get('score', 0.0),
+                    'type': 'hybrid',
+                    'source': recommendation.get('source', 'unknown'),
+                    'data': recommendation
+                }
+                
+                # 创建推荐卡片
+                card = RecommendationCard(card_data)
+                card.card_clicked.connect(self._on_hybrid_card_clicked)
+                card.action_clicked.connect(self._on_hybrid_action_clicked)
+                
+                # 添加到网格布局
+                self.hybrid_cards_layout.addWidget(card, row, col)
+                
+                # 更新网格位置
+                col += 1
+                if col >= 4:  # 每行最多4个卡片
+                    col = 0
+                    row += 1
+            
+            logger.info(f"显示了 {len(recommendations)} 个混合推荐结果")
+            
+        except Exception as e:
+            logger.error(f"显示混合推荐结果失败: {e}")
+            self._show_error_message(f"显示混合推荐结果失败: {str(e)}")
+
+    def _handle_hybrid_error(self, error_message):
+        """处理混合推荐错误"""
+        logger.error(f"混合推荐加载失败: {error_message}")
+        self._show_error_message(error_message)
+
+    def _on_hybrid_card_clicked(self, recommendation_data):
+        """处理混合推荐卡片点击"""
+        logger.info(f"用户点击了混合推荐: {recommendation_data.get('title', '未知')}")
+        
+        # 发出推荐选择信号
+        self.recommendation_selected.emit(recommendation_data)
+        
+        # TODO: 实现更详细的推荐信息显示逻辑
+        
+    def _on_hybrid_action_clicked(self, action, recommendation_data):
+        """处理混合推荐操作按钮点击"""
+        logger.info(f"用户对混合推荐执行了操作: {action}")
+        
+        # 根据操作类型执行不同逻辑
+        if action == "view_detail":
+            # 显示推荐详情
+            self._show_recommendation_detail(recommendation_data)
+            
+            # 记录用户行为
+            self._record_user_interaction("view_detail", recommendation_data)
+    
+    def _show_recommendation_detail(self, recommendation_data):
+        """显示推荐详情"""
+        # TODO: 实现推荐详情弹窗或详情页面
+        
+    def _record_user_interaction(self, action, recommendation_data):
+        """记录用户交互"""
+        # TODO: 实现用户交互记录逻辑
+        
+    def _warm_hybrid_cache(self):
+        """预热混合推荐缓存"""
+        try:
+            # 显示预热状态
+            self.warm_cache_btn.setEnabled(False)
+            self.warm_cache_btn.setText("正在预热...")
+            
+            # 获取当前用户ID和上下文信息
+            user_id = self._get_current_user_id()
+            context = {'category': 'all', 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            
+            # 创建预热参数
+            params = {
+                'user_id': user_id,
+                'context': context,
+                'stock_codes': []
+            }
+            
+            # 创建后台任务预热缓存
+            from PyQt5.QtCore import QThreadPool
+            self.cache_warmup_worker = CacheWarmupWorker(params)
+            self.cache_warmup_worker.signals.success.connect(self._on_cache_warmup_success)
+            self.cache_warmup_worker.signals.error_occurred.connect(self._on_cache_warmup_error)
+            self.cache_warmup_worker.signals.finished.connect(lambda: logger.info("缓存预热完成"))
+            
+            # 使用线程池执行任务
+            QThreadPool.globalInstance().start(self.cache_warmup_worker)
+            
+        except Exception as e:
+            logger.error(f"预热缓存失败: {e}")
+            self._on_cache_warmup_error(str(e))
+            
+    def _clear_hybrid_cache(self):
+        """清空混合推荐缓存"""
+        try:
+            # 显示清空状态
+            self.clear_cache_btn.setEnabled(False)
+            self.clear_cache_btn.setText("正在清空...")
+            
+            # 创建后台任务清空缓存
+            from PyQt5.QtCore import QThreadPool
+            self.cache_clear_worker = CacheClearWorker()
+            self.cache_clear_worker.signals.success.connect(self._on_cache_clear_success)
+            self.cache_clear_worker.signals.error_occurred.connect(self._on_cache_clear_error)
+            self.cache_clear_worker.signals.finished.connect(lambda: logger.info("缓存清空完成"))
+            
+            # 使用线程池执行任务
+            QThreadPool.globalInstance().start(self.cache_clear_worker)
+            
+        except Exception as e:
+            logger.error(f"清空缓存失败: {e}")
+            self._on_cache_clear_error(str(e))
+            
+    def _get_cache_statistics(self):
+        """获取缓存统计信息"""
+        try:
+            # 显示获取状态
+            self.cache_stats_btn.setEnabled(False)
+            self.cache_stats_btn.setText("正在获取...")
+            
+            # 创建后台任务获取缓存统计
+            from PyQt5.QtCore import QThreadPool
+            self.cache_stats_worker = CacheStatsWorker()
+            self.cache_stats_worker.signals.success.connect(self._on_cache_stats_success)
+            self.cache_stats_worker.signals.error_occurred.connect(self._on_cache_stats_error)
+            self.cache_stats_worker.signals.finished.connect(lambda: logger.info("缓存统计获取完成"))
+            
+            # 使用线程池执行任务
+            QThreadPool.globalInstance().start(self.cache_stats_worker)
+            
+        except Exception as e:
+            logger.error(f"获取缓存统计失败: {e}")
+            self._on_cache_stats_error(str(e))
+            
+    def _on_cache_warmup_success(self, message):
+        """缓存预热完成"""
+        logger.info(f"缓存预热完成: {message}")
+        
+        # 恢复按钮状态
+        self.warm_cache_btn.setEnabled(True)
+        self.warm_cache_btn.setText("预热缓存")
+        
+        # 显示成功消息
+        self._show_message("缓存预热成功", "success")
+        
+    def _on_cache_warmup_error(self, error_message):
+        """缓存预热错误"""
+        logger.error(f"缓存预热失败: {error_message}")
+        
+        # 恢复按钮状态
+        self.warm_cache_btn.setEnabled(True)
+        self.warm_cache_btn.setText("预热缓存")
+        
+        # 显示错误消息
+        self._show_message(f"缓存预热失败: {error_message}", "error")
+        
+    def _on_cache_clear_success(self, message):
+        """缓存清空完成"""
+        logger.info(f"缓存清空完成: {message}")
+        
+        # 恢复按钮状态
+        self.clear_cache_btn.setEnabled(True)
+        self.clear_cache_btn.setText("清空缓存")
+        
+        # 显示成功消息
+        self._show_message("缓存清空成功", "success")
+        
+    def _on_cache_clear_error(self, error_message):
+        """缓存清空错误"""
+        logger.error(f"缓存清空失败: {error_message}")
+        
+        # 恢复按钮状态
+        self.clear_cache_btn.setEnabled(True)
+        self.clear_cache_btn.setText("清空缓存")
+        
+        # 显示错误消息
+        self._show_message(f"缓存清空失败: {error_message}", "error")
+        
+    def _on_cache_stats_success(self, message):
+        """缓存统计获取完成"""
+        logger.info(f"缓存统计获取完成: {message}")
+        
+        # 恢复按钮状态
+        self.cache_stats_btn.setEnabled(True)
+        self.cache_stats_btn.setText("缓存统计")
+        
+        # 获取统计数据
+        if hasattr(self, 'cache_stats_worker'):
+            stats = self.cache_stats_worker.get_stats_data()
+            if stats:
+                self._show_cache_statistics(stats)
+            else:
+                self._show_message("缓存统计获取成功，但无统计数据", "info")
+        else:
+            self._show_message("缓存统计获取成功", "success")
+        
+    def _on_cache_stats_error(self, error_message):
+        """缓存统计获取错误"""
+        logger.error(f"获取缓存统计失败: {error_message}")
+        
+        # 恢复按钮状态
+        self.cache_stats_btn.setEnabled(True)
+        self.cache_stats_btn.setText("缓存统计")
+        
+        # 显示错误消息
+        self._show_message(f"获取缓存统计失败: {error_message}", "error")
+        
+    def _show_message(self, message, message_type="info"):
+        """显示消息提示
+        
+        Args:
+            message: 消息内容
+            message_type: 消息类型 ("info", "success", "warning", "error", "question")
+        """
+        try:
+            from PyQt5.QtWidgets import QMessageBox
+            
+            if message_type == "info":
+                self.show_info_message("信息", message)
+            elif message_type == "success":
+                self.show_info_message("成功", message)
+            elif message_type == "warning":
+                self.show_warning_message("警告", message)
+            elif message_type == "error":
+                self.show_error_message("错误", message)
+            elif message_type == "question":
+                result = self.show_question_message("确认", message)
+                return result
+            else:
+                # 默认使用信息框
+                self.show_info_message("信息", message)
+                
+        except Exception as e:
+            # 如果消息框显示失败，记录到日志
+            logger.error(f"显示消息提示失败: {e}")
+            # 退回到控制台输出
+            logger.info(f"[{message_type}] {message}")
+
+    def show_info_message(self, title: str, message: str, parent=None) -> int:
+        """显示信息消息框
+        
+        Args:
+            title: 对话框标题
+            message: 消息内容
+            parent: 父窗口
+            
+        Returns:
+            int: 用户选择结果
+        """
+        if parent is None:
+            parent = self
+
+        msg_box = QMessageBox(parent)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+
+        # 应用样式
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: white;
+                font-size: 12px;
+            }
+            QMessageBox QPushButton {
+                background-color: #1976D2;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                min-width: 80px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #1565C0;
+            }
+        """)
+
+        return msg_box.exec_()
+
+    def show_warning_message(self, title: str, message: str, parent=None) -> int:
+        """显示警告消息框"""
+        if parent is None:
+            parent = self
+
+        msg_box = QMessageBox(parent)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: white;
+                font-size: 12px;
+            }
+            QMessageBox QPushButton {
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                min-width: 80px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #F57C00;
+            }
+        """)
+
+        return msg_box.exec_()
+
+    def show_error_message(self, title: str, message: str, parent=None) -> int:
+        """显示错误消息框"""
+        if parent is None:
+            parent = self
+
+        msg_box = QMessageBox(parent)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: white;
+                font-size: 12px;
+            }
+            QMessageBox QPushButton {
+                background-color: #F44336;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                min-width: 80px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #D32F2F;
+            }
+        """)
+
+        return msg_box.exec_()
+
+    def show_question_message(self, title: str, message: str, parent=None) -> int:
+        """显示询问消息框
+
+        Returns:
+            int: QMessageBox.Yes 或 QMessageBox.No
+        """
+        if parent is None:
+            parent = self
+
+        msg_box = QMessageBox(parent)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: white;
+                font-size: 12px;
+            }
+            QMessageBox QPushButton {
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                min-width: 80px;
+            }
+            QMessageBox QPushButton[text="Yes"] {
+                background-color: #4CAF50;
+            }
+            QMessageBox QPushButton[text="Yes"]:hover {
+                background-color: #45A049;
+            }
+            QMessageBox QPushButton[text="No"] {
+                background-color: #F44336;
+            }
+            QMessageBox QPushButton[text="No"]:hover {
+                background-color: #D32F2F;
+            }
+        """)
+
+        return msg_box.exec_()
+        
+    def _show_cache_statistics(self, stats):
+        """显示缓存统计信息
+        
+        Args:
+            stats: 缓存统计数据字典
+        """
+        try:
+            # QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QScrollArea 已在顶部导入
+            from PyQt5.QtCore import Qt
+            
+            # 创建对话框
+            dialog = QDialog(self)
+            dialog.setWindowTitle("缓存统计信息")
+            dialog.setFixedSize(500, 400)
+            dialog.setModal(True)
+            
+            # 主布局
+            main_layout = QVBoxLayout(dialog)
+            main_layout.setSpacing(10)
+            
+            # 标题
+            title_label = QLabel("缓存统计信息")
+            title_label.setFont(QFont("Arial", 14, QFont.Bold))
+            title_label.setAlignment(Qt.AlignCenter)
+            title_label.setStyleSheet("color: #1976D2; margin: 10px;")
+            main_layout.addWidget(title_label)
+            
+            # 创建滚动区域
+            scroll_area = QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            main_layout.addWidget(scroll_area)
+            
+            # 内容容器
+            content_widget = QWidget()
+            content_layout = QVBoxLayout(content_widget)
+            content_layout.setSpacing(8)
+            
+            # 如果没有统计数据
+            if not stats:
+                no_data_label = QLabel("暂无缓存统计数据")
+                no_data_label.setAlignment(Qt.AlignCenter)
+                no_data_label.setStyleSheet("color: #7F8C8D; font-style: italic; padding: 20px;")
+                content_layout.addWidget(no_data_label)
+            else:
+                # 添加统计信息
+                for key, value in stats.items():
+                    # 格式化键名
+                    formatted_key = key.replace('_', ' ').title()
+                    
+                    # 创建统计项
+                    item_layout = QHBoxLayout()
+                    
+                    key_label = QLabel(f"{formatted_key}:")
+                    key_label.setMinimumWidth(120)
+                    key_label.setFont(QFont("Arial", 10, QFont.Bold))
+                    
+                    value_label = QLabel(str(value))
+                    value_label.setFont(QFont("Arial", 10))
+                    value_label.setStyleSheet("color: #2C3E50;")
+                    
+                    # 根据数据类型设置颜色
+                    if isinstance(value, (int, float)):
+                        if 'size' in key.lower() or 'count' in key.lower():
+                            value_label.setStyleSheet("color: #E67E22; font-weight: bold;")
+                        elif 'rate' in key.lower() or 'hit' in key.lower():
+                            value_label.setStyleSheet("color: #27AE60; font-weight: bold;")
+                        elif 'error' in key.lower() or 'fail' in key.lower():
+                            value_label.setStyleSheet("color: #E74C3C; font-weight: bold;")
+                    
+                    item_layout.addWidget(key_label)
+                    item_layout.addWidget(value_label)
+                    item_layout.addStretch()
+                    
+                    # 添加分隔线
+                    if list(stats.keys()).index(key) < len(stats) - 1:
+                        separator = QLabel()
+                        separator.setFixedHeight(1)
+                        separator.setStyleSheet("background-color: #E0E0E0; margin: 5px 0px;")
+                        content_layout.addWidget(separator)
+                    
+                    content_layout.addLayout(item_layout)
+            
+            # 添加刷新时间
+            refresh_time = QLabel(f"更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            refresh_time.setStyleSheet("color: #95A5A6; font-size: 9px; margin-top: 10px;")
+            refresh_time.setAlignment(Qt.AlignRight)
+            content_layout.addWidget(refresh_time)
+            
+            scroll_area.setWidget(content_widget)
+            
+            # 按钮区域
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+            
+            refresh_btn = QPushButton("刷新")
+            refresh_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #3498DB;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    min-width: 80px;
+                }
+                QPushButton:hover {
+                    background-color: #2980B9;
+                }
+            """)
+            refresh_btn.clicked.connect(lambda: self._refresh_cache_statistics(dialog))
+            
+            close_btn = QPushButton("关闭")
+            close_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #95A5A6;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    min-width: 80px;
+                }
+                QPushButton:hover {
+                    background-color: #7F8C8D;
+                }
+            """)
+            close_btn.clicked.connect(dialog.accept)
+            
+            button_layout.addWidget(refresh_btn)
+            button_layout.addWidget(close_btn)
+            main_layout.addLayout(button_layout)
+            
+            # 显示对话框
+            dialog.exec_()
+            
+        except Exception as e:
+            logger.error(f"显示缓存统计信息失败: {e}")
+            self._show_message(f"显示缓存统计信息失败: {str(e)}", "error")
+    
+    def _refresh_cache_statistics(self, dialog):
+        """刷新缓存统计信息
+        
+        Args:
+            dialog: 统计信息对话框
+        """
+        try:
+            # 关闭当前对话框
+            dialog.accept()
+            
+            # 重新获取缓存统计
+            self._get_cache_statistics()
+            
+        except Exception as e:
+            logger.error(f"刷新缓存统计失败: {e}")
+            self._show_message(f"刷新缓存统计失败: {str(e)}", "error")
+
+    def _get_current_user_id(self) -> str:
+        """获取当前用户ID"""
+        # TODO: 实现获取当前用户ID的逻辑
+        return "user_1"
+
+    def _create_update_timer(self):
+        """创建更新定时器（确保在主Qt线程中创建）"""
+        if self.update_timer is None:
+            self.update_timer = QTimer()
+            self.update_timer.timeout.connect(self._update_recommendations)
+            self.update_timer.start(self.update_interval * 60 * 1000)
+            logger.debug("定时器创建成功，避免QObject::startTimer警告")
 
     def _load_initial_recommendations(self):
         """加载初始推荐（使用真实推荐引擎）"""
@@ -1516,10 +2707,14 @@ class SmartRecommendationPanel(QWidget):
         self.update_interval = interval
 
         if interval > 0:
+            # 确保定时器已创建
+            if self.update_timer is None:
+                self._create_update_timer()
             self.update_timer.setInterval(interval * 60 * 1000)
             self.update_timer.start()
         else:
-            self.update_timer.stop()
+            if self.update_timer is not None:
+                self.update_timer.stop()
 
         logger.debug(f"推荐更新频率已调整为: {frequency}")
 

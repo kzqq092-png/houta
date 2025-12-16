@@ -105,6 +105,58 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
         """获取指标元数据"""
         return self._metadata_cache.get(indicator_name.upper())
 
+    def validate_parameters(self, indicator_name: str, parameters: Dict[str, Any]) -> Tuple[bool, str]:
+        """验证指标参数"""
+        indicator_name = indicator_name.upper()
+        
+        # 检查指标是否支持
+        if indicator_name not in self.get_supported_indicators():
+            return False, f"不支持的指标: {indicator_name}"
+        
+        # 基础参数验证
+        try:
+            # 验证通用数值参数
+            for param_name, param_value in parameters.items():
+                if isinstance(param_value, (int, float)):
+                    if not np.isfinite(param_value):
+                        return False, f"参数 {param_name} 必须是有限的数值"
+            
+            # 特殊指标的特殊验证
+            if indicator_name in ['SMA', 'EMA', 'WMA', 'RSI', 'ATR']:
+                length = parameters.get('length', 10)
+                if not isinstance(length, int) or length <= 0 or length > 10000:
+                    return False, "length参数必须是1-10000之间的正整数"
+            
+            elif indicator_name == 'MACD':
+                fast = parameters.get('fast', 12)
+                slow = parameters.get('slow', 26)
+                signal = parameters.get('signal', 9)
+                if not all(isinstance(x, int) and x > 0 for x in [fast, slow, signal]):
+                    return False, "MACD参数必须是正整数"
+                if fast >= slow:
+                    return False, "MACD快线周期必须小于慢线周期"
+            
+            elif indicator_name == 'ADOSC':
+                fast = parameters.get('fast', 3)
+                slow = parameters.get('slow', 10)
+                if not all(isinstance(x, int) and x > 0 for x in [fast, slow]):
+                    return False, "ADOSC参数必须是正整数"
+                if fast >= slow:
+                    return False, "ADOSC快线周期必须小于慢线周期"
+            
+            elif indicator_name == 'BBANDS':
+                length = parameters.get('length', 20)
+                std = parameters.get('std', 2.0)
+                if not isinstance(length, int) or length <= 0 or length > 1000:
+                    return False, "length参数必须是1-1000之间的正整数"
+                if not isinstance(std, (int, float)) or std <= 0 or std > 10:
+                    return False, "std参数必须是0.1-10之间的正数"
+            
+            return True, ""
+            
+        except Exception as e:
+            return False, f"参数验证失败: {e}"
+
     def calculate_indicator(self, indicator_name: str, kline_data: StandardKlineData,
                             params: Dict[str, Any], context: IndicatorCalculationContext) -> StandardIndicatorResult:
         """计算单个指标"""
@@ -142,7 +194,9 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
                     'timeframe': context.timeframe,
                     'parameters': params.copy(),
                     'data_points': len(result_df)
-                }
+                },
+                calculation_time_ms=calculation_time,
+                parameters=params.copy()
             )
 
         except Exception as e:
@@ -391,35 +445,169 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
         """将pandas-ta指标结果转换为DataFrame"""
         try:
             if isinstance(result_data, pd.DataFrame):
-                # 已经是DataFrame，直接返回
-                return result_data
+                # 已经是DataFrame，直接返回，但需要验证数据
+                return self._validate_and_clean_dataframe(result_data, indicator_name)
 
             elif isinstance(result_data, pd.Series):
-                # Series转换为DataFrame
-                return pd.DataFrame({'value': result_data})
+                # Series转换为DataFrame，但需要验证数据
+                df = pd.DataFrame({'value': result_data})
+                return self._validate_and_clean_dataframe(df, indicator_name)
 
             elif isinstance(result_data, dict):
-                # 字典转换为DataFrame
-                return pd.DataFrame(result_data)
+                # 字典转换为DataFrame，但需要验证数据
+                df = pd.DataFrame(result_data)
+                return self._validate_and_clean_dataframe(df, indicator_name)
 
             elif isinstance(result_data, (list, tuple, np.ndarray)):
-                # 数组转换为DataFrame
+                # 数组转换为DataFrame，但需要验证数据
                 if len(result_data) > 0 and isinstance(result_data[0], pd.Series):
                     # 多个Series
                     data_dict = {f'output_{i}': series for i, series in enumerate(result_data)}
-                    return pd.DataFrame(data_dict)
+                    df = pd.DataFrame(data_dict)
+                    return self._validate_and_clean_dataframe(df, indicator_name)
                 else:
-                    # 单个数组
-                    return pd.DataFrame({'value': result_data})
+                    # 单个数组，需要先验证数组内容
+                    cleaned_data = self._clean_numeric_array(result_data)
+                    df = pd.DataFrame({'value': cleaned_data})
+                    return self._validate_and_clean_dataframe(df, indicator_name)
 
             else:
-                # 其他类型，尝试转换
-                return pd.DataFrame({'value': [result_data]})
+                # 其他类型，尝试转换但先验证
+                try:
+                    if isinstance(result_data, str):
+                        # 尝试解析字符串为数值
+                        cleaned_value = self._clean_numeric_value(result_data)
+                        return pd.DataFrame({'value': [cleaned_value]})
+                    else:
+                        return pd.DataFrame({'value': [result_data]})
+                except Exception as e:
+                    logger.warning(f"无法转换值类型 {type(result_data)} 到数值: {result_data}")
+                    return pd.DataFrame({'value': [np.nan]})
 
         except Exception as e:
             logger.error(f"转换pandas-ta结果到DataFrame失败: {e}")
-            # 返回空DataFrame
+            # 返回空DataFrame，但确保有合适的索引
             return pd.DataFrame()
+
+    def _validate_and_clean_dataframe(self, df: pd.DataFrame, indicator_name: str) -> pd.DataFrame:
+        """验证和清理DataFrame数据"""
+        try:
+            if df.empty:
+                return df
+            
+            # 检查并清理每列的数据
+            for column in df.columns:
+                if df[column].dtype == 'object':
+                    # 对于字符串列，尝试转换为数值
+                    df[column] = df[column].apply(self._safe_convert_to_numeric)
+                elif df[column].dtype in ['float64', 'int64', 'float32', 'int32']:
+                    # 数值列，清理无效值
+                    df[column] = df[column].replace([np.inf, -np.inf], np.nan)
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"验证和清理DataFrame失败 {indicator_name}: {e}")
+            return pd.DataFrame()
+
+    def _clean_numeric_array(self, data: Any) -> np.ndarray:
+        """清理数值数组中的无效数据"""
+        try:
+            if isinstance(data, (list, tuple)):
+                # 清理列表数据
+                cleaned = []
+                for item in data:
+                    try:
+                        cleaned_item = self._clean_numeric_value(item)
+                        cleaned.append(cleaned_item)
+                    except (ValueError, TypeError):
+                        cleaned.append(np.nan)
+                return np.array(cleaned)
+            elif isinstance(data, np.ndarray):
+                # 处理numpy数组
+                if data.dtype.kind in ['U', 'S']:  # Unicode or Byte strings
+                    # 字符串数组，转换为数值
+                    return np.array([self._safe_convert_to_numeric(item) for item in data])
+                else:
+                    # 数值数组，清理无效值
+                    cleaned = data.astype(float)
+                    cleaned[~np.isfinite(cleaned)] = np.nan
+                    return cleaned
+            else:
+                return np.array([np.nan])
+        except Exception as e:
+            logger.warning(f"清理数值数组失败: {e}")
+            return np.array([np.nan])
+
+    def _clean_numeric_value(self, value: Any) -> float:
+        """清理单个数值，处理字符串和异常情况"""
+        try:
+            if isinstance(value, str):
+                # 检查是否包含重复模式
+                if len(value) > 10 and value == value[0:6] * (len(value) // 6):
+                    # 检测到重复字符串，返回NaN
+                    logger.warning(f"检测到重复字符串模式: {value[:20]}...")
+                    return np.nan
+                
+                # 尝试转换为浮点数
+                try:
+                    return float(value)
+                except ValueError:
+                    # 如果包含非数字字符，尝试提取数字
+                    import re
+                    numbers = re.findall(r'[-+]?\d*\.?\d+', value)
+                    if numbers:
+                        return float(numbers[0])
+                    else:
+                        logger.warning(f"无法从字符串提取数值: {value}")
+                        return np.nan
+            
+            elif isinstance(value, (int, float)):
+                if np.isfinite(value):
+                    return float(value)
+                else:
+                    return np.nan
+            
+            else:
+                logger.warning(f"不支持的值类型: {type(value)}")
+                return np.nan
+                
+        except Exception as e:
+            logger.warning(f"清理数值失败 {value}: {e}")
+            return np.nan
+
+    def _safe_convert_to_numeric(self, value: Any) -> Any:
+        """安全地转换值为数值类型"""
+        try:
+            if pd.isna(value) or value is None:
+                return np.nan
+            
+            if isinstance(value, (int, float)):
+                return value if np.isfinite(value) else np.nan
+            
+            if isinstance(value, str):
+                # 检查重复字符串模式
+                if len(value) > 10 and value == value[0:6] * (len(value) // 6):
+                    logger.warning(f"检测到重复字符串模式: {value[:20]}...")
+                    return np.nan
+                
+                # 尝试直接转换
+                try:
+                    return float(value)
+                except ValueError:
+                    # 使用正则表达式提取数字
+                    import re
+                    numbers = re.findall(r'[-+]?\d*\.?\d+', value)
+                    if numbers:
+                        return float(numbers[0])
+                    else:
+                        return np.nan
+            
+            return np.nan
+            
+        except Exception as e:
+            logger.debug(f"安全转换数值失败: {value} -> {e}")
+            return np.nan
 
     def _initialize_metadata(self):
         """初始化指标元数据"""
@@ -430,11 +618,10 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
             description='简单移动平均线，计算指定周期内的平均价格',
             category=IndicatorCategory.TREND,
             parameters=[
-                ParameterDef('length', ParameterType.INTEGER, 10, '长度', 1, 1000)
+                ParameterDef('length', ParameterType.INTEGER, 10, 1, 1000, '移动平均周期')
             ],
             output_columns=['value'],
-            tags=['trend', 'moving_average', 'basic'],
-            source='pandas-ta'
+            tags=['trend', 'moving_average', 'basic']
         )
 
         self._metadata_cache['EMA'] = IndicatorMetadata(
@@ -443,11 +630,10 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
             description='指数移动平均线，对近期价格赋予更高权重',
             category=IndicatorCategory.TREND,
             parameters=[
-                ParameterDef('length', ParameterType.INTEGER, 10, '长度', 1, 1000)
+                ParameterDef('length', ParameterType.INTEGER, 10, 1, 1000, '移动平均周期')
             ],
             output_columns=['value'],
-            tags=['trend', 'exponential', 'moving_average'],
-            source='pandas-ta'
+            tags=['trend', 'exponential', 'moving_average']
         )
 
         self._metadata_cache['MACD'] = IndicatorMetadata(
@@ -456,13 +642,12 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
             description='MACD指标，用于判断趋势变化和买卖信号',
             category=IndicatorCategory.MOMENTUM,
             parameters=[
-                ParameterDef('fast', ParameterType.INTEGER, 12, '快线周期', 1, 100),
-                ParameterDef('slow', ParameterType.INTEGER, 26, '慢线周期', 1, 200),
-                ParameterDef('signal', ParameterType.INTEGER, 9, '信号线周期', 1, 50)
+                ParameterDef('fast', ParameterType.INTEGER, 12, 1, 100, '快线周期'),
+                ParameterDef('slow', ParameterType.INTEGER, 26, 1, 200, '慢线周期'),
+                ParameterDef('signal', ParameterType.INTEGER, 9, 1, 50, '信号线周期')
             ],
             output_columns=['MACD_12_26_9', 'MACDh_12_26_9', 'MACDs_12_26_9'],
-            tags=['momentum', 'oscillator', 'classic'],
-            source='pandas-ta'
+            tags=['momentum', 'oscillator', 'classic']
         )
 
         self._metadata_cache['RSI'] = IndicatorMetadata(
@@ -471,11 +656,10 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
             description='RSI指标，衡量价格变动的速度和变化，识别超买超卖',
             category=IndicatorCategory.MOMENTUM,
             parameters=[
-                ParameterDef('length', ParameterType.INTEGER, 14, '长度', 1, 100)
+                ParameterDef('length', ParameterType.INTEGER, 14, 1, 100, 'RSI周期')
             ],
             output_columns=['value'],
-            tags=['momentum', 'oscillator', 'overbought_oversold'],
-            source='pandas-ta'
+            tags=['momentum', 'oscillator', 'overbought_oversold']
         )
 
         self._metadata_cache['BBANDS'] = IndicatorMetadata(
@@ -484,12 +668,11 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
             description='布林带指标，基于标准差的价格通道指标',
             category=IndicatorCategory.VOLATILITY,
             parameters=[
-                ParameterDef('length', ParameterType.INTEGER, 5, '长度', 1, 100),
-                ParameterDef('std', ParameterType.FLOAT, 2.0, '标准差倍数', 0.1, 5.0)
+                ParameterDef('length', ParameterType.INTEGER, 5, 1, 100, '移动平均周期'),
+                ParameterDef('std', ParameterType.FLOAT, 2.0, 0.1, 5.0, '标准差倍数')
             ],
             output_columns=['BBL_5_2.0', 'BBM_5_2.0', 'BBU_5_2.0', 'BBB_5_2.0', 'BBP_5_2.0'],
-            tags=['volatility', 'bands', 'channel'],
-            source='pandas-ta'
+            tags=['volatility', 'bands', 'channel']
         )
 
         self._metadata_cache['ATR'] = IndicatorMetadata(
@@ -498,11 +681,10 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
             description='ATR指标，衡量价格波动的强度',
             category=IndicatorCategory.VOLATILITY,
             parameters=[
-                ParameterDef('length', ParameterType.INTEGER, 14, '长度', 1, 100)
+                ParameterDef('length', ParameterType.INTEGER, 14, 1, 100, 'ATR周期')
             ],
             output_columns=['value'],
-            tags=['volatility', 'range', 'risk'],
-            source='pandas-ta'
+            tags=['volatility', 'range', 'risk']
         )
 
         self._metadata_cache['OBV'] = IndicatorMetadata(
@@ -512,8 +694,7 @@ class PandasTAIndicatorsPlugin(IIndicatorPlugin):
             category=IndicatorCategory.VOLUME,
             parameters=[],
             output_columns=['value'],
-            tags=['volume', 'accumulation', 'distribution'],
-            source='pandas-ta'
+            tags=['volume', 'accumulation', 'distribution']
         )
 
         # 添加更多指标元数据...

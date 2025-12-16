@@ -10,6 +10,7 @@ import asyncio
 import threading
 import time
 import contextlib
+import json
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -368,19 +369,22 @@ class DatabaseService(BaseService):
             # 3. 初始化资产数据库管理器
             self._initialize_asset_managers()
 
-            # 4. 初始化分析数据库
-            self._initialize_analytics_db()
-
-            # 5. 创建默认连接池
+            # 4. 创建默认连接池（必须在其他初始化之前）
             self._create_default_pools()
 
-            # 6. 初始化性能优化器
+            # 5. 初始化分析数据库
+            self._initialize_analytics_db()
+
+            # 6. 初始化AI选股相关数据表
+            self._initialize_ai_tables()
+
+            # 7. 初始化性能优化器
             self._initialize_performance_optimizers()
 
-            # 7. 启动后台任务
+            # 8. 启动后台任务
             self._start_background_tasks()
 
-            # 8. 验证数据库连接
+            # 9. 验证数据库连接
             self._validate_database_connections()
 
             logger.info("✅ DatabaseService initialized successfully with full database management capabilities")
@@ -1136,6 +1140,563 @@ class DatabaseService(BaseService):
         except Exception as e:
             logger.error(f"Error disposing DatabaseService: {e}")
 
+    def _initialize_ai_tables(self) -> None:
+        """初始化AI选股相关数据表"""
+        try:
+            logger.info("Initializing AI selection database tables...")
+
+            # 创建AI选股策略表
+            self._create_ai_strategy_table()
+            
+            # 创建AI选股结果表
+            self._create_ai_selection_results_table()
+            
+            # 创建AI策略回测结果表
+            self._create_ai_backtest_results_table()
+            
+            # 创建AI选股解释表
+            self._create_ai_explanations_table()
+            
+            # 创建用户画像表
+            self._create_user_profiles_table()
+
+            logger.info("✓ AI selection database tables initialized")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize AI selection tables: {e}")
+            raise
+
+    def _create_ai_strategy_table(self) -> None:
+        """创建AI选股策略表"""
+        sql = """
+        CREATE TABLE IF NOT EXISTS ai_strategies (
+            id VARCHAR(36) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            description TEXT,
+            strategy_type VARCHAR(50) NOT NULL,
+            parameters JSON NOT NULL,
+            weight_config JSON,
+            risk_config JSON,
+            performance_metrics JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE,
+            version INTEGER DEFAULT 1,
+            created_by VARCHAR(100),
+            tags TEXT,
+            status VARCHAR(20) DEFAULT 'draft'
+        )
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            conn.execute(sql)
+            
+        # 创建索引
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_ai_strategies_type ON ai_strategies(strategy_type)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_strategies_active ON ai_strategies(is_active)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_strategies_created ON ai_strategies(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_strategies_status ON ai_strategies(status)"
+        ]
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            for index_sql in indices:
+                conn.execute(index_sql)
+
+    def _create_ai_selection_results_table(self) -> None:
+        """创建AI选股结果表"""
+        sql = """
+        CREATE TABLE IF NOT EXISTS ai_selection_results (
+            id VARCHAR(36) PRIMARY KEY,
+            strategy_id VARCHAR(36) NOT NULL,
+            selection_date DATE NOT NULL,
+            stock_code VARCHAR(20) NOT NULL,
+            stock_name VARCHAR(255),
+            industry VARCHAR(100),
+            selection_reason JSON,
+            score DECIMAL(10,4),
+            weight DECIMAL(8,6),
+            confidence DECIMAL(5,4),
+            risk_level VARCHAR(20),
+            expected_return DECIMAL(10,4),
+            volatility DECIMAL(10,4),
+            sharpe_ratio DECIMAL(8,4),
+            max_drawdown DECIMAL(8,4),
+            market_cap DECIMAL(20,2),
+            pe_ratio DECIMAL(10,2),
+            pb_ratio DECIMAL(10,2),
+            turnover_rate DECIMAL(8,4),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            backtested BOOLEAN DEFAULT FALSE,
+            performance_updated_at TIMESTAMP,
+            FOREIGN KEY (strategy_id) REFERENCES ai_strategies(id)
+        )
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            conn.execute(sql)
+            
+        # 创建索引
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_ai_results_strategy ON ai_selection_results(strategy_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_results_date ON ai_selection_results(selection_date)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_results_stock ON ai_selection_results(stock_code)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_results_score ON ai_selection_results(score DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_results_risk ON ai_selection_results(risk_level)"
+        ]
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            for index_sql in indices:
+                conn.execute(index_sql)
+
+    def _create_ai_backtest_results_table(self) -> None:
+        """创建AI策略回测结果表"""
+        sql = """
+        CREATE TABLE IF NOT EXISTS ai_backtest_results (
+            id VARCHAR(36) PRIMARY KEY,
+            strategy_id VARCHAR(36) NOT NULL,
+            backtest_period_start DATE NOT NULL,
+            backtest_period_end DATE NOT NULL,
+            total_return DECIMAL(10,4),
+            annual_return DECIMAL(10,4),
+            volatility DECIMAL(10,4),
+            sharpe_ratio DECIMAL(8,4),
+            max_drawdown DECIMAL(8,4),
+            win_rate DECIMAL(5,4),
+            profit_loss_ratio DECIMAL(8,4),
+            calmar_ratio DECIMAL(8,4),
+            sortino_ratio DECIMAL(8,4),
+            beta DECIMAL(8,4),
+            alpha DECIMAL(8,4),
+            information_ratio DECIMAL(8,4),
+            tracking_error DECIMAL(8,4),
+            benchmark_return DECIMAL(10,4),
+            excess_return DECIMAL(10,4),
+            turnover_rate DECIMAL(8,4),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            backtest_config JSON,
+            daily_returns JSON,
+            monthly_returns JSON,
+            trade_records JSON,
+            FOREIGN KEY (strategy_id) REFERENCES ai_strategies(id)
+        )
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            conn.execute(sql)
+            
+        # 创建索引
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_ai_backtest_strategy ON ai_backtest_results(strategy_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_backtest_period ON ai_backtest_results(backtest_period_start, backtest_period_end)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_backtest_sharpe ON ai_backtest_results(sharpe_ratio DESC)"
+        ]
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            for index_sql in indices:
+                conn.execute(index_sql)
+
+    def _create_ai_explanations_table(self) -> None:
+        """创建AI选股解释表"""
+        sql = """
+        CREATE TABLE IF NOT EXISTS ai_explanations (
+            id VARCHAR(36) PRIMARY KEY,
+            selection_result_id VARCHAR(36) NOT NULL,
+            explanation_type VARCHAR(50) NOT NULL,
+            factor_name VARCHAR(100) NOT NULL,
+            factor_value DECIMAL(15,6),
+            contribution_score DECIMAL(8,4),
+            importance_rank INTEGER,
+            explanation_text TEXT,
+            visualization_data JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (selection_result_id) REFERENCES ai_selection_results(id)
+        )
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            conn.execute(sql)
+            
+        # 创建索引
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_ai_explain_result ON ai_explanations(selection_result_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_explain_type ON ai_explanations(explanation_type)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_explain_factor ON ai_explanations(factor_name)"
+        ]
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            for index_sql in indices:
+                conn.execute(index_sql)
+
+    def _create_user_profiles_table(self) -> None:
+        """创建用户画像表"""
+        sql = """
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            id VARCHAR(36) PRIMARY KEY,
+            user_id VARCHAR(100) NOT NULL UNIQUE,
+            risk_tolerance VARCHAR(20),
+            investment_horizon VARCHAR(20),
+            investment_style VARCHAR(50),
+            preferred_industries TEXT,
+            excluded_industries TEXT,
+            max_position_size DECIMAL(5,4),
+            min_market_cap DECIMAL(20,2),
+            max_pe_ratio DECIMAL(10,2),
+            max_pb_ratio DECIMAL(10,2),
+            max_volatility DECIMAL(8,4),
+            preferred_stock_count INTEGER,
+            rebalance_frequency VARCHAR(20),
+            custom_constraints JSON,
+            performance_history JSON,
+            feedback_data JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE
+        )
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            conn.execute(sql)
+            
+        # 创建索引
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_user_profiles_risk ON user_profiles(risk_tolerance)",
+            "CREATE INDEX IF NOT EXISTS idx_user_profiles_style ON user_profiles(investment_style)"
+        ]
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            for index_sql in indices:
+                conn.execute(index_sql)
+
+    def create_ai_strategy(self, strategy_data: Dict[str, Any]) -> str:
+        """
+        创建AI选股策略
+        
+        Args:
+            strategy_data: 策略数据
+            
+        Returns:
+            策略ID
+        """
+        strategy_id = str(uuid.uuid4())
+        
+        sql = """
+        INSERT INTO ai_strategies (
+            id, name, description, strategy_type, parameters, weight_config, 
+            risk_config, performance_metrics, created_by, tags, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        params = (
+            strategy_id,
+            strategy_data.get('name', ''),
+            strategy_data.get('description', ''),
+            strategy_data.get('strategy_type', 'comprehensive'),
+            json.dumps(strategy_data.get('parameters', {})),
+            json.dumps(strategy_data.get('weight_config', {})),
+            json.dumps(strategy_data.get('risk_config', {})),
+            json.dumps(strategy_data.get('performance_metrics', {})),
+            strategy_data.get('created_by', 'system'),
+            strategy_data.get('tags', ''),
+            strategy_data.get('status', 'draft')
+        )
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            conn.execute(sql, params)
+            
+        logger.info(f"Created AI strategy: {strategy_id}")
+        return strategy_id
+
+    def save_ai_selection_results(self, results: List[Dict[str, Any]]) -> None:
+        """
+        保存AI选股结果
+        
+        Args:
+            results: 选股结果列表
+        """
+        if not results:
+            return
+            
+        sql = """
+        INSERT OR REPLACE INTO ai_selection_results (
+            id, strategy_id, selection_date, stock_code, stock_name, industry,
+            selection_reason, score, weight, confidence, risk_level,
+            expected_return, volatility, sharpe_ratio, max_drawdown,
+            market_cap, pe_ratio, pb_ratio, turnover_rate, backtested
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            for result in results:
+                result_id = result.get('id', str(uuid.uuid4()))
+                params = (
+                    result_id,
+                    result.get('strategy_id'),
+                    result.get('selection_date'),
+                    result.get('stock_code'),
+                    result.get('stock_name'),
+                    result.get('industry'),
+                    json.dumps(result.get('selection_reason', {})),
+                    result.get('score'),
+                    result.get('weight'),
+                    result.get('confidence'),
+                    result.get('risk_level'),
+                    result.get('expected_return'),
+                    result.get('volatility'),
+                    result.get('sharpe_ratio'),
+                    result.get('max_drawdown'),
+                    result.get('market_cap'),
+                    result.get('pe_ratio'),
+                    result.get('pb_ratio'),
+                    result.get('turnover_rate'),
+                    result.get('backtested', False)
+                )
+                conn.execute(sql, params)
+                
+        logger.info(f"Saved {len(results)} AI selection results")
+
+    def get_ai_strategies(self, active_only: bool = True) -> List[Dict[str, Any]]:
+        """
+        获取AI策略列表
+        
+        Args:
+            active_only: 是否只获取活跃策略
+            
+        Returns:
+            策略列表
+        """
+        sql = """
+        SELECT * FROM ai_strategies
+        """
+        
+        params = ()
+        if active_only:
+            sql += " WHERE is_active = TRUE"
+            
+        sql += " ORDER BY created_at DESC"
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            rows = conn.execute(sql, params).fetchall()
+            
+        strategies = []
+        for row in rows:
+            strategy = dict(row)
+            # 解析JSON字段
+            strategy['parameters'] = json.loads(strategy['parameters']) if strategy['parameters'] else {}
+            strategy['weight_config'] = json.loads(strategy['weight_config']) if strategy['weight_config'] else {}
+            strategy['risk_config'] = json.loads(strategy['risk_config']) if strategy['risk_config'] else {}
+            strategy['performance_metrics'] = json.loads(strategy['performance_metrics']) if strategy['performance_metrics'] else {}
+            strategies.append(strategy)
+            
+        return strategies
+
+    def get_latest_selection_results(self, strategy_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        获取最新的选股结果
+        
+        Args:
+            strategy_id: 策略ID
+            limit: 返回数量限制
+            
+        Returns:
+            选股结果列表
+        """
+        sql = """
+        SELECT * FROM ai_selection_results 
+        WHERE strategy_id = ?
+        ORDER BY selection_date DESC, score DESC
+        LIMIT ?
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            rows = conn.execute(sql, (strategy_id, limit)).fetchall()
+            
+        results = []
+        for row in rows:
+            result = dict(row)
+            result['selection_reason'] = json.loads(result['selection_reason']) if result['selection_reason'] else {}
+            results.append(result)
+            
+        return results
+
+    def save_ai_backtest_results(self, backtest_data: Dict[str, Any]) -> str:
+        """
+        保存AI策略回测结果
+        
+        Args:
+            backtest_data: 回测数据
+            
+        Returns:
+            回测结果ID
+        """
+        backtest_id = str(uuid.uuid4())
+        
+        sql = """
+        INSERT INTO ai_backtest_results (
+            id, strategy_id, backtest_period_start, backtest_period_end,
+            total_return, annual_return, volatility, sharpe_ratio, max_drawdown,
+            win_rate, profit_loss_ratio, calmar_ratio, sortino_ratio,
+            beta, alpha, information_ratio, tracking_error,
+            benchmark_return, excess_return, turnover_rate,
+            backtest_config, daily_returns, monthly_returns, trade_records
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        params = (
+            backtest_id,
+            backtest_data.get('strategy_id'),
+            backtest_data.get('backtest_period_start'),
+            backtest_data.get('backtest_period_end'),
+            backtest_data.get('total_return'),
+            backtest_data.get('annual_return'),
+            backtest_data.get('volatility'),
+            backtest_data.get('sharpe_ratio'),
+            backtest_data.get('max_drawdown'),
+            backtest_data.get('win_rate'),
+            backtest_data.get('profit_loss_ratio'),
+            backtest_data.get('calmar_ratio'),
+            backtest_data.get('sortino_ratio'),
+            backtest_data.get('beta'),
+            backtest_data.get('alpha'),
+            backtest_data.get('information_ratio'),
+            backtest_data.get('tracking_error'),
+            backtest_data.get('benchmark_return'),
+            backtest_data.get('excess_return'),
+            backtest_data.get('turnover_rate'),
+            json.dumps(backtest_data.get('backtest_config', {})),
+            json.dumps(backtest_data.get('daily_returns', [])),
+            json.dumps(backtest_data.get('monthly_returns', [])),
+            json.dumps(backtest_data.get('trade_records', []))
+        )
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            conn.execute(sql, params)
+            
+        logger.info(f"Saved AI backtest results: {backtest_id}")
+        return backtest_id
+
+    def save_ai_explanations(self, explanations: List[Dict[str, Any]]) -> None:
+        """
+        保存AI选股解释
+        
+        Args:
+            explanations: 解释列表
+        """
+        if not explanations:
+            return
+            
+        sql = """
+        INSERT OR REPLACE INTO ai_explanations (
+            id, selection_result_id, explanation_type, factor_name,
+            factor_value, contribution_score, importance_rank,
+            explanation_text, visualization_data
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            for explanation in explanations:
+                explanation_id = explanation.get('id', str(uuid.uuid4()))
+                params = (
+                    explanation_id,
+                    explanation.get('selection_result_id'),
+                    explanation.get('explanation_type'),
+                    explanation.get('factor_name'),
+                    explanation.get('factor_value'),
+                    explanation.get('contribution_score'),
+                    explanation.get('importance_rank'),
+                    explanation.get('explanation_text'),
+                    json.dumps(explanation.get('visualization_data', {}))
+                )
+                conn.execute(sql, params)
+                
+        logger.info(f"Saved {len(explanations)} AI explanations")
+
+    def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        获取用户画像
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            用户画像数据
+        """
+        sql = """
+        SELECT * FROM user_profiles 
+        WHERE user_id = ? AND is_active = TRUE
+        """
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            row = conn.execute(sql, (user_id,)).fetchone()
+            
+        if not row:
+            return None
+            
+        profile = dict(row)
+        profile['preferred_industries'] = profile['preferred_industries'].split(',') if profile['preferred_industries'] else []
+        profile['excluded_industries'] = profile['excluded_industries'].split(',') if profile['excluded_industries'] else []
+        profile['custom_constraints'] = json.loads(profile['custom_constraints']) if profile['custom_constraints'] else {}
+        profile['performance_history'] = json.loads(profile['performance_history']) if profile['performance_history'] else {}
+        profile['feedback_data'] = json.loads(profile['feedback_data']) if profile['feedback_data'] else {}
+        
+        return profile
+
+    def save_user_profile(self, profile_data: Dict[str, Any]) -> str:
+        """
+        保存用户画像
+        
+        Args:
+            profile_data: 用户画像数据
+            
+        Returns:
+            用户画像ID
+        """
+        user_id = profile_data.get('user_id')
+        if not user_id:
+            raise ValueError("user_id is required")
+            
+        # 检查用户画像是否已存在
+        existing = self.get_user_profile(user_id)
+        profile_id = existing['id'] if existing else str(uuid.uuid4())
+        
+        sql = """
+        INSERT OR REPLACE INTO user_profiles (
+            id, user_id, risk_tolerance, investment_horizon, investment_style,
+            preferred_industries, excluded_industries, max_position_size,
+            min_market_cap, max_pe_ratio, max_pb_ratio, max_volatility,
+            preferred_stock_count, rebalance_frequency, custom_constraints,
+            performance_history, feedback_data, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        params = (
+            profile_id,
+            user_id,
+            profile_data.get('risk_tolerance'),
+            profile_data.get('investment_horizon'),
+            profile_data.get('investment_style'),
+            ','.join(profile_data.get('preferred_industries', [])),
+            ','.join(profile_data.get('excluded_industries', [])),
+            profile_data.get('max_position_size'),
+            profile_data.get('min_market_cap'),
+            profile_data.get('max_pe_ratio'),
+            profile_data.get('max_pb_ratio'),
+            profile_data.get('max_volatility'),
+            profile_data.get('preferred_stock_count'),
+            profile_data.get('rebalance_frequency'),
+            json.dumps(profile_data.get('custom_constraints', {})),
+            json.dumps(profile_data.get('performance_history', {})),
+            json.dumps(profile_data.get('feedback_data', {})),
+            profile_data.get('is_active', True)
+        )
+        
+        with self.get_connection("analytics_duckdb") as conn:
+            conn.execute(sql, params)
+            
+        logger.info(f"Saved user profile: {user_id}")
+        return profile_id
+
     @property
     def metrics(self) -> Dict[str, Any]:
         """返回数据库服务指标的字典表示"""
@@ -1152,3 +1713,15 @@ class DatabaseService(BaseService):
             'database_connections': self._database_metrics.database_connections,
             'last_update': self._database_metrics.last_update.isoformat()
         }
+
+    def get_connection_pool(self, pool_name: str) -> Optional[List[DatabaseConnection]]:
+        """
+        获取指定连接池
+        
+        Args:
+            pool_name: 连接池名称
+            
+        Returns:
+            连接池列表，如果连接池不存在则返回 None
+        """
+        return self._connection_pools.get(pool_name)

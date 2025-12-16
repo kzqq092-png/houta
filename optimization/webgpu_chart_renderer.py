@@ -64,9 +64,7 @@ class WebGPUChartRenderer(BaseChartRenderer):
                 webgpu_config = WebGPUConfig(
                     auto_initialize=True,
                     enable_fallback=True,
-                    enable_compatibility_check=True,
-                    auto_fallback_on_error=True,
-                    performance_monitoring=False  # 禁用监控
+                    auto_fallback_on_error=True
                 )
 
                 # 获取WebGPU管理器
@@ -75,6 +73,8 @@ class WebGPUChartRenderer(BaseChartRenderer):
                 # 简化的初始化检查
                 if self._webgpu_manager._initialized:
                     self._webgpu_initialized = True
+                    # 获取实际的后端类型
+                    self._current_backend = self._webgpu_manager.current_backend
                     logger.info(f"WebGPU初始化成功，当前后端: {self._current_backend}")
                 else:
                     logger.warning("WebGPU初始化失败，使用matplotlib后备")
