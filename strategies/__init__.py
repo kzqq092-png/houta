@@ -6,7 +6,8 @@
 # 导出策略类供外部使用
 try:
     from .adj_vwap_strategies import AdjMomentumPlugin, VWAPReversionPlugin
-    __all__ = ['AdjMomentumPlugin', 'VWAPReversionPlugin']
+    from .strategy_manager import StrategyManager, get_strategy_manager
+    __all__ = ['AdjMomentumPlugin', 'VWAPReversionPlugin', 'StrategyManager', 'get_strategy_manager']
 except ImportError:
     __all__ = []
 

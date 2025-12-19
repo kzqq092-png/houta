@@ -1738,6 +1738,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             if not results or 'backtest_result' not in results:
                 return
 
+            result_text = ""
             backtest_result = results['backtest_result']
             risk_metrics = results.get('risk_metrics', {})
             pattern_analysis = results.get('pattern_analysis', {})

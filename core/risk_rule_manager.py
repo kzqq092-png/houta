@@ -71,7 +71,7 @@ class RiskRuleManager:
     def __init__(self, db_path: str = 'data/factorweave_system.sqlite'):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.        self._init_tables()
+        self._init_tables()
         self._active_alerts = {}  # 活跃告警缓存
         self._last_check_time = {}  # 上次检查时间
 
@@ -140,10 +140,10 @@ class RiskRuleManager:
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_risk_alerts_created ON risk_alerts(created_at)')
 
                 conn.commit()
-                self.logger.info("风险规则数据表初始化完成")
+                logger.info("风险规则数据表初始化完成")
 
         except Exception as e:
-            self.logger.error(f"初始化风险规则数据表失败: {e}")
+            logger.error(f"初始化风险规则数据表失败: {e}")
 
     def add_rule(self, rule: RiskRule) -> bool:
         """添加风险规则"""
@@ -170,14 +170,14 @@ class RiskRuleManager:
                 rule.id = cursor.lastrowid
                 conn.commit()
 
-                self.logger.info(f"风险规则已添加: {rule.name}")
+                logger.info(f"风险规则已添加: {rule.name}")
                 return True
 
         except sqlite3.IntegrityError:
-            self.logger.error(f"风险规则名称已存在: {rule.name}")
+            logger.error(f"风险规则名称已存在: {rule.name}")
             return False
         except Exception as e:
-            self.logger.error(f"添加风险规则失败: {e}")
+            logger.error(f"添加风险规则失败: {e}")
             return False
 
     def update_rule(self, rule: RiskRule) -> bool:
@@ -207,14 +207,14 @@ class RiskRuleManager:
                 conn.commit()
 
                 if cursor.rowcount > 0:
-                    self.logger.info(f"风险规则已更新: {rule.name}")
+                    logger.info(f"风险规则已更新: {rule.name}")
                     return True
                 else:
-                    self.logger.warning(f"未找到要更新的风险规则: {rule.id}")
+                    logger.warning(f"未找到要更新的风险规则: {rule.id}")
                     return False
 
         except Exception as e:
-            self.logger.error(f"更新风险规则失败: {e}")
+            logger.error(f"更新风险规则失败: {e}")
             return False
 
     def delete_rule(self, rule_id: int) -> bool:
@@ -232,14 +232,14 @@ class RiskRuleManager:
                 conn.commit()
 
                 if cursor.rowcount > 0:
-                    self.logger.info(f"风险规则已删除: {rule_id}")
+                    logger.info(f"风险规则已删除: {rule_id}")
                     return True
                 else:
-                    self.logger.warning(f"未找到要删除的风险规则: {rule_id}")
+                    logger.warning(f"未找到要删除的风险规则: {rule_id}")
                     return False
 
         except Exception as e:
-            self.logger.error(f"删除风险规则失败: {e}")
+            logger.error(f"删除风险规则失败: {e}")
             return False
 
     def get_rule(self, rule_id: int) -> Optional[RiskRule]:
@@ -256,7 +256,7 @@ class RiskRuleManager:
                 return None
 
         except Exception as e:
-            self.logger.error(f"获取风险规则失败: {e}")
+            logger.error(f"获取风险规则失败: {e}")
             return None
 
     def get_all_rules(self, enabled_only: bool = False) -> List[RiskRule]:
@@ -274,7 +274,7 @@ class RiskRuleManager:
                 return [self._row_to_rule(row) for row in rows]
 
         except Exception as e:
-            self.logger.error(f"获取风险规则列表失败: {e}")
+            logger.error(f"获取风险规则列表失败: {e}")
             return []
 
     def check_rules(self, risk_metrics: Dict[str, float]) -> List[RiskAlert]:
@@ -314,7 +314,7 @@ class RiskRuleManager:
             return alerts
 
         except Exception as e:
-            self.logger.error(f"检查风险规则失败: {e}")
+            logger.error(f"检查风险规则失败: {e}")
             return []
 
     def _check_rule_condition(self, rule: RiskRule, risk_metrics: Dict[str, float]) -> bool:
@@ -339,7 +339,7 @@ class RiskRuleManager:
             return False
 
         except Exception as e:
-            self.logger.error(f"检查规则条件失败: {e}")
+            logger.error(f"检查规则条件失败: {e}")
             return False
 
     def _is_in_silence_period(self, rule: RiskRule) -> bool:
@@ -386,7 +386,7 @@ class RiskRuleManager:
             return alert
 
         except Exception as e:
-            self.logger.error(f"创建告警记录失败: {e}")
+            logger.error(f"创建告警记录失败: {e}")
             return None
 
     def _save_alert(self, alert: RiskAlert) -> bool:
@@ -412,7 +412,7 @@ class RiskRuleManager:
                 return True
 
         except Exception as e:
-            self.logger.error(f"保存告警记录失败: {e}")
+            logger.error(f"保存告警记录失败: {e}")
             return False
 
     def _update_rule_trigger_info(self, rule: RiskRule):
@@ -431,7 +431,7 @@ class RiskRuleManager:
                 conn.commit()
 
         except Exception as e:
-            self.logger.error(f"更新规则触发信息失败: {e}")
+            logger.error(f"更新规则触发信息失败: {e}")
 
     def get_alerts(self, status: str = None, limit: int = 100) -> List[RiskAlert]:
         """获取告警记录"""
@@ -454,7 +454,7 @@ class RiskRuleManager:
                 return [self._row_to_alert(row) for row in rows]
 
         except Exception as e:
-            self.logger.error(f"获取告警记录失败: {e}")
+            logger.error(f"获取告警记录失败: {e}")
             return []
 
     def acknowledge_alert(self, alert_id: int) -> bool:
@@ -474,7 +474,7 @@ class RiskRuleManager:
                 return cursor.rowcount > 0
 
         except Exception as e:
-            self.logger.error(f"确认告警失败: {e}")
+            logger.error(f"确认告警失败: {e}")
             return False
 
     def resolve_alert(self, alert_id: int) -> bool:
@@ -494,7 +494,7 @@ class RiskRuleManager:
                 return cursor.rowcount > 0
 
         except Exception as e:
-            self.logger.error(f"解决告警失败: {e}")
+            logger.error(f"解决告警失败: {e}")
             return False
 
     def _row_to_rule(self, row) -> RiskRule:

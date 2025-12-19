@@ -60,7 +60,7 @@ class MainWindowCoordinator(BaseCoordinator):
     4. 管理服务依赖
     """
 
-    def __init__t__(self,
+    def __init__(self,
                  service_container: ServiceContainer,
                  event_bus: EventBus,
                  parent: Optional[QWidget] = None):

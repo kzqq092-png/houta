@@ -18,7 +18,7 @@ from enum import Enum
 from dataclasses import dataclass, asdict, field
 from PyQt5.QtCore import QObject, pyqtSignal
 import traceback
-import datetime
+from datetime import datetime
 
 # 添加项目根目录到Python路径，确保可以导入plugins包
 current_dir = Path(__file__).parent
@@ -33,26 +33,24 @@ IPlugin = None
 PluginMetadata = None
 PluginMarket = None
 
-# 尝试多种导入方式，确保能够找到插件接口
+# 只导入必要的插件接口，将插件市场的导入延迟到需要时再进行
 try:
-    # 首先尝试直接导入
+    # 首先尝试直接导入插件接口（不导入市场模块）
     from plugins.plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
-    from plugins.plugin_market import PluginMarket
-    logger.info("成功直接导入插件接口和市场模块")
+    logger.info("成功直接导入插件接口")
 except ImportError:
     # 如果直接导入失败，尝试使用相对路径
     try:
         sys.path.append(str(project_root))
         from plugins.plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
-        from plugins.plugin_market import PluginMarket
-        logger.info("成功导入插件接口和市场模块")
+        logger.info("成功导入插件接口")
     except ImportError:
         # 尝试使用绝对路径
         try:
             plugins_path = project_root / "plugins"
             sys.path.append(str(plugins_path))
 
-            # 尝试直接从文件导入
+            # 尝试直接从文件导入插件接口
             spec_interface = importlib.util.spec_from_file_location(
                 "plugin_interface",
                 project_root / "plugins" / "plugin_interface.py"
@@ -68,49 +66,59 @@ except ImportError:
                 PluginMetadata = plugin_interface_module.PluginMetadata
                 logger.info("成功通过spec导入插件接口")
 
-            spec_market = importlib.util.spec_from_file_location(
-                "plugin_market",
-                project_root / "plugins" / "plugin_market.py"
-            )
-            if spec_market and spec_market.loader:
-                plugin_market_module = importlib.util.module_from_spec(
-                    spec_market)
-                sys.modules["plugin_market"] = plugin_market_module
-                spec_market.loader.exec_module(plugin_market_module)
-                PluginMarket = plugin_market_module.PluginMarket
-                logger.info("成功通过spec导入插件市场")
-
         except Exception as e:
-            logger.error(f"通过spec导入插件模块失败: {e}")
+            logger.error(f"通过spec导入插件接口失败: {e}")
 
             # 如果仍然失败，尝试最后的方法
             try:
                 # 直接导入
                 import plugin_interface
-                import plugin_market
                 IPlugin = plugin_interface.IPlugin
                 PluginType = plugin_interface.PluginType
                 PluginCategory = plugin_interface.PluginCategory
                 PluginMetadata = plugin_interface.PluginMetadata
-                PluginMarket = plugin_market.PluginMarket
-                logger.info("成功通过直接导入加载插件接口和市场模块")
+                logger.info("成功通过直接导入加载插件接口")
             except ImportError as e:
-                logger.error(f"导入插件模块失败: {e}")
+                logger.error(f"导入插件接口失败: {e}")
 
                 # 如果仍然失败，创建占位类
                 class IPlugin:
                     """插件接口占位类"""
                     pass
 
-                class PluginMetadata:
-                    """插件元数据占位类"""
-                    pass
 
-                class PluginMarket:
-                    """插件市场占位类"""
-                    pass
+def get_plugin_market() -> Optional[Any]:
+    """
+    延迟导入并返回插件市场实例
+    
+    Returns:
+        PluginMarket实例或None
+    """
+    global PluginMarket
+    if PluginMarket is None:
+        try:
+            # 尝试多种导入方式
+            try:
+                from plugins.plugin_market import PluginMarket
+                logger.info("成功导入插件市场模块")
+            except ImportError:
+                # 尝试使用相对路径
+                sys.path.append(str(project_root))
+                from plugins.plugin_market import PluginMarket
+                logger.info("成功通过项目路径导入插件市场模块")
+        except Exception as e:
+            logger.error(f"导入插件市场失败: {e}")
+            return None
+    return PluginMarket
 
-                logger.warning("使用占位类替代插件接口和市场模块")
+# 如果仍然失败，创建占位类
+class PluginMetadata:
+    """插件元数据占位类"""
+    pass
+
+class PluginMarket:
+    """插件市场占位类"""
+    pass
 
 
 class PluginStatus(Enum):
