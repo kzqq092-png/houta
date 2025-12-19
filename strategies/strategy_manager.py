@@ -19,11 +19,12 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from loguru import logger
 import pandas as pd
+from datetime import datetime
+# 添加插件支持
+from core.indicator_strategy_extensions import IStrategyPluginV2
+from plugins.strategies import MovingAverageStrategyPlugin
 
-# 添加项目根目录到路径
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
+# 使用绝对导入，无需修改 sys.path
 from core.plugin_types import AssetType, DataType
 from core.services.unified_data_manager import UnifiedDataManager
 
@@ -174,20 +175,122 @@ class VWAPMeanReversionStrategy(StrategyBase):
         return data
 
 
+class StrategyPluginAdapter(StrategyBase):
+    """策略插件适配器，将IStrategyPluginV2接口转换为StrategyBase接口"""
+    
+    def __init__(self, plugin: IStrategyPluginV2):
+        """
+        初始化策略插件适配器
+        
+        Args:
+            plugin: IStrategyPluginV2接口的策略插件
+        """
+        plugin_info = plugin.get_plugin_info()
+        super().__init__(name=plugin_info.name, description=plugin_info.description)
+        self.plugin = plugin
+        self._initialized = False
+        
+        # 初始化插件
+        self.plugin.initialize({})
+        self._initialized = True
+    
+    def get_required_fields(self) -> List[str]:
+        """获取策略需要的字段列表"""
+        return ['close', 'datetime', 'symbol']
+    
+    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        """生成交易信号"""
+        if not self._initialized:
+            return pd.DataFrame()
+        
+        try:
+            # 调用插件的generate_signals方法
+            signals_dict = self.plugin.generate_signals(data)
+            
+            # 将信号字典转换为DataFrame格式
+            if signals_dict:
+                # 创建结果DataFrame
+                result = data.copy()
+                
+                # 添加信号列
+                if 'buy_signal' in signals_dict and 'sell_signal' in signals_dict:
+                    # 合并买卖信号为单一信号列（1=买入，-1=卖出，0=持有）
+                    buy_signal = signals_dict['buy_signal'].astype(int)
+                    sell_signal = signals_dict['sell_signal'].astype(int)
+                    result['signal'] = buy_signal - sell_signal
+                elif 'position' in signals_dict:
+                    # 使用position信号
+                    result['signal'] = signals_dict['position']
+                else:
+                    # 如果没有标准信号列，尝试使用第一个可用信号
+                    first_signal = next(iter(signals_dict.values()), None)
+                    if first_signal is not None:
+                        result['signal'] = first_signal.astype(int)
+                    else:
+                        result['signal'] = 0
+                
+                # 添加插件生成的其他列
+                for key, value in signals_dict.items():
+                    if key not in ['buy_signal', 'sell_signal', 'position']:
+                        result[key] = value
+                
+                logger.info(f"插件策略 {self.name} 信号生成完成")
+                return result
+            
+            return pd.DataFrame()
+            
+        except Exception as e:
+            logger.error(f"插件策略 {self.name} 信号生成失败: {e}")
+            return pd.DataFrame()
+
+
 class StrategyManager:
     """策略管理器"""
     
     def __init__(self):
         """初始化策略管理器"""
-        self.strategies: Dict[str, StrategyBase] = {}
+        print("===== 开始初始化策略管理器 =====")
+        self.strategies: Dict[str, StrategyBase] = {} 
         self.data_manager = None
+        print("步骤1: 注册内置策略")
         self._register_builtin_strategies()
+        print(f"内置策略注册完成，当前策略数量: {len(self.strategies)}")
+        
+        print("步骤2: 注册插件策略")
+        self._register_plugin_strategies()
+        print(f"插件策略注册完成，当前策略数量: {len(self.strategies)}")
+        
+        # 调试信息
+        print("===== 策略注册详情 =====")
+        for strategy_id, strategy in self.strategies.items():
+            print(f"- ID: {strategy_id}, 名称: {strategy.name}")
+        print("=========================")
         
     def _register_builtin_strategies(self):
         """注册内置策略"""
         self.register_strategy('adj_momentum', AdjPriceMomentumStrategy())
         self.register_strategy('vwap_reversion', VWAPMeanReversionStrategy())
         logger.info(f"已注册 {len(self.strategies)} 个内置策略")
+    
+    def _register_plugin_strategies(self):
+        """注册插件策略"""
+        try:
+            # 注册双均线策略插件
+            import traceback
+            print("DEBUG: 正在尝试注册双均线策略插件...")
+            ma_plugin = MovingAverageStrategyPlugin()
+            print(f"DEBUG: 插件创建成功: {ma_plugin}")
+            ma_adapter = StrategyPluginAdapter(ma_plugin)
+            print(f"DEBUG: 适配器创建成功: {ma_adapter}")
+            print(f"DEBUG: 适配器策略名称: {ma_adapter.name}")
+            self.register_strategy('ma_crossover', ma_adapter)
+            print(f"DEBUG: 策略注册成功")
+            logger.info(f"已注册双均线策略插件")
+            
+        except Exception as e:
+            print(f"DEBUG: 注册策略插件失败: {e}")
+            traceback.print_exc()
+            logger.error(f"注册策略插件失败: {e}")
     
     def register_strategy(self, strategy_id: str, strategy: StrategyBase):
         """
@@ -205,12 +308,22 @@ class StrategyManager:
         获取策略实例
         
         Args:
-            strategy_id: 策略ID
+            strategy_id: 策略ID或策略名称
             
         Returns:
             策略实例，如果不存在则返回None
         """
-        return self.strategies.get(strategy_id)
+        # 首先尝试通过ID查找
+        strategy = self.strategies.get(strategy_id)
+        if strategy:
+            return strategy
+            
+        # 如果通过ID找不到，尝试通过名称查找
+        for strategy_obj in self.strategies.values():
+            if strategy_obj.name == strategy_id:
+                return strategy_obj
+                
+        return None
     
     def list_strategies(self) -> List[Dict[str, str]]:
         """
@@ -327,18 +440,30 @@ class StrategyManager:
             K线DataFrame
         """
         try:
-            # 使用统一数据管理器获取数据
+            # 优先从DuckDB获取数据
             data = self.data_manager.get_kdata(
                 stock_code=symbol,
                 period=period,
-                count=365  # 默认获取一年数据
+                count=730  # 获取足够多的数据，以便进行日期范围过滤
             )
             
-            # 日期过滤（如果指定）
-            if not data.empty and start_date:
-                data = data[data['datetime'] >= pd.to_datetime(start_date)]
-            if not data.empty and end_date:
-                data = data[data['datetime'] <= pd.to_datetime(end_date)]
+            # 如果提供了日期范围，进行过滤
+            if start_date and end_date and not data.empty:
+                logger.info(f"使用日期范围过滤: {start_date} ~ {end_date}")
+                # 确保datetime列是datetime类型
+                if not pd.api.types.is_datetime64_any_dtype(data['datetime']):
+                    data['datetime'] = pd.to_datetime(data['datetime'])
+                
+                # 过滤日期范围
+                start_dt = pd.to_datetime(start_date)
+                end_dt = pd.to_datetime(end_date)
+                data = data[(data['datetime'] >= start_dt) & (data['datetime'] <= end_dt)]
+            
+            # 确保返回的数据不为空
+            if data.empty:
+                logger.warning(f"获取到的K线数据为空: {symbol}")
+            else:
+                logger.info(f"获取K线数据成功: {symbol}，共 {len(data)} 条记录")
             
             return data
             
@@ -776,7 +901,7 @@ class StrategyManager:
             return self._fallback_backtest(strategy_id, symbols, initial_capital, **strategy_params)
 
 
-# 全局策略管理器实例
+# # 全局策略管理器实例
 _strategy_manager_instance = None
 
 

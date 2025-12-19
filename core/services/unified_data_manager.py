@@ -1206,16 +1206,26 @@ class UnifiedDataManager:
             df = df.replace([np.inf, -np.inf], np.nan)
             df = df.dropna(subset=['close'])  # 至少要有收盘价
 
-            # ✅ 修复：确保code/symbol字段存在
+            # ✅ 修复：确保code和symbol字段都存在
             if 'code' not in df.columns and 'symbol' not in df.columns:
                 df['code'] = stock_code
-                logger.debug(f"添加code字段: {stock_code}")
+                df['symbol'] = stock_code
+                logger.debug(f"添加code和symbol字段: {stock_code}")
             elif 'symbol' in df.columns and 'code' not in df.columns:
-                # 如果只有symbol没有code，保持symbol不变
-                logger.debug(f"数据已包含symbol字段，跳过code字段添加")
+                df['code'] = df['symbol']
+                logger.debug(f"数据已包含symbol字段，添加code字段")
             elif 'code' in df.columns and 'symbol' not in df.columns:
-                # 如果只有code没有symbol，保持code不变
-                logger.debug(f"数据已包含code字段，将在后续转换为symbol")
+                df['symbol'] = df['code']
+                logger.debug(f"数据已包含code字段，添加symbol字段")
+
+            # ✅ 修复：确保adj_close和adj_factor字段存在（用于复权策略）
+            if 'adj_close' not in df.columns:
+                df['adj_close'] = df['close']
+                logger.debug("添加adj_close字段，使用close值")
+            
+            if 'adj_factor' not in df.columns:
+                df['adj_factor'] = 1.0
+                logger.debug("添加adj_factor字段，默认值为1.0")
 
             # 确保amount字段存在
             if 'amount' not in df.columns:

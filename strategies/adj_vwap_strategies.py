@@ -10,6 +10,32 @@
 日期：2025-10-12
 """
 
+# 首先设置路径，确保正确的模块解析
+import sys
+from pathlib import Path
+
+# 添加项目根目录到Python路径
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# 添加core目录到Python路径
+core_dir = project_root / "core"
+if str(core_dir) not in sys.path:
+    sys.path.insert(0, str(core_dir))
+
+# 添加examples目录到Python路径
+examples_dir = project_root / "examples"
+if str(examples_dir) not in sys.path:
+    sys.path.insert(0, str(examples_dir))
+
+# 现在导入其他模块
+from loguru import logger
+from typing import Dict, Any, List, Tuple
+from datetime import datetime
+import pandas as pd
+import uuid
+
 from examples.strategies.vwap_mean_reversion_strategy import VWAPMeanReversionStrategy as OriginalVWAPStrategy
 from examples.strategies.adj_price_momentum_strategy import AdjPriceMomentumStrategy as OriginalAdjMomentum
 from core.strategy_extensions import (
@@ -19,17 +45,6 @@ from core.strategy_extensions import (
     StrategyType, AssetType, TimeFrame, RiskLevel,
     SignalType, TradeAction, TradeStatus
 )
-import sys
-from pathlib import Path
-from loguru import logger
-from typing import Dict, Any, List, Tuple
-from datetime import datetime
-import pandas as pd
-import uuid
-
-# 添加项目根目录到路径
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 # 导入现有策略框架
 
