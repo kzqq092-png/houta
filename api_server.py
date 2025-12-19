@@ -16,11 +16,15 @@ RESTful API主服务
     curl http://localhost:8000/api/sector/fund-flow/trend/BK0001?period=30
     # 获取板块分时资金流
     curl http://localhost:8000/api/sector/fund-flow/intraday/BK0001?date=2024-01-01
+    # 混合推荐
+    curl -X POST http://localhost:8000/api/hybrid/recommendation -H "Content-Type: application/json" -d '{"user_id": "user_1", "context": {"risk_level": "medium"}, "stock_codes": ["000001", "000002"]}'
 """
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, BackgroundTasks
 from typing import List, Dict, Any, Optional
 import uvicorn
-from ai_stock_selector import AIStockSelector
+import asyncio
+import time
+from core.services.ai_stock_selector_service import AIStockSelector
 import pandas as pd
 from datetime import datetime
 from core.services.unified_data_manager import UnifiedDataManager
@@ -28,7 +32,24 @@ from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess
 
 # 假设有全局data_manager实例
 from core.services.unified_data_manager import get_unified_data_manager
+from core.services.hybrid_recommendation_engine import HybridRecommendationEngine
+from core.containers import get_service_container
+
 data_manager = get_unified_data_manager()
+
+# 获取混合推荐引擎实例
+async def get_hybrid_engine():
+    """获取混合推荐引擎实例"""
+    try:
+        container = get_service_container()
+        if container:
+            engine = container.get_service('hybrid_recommendation_engine')
+            if engine and hasattr(engine, 'is_initialized') and engine.is_initialized:
+                return engine
+        return None
+    except Exception as e:
+        logger.error(f"获取混合推荐引擎失败: {e}")
+        return None
 
 app = FastAPI(title="FactorWeave-Quant量化交易API", version="1.0.0")
 
@@ -450,6 +471,198 @@ def get_sector_service_status():
             "message": f"获取服务状态失败: {str(e)}",
             "data_sources": []
         }
+
+# ===========================================
+# 混合推荐API
+# ===========================================
+
+@app.post("/api/hybrid/recommendation")
+async def get_hybrid_recommendation(params: Dict[str, Any]):
+    """
+    获取混合推荐结果
+    
+    参数：
+        params: {
+            'user_id': str,           # 用户ID
+            'context': Dict,          # 推荐上下文
+            'stock_codes': List[str]  # 股票代码列表（可选）
+        }
+        
+    返回：
+        dict: 包含混合推荐结果和元数据
+    """
+    # 获取混合推荐引擎
+    engine = await get_hybrid_engine()
+    if not engine:
+        raise HTTPException(status_code=503, detail="混合推荐引擎不可用")
+        
+    # 提取参数
+    user_id = params.get('user_id')
+    context = params.get('context', {})
+    stock_codes = params.get('stock_codes', [])
+    
+    if not user_id:
+        raise HTTPException(status_code=400, detail="缺少必要参数: user_id")
+        
+    # 请求推荐
+    request_id = await engine.request_hybrid_recommendation(user_id, context, stock_codes)
+    
+    # 获取结果
+    result = await engine.get_recommendation_by_request_id(request_id, timeout=30)
+    
+    if result:
+        return {
+            'status': 'success',
+            'request_id': request_id,
+            'data': result,
+            'timestamp': datetime.now().isoformat()
+        }
+    else:
+        raise HTTPException(status_code=504, detail="获取推荐结果超时")
+
+@app.get("/api/hybrid/recommendation/{request_id}")
+async def get_hybrid_recommendation_by_id(request_id: str):
+    """
+    通过请求ID获取混合推荐结果
+    
+    参数：
+        request_id: 推荐请求ID
+        
+    返回：
+        dict: 包含混合推荐结果和元数据
+    """
+    # 获取混合推荐引擎
+    engine = await get_hybrid_engine()
+    if not engine:
+        raise HTTPException(status_code=503, detail="混合推荐引擎不可用")
+        
+    # 获取结果
+    result = await engine.get_recommendation_by_request_id(request_id, timeout=10)
+    
+    if result:
+        return {
+            'status': 'success',
+            'request_id': request_id,
+            'data': result,
+            'timestamp': datetime.now().isoformat()
+        }
+    else:
+        raise HTTPException(status_code=504, detail="获取推荐结果超时")
+
+@app.get("/api/hybrid/status")
+async def get_hybrid_engine_status():
+    """
+    获取混合推荐引擎状态
+    
+    返回：
+        dict: 混合推荐引擎状态信息
+    """
+    # 获取混合推荐引擎
+    engine = await get_hybrid_engine()
+    if not engine:
+        return {
+            "status": "unavailable",
+            "message": "混合推荐引擎不可用",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    # 返回引擎状态
+    return {
+        "status": "available" if engine.is_initialized else "initializing",
+        "message": "混合推荐引擎运行正常" if engine.is_initialized else "混合推荐引擎初始化中",
+        "engine_version": getattr(engine, "version", "unknown"),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/hybrid/cache/stats")
+async def get_hybrid_cache_stats():
+    """
+    获取混合推荐引擎缓存统计信息
+    
+    返回：
+        dict: 缓存统计信息
+    """
+    # 获取混合推荐引擎
+    engine = await get_hybrid_engine()
+    if not engine:
+        raise HTTPException(status_code=503, detail="混合推荐引擎不可用")
+        
+    # 获取缓存统计信息
+    cache_stats = await engine.get_cache_statistics()
+    
+    if cache_stats:
+        return {
+            'status': 'success',
+            'data': cache_stats,
+            'timestamp': datetime.now().isoformat()
+        }
+    else:
+        return {
+            'status': 'success',
+            'data': {},
+            'message': '缓存统计信息不可用',
+            'timestamp': datetime.now().isoformat()
+        }
+
+@app.post("/api/hybrid/cache/warm")
+async def warm_hybrid_cache(params: Dict[str, Any]):
+    """
+    预热混合推荐引擎缓存
+    
+    参数：
+        params: {
+            'user_ids': List[str],   # 预热用户ID列表（可选）
+            'stock_codes': List[str]  # 预热股票代码列表（可选）
+        }
+        
+    返回：
+        dict: 预热结果
+    """
+    # 获取混合推荐引擎
+    engine = await get_hybrid_engine()
+    if not engine:
+        raise HTTPException(status_code=503, detail="混合推荐引擎不可用")
+        
+    # 提取参数
+    user_ids = params.get('user_ids', None)
+    stock_codes = params.get('stock_codes', None)
+    
+    # 执行缓存预热
+    try:
+        await engine.warm_cache(user_ids, stock_codes)
+        return {
+            'status': 'success',
+            'message': '缓存预热成功',
+            'timestamp': datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"缓存预热失败: {e}")
+        raise HTTPException(status_code=500, detail=f"缓存预热失败: {str(e)}")
+
+@app.delete("/api/hybrid/cache")
+async def clear_hybrid_cache():
+    """
+    清空混合推荐引擎缓存
+    
+    返回：
+        dict: 清空结果
+    """
+    # 获取混合推荐引擎
+    engine = await get_hybrid_engine()
+    if not engine:
+        raise HTTPException(status_code=503, detail="混合推荐引擎不可用")
+        
+    # 清空缓存
+    try:
+        await engine.clear_cache()
+        return {
+            'status': 'success',
+            'message': '缓存清空成功',
+            'timestamp': datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"缓存清空失败: {e}")
+        raise HTTPException(status_code=500, detail=f"缓存清空失败: {str(e)}")
 
 # 后续可扩展：用户认证、插件注册、WebHook等
 

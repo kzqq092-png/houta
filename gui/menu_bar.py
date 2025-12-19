@@ -206,6 +206,14 @@ class MainMenuBar(QMenuBar):
             self.batch_analysis_action = QAction("批量/分布式分析", self)
             self.batch_analysis_action.setStatusTip("批量/分布式回测与分析")
             self.analysis_menu.addAction(self.batch_analysis_action)
+
+            self.analysis_menu.addSeparator()
+
+            # 智能模型选择
+            self.intelligent_model_selection_action = QAction("智能模型选择", self)
+            self.intelligent_model_selection_action.setStatusTip("打开智能模型选择界面，根据市场状态自动选择最优模型")
+            self.intelligent_model_selection_action.setShortcut("Ctrl+M")
+            self.analysis_menu.addAction(self.intelligent_model_selection_action)
         except Exception as e:
             if True:  # 使用Loguru日志
                 logger.error(f"初始化分析菜单失败: {str(e)}")
@@ -970,6 +978,7 @@ class MainMenuBar(QMenuBar):
                 ('professional_backtest_action', '_on_professional_backtest'),
                 ('optimize_action', '_on_optimize'),
                 ('batch_analysis_action', '_on_batch_analysis'),
+                ('intelligent_model_selection_action', '_on_intelligent_model_selection'),
 
                 # 策略相关
                 ('strategy_manager_action', '_on_strategy_management'),

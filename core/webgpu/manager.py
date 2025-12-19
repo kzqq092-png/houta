@@ -10,12 +10,15 @@ WebGPU管理器模块
 """
 
 import threading
+import time
+import numpy as np
 from typing import Dict, Any, Optional, List, Callable
 from dataclasses import dataclass
 
 from .environment import WebGPUEnvironment, get_webgpu_environment, GPUSupportLevel
-from .compatibility import GPUCompatibilityChecker, CompatibilityReport, CompatibilityLevel
 from .fallback import FallbackRenderer, RenderBackend
+from .webgpu_renderer import WebGPURenderer, GPUResourcePool
+from .compatibility import GPUCompatibilityChecker, CompatibilityReport, CompatibilityLevel
 
 
 @dataclass
@@ -23,15 +26,8 @@ class WebGPUConfig:
     """WebGPU配置"""
     auto_initialize: bool = True
     enable_fallback: bool = True
-    enable_compatibility_check: bool = True
     auto_fallback_on_error: bool = True
     max_fallback_attempts: int = 3
-    performance_monitoring: bool = True
-
-    # 性能阈值
-    max_render_time_ms: float = 100.0
-    max_memory_usage_mb: float = 512.0
-    min_fps: float = 30.0
 
 class WebGPUManager:
     """WebGPU管理器
@@ -48,15 +44,21 @@ class WebGPUManager:
 
         # 核心组件
         self._environment = None
-        self._compatibility_checker = None
-        self._compatibility_report = None
+        self._webgpu_renderer = None  # ✅ 新增：真正的WebGPU渲染器
         self._fallback_renderer = None
+        self._compatibility_checker = GPUCompatibilityChecker()
+        self._compatibility_report = None
 
         # 状态管理
         self._initialized = False
         self._initialization_lock = threading.Lock()
 
-        # 性能监控
+        # 回调函数
+        self._initialization_callbacks = []
+        self._fallback_callbacks = []
+        self._error_callbacks = []
+
+        # 初始化性能统计
         self._performance_stats = {
             'total_renders': 0,
             'successful_renders': 0,
@@ -65,11 +67,6 @@ class WebGPUManager:
             'average_render_time': 0.0,
             'current_backend': None
         }
-
-        # 回调函数
-        self._initialization_callbacks = []
-        self._fallback_callbacks = []
-        self._error_callbacks = []
 
         # 自动初始化
         if self.config.auto_initialize:
@@ -96,18 +93,59 @@ class WebGPUManager:
                     if not self.config.enable_fallback:
                         return False
 
-                # 2. 兼容性检查
-                if self.config.enable_compatibility_check:
-                    self._compatibility_checker = GPUCompatibilityChecker()
-                    self._compatibility_report = self._compatibility_checker.check_compatibility(
-                        self._environment.gpu_capabilities,
-                        self._environment.support_level
+
+
+                # 3. 生成兼容性报告
+                self._compatibility_report = None
+                if self._environment:
+                    try:
+                        capabilities = self._environment.gpu_capabilities
+                        support_level = self._environment.support_level
+                        self._compatibility_report = self._compatibility_checker.check_compatibility(capabilities, support_level)
+                        logger.info(f"生成兼容性报告: {self._compatibility_report.level.value}")
+                    except Exception as e:
+                        logger.warning(f"生成兼容性报告失败: {e}")
+                        # 如果生成失败，创建一个默认的兼容性报告
+                        from .compatibility import CompatibilityReport, CompatibilityLevel, GPUSupportLevel
+                        self._compatibility_report = CompatibilityReport(
+                            level=CompatibilityLevel.FAIR,
+                            recommended_backend=GPUSupportLevel.WEBGPU,
+                            issues=[],
+                            performance_score=75.0,
+                            recommendations=["使用默认兼容性设置"]
+                        )
+                else:
+                    # 如果没有环境信息，创建默认兼容性报告
+                    from .compatibility import CompatibilityReport, CompatibilityLevel, GPUSupportLevel
+                    logger.warning("⚠️ 没有GPU环境信息，使用默认兼容性报告")
+                    self._compatibility_report = CompatibilityReport(
+                        level=CompatibilityLevel.FAIR,
+                        recommended_backend=GPUSupportLevel.WEBGPU,
+                        issues=[],
+                        performance_score=75.0,
+                        recommendations=["默认GPU支持配置"]
                     )
 
-                    # 记录兼容性信息
-                    self._log_compatibility_info()
+                # 4. 初始化WebGPU渲染器（主要渲染器）
+                logger.info("🚀 初始化WebGPU渲染器...")
+                from .webgpu_renderer import WebGPURenderer, GPURendererConfig
+                
+                gpu_config = GPURendererConfig(
+                    backend_type=self._compatibility_report.recommended_backend,
+                    preferred_backend=self._compatibility_report.recommended_backend
+                )
+                
+                self._webgpu_renderer = WebGPURenderer(gpu_config)
+                webgpu_success = self._webgpu_renderer.initialize(self._compatibility_report)
+                
+                if webgpu_success:
+                    logger.info(f"✅ WebGPU渲染器初始化成功，使用后端: {self._webgpu_renderer.backend_type.value}")
+                    self._performance_stats['current_backend'] = self._webgpu_renderer.backend_type.value
+                else:
+                    logger.warning("⚠️ WebGPU渲染器初始化失败，将使用降级渲染器")
+                    self._performance_stats['current_backend'] = "fallback"
 
-                # 3. 初始化降级渲染器
+                # 5. 初始化降级渲染器
                 if self.config.enable_fallback:
                     self._fallback_renderer = FallbackRenderer()
                     render_context = self._environment.create_render_context()
@@ -117,9 +155,6 @@ class WebGPUManager:
                         return False
 
                 self._initialized = True
-
-                # 更新性能统计
-                self._update_current_backend()
 
                 # 调用初始化回调
                 self._call_initialization_callbacks(True)
@@ -132,149 +167,166 @@ class WebGPUManager:
                 self._call_initialization_callbacks(False)
                 return False
 
-    def _log_compatibility_info(self):
-        """记录兼容性信息"""
-        if not self._compatibility_report:
-            return
 
-        report = self._compatibility_report
-        logger.info("=== WebGPU兼容性报告 ===")
-        logger.info(f"兼容性级别: {report.level.value}")
-        logger.info(f"推荐后端: {report.recommended_backend.value}")
-        logger.info(f"性能评分: {report.performance_score:.1f}/100")
 
-        if report.issues:
-            logger.info("兼容性问题:")
-            for issue in report.issues:
-                logger.info(f"  - {issue.description} (严重性: {issue.severity})")
-                if issue.workaround:
-                    logger.info(f"    解决方案: {issue.workaround}")
-
-        if report.recommendations:
-            logger.info("优化建议:")
-            for rec in report.recommendations:
-                logger.info(f"  - {rec}")
-
-        logger.info("========================")
-
-    def _update_current_backend(self):
-        """更新当前后端信息"""
-        if self._fallback_renderer:
-            current_backend = self._fallback_renderer.get_current_backend()
-            self._performance_stats['current_backend'] = current_backend.value if current_backend else None
-
-    def render_candlesticks(self, data, style: Dict[str, Any] = None) -> bool:
+    def render_candlesticks(self, ax, data, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """
         渲染K线图
 
         Args:
+            ax: matplotlib轴对象
             data: K线数据
             style: 样式设置
+            x: 可选，X轴数据（可以是datetime数组或数字索引）
+            use_datetime_axis: 是否使用datetime X轴
 
         Returns:
             是否渲染成功
         """
-        return self._render_with_monitoring('render_candlesticks', data, style or {})
+        return self._render('render_candlesticks', ax, data, style or {}, x, use_datetime_axis)
 
-    def render_volume(self, data, style: Dict[str, Any] = None) -> bool:
+    def render_volume(self, ax, data, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """
         渲染成交量
 
         Args:
+            ax: matplotlib轴对象
             data: 成交量数据
             style: 样式设置
+            x: 可选，X轴数据（可以是datetime数组或数字索引）
+            use_datetime_axis: 是否使用datetime X轴
 
         Returns:
             是否渲染成功
         """
-        return self._render_with_monitoring('render_volume', data, style or {})
+        return self._render('render_volume', ax, data, style or {}, x, use_datetime_axis)
 
-    def render_line(self, data, style: Dict[str, Any] = None) -> bool:
+    def render_line(self, ax, data, style: Dict[str, Any] = None) -> bool:
         """
         渲染线图
 
         Args:
+            ax: matplotlib轴对象
             data: 线图数据
             style: 样式设置
 
         Returns:
             是否渲染成功
         """
-        return self._render_with_monitoring('render_line', data, style or {})
+        return self._render('render_line', ax, data, style or {})
 
-    def _render_with_monitoring(self, method_name: str, *args, **kwargs) -> bool:
-        """带性能监控的渲染"""
+    def _render(self, method_name: str, *args, **kwargs) -> bool:
+        """执行渲染操作"""
         if not self._initialized:
             logger.error("WebGPU管理器未初始化")
             return False
 
-        if not self._fallback_renderer:
-            logger.error("降级渲染器不可用")
-            return False
-
-        import time
         start_time = time.time()
-
+        
         try:
-            # 更新渲染统计
-            self._performance_stats['total_renders'] += 1
-
-            # 执行渲染
-            method = getattr(self._fallback_renderer, method_name)
-            success = method(*args, **kwargs)
-
-            render_time = time.time() - start_time
-
-            if success:
-                self._performance_stats['successful_renders'] += 1
-
-                # 更新平均渲染时间
-                total_successful = self._performance_stats['successful_renders']
-                current_avg = self._performance_stats['average_render_time']
-                new_avg = (current_avg * (total_successful - 1) + render_time * 1000) / total_successful
-                self._performance_stats['average_render_time'] = new_avg
-
-                # 检查性能阈值
-                if render_time * 1000 > self.config.max_render_time_ms:
-                    logger.warning(f"渲染时间超过阈值: {render_time*1000:.1f}ms > {self.config.max_render_time_ms}ms")
-                    if self.config.auto_fallback_on_error:
-                        self._try_performance_fallback()
+            # ✅ 优先使用WebGPU渲染器
+            if self._webgpu_renderer and self._webgpu_renderer.initialized:
+                logger.info(f"🚀 使用WebGPU渲染器执行: {method_name}")
+                method = getattr(self._webgpu_renderer, method_name)
+                success = method(*args, **kwargs)
+                
+                if success:
+                    # 更新性能统计
+                    render_time = time.time() - start_time
+                    self._update_performance_stats(True, render_time)
+                    logger.info(f"✅ WebGPU渲染成功: {method_name} ({render_time:.3f}s)")
+                    return True
+                else:
+                    logger.warning(f"⚠️ WebGPU渲染失败: {method_name}")
+            
+            # 如果WebGPU渲染器不可用或失败，使用降级渲染器
+            if self._fallback_renderer:
+                logger.info(f"🔄 使用降级渲染器执行: {method_name}")
+                method = getattr(self._fallback_renderer, method_name)
+                success = method(*args, **kwargs)
+                
+                # 更新性能统计
+                render_time = time.time() - start_time
+                self._update_performance_stats(success, render_time)
+                
+                if success:
+                    logger.info(f"✅ 降级渲染成功: {method_name} ({render_time:.3f}s)")
+                else:
+                    logger.warning(f"⚠️ 降级渲染失败: {method_name}")
+                    
+                return success
             else:
-                self._performance_stats['failed_renders'] += 1
-                logger.warning(f"渲染失败: {method_name}")
-
-                if self.config.auto_fallback_on_error:
-                    self._try_fallback()
-
-            return success
+                logger.error("没有可用的渲染器")
+                self._update_performance_stats(False, time.time() - start_time)
+                return False
 
         except Exception as e:
             render_time = time.time() - start_time
-            self._performance_stats['failed_renders'] += 1
-
-            logger.error(f"渲染异常: {e}")
-
-            if self.config.auto_fallback_on_error:
-                return self._try_fallback()
-
+            self._update_performance_stats(False, render_time)
+            logger.error(f"渲染异常: {method_name}, 错误: {e}")
+            
+            # 尝试降级
+            if self.config.auto_fallback_on_error and self._fallback_renderer:
+                logger.info(f"🔄 尝试降级渲染: {method_name}")
+                try:
+                    method = getattr(self._fallback_renderer, method_name)
+                    success = method(*args, **kwargs)
+                    if success:
+                        logger.info(f"✅ 降级渲染成功: {method_name}")
+                        self._performance_stats['fallback_triggered'] += 1
+                    return success
+                except Exception as fallback_error:
+                    logger.error(f"降级渲染也失败: {fallback_error}")
+            
             return False
+    
+    def _update_performance_stats(self, success: bool, render_time: float):
+        """更新性能统计"""
+        self._performance_stats['total_renders'] += 1
+        if success:
+            self._performance_stats['successful_renders'] += 1
+        else:
+            self._performance_stats['failed_renders'] += 1
+        
+        # 更新平均渲染时间
+        total_renders = self._performance_stats['total_renders']
+        current_avg = self._performance_stats['average_render_time']
+        self._performance_stats['average_render_time'] = (
+            (current_avg * (total_renders - 1) + render_time) / total_renders
+        )
 
     def _try_fallback(self) -> bool:
         """尝试降级"""
+        if self._fallback_renderer and not self._fallback_renderer._initialized:
+            try:
+                render_context = self._environment.create_render_context()
+                if self._fallback_renderer.initialize(self._compatibility_report, render_context):
+                    logger.info("✅ 降级渲染器初始化成功")
+                    return True
+            except Exception as e:
+                logger.error(f"降级渲染器初始化失败: {e}")
+        return False
+    
+    @property
+    def current_backend(self) -> str:
+        """获取当前渲染后端"""
+        if not self._initialized:
+            return "uninitialized"
+        
+        # 优先从WebGPU渲染器获取
+        if self._webgpu_renderer and hasattr(self._webgpu_renderer, 'backend_type'):
+            return self._webgpu_renderer.backend_type.value
+        
+        # 从性能统计获取
+        return self._performance_stats.get('current_backend', 'unknown')
         if not self._fallback_renderer:
             return False
 
         try:
-            self._performance_stats['fallback_triggered'] += 1
-
             # 强制降级到下一个后端
             if self._fallback_renderer.force_fallback():
-                self._update_current_backend()
-
                 # 调用降级回调
                 self._call_fallback_callbacks()
-
-                logger.info(f"已降级到: {self._performance_stats['current_backend']}")
                 return True
             else:
                 logger.error("降级失败，没有更多可用后端")
@@ -283,19 +335,6 @@ class WebGPUManager:
         except Exception as e:
             logger.error(f"降级处理异常: {e}")
             return False
-
-    def _try_performance_fallback(self):
-        """尝试性能优化降级"""
-        if self._compatibility_checker and self._compatibility_report:
-            # 获取优化设置
-            optimized_settings = self._compatibility_checker.get_performance_settings(self._compatibility_report)
-
-            logger.info(f"应用性能优化设置: {optimized_settings}")
-
-            # 如果性能仍然不佳，考虑降级
-            if self._performance_stats['average_render_time'] > self.config.max_render_time_ms * 2:
-                logger.info("性能严重不佳，触发降级")
-                self._try_fallback()
 
     def clear(self) -> None:
         """清空渲染内容"""
@@ -310,12 +349,6 @@ class WebGPUManager:
                 'support_level': self._environment.support_level.value if self._environment else None,
                 'gpu_capabilities': self._environment.gpu_capabilities.__dict__ if self._environment else None
             },
-            'compatibility': {
-                'level': self._compatibility_report.level.value if self._compatibility_report else None,
-                'performance_score': self._compatibility_report.performance_score if self._compatibility_report else None,
-                'issues_count': len(self._compatibility_report.issues) if self._compatibility_report else 0
-            },
-            'performance': self._performance_stats.copy(),
             'config': self.config.__dict__
         }
 
@@ -326,23 +359,21 @@ class WebGPUManager:
 
     def get_compatibility_report(self) -> Optional[CompatibilityReport]:
         """获取兼容性报告"""
+        if not self._initialized:
+            logger.warning("WebGPU管理器未初始化，无法获取兼容性报告")
+            return None
+
         return self._compatibility_report
 
     def get_recommendations(self) -> List[str]:
         """获取优化建议"""
         recommendations = []
 
-        if self._compatibility_report:
-            recommendations.extend(self._compatibility_report.recommendations)
-
         # 基于性能统计添加建议
         if self._performance_stats['failed_renders'] > 0:
-            failure_rate = self._performance_stats['failed_renders'] / self._performance_stats['total_renders']
+            failure_rate = self._performance_stats['failed_renders'] / max(1, self._performance_stats['total_renders'])
             if failure_rate > 0.1:  # 10%失败率
                 recommendations.append("渲染失败率较高，建议检查数据格式或降低复杂度")
-
-        if self._performance_stats['average_render_time'] > self.config.max_render_time_ms:
-            recommendations.append("平均渲染时间过长，建议启用数据降采样或使用更简单的样式")
 
         return recommendations
 
@@ -358,15 +389,21 @@ class WebGPUManager:
 
         return success
 
+    def _update_current_backend(self):
+        """更新当前后端信息"""
+        if self._fallback_renderer:
+            self._performance_stats['current_backend'] = self._fallback_renderer.get_current_backend()
+
     def reset_performance_stats(self):
         """重置性能统计"""
+        current_backend = self._performance_stats.get('current_backend')
         self._performance_stats = {
             'total_renders': 0,
             'successful_renders': 0,
             'failed_renders': 0,
             'fallback_triggered': 0,
             'average_render_time': 0.0,
-            'current_backend': self._performance_stats.get('current_backend')
+            'current_backend': current_backend
         }
 
     # 回调函数管理
@@ -435,14 +472,17 @@ def initialize_webgpu_manager(config: Optional[WebGPUConfig] = None) -> bool:
     manager = get_webgpu_manager(config)
     return manager.initialize()
 
-def render_chart_webgpu(chart_type: str, data, style: Dict[str, Any] = None) -> bool:
+def render_chart_webgpu(chart_type: str, ax, data, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
     """
     使用WebGPU渲染图表的便捷函数
 
     Args:
         chart_type: 图表类型 ('candlesticks', 'volume', 'line')
+        ax: matplotlib轴对象
         data: 图表数据
         style: 样式设置
+        x: 可选，X轴数据
+        use_datetime_axis: 是否使用datetime轴
 
     Returns:
         是否渲染成功
@@ -450,11 +490,11 @@ def render_chart_webgpu(chart_type: str, data, style: Dict[str, Any] = None) -> 
     manager = get_webgpu_manager()
 
     if chart_type == 'candlesticks':
-        return manager.render_candlesticks(data, style)
+        return manager.render_candlesticks(ax, data, style, x, use_datetime_axis)
     elif chart_type == 'volume':
-        return manager.render_volume(data, style)
+        return manager.render_volume(ax, data, style, x, use_datetime_axis)
     elif chart_type == 'line':
-        return manager.render_line(data, style)
+        return manager.render_line(ax, data, style)
     else:
         logger.error(f"不支持的图表类型: {chart_type}")
         return False

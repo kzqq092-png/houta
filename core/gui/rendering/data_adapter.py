@@ -149,6 +149,74 @@ class DataAdapter:
             )
             self.schemas["numerical"] = numerical_schema
             
+            # 混合推荐数据模式
+            hybrid_recommendation_schema = DataSchema(
+                name="hybrid_recommendation",
+                format=DataFormat.NUMERICAL,
+                required_columns=["stock_code", "score", "confidence", "recommendation_type"],
+                optional_columns=["reason", "metadata"],
+                data_types={
+                    "stock_code": "object",
+                    "score": "float64",
+                    "confidence": "float64", 
+                    "recommendation_type": "object",
+                    "reason": "object",
+                    "metadata": "object"
+                },
+                validation_rules={
+                    "score": {"min": 0.0, "max": 1.0},
+                    "confidence": {"min": 0.0, "max": 1.0},
+                    "recommendation_type": {"choices": ["BUY", "SELL", "HOLD"]}
+                }
+            )
+            self.schemas["hybrid_recommendation"] = hybrid_recommendation_schema
+            
+            # 传统推荐数据模式
+            traditional_recommendation_schema = DataSchema(
+                name="traditional_recommendation",
+                format=DataFormat.NUMERICAL,
+                required_columns=["stock_code", "score", "confidence", "recommendation_type"],
+                optional_columns=["reason", "metadata"],
+                data_types={
+                    "stock_code": "object",
+                    "score": "float64",
+                    "confidence": "float64",
+                    "recommendation_type": "object", 
+                    "reason": "object",
+                    "metadata": "object"
+                },
+                validation_rules={
+                    "score": {"min": 0.0, "max": 1.0},
+                    "confidence": {"min": 0.0, "max": 1.0},
+                    "recommendation_type": {"choices": ["BUY", "SELL", "HOLD"]}
+                }
+            )
+            self.schemas["traditional_recommendation"] = traditional_recommendation_schema
+            
+            # BettaFish信号数据模式
+            bettafish_signal_schema = DataSchema(
+                name="bettafish_signal",
+                format=DataFormat.NUMERICAL,
+                required_columns=["stock_code", "strength", "signal_type"],
+                optional_columns=["confidence", "reasoning", "risk_level", "agents_consensus"],
+                data_types={
+                    "stock_code": "object",
+                    "strength": "float64",
+                    "signal_type": "object",
+                    "confidence": "float64",
+                    "reasoning": "object",
+                    "risk_level": "object",
+                    "agents_consensus": "object"
+                },
+                validation_rules={
+                    "strength": {"min": 0.0, "max": 1.0},
+                    "confidence": {"min": 0.0, "max": 1.0},
+                    "signal_type": {"choices": ["BUY", "SELL", "HOLD"]},
+                    "risk_level": {"choices": ["LOW", "MEDIUM", "HIGH"]}
+                }
+            )
+            self.schemas["bettafish_signal"] = bettafish_signal_schema
+            
             logger.debug("预定义数据模式注册完成")
             
         except Exception as e:
@@ -305,6 +373,11 @@ class DataAdapter:
             warnings = []
             statistics = {}
             
+            # 验证规则检查
+            validation_errors, validation_warnings = self._validate_field_rules(data, schema)
+            errors.extend(validation_errors)
+            warnings.extend(validation_warnings)
+            
             # 完整性检查
             completeness = self._calculate_completeness(data, schema)
             statistics['completeness'] = completeness
@@ -322,8 +395,8 @@ class DataAdapter:
             statistics['timeliness'] = timeliness
             
             # 总体质量分数
-            score = (completeness * 0.3 + consistency * 0.25 + 
-                    accuracy * 0.25 + timeliness * 0.2)
+            score = (completeness * 0.25 + consistency * 0.25 + 
+                    accuracy * 0.25 + timeliness * 0.15 + (1.0 - len(errors) * 0.1) * 0.1)
             
             # 根据验证级别调整检查严格程度
             if self.validation_level == DataValidationLevel.STRICT:
@@ -513,6 +586,100 @@ class DataAdapter:
         except Exception as e:
             logger.error(f"计算时效性失败: {e}")
             return 0.5
+            
+    def _validate_field_rules(self, data: pd.DataFrame, schema: DataSchema) -> tuple[list[str], list[str]]:
+        """验证字段级别的验证规则"""
+        errors = []
+        warnings = []
+        
+        try:
+            # 如果没有验证规则，直接返回
+            if not schema.validation_rules:
+                return errors, warnings
+                
+            for field_name, rules in schema.validation_rules.items():
+                if field_name not in data.columns:
+                    continue
+                    
+                field_data = data[field_name]
+                
+                # 最小/最大值验证
+                if 'min' in rules:
+                    min_value = rules['min']
+                    if field_data.dtype in ['float64', 'int64']:
+                        invalid_count = (field_data < min_value).sum()
+                        if invalid_count > 0:
+                            errors.append(f"字段 {field_name} 有 {invalid_count} 个值小于最小值 {min_value}")
+                    else:
+                        # 字符串字段的长度检查
+                        invalid_count = (field_data.str.len() < min_value).sum()
+                        if invalid_count > 0:
+                            warnings.append(f"字段 {field_name} 有 {invalid_count} 个值长度小于最小值 {min_value}")
+                            
+                if 'max' in rules:
+                    max_value = rules['max']
+                    if field_data.dtype in ['float64', 'int64']:
+                        invalid_count = (field_data > max_value).sum()
+                        if invalid_count > 0:
+                            errors.append(f"字段 {field_name} 有 {invalid_count} 个值大于最大值 {max_value}")
+                    else:
+                        # 字符串字段的长度检查
+                        invalid_count = (field_data.str.len() > max_value).sum()
+                        if invalid_count > 0:
+                            warnings.append(f"字段 {field_name} 有 {invalid_count} 个值长度大于最大值 {max_value}")
+                            
+                # 选择值验证
+                if 'choices' in rules:
+                    valid_choices = set(rules['choices'])
+                    # 移除空值进行验证
+                    non_null_data = field_data.dropna()
+                    if len(non_null_data) > 0:
+                        invalid_choices = set(non_null_data.astype(str)) - valid_choices
+                        if invalid_choices:
+                            errors.append(f"字段 {field_name} 包含无效值: {list(invalid_choices)[:5]}")
+                            
+                # 范围验证（特殊格式）
+                if 'range' in rules:
+                    range_config = rules['range']
+                    if isinstance(range_config, dict) and 'min' in range_config and 'max' in range_config:
+                        min_val, max_val = range_config['min'], range_config['max']
+                        if field_data.dtype in ['float64', 'int64']:
+                            invalid_count = ((field_data < min_val) | (field_data > max_val)).sum()
+                            if invalid_count > 0:
+                                errors.append(f"字段 {field_name} 有 {invalid_count} 个值超出范围 [{min_val}, {max_val}]")
+                                
+                # 正则表达式验证
+                if 'pattern' in rules:
+                    import re
+                    pattern = rules['pattern']
+                    try:
+                        # 编译正则表达式
+                        regex = re.compile(pattern)
+                        # 检查非空值
+                        non_null_data = field_data.dropna().astype(str)
+                        if len(non_null_data) > 0:
+                            invalid_count = (~non_null_data.str.match(regex)).sum()
+                            if invalid_count > 0:
+                                errors.append(f"字段 {field_name} 有 {invalid_count} 个值不符合模式 {pattern}")
+                    except re.error as e:
+                        errors.append(f"字段 {field_name} 正则表达式模式错误: {e}")
+                        
+                # 自定义验证函数
+                if 'custom_validator' in rules:
+                    try:
+                        validator_func = rules['custom_validator']
+                        if callable(validator_func):
+                            validation_result = validator_func(field_data)
+                            if not validation_result:
+                                errors.append(f"字段 {field_name} 自定义验证失败")
+                    except Exception as e:
+                        errors.append(f"字段 {field_name} 自定义验证执行失败: {e}")
+                        
+        except Exception as e:
+            logger.error(f"验证字段规则失败: {e}")
+            errors.append(f"验证过程异常: {str(e)}")
+            
+        return errors, warnings
             
     def get_data_statistics(self, data: pd.DataFrame) -> Dict[str, Any]:
         """获取数据统计信息"""

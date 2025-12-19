@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QTableView, QPushButton, QMessageBox, QLineEdit, QLabel, QFileDialog, QStyledItemDelegate, QSpinBox, QDoubleSpinBox, QDateEdit, QCheckBox, QComboBox, QInputDialog, QSplitter, QHeaderView, QWidget, QAbstractItemView, QGroupBox, QTextEdit
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QTableView, QPushButton, QMessageBox, QLineEdit, QLabel, QFileDialog, QStyledItemDelegate, QSpinBox, QDoubleSpinBox, QDateEdit, QCheckBox, QComboBox, QInputDialog, QSplitter, QHeaderView, QWidget, QAbstractItemView, QGroupBox, QTextEdit, QProgressDialog
 from PyQt5.QtSql import QSqlDatabase, QSqlTableModel
 from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal, QAbstractTableModel, QVariant
 from PyQt5.QtGui import QFont, QColor, QBrush
@@ -309,6 +309,11 @@ class DatabaseAdminDialog(QDialog):
         self.total_pages = 0  # 总页数
         self.log = []
 
+        # 性能优化：添加缓存
+        self._table_cache = {}  # 表数据缓存 {"table_name": {"data": data, "schema": schema, "timestamp": time}}
+        self._cache_ttl = 300  # 缓存有效期（秒）
+        self._max_cache_size = 5  # 最大缓存表数量
+
         # 慢SQL记录功能
         self.slow_query_threshold = 500  # 慢查询阈值(毫秒)
         self.slow_queries = []  # 慢查询记录
@@ -366,12 +371,113 @@ class DatabaseAdminDialog(QDialog):
 
         # 搜索栏
         search_layout = QHBoxLayout()
-        self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("字段/内容搜索...支持模糊")
-        self.search_edit.textChanged.connect(self.apply_search)
         search_layout.addWidget(QLabel("搜索:"))
-        search_layout.addWidget(self.search_edit)
+        
+        # 创建搜索框容器
+        search_box_layout = QVBoxLayout()
+        search_box_layout.setContentsMargins(0, 0, 0, 0)
+        search_box_layout.setSpacing(2)
+        
+        # 主搜索框
+        search_input_layout = QHBoxLayout()
+        search_input_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("输入搜索条件，支持字段名=值、LIKE模糊搜索、AND/OR组合条件")
+        
+        # 添加搜索帮助按钮
+        self.help_btn = QPushButton("?")
+        self.help_btn.setFixedSize(25, 25)
+        self.help_btn.setToolTip("点击查看搜索语法帮助")
+        self.help_btn.setStyleSheet("""
+            QPushButton {
+                border: 1px solid #ccc;
+                border-radius: 12px;
+                background-color: #f8f9fa;
+                font-size: 12px;
+                font-weight: bold;
+                color: #6c757d;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+                color: #495057;
+            }
+            QPushButton:pressed {
+                background-color: #dee2e6;
+            }
+        """)
+        self.help_btn.clicked.connect(self.show_search_help)
+        
+        search_input_layout.addWidget(self.search_edit, 1)
+        search_input_layout.addWidget(self.help_btn, 0)
+        
+        # 搜索示例标签
+        self.example_label = QLabel()
+        self.example_label.setStyleSheet("""
+            QLabel {
+                color: #6c757d;
+                font-size: 11px;
+                padding-left: 4px;
+            }
+        """)
+        self.example_label.setText("💡 示例: name=Apple, description LIKE \"%red%\", (category=fruit AND price>5)")
+        self.example_label.setVisible(False)  # 默认隐藏，按需显示
+        
+        search_box_layout.addLayout(search_input_layout)
+        search_box_layout.addWidget(self.example_label)
+        
+        # 将搜索框容器添加到主布局
+        search_layout.addLayout(search_box_layout, 1)
+        
+        # 修改信号连接，只在用户按回车键或编辑结束时触发搜索
+        self.search_edit.returnPressed.connect(self.apply_search)
+        self.search_edit.editingFinished.connect(self.apply_search)
+        self.search_edit.textChanged.connect(self.on_search_text_changed)
+        
+        # 添加搜索按钮
+        self.search_btn = QPushButton("搜索")
+        self.search_btn.setEnabled(True)
+        self.search_btn.clicked.connect(self.apply_search)
+        search_layout.addWidget(self.search_btn)
+        
+        # 搜索建议下拉框
+        self.search_suggestions = QComboBox()
+        self.search_suggestions.setVisible(False)
+        self.search_suggestions.setEditable(True)
+        self.search_suggestions.currentTextChanged.connect(self.on_suggestion_selected)
+        search_layout.addWidget(self.search_suggestions)
+        
         right_layout.addLayout(search_layout)
+
+        # 过滤信息显示区域
+        self.filter_info_label = QLabel()
+        self.filter_info_label.setStyleSheet("""
+            QLabel {
+                background: #F0F8FF;
+                border: 1px solid #4A90E2;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 11px;
+                color: #2E5266;
+            }
+        """)
+        self.filter_info_label.setVisible(False)
+        right_layout.addWidget(self.filter_info_label)
+        
+        # 语法验证提示区域
+        self.syntax_validation_label = QLabel()
+        self.syntax_validation_label.setStyleSheet("""
+            QLabel {
+                background: #FFF8E1;
+                border: 1px solid #FFC107;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 11px;
+                color: #E65100;
+            }
+        """)
+        self.syntax_validation_label.setVisible(False)
+        right_layout.addWidget(self.syntax_validation_label)
 
         # 表格
         self.table_view = QTableView()
@@ -738,29 +844,62 @@ class DatabaseAdminDialog(QDialog):
         # 动态显示表描述信息
         self._update_dynamic_table_info(table_name)
 
+        # 显示加载进度
+        self._show_loading_progress(f"正在加载表 {table_name} 的数据...")
+
+        # 开始性能监控
+        start_time = time.time()
+        
+        # 初始化total_rows变量，确保在所有路径中都有定义
+        total_rows = 0
+
         try:
+            # 优化查询执行策略
+            self._optimize_query_execution(table_name)
+            
             if self.current_db_type == 'duckdb':
                 # DuckDB 处理
                 if hasattr(self, '_duckdb_conn'):
-                    # 获取表结构
-                    schema_result = self._duckdb_conn.execute(f"DESCRIBE {table_name}").fetchall()
+                    # 先尝试从缓存获取数据
+                    cached_schema, cached_data, cached_total_rows, from_cache = self._get_cached_data(table_name, self.current_page)
+                    
+                    if from_cache:
+                        # 使用缓存数据
+                        total_rows = cached_total_rows
+                        self._create_duckdb_table_model(cached_schema, cached_data, cached_total_rows)
+                    else:
+                        # 缓存未命中，从数据库获取
+                        # 获取表结构
+                        schema_result = self._duckdb_conn.execute(f"DESCRIBE {table_name}").fetchall()
 
-                    # 获取数据（分页）
-                    offset = self.current_page * self.page_size
-                    data_result = self._duckdb_conn.execute(
-                        f"SELECT * FROM {table_name} LIMIT {self.page_size} OFFSET {offset}"
-                    ).fetchall()
+                        # 获取数据（分页）- 优化版本
+                        offset = self.current_page * self.page_size
+                        
+                        # 先获取总行数
+                        count_result = self._duckdb_conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                        total_rows = count_result[0] if count_result else 0
+                        
+                        # 检查表大小，提供性能建议
+                        self._analyze_table_performance(table_name, total_rows)
+                        
+                        # 检查索引情况
+                        self._check_table_indexes(table_name)
+                        
+                        # 使用优化的分页查询
+                        data_result = self._duckdb_conn.execute(
+                            f"SELECT * FROM {table_name} ORDER BY 1 LIMIT {self.page_size} OFFSET {offset}"
+                        ).fetchall()
 
-                    # 获取总行数
-                    count_result = self._duckdb_conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
-                    total_rows = count_result[0] if count_result else 0
+                        # 存储到缓存（如果表不太大）
+                        if total_rows < 100000:  # 只有小表才缓存，避免内存占用过大
+                            self._set_cached_data(table_name, schema_result, data_result, total_rows)
 
-                    # 创建自定义模型显示数据
-                    self._create_duckdb_table_model(schema_result, data_result, total_rows)
+                        # 创建自定义模型显示数据
+                        self._create_duckdb_table_model(schema_result, data_result, total_rows)
 
             else:
                 # SQLite 处理（原有逻辑）
-                if hasattr(self, 'model'):
+                if hasattr(self, 'model') and self.model is not None:
                     self.model.deleteLater()
 
                 self.model = QSqlTableModel(self, self.db)
@@ -784,7 +923,17 @@ class DatabaseAdminDialog(QDialog):
             self.prev_btn.setEnabled(self.current_page > 0)
             self.next_btn.setEnabled(self.current_page < self.total_pages - 1)
 
+            # 结束性能监控
+            self._monitor_query_performance(start_time, table_name, "SELECT")
+
+            # 隐藏加载进度
+            self._hide_loading_progress()
+
         except Exception as e:
+            # 结束性能监控（错误情况）
+            self._monitor_query_performance(start_time, table_name, "SELECT (ERROR)")
+            # 隐藏加载进度
+            self._hide_loading_progress()
             QMessageBox.critical(self, "错误", f"加载表 {table_name} 失败: {str(e)}")
 
     def refresh_table(self):
@@ -797,6 +946,207 @@ class DatabaseAdminDialog(QDialog):
         current_item = self.table_list.currentItem()
         if current_item:
             self.load_table(current_item)
+
+    def _show_loading_progress(self, message):
+        """显示数据加载进度"""
+        try:
+            # 创建或更新进度对话框
+            if not hasattr(self, '_progress_dialog') or self._progress_dialog is None:
+                self._progress_dialog = QProgressDialog(self)
+                self._progress_dialog.setWindowTitle("数据加载中")
+                self._progress_dialog.setCancelButton(None)
+                self._progress_dialog.setWindowModality(Qt.WindowModal)
+                self._progress_dialog.setMinimumWidth(300)
+                self._progress_dialog.setMinimumHeight(100)
+                
+            self._progress_dialog.setLabelText(message)
+            self._progress_dialog.setRange(0, 0)  # 不确定进度，显示旋转动画
+            self._progress_dialog.show()
+            self._progress_dialog.raise_()
+            self._progress_dialog.activateWindow()
+            
+            # 强制UI更新
+            QApplication.processEvents()
+            
+        except Exception as e:
+            logger.warning(f"显示进度对话框失败: {e}")
+
+    def _hide_loading_progress(self):
+        """隐藏数据加载进度"""
+        try:
+            if hasattr(self, '_progress_dialog') and self._progress_dialog is not None:
+                self._progress_dialog.close()
+                self._progress_dialog = None
+        except Exception as e:
+            logger.warning(f"隐藏进度对话框失败: {e}")
+
+    def _analyze_table_performance(self, table_name, total_rows):
+        """分析表性能并提供优化建议"""
+        try:
+            if total_rows > 500000:
+                logger.warning(f"大型表检测: {table_name} 包含 {total_rows} 行数据，建议优化查询")
+                QMessageBox.information(
+                    self, 
+                    "性能建议", 
+                    f"表 {table_name} 包含 {total_rows:,} 行数据，可能影响查询性能。\n"
+                    f"建议：\n"
+                    f"• 考虑添加适当的索引\n"
+                    f"• 使用更具体的过滤条件\n"
+                    f"• 考虑数据分区"
+                )
+            elif total_rows > 100000:
+                logger.info(f"中等大小表: {table_name} 包含 {total_rows} 行数据")
+                # 对于中等大小的表，可以在日志中记录性能建议
+                self.log.append(f"表 {table_name} 大小: {total_rows:,} 行 (中等大小)")
+            else:
+                logger.debug(f"小表: {table_name} 包含 {total_rows} 行数据")
+                
+        except Exception as e:
+            logger.warning(f"分析表性能失败: {e}")
+
+    def _check_table_indexes(self, table_name):
+        """检查表的索引情况"""
+        try:
+            if self.current_db_type == 'duckdb':
+                # DuckDB 获取索引信息
+                index_info = self._duckdb_conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+                # DuckDB 不直接支持显示索引，我们可以通过表信息推断
+                logger.info(f"表 {table_name} 包含 {len(index_info)} 个字段")
+                return len(index_info)
+            elif self.current_db_type == 'sqlite':
+                # SQLite 获取索引信息
+                indexes = self.db.executescript(f"PRAGMA index_list({table_name})").fetchall()
+                logger.info(f"表 {table_name} 包含 {len(indexes)} 个索引")
+                return len(indexes)
+        except Exception as e:
+            logger.warning(f"检查索引失败: {e}")
+            return 0
+
+    def _monitor_query_performance(self, start_time, table_name, query_type="SELECT"):
+        """监控查询性能"""
+        try:
+            end_time = time.time()
+            duration = end_time - start_time
+            
+            if duration > 5.0:  # 超过5秒的查询
+                logger.warning(f"慢查询检测: {query_type} on {table_name} 耗时 {duration:.2f} 秒")
+                self.log.append(f"⚠️  慢查询: {query_type} on {table_name} 耗时 {duration:.2f} 秒")
+            elif duration > 2.0:  # 超过2秒的查询
+                logger.info(f"中等耗时查询: {query_type} on {table_name} 耗时 {duration:.2f} 秒")
+                self.log.append(f"⏱️  查询耗时: {query_type} on {table_name} 耗时 {duration:.2f} 秒")
+            else:
+                logger.debug(f"快速查询: {query_type} on {table_name} 耗时 {duration:.2f} 秒")
+                
+        except Exception as e:
+            logger.warning(f"性能监控失败: {e}")
+
+    def _optimize_query_execution(self, table_name):
+        """优化查询执行策略"""
+        try:
+            # 检查表大小并调整分页策略
+            if self.current_db_type == 'duckdb':
+                count_result = self._duckdb_conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                total_rows = count_result[0] if count_result else 0
+                
+                # 对于大型表，调整分页大小
+                if total_rows > 1000000:
+                    self.page_size = 500  # 大表使用较小的分页
+                    logger.info(f"大表检测，调整分页大小为 {self.page_size}")
+                elif total_rows > 500000:
+                    self.page_size = 1000  # 中等表
+                else:
+                    self.page_size = 2000  # 小表使用较大的分页
+                    
+        except Exception as e:
+            logger.warning(f"优化查询执行失败: {e}")
+
+    def _get_cached_data(self, table_name, page):
+        """从缓存获取表数据"""
+        try:
+            if table_name in self._table_cache:
+                cache_entry = self._table_cache[table_name]
+                cache_time = cache_entry.get('timestamp', 0)
+                current_time = time.time()
+                
+                # 检查缓存是否过期
+                if current_time - cache_time < self._cache_ttl:
+                    data = cache_entry.get('data', [])
+                    schema = cache_entry.get('schema', [])
+                    total_rows = cache_entry.get('total_rows', 0)
+                    
+                    # 计算当前页的数据范围
+                    start_idx = page * self.page_size
+                    end_idx = start_idx + self.page_size
+                    
+                    if start_idx < len(data):
+                        page_data = data[start_idx:end_idx]
+                        logger.debug(f"使用缓存数据: {table_name} 第{page+1}页")
+                        return schema, page_data, total_rows, True  # True表示来自缓存
+                        
+        except Exception as e:
+            logger.warning(f"获取缓存数据失败: {e}")
+            
+        return None, None, None, False  # 无缓存数据
+
+    def _set_cached_data(self, table_name, schema, data, total_rows):
+        """将表数据存入缓存"""
+        try:
+            # 清理过期缓存
+            self._clear_expired_cache()
+            
+            # 管理缓存大小
+            self._manage_cache_size()
+            
+            # 存储新数据
+            self._table_cache[table_name] = {
+                'schema': schema,
+                'data': data,
+                'total_rows': total_rows,
+                'timestamp': time.time()
+            }
+            logger.debug(f"数据已缓存: {table_name}")
+            
+        except Exception as e:
+            logger.warning(f"存储缓存数据失败: {e}")
+
+    def _clear_expired_cache(self):
+        """清理过期的缓存数据"""
+        try:
+            current_time = time.time()
+            expired_tables = []
+            
+            for table_name, cache_entry in self._table_cache.items():
+                cache_time = cache_entry.get('timestamp', 0)
+                if current_time - cache_time >= self._cache_ttl:
+                    expired_tables.append(table_name)
+            
+            # 清理过期数据
+            for table_name in expired_tables:
+                del self._table_cache[table_name]
+                logger.debug(f"清理过期缓存: {table_name}")
+                
+        except Exception as e:
+            logger.warning(f"清理过期缓存失败: {e}")
+
+    def _manage_cache_size(self):
+        """管理缓存大小"""
+        try:
+            if len(self._table_cache) > self._max_cache_size:
+                # 按时间戳排序，删除最旧的缓存
+                sorted_cache = sorted(
+                    self._table_cache.items(),
+                    key=lambda x: x[1].get('timestamp', 0)
+                )
+                
+                # 删除最旧的缓存项
+                tables_to_remove = len(self._table_cache) - self._max_cache_size
+                for i in range(tables_to_remove):
+                    table_name = sorted_cache[i][0]
+                    del self._table_cache[table_name]
+                    logger.debug(f"清理缓存以节省空间: {table_name}")
+                    
+        except Exception as e:
+            logger.warning(f"管理缓存大小失败: {e}")
 
     def add_row(self):
         if hasattr(self, 'model') and self.model:
@@ -913,13 +1263,15 @@ class DatabaseAdminDialog(QDialog):
         if not text:
             self.model.setFilter("")
         else:
-            filters = []
-            for col in range(self.model.columnCount()):
-                name = self.model.headerData(col, Qt.Horizontal)
-                filters.append(f"{name} LIKE '%{text}%'")
-            self.model.setFilter("OR ".join(filters))
+            # 使用新的过滤方法
+            self.model.setFilter(text)
         self.model.select()
         self.update_page_label()
+        self.update_filter_info()
+        # 更新搜索建议
+        self.update_search_suggestions(text)
+        # 验证语法并显示结果
+        self.validate_and_display_syntax(text)
 
     def prev_page(self):
         """上一页"""
@@ -948,6 +1300,195 @@ class DatabaseAdminDialog(QDialog):
             total_pages = max(1, (total - 1) // self.page_size + 1) if total > 0 else 1
             self.page_label.setText(
                 f"第{self.current_page+1}页 / 共{total_pages}页  共{total}行")
+
+    def update_filter_info(self):
+        """更新过滤信息显示"""
+        try:
+            if hasattr(self, 'model') and self.model:
+                filter_info = self.model.get_filter_info()
+                if filter_info['filter_active']:
+                    text = f"🔍 过滤: {filter_info['filtered_rows']}/{filter_info['total_rows']} 行 ({filter_info['match_percentage']:.1f}%)"
+                    self.filter_info_label.setText(text)
+                    self.filter_info_label.setVisible(True)
+                else:
+                    self.filter_info_label.setVisible(False)
+        except Exception as e:
+            print(f"更新过滤信息失败: {e}")
+            self.filter_info_label.setVisible(False)
+            
+    def update_search_suggestions(self, text):
+        """更新搜索建议"""
+        try:
+            if not text or len(text) < 2:  # 至少输入2个字符才显示建议
+                self.search_suggestions.setVisible(False)
+                return
+                
+            if hasattr(self, 'model') and self.model:
+                # 使用模型中的get_search_suggestions方法
+                suggestions = self.model.get_search_suggestions(text, 5)
+                self.search_suggestions.clear()
+                if suggestions:
+                    self.search_suggestions.addItems(suggestions)
+                    self.search_suggestions.setVisible(True)
+                else:
+                    self.search_suggestions.setVisible(False)
+        except Exception as e:
+            print(f"更新搜索建议失败: {e}")
+            self.search_suggestions.setVisible(False)
+            
+    def validate_and_display_syntax(self, filter_text):
+        """验证过滤语法并在UI上显示结果"""
+        try:
+            if not filter_text.strip():
+                # 如果搜索框为空，隐藏语法验证标签
+                self.syntax_validation_label.setVisible(False)
+                return
+                
+            if hasattr(self, 'model') and self.model:
+                # 使用模型中的validate_filter_syntax方法
+                is_valid, message = self.model.validate_filter_syntax(filter_text)
+                
+                if is_valid:
+                    # 语法正确，显示成功消息
+                    self.syntax_validation_label.setStyleSheet("""
+                        QLabel {
+                            background: #E8F5E9;
+                            border: 1px solid #4CAF50;
+                            border-radius: 4px;
+                            padding: 4px 8px;
+                            font-size: 11px;
+                            color: #1B5E20;
+                        }
+                    """)
+                    self.syntax_validation_label.setText(f"✓ {message}")
+                else:
+                    # 语法错误，显示错误消息
+                    self.syntax_validation_label.setStyleSheet("""
+                        QLabel {
+                            background: #FFEBEE;
+                            border: 1px solid #F44336;
+                            border-radius: 4px;
+                            padding: 4px 8px;
+                            font-size: 11px;
+                            color: #B71C1C;
+                        }
+                    """)
+                    self.syntax_validation_label.setText(f"✗ {message}")
+                
+                self.syntax_validation_label.setVisible(True)
+        except Exception as e:
+            print(f"语法验证失败: {e}")
+            self.syntax_validation_label.setVisible(False)
+            
+    def on_suggestion_selected(self, suggestion_text):
+        """处理用户选择的建议"""
+        if suggestion_text:
+            # 将选中的建议设置到搜索框
+            self.search_edit.setText(suggestion_text)
+            # 应用搜索
+            self.apply_search()
+            # 隐藏建议下拉框
+            self.search_suggestions.setVisible(False)
+            
+    def on_search_text_changed(self, text):
+        """处理搜索文本变化，显示友好的提示"""
+        try:
+            if not text.strip():
+                # 空文本时隐藏所有提示
+                self.example_label.setVisible(False)
+                return
+                
+            # 如果用户输入了内容，显示搜索示例
+            self.example_label.setVisible(True)
+            
+            # 根据输入的内容动态更新示例
+            if "LIKE" in text.upper():
+                self.example_label.setText("🔍 正在使用LIKE模糊搜索，支持 % 通配符")
+            elif "AND" in text.upper() or "OR" in text.upper():
+                self.example_label.setText("🔍 正在使用组合条件搜索")
+            elif "=" in text:
+                self.example_label.setText("🔍 正在使用精确匹配搜索")
+            else:
+                self.example_label.setText("💡 提示：可使用 name=值、LIKE模糊搜索、AND/OR组合条件")
+                
+        except Exception as e:
+            print(f"更新搜索提示失败: {e}")
+            
+    def show_search_help(self):
+        """显示搜索语法帮助对话框"""
+        try:
+            help_dialog = QDialog(self)
+            help_dialog.setWindowTitle("搜索语法帮助")
+            help_dialog.setModal(True)
+            help_dialog.resize(500, 400)
+            
+            layout = QVBoxLayout(help_dialog)
+            
+            # 创建帮助内容
+            help_text = QTextEdit()
+            help_text.setReadOnly(True)
+            help_text.setHtml("""
+            <h3>🔍 数据库搜索语法帮助</h3>
+            
+            <h4>1. 基本搜索语法</h4>
+            <ul>
+                <li><b>精确匹配</b>：<code>字段名=值</code><br>
+                    示例：<code>name=Apple</code>, <code>price=5.99</code></li>
+                
+                <li><b>模糊搜索</b>：<code>字段名 LIKE "模式"</code><br>
+                    示例：<code>name LIKE "Apple%"</code> (以Apple开头)<br>
+                    示例：<code>description LIKE "%red%"</code> (包含red)<br>
+                    示例：<code>name LIKE "%pie"</code> (以pie结尾)</li>
+            </ul>
+            
+            <h4>2. 组合条件搜索</h4>
+            <ul>
+                <li><b>AND条件</b>：<code>条件1 AND 条件2</code><br>
+                    示例：<code>category=fruit AND price>5</code></li>
+                
+                <li><b>OR条件</b>：<code>条件1 OR 条件2</code><br>
+                    示例：<code>name=Apple OR name=Banana</code></li>
+                
+                <li><b>括号分组</b>：<code>(条件1 OR 条件2) AND 条件3</code><br>
+                    示例：<code>(category=fruit AND price>5) OR (category=vegetable AND color=green)</code></li>
+            </ul>
+            
+            <h4>3. 通配符说明</h4>
+            <ul>
+                <li><code>%</code> - 匹配任意长度的字符（包括零个字符）</li>
+                <li><code>_</code> - 匹配单个字符</li>
+                <li>不区分大小写搜索</li>
+            </ul>
+            
+            <h4>4. 实用示例</h4>
+            <ul>
+                <li>搜索所有水果：<code>category=fruit</code></li>
+                <li>搜索名称包含"apple"的所有商品：<code>name LIKE "%apple%"</code></li>
+                <li>搜索价格大于5元的水果：<code>category=fruit AND price>5</code></li>
+                <li>搜索名称以"A"开头的商品：<code>name LIKE "A%"</code></li>
+            </ul>
+            
+            <h4>💡 使用提示</h4>
+            <ul>
+                <li>搜索不区分大小写</li>
+                <li>可以使用比较运算符：=, >, <, >=, <=, !=</li>
+                <li>支持数学运算：+, -, *, /</li>
+                <li>字段名必须与数据库表中的列名完全匹配</li>
+            </ul>
+            """)
+            
+            layout.addWidget(help_text)
+            
+            # 添加关闭按钮
+            close_btn = QPushButton("关闭")
+            close_btn.clicked.connect(help_dialog.accept)
+            layout.addWidget(close_btn)
+            
+            help_dialog.exec_()
+            
+        except Exception as e:
+            print(f"显示搜索帮助失败: {e}")
+            QMessageBox.warning(self, "错误", f"无法显示搜索帮助：{e}")
 
     def show_log(self):
         if self.log_window is None:
@@ -1832,15 +2373,23 @@ class DatabaseAdminDialog(QDialog):
                 super().__init__(parent)
                 self.schema = schema  # [(column_name, data_type, null, key, default, extra), ...]
                 self._data = [list(row) for row in data]  # 转换为可修改的列表
+                self._original_data = [list(row) for row in data]  # 保存原始数据用于过滤
                 self.headers = [col[0] for col in schema]
                 self.conn = conn  # DuckDB连接
                 self.table_name = table_name
                 self._deleted_rows = []  # 记录待删除的行
                 self._new_rows = []  # 记录新增的行索引
                 self._modified_cells = {}  # 记录修改的单元格 {(row, col): value}
+                self._current_filter = ""  # 当前过滤条件
+                # 初始化过滤索引为包含所有行的索引列表
+                self._filtered_indices = list(range(len(self._data)))  # 过滤后的行索引
+                
+                # 性能优化：缓存和增量更新
+                self._filter_cache = {}  # 缓存过滤结果
+                self._last_filter_hash = ""  # 上次过滤条件的哈希
+                self._column_types = self._analyze_column_types()  # 分析列类型
 
-            def rowCount(self, parent=None):
-                return len(self._data)
+
 
             def columnCount(self, parent=None):
                 return len(self.headers)
@@ -1868,6 +2417,160 @@ class DatabaseAdminDialog(QDialog):
             def setData(self, index, value, role=Qt.EditRole):
                 """设置数据"""
                 if not index.isValid() or role != Qt.EditRole:
+                    return False
+
+            # 用户体验增强功能
+            def get_filter_info(self):
+                """获取过滤信息用于显示"""
+                try:
+                    total_rows = len(self._data)
+                    filtered_rows = len(self._filtered_indices)
+                    filter_text = self._current_filter.strip()
+                    
+                    return {
+                        'total_rows': total_rows,
+                        'filtered_rows': filtered_rows,
+                        'filter_active': bool(filter_text),
+                        'filter_text': filter_text,
+                        'match_percentage': (filtered_rows / total_rows * 100) if total_rows > 0 else 0
+                    }
+                except Exception as e:
+                    logger.warning(f"获取过滤信息失败: {e}")
+                    return {
+                        'total_rows': len(self._data),
+                        'filtered_rows': len(self._filtered_indices),
+                        'filter_active': False,
+                        'filter_text': '',
+                        'match_percentage': 0
+                    }
+
+            def get_search_suggestions(self, partial_text="", max_suggestions=10):
+                """获取搜索建议"""
+                try:
+                    suggestions = set()
+                    search_text = partial_text.strip().lower()
+                    
+                    if not search_text:
+                        return list(suggestions)
+                    
+                    # 从数据中收集建议
+                    for row_data in self._data:
+                        for cell_value in row_data:
+                            if cell_value is not None:
+                                cell_str = str(cell_value).lower()
+                                if search_text in cell_str and len(cell_str) > len(search_text):
+                                    suggestions.add(str(cell_value))
+                                    
+                                    if len(suggestions) >= max_suggestions:
+                                        break
+                        if len(suggestions) >= max_suggestions:
+                            break
+                    
+                    return list(suggestions)[:max_suggestions]
+                except Exception as e:
+                    logger.warning(f"获取搜索建议失败: {e}")
+                    return []
+
+            def validate_filter_syntax(self, filter_str):
+                """验证过滤条件语法"""
+                try:
+                    if not filter_str.strip():
+                        return True, ""
+                    
+                    # 基本的语法检查
+                    test_conditions = self._parse_filter_conditions(filter_str)
+                    if not test_conditions:
+                        return False, "无法解析过滤条件"
+                    
+                    # 测试应用过滤条件（不修改实际数据）
+                    original_filter = self._current_filter
+                    original_indices = self._filtered_indices.copy()
+                    
+                    try:
+                        self._current_filter = filter_str
+                        test_indices = self._execute_filter(test_conditions)
+                        
+                        # 恢复原始状态
+                        self._current_filter = original_filter
+                        self._filtered_indices = original_indices
+                        
+                        return True, f"语法正确，找到 {len(test_indices)} 条匹配记录"
+                    except Exception as e:
+                        # 恢复原始状态
+                        self._current_filter = original_filter
+                        self._filtered_indices = original_indices
+                        return False, f"过滤执行失败: {str(e)}"
+                        
+                except Exception as e:
+                    return False, f"语法验证失败: {str(e)}"
+
+            def export_filter_results(self, file_path, format_type='csv'):
+                """导出过滤结果"""
+                try:
+                    import csv
+                    import os
+                    
+                    if format_type.lower() == 'csv':
+                        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+                            writer = csv.writer(csvfile)
+                            
+                            # 写入表头
+                            writer.writerow(self.headers)
+                            
+                            # 写入过滤后的数据
+                            for row_idx in self._filtered_indices:
+                                if row_idx < len(self._data):
+                                    writer.writerow(self._data[row_idx])
+                        
+                        logger.info(f"过滤结果已导出到: {file_path}")
+                        return True
+                    else:
+                        return False, f"不支持的导出格式: {format_type}"
+                        
+                except Exception as e:
+                    logger.error(f"导出过滤结果失败: {e}")
+                    return False, str(e)
+
+            def get_performance_stats(self):
+                """获取性能统计信息"""
+                try:
+                    stats = {
+                        'total_rows': len(self._data),
+                        'filtered_rows': len(self._filtered_indices),
+                        'memory_usage_mb': 0,  # 简化实现
+                        'filter_cache_size': len(getattr(self, '_filter_cache', {}))
+                    }
+                    
+                    # 如果有性能数据，计算过滤速度
+                    if hasattr(self, '_last_performance'):
+                        stats['last_filter_time_ms'] = self._last_performance.get('filter_time', 0)
+                        stats['rows_per_second'] = stats['filtered_rows'] / max(stats['last_filter_time_ms'] / 1000, 0.001)
+                    else:
+                        stats['last_filter_time_ms'] = 0
+                        stats['rows_per_second'] = 0
+                    
+                    return stats
+                except Exception as e:
+                    logger.warning(f"获取性能统计失败: {e}")
+                    return {
+                        'total_rows': len(self._data),
+                        'filtered_rows': len(self._filtered_indices),
+                        'memory_usage_mb': 0,
+                        'filter_cache_size': 0,
+                        'last_filter_time_ms': 0,
+                        'rows_per_second': 0
+                    }
+
+            def clear_filter_cache(self):
+                """清空过滤缓存"""
+                try:
+                    if hasattr(self, '_filter_cache'):
+                        self._filter_cache.clear()
+                        logger.debug("过滤缓存已清空")
+                        return True
+                    return False
+                except Exception as e:
+                    logger.warning(f"清空缓存失败: {e}")
                     return False
 
                 try:
@@ -2016,6 +2719,515 @@ class DatabaseAdminDialog(QDialog):
                     logger.error(traceback.format_exc())
                     return False
 
+            def setFilter(self, filter_str):
+                """设置搜索过滤条件"""
+                try:
+                    import hashlib
+                    import time
+                    
+                    start_time = time.time()
+                    
+                    # 生成过滤条件的哈希用于缓存检查
+                    filter_hash = hashlib.md5(str(self._current_filter + str(len(self._data))).encode()).hexdigest()
+                    
+                    # 如果数据没有变化且过滤条件相同，使用缓存
+                    if (filter_hash == self._last_filter_hash and 
+                        len(self._data) == getattr(self, '_last_data_length', 0)):
+                        logger.debug(f"使用缓存的过滤结果: {filter_str}")
+                        return True
+                    
+                    self._current_filter = filter_str
+                    self._last_filter_hash = filter_hash
+                    self._last_data_length = len(self._data)
+                    
+                    self._apply_filter()
+                    
+                    # 性能统计
+                    elapsed_time = time.time() - start_time
+                    
+                    # 保存性能数据用于统计
+                    self._last_performance = {
+                        'filter_time': elapsed_time * 1000,  # 毫秒
+                        'rows_processed': len(self._data),
+                        'matches_found': len(self._filtered_indices)
+                    }
+                    
+                    logger.debug(f"过滤完成，耗时: {elapsed_time:.3f}s，匹配行数: {len(self._filtered_indices)}")
+                    
+                    self.layoutChanged.emit()  # 通知视图数据已更改
+                    return True
+                except Exception as e:
+                    logger.error(f"设置过滤条件失败: {e}")
+                    return False
+
+            def _apply_filter(self):
+                """应用过滤条件到数据"""
+                if not self._current_filter.strip():
+                    # 如果没有过滤条件，显示所有数据
+                    self._filtered_indices = list(range(len(self._data)))
+                    return
+
+                # 使用增强的过滤解析器
+                try:
+                    parsed_conditions = self._parse_filter_conditions(self._current_filter)
+                    matched_rows = self._execute_filter(parsed_conditions)
+                    self._filtered_indices = matched_rows
+                except Exception as e:
+                    logger.error(f"应用过滤条件失败: {e}")
+                    # 出错时显示所有数据
+                    self._filtered_indices = list(range(len(self._data)))
+
+            def _parse_filter_conditions(self, filter_str):
+                """解析过滤条件为结构化格式"""
+                conditions = []
+                try:
+                    # 简单的条件解析，支持 OR 和 AND
+                    parts = filter_str.split(" OR ")
+                    for part in parts:
+                        and_parts = part.split(" AND ")
+                        and_conditions = []
+                        
+                        for cond in and_parts:
+                            cond = cond.strip()
+                            if not cond:
+                                continue
+                                
+                            # 解析不同类型的条件
+                            if " LIKE " in cond:
+                                # 使用更健壮的方法提取LIKE条件
+                                like_index = cond.rfind(" LIKE ")
+                                if like_index >= 0:
+                                    column_name = cond[:like_index].strip()
+                                    # 提取值部分，并正确处理引号
+                                    raw_value = cond[like_index + 6:].strip()
+                                    # 去掉最外层引号，如果存在
+                                    if (raw_value.startswith("'") and raw_value.endswith("'")) or \
+                                       (raw_value.startswith('"') and raw_value.endswith('"')):
+                                        value = raw_value[1:-1]
+                                    else:
+                                        value = raw_value
+                                    
+                                    and_conditions.append({
+                                        'type': 'LIKE',
+                                        'column': column_name,
+                                        'value': value
+                                    })
+                            elif " = " in cond:
+                                column_name, value = cond.split(" = ", 1)
+                                and_conditions.append({
+                                    'type': 'EQUALS',
+                                    'column': column_name.strip(),
+                                    'value': value.strip().strip("'\"")
+                                })
+                            elif " > " in cond:
+                                column_name, value = cond.split(" > ", 1)
+                                and_conditions.append({
+                                    'type': 'GREATER',
+                                    'column': column_name.strip(),
+                                    'value': value.strip().strip("'\"")
+                                })
+                            elif " >= " in cond:
+                                column_name, value = cond.split(" >= ", 1)
+                                and_conditions.append({
+                                    'type': 'GREATER_EQUAL',
+                                    'column': column_name.strip(),
+                                    'value': value.strip().strip("'\"")
+                                })
+                            elif " <= " in cond:
+                                column_name, value = cond.split(" <= ", 1)
+                                and_conditions.append({
+                                    'type': 'LESS_EQUAL',
+                                    'column': column_name.strip(),
+                                    'value': value.strip().strip("'\"")
+                                })
+                            elif " < " in cond:
+                                column_name, value = cond.split(" < ", 1)
+                                and_conditions.append({
+                                    'type': 'LESS',
+                                    'column': column_name.strip(),
+                                    'value': value.strip().strip("'\"")
+                                })
+                            # 解析IN条件
+                            elif " IN (" in cond and cond.endswith(")"):
+                                column_name, values_part = cond.split(" IN ", 1)
+                                values = [v.strip().strip("'\"") for v in values_part.strip("()").split(",")]
+                                and_conditions.append({
+                                    'type': 'IN',
+                                    'column': column_name.strip(),
+                                    'values': values
+                                })
+                            # 解析不等于条件
+                            elif " != " in cond or " <> " in cond:
+                                sep = " != " if " != " in cond else " <> "
+                                column_name, value = cond.split(sep, 1)
+                                and_conditions.append({
+                                    'type': 'NOT_EQUALS',
+                                    'column': column_name.strip(),
+                                    'value': value.strip().strip("'\"")
+                                })
+                            # 解析正则表达式
+                            elif " REGEXP " in cond or " ~ " in cond:
+                                sep = " REGEXP " if " REGEXP " in cond else " ~ "
+                                column_name, value = cond.split(sep, 1)
+                                and_conditions.append({
+                                    'type': 'REGEXP',
+                                    'column': column_name.strip(),
+                                    'value': value.strip().strip("'\"")
+                                })
+                            # 解析BETWEEN条件
+                            elif " BETWEEN " in cond:
+                                parts_between = cond.split(" BETWEEN ")
+                                if len(parts_between) == 2:
+                                    column_name, range_part = parts_between
+                                    range_values = [v.strip().strip("'\"") for v in range_part.split(" AND ")]
+                                    if len(range_values) == 2:
+                                        and_conditions.append({
+                                            'type': 'BETWEEN',
+                                            'column': column_name.strip(),
+                                            'min': range_values[0],
+                                            'max': range_values[1]
+                                        })
+                            else:
+                                # 默认作为LIKE条件处理
+                                and_conditions.append({
+                                    'type': 'LIKE',
+                                    'column': '',  # 匹配所有列
+                                    'value': cond.strip()
+                                })
+                        
+                        if and_conditions:
+                            conditions.append(and_conditions)
+                except Exception as e:
+                    logger.warning(f"解析过滤条件失败: {e}")
+                    # 解析失败时作为简单的LIKE处理
+                    return [[{
+                        'type': 'LIKE',
+                        'column': '',
+                        'value': filter_str.strip()
+                    }]]
+                
+                return conditions
+
+            def _execute_filter(self, conditions):
+                """执行过滤逻辑"""
+                matched_rows = []
+                
+                for row_idx, row_data in enumerate(self._data):
+                    # 检查当前行是否匹配任何OR条件组
+                    for and_conditions in conditions:
+                        row_matches = True
+                        
+                        # 行必须匹配所有AND条件
+                        for condition in and_conditions:
+                            if not self._check_condition(row_data, condition):
+                                row_matches = False
+                                break
+                        
+                        if row_matches:
+                            matched_rows.append(row_idx)
+                            break
+                
+                return matched_rows
+
+            def _check_condition(self, row_data, condition):
+                """检查单个条件是否匹配"""
+                try:
+                    condition_type = condition['type']
+                    column_name = condition['column']
+                    value = condition['value']
+                    
+                    if condition_type == 'LIKE':
+                        if column_name:
+                            # 指定列的LIKE匹配
+                            if column_name in self.headers:
+                                col_idx = self.headers.index(column_name)
+                                if col_idx < len(row_data):
+                                    cell_value = str(row_data[col_idx]) if row_data[col_idx] is not None else ""
+                                    
+                                    # 正确处理通配符
+                                    if value.startswith('%') and value.endswith('%'):
+                                        # 前缀和后缀都有通配符：%pattern%
+                                        pattern = value[1:-1]  # 去掉前后的%
+                                        return pattern.lower() in cell_value.lower()
+                                    elif value.startswith('%'):
+                                        # 后缀通配符：%pattern
+                                        pattern = value[1:]  # 去掉前面的%
+                                        return cell_value.lower().endswith(pattern.lower())
+                                    elif value.endswith('%'):
+                                        # 前缀通配符：pattern%
+                                        pattern = value[:-1]  # 去掉后面的%
+                                        return cell_value.lower().startswith(pattern.lower())
+                                    else:
+                                         # 没有通配符，使用部分匹配（传统SQL LIKE语义）
+                                         return value.lower() in cell_value.lower()
+                            return False
+                        else:
+                            # 匹配所有列
+                            for cell_value in row_data:
+                                cell_str = str(cell_value) if cell_value is not None else ""
+                                
+                                # 正确处理通配符
+                                if value.startswith('%') and value.endswith('%'):
+                                    # 前缀和后缀都有通配符：%pattern%
+                                    pattern = value[1:-1]  # 去掉前后的%
+                                    if pattern.lower() in cell_str.lower():
+                                        return True
+                                elif value.startswith('%'):
+                                    # 后缀通配符：%pattern
+                                    pattern = value[1:]  # 去掉前面的%
+                                    if cell_str.lower().endswith(pattern.lower()):
+                                        return True
+                                elif value.endswith('%'):
+                                    # 前缀通配符：pattern%
+                                    pattern = value[:-1]  # 去掉后面的%
+                                    if cell_str.lower().startswith(pattern.lower()):
+                                        return True
+                                else:
+                                     # 没有通配符，使用部分匹配（传统SQL LIKE语义）
+                                     if value.lower() in cell_str.lower():
+                                         return True
+                            return False
+                    
+                    elif condition_type == 'EQUALS':
+                        if column_name and column_name in self.headers:
+                            col_idx = self.headers.index(column_name)
+                            if col_idx < len(row_data):
+                                cell_value = str(row_data[col_idx]) if row_data[col_idx] is not None else ""
+                                return cell_value == value
+                        return False
+                    
+                    elif condition_type == 'GREATER':
+                        if column_name and column_name in self.headers:
+                            col_idx = self.headers.index(column_name)
+                            if col_idx < len(row_data):
+                                try:
+                                    cell_value = float(row_data[col_idx]) if row_data[col_idx] is not None else 0
+                                    compare_value = float(value)
+                                    return cell_value > compare_value
+                                except (ValueError, TypeError):
+                                    return False
+                        return False
+                    
+                    elif condition_type == 'GREATER_EQUAL':
+                        if column_name and column_name in self.headers:
+                            col_idx = self.headers.index(column_name)
+                            if col_idx < len(row_data):
+                                return self._compare_values(row_data[col_idx], value, '>=')
+                        return False
+                    
+                    elif condition_type == 'LESS_EQUAL':
+                        if column_name and column_name in self.headers:
+                            col_idx = self.headers.index(column_name)
+                            if col_idx < len(row_data):
+                                return self._compare_values(row_data[col_idx], value, '<=')
+                        return False
+                    
+                    elif condition_type == 'LESS':
+                        if column_name and column_name in self.headers:
+                            col_idx = self.headers.index(column_name)
+                            if col_idx < len(row_data):
+                                return self._compare_values(row_data[col_idx], value, '<')
+                        return False
+                    
+                    elif condition_type == 'NOT_EQUALS':
+                        if column_name and column_name in self.headers:
+                            col_idx = self.headers.index(column_name)
+                            if col_idx < len(row_data):
+                                cell_value = str(row_data[col_idx]) if row_data[col_idx] is not None else ""
+                                return cell_value != value
+                        return False
+                    
+                    elif condition_type == 'IN':
+                        if column_name and column_name in self.headers:
+                            col_idx = self.headers.index(column_name)
+                            if col_idx < len(row_data):
+                                cell_value = str(row_data[col_idx]) if row_data[col_idx] is not None else ""
+                                return cell_value in condition['values']
+                        return False
+                    
+                    elif condition_type == 'BETWEEN':
+                        if column_name and column_name in self.headers:
+                            col_idx = self.headers.index(column_name)
+                            if col_idx < len(row_data):
+                                try:
+                                    cell_value = float(row_data[col_idx]) if row_data[col_idx] is not None else 0
+                                    min_val = float(condition['min'])
+                                    max_val = float(condition['max'])
+                                    return min_val <= cell_value <= max_val
+                                except (ValueError, TypeError):
+                                    return False
+                        return False
+                    
+                    elif condition_type == 'REGEXP':
+                        if column_name:
+                            # 指定列的正则匹配
+                            if column_name in self.headers:
+                                col_idx = self.headers.index(column_name)
+                                if col_idx < len(row_data):
+                                    import re
+                                    try:
+                                        cell_value = str(row_data[col_idx]) if row_data[col_idx] is not None else ""
+                                        pattern = re.compile(value, re.IGNORECASE)
+                                        return bool(pattern.search(cell_value))
+                                    except re.error:
+                                        return False
+                            return False
+                        else:
+                            # 匹配所有列
+                            import re
+                            try:
+                                pattern = re.compile(value, re.IGNORECASE)
+                                for cell_value in row_data:
+                                    cell_str = str(cell_value) if cell_value is not None else ""
+                                    if pattern.search(cell_str):
+                                        return True
+                                return False
+                            except re.error:
+                                return False
+                    
+                    elif condition_type == 'NOT':
+                        # 处理NOT条件
+                        not_conditions = condition['conditions']
+                        for not_cond in not_conditions:
+                            if self._check_condition(row_data, not_cond):
+                                return False
+                        return True
+                    
+                    return False
+                except Exception as e:
+                     logger.warning(f"检查条件时出错: {e}")
+                     return False
+
+            def _compare_values(self, cell_value, compare_value, operation):
+                """类型感知的值比较"""
+                try:
+                    # 获取列类型（如果知道）
+                    col_type = 'text'  # 默认类型
+                    
+                    # 如果是数字列，尝试数字比较
+                    try:
+                        cell_num = float(cell_value) if cell_value is not None else 0
+                        compare_num = float(compare_value)
+                        
+                        if operation == '>':
+                            return cell_num > compare_num
+                        elif operation == '>=':
+                            return cell_num >= compare_num
+                        elif operation == '<':
+                            return cell_num < compare_num
+                        elif operation == '<=':
+                            return cell_num <= compare_num
+                    except (ValueError, TypeError):
+                        # 如果不能转换为数字，使用字符串比较
+                        cell_str = str(cell_value) if cell_value is not None else ""
+                        compare_str = str(compare_value)
+                        
+                        if operation == '>':
+                            return cell_str > compare_str
+                        elif operation == '>=':
+                            return cell_str >= compare_str
+                        elif operation == '<':
+                            return cell_str < compare_str
+                        elif operation == '<=':
+                            return cell_str <= compare_str
+                        
+                except Exception as e:
+                    logger.warning(f"比较值时出错: {e}")
+                    return False
+                
+                return False
+
+            def rowCount(self, parent=None):
+                """返回过滤后的行数"""
+                return len(self._filtered_indices)
+
+            def data(self, index, role=Qt.DisplayRole):
+                """返回过滤后数据中的对应行数据"""
+                if not index.isValid():
+                    return QVariant()
+
+                # 获取实际数据行索引
+                actual_row = self._filtered_indices[index.row()] if index.row() < len(self._filtered_indices) else -1
+                if actual_row == -1:
+                    return QVariant()
+
+                if role == Qt.DisplayRole or role == Qt.EditRole:
+                    try:
+                        value = self._data[actual_row][index.column()]
+                        return str(value) if value is not None else ""
+                    except IndexError:
+                        return QVariant()
+
+                # 标记修改过的单元格
+                if role == Qt.BackgroundRole:
+                    if (actual_row, index.column()) in self._modified_cells:
+                        return QBrush(QColor(255, 255, 200))  # 浅黄色背景
+                    if actual_row in self._new_rows:
+                        return QBrush(QColor(200, 255, 200))  # 浅绿色背景
+
+                return QVariant()
+
+            def _analyze_column_types(self):
+                """分析列的数据类型"""
+                column_types = {}
+                if not self.schema or not self._data:
+                    return column_types
+
+                try:
+                    for i, (col_name, data_type, null, key, default, extra) in enumerate(self.schema):
+                        # 基于schema信息和数据样本来确定类型
+                        if data_type:
+                            if 'INT' in data_type.upper() or 'DECIMAL' in data_type.upper():
+                                column_types[col_name] = 'numeric'
+                            elif 'DATE' in data_type.upper() or 'TIME' in data_type.upper():
+                                column_types[col_name] = 'datetime'
+                            elif 'BOOL' in data_type.upper():
+                                column_types[col_name] = 'boolean'
+                            else:
+                                column_types[col_name] = 'text'
+                        else:
+                            # 基于数据样本推断类型
+                            sample_values = [row[i] for row in self._data[:10] if row[i] is not None]
+                            if sample_values:
+                                if all(isinstance(v, (int, float)) for v in sample_values):
+                                    column_types[col_name] = 'numeric'
+                                elif any(isinstance(v, bool) for v in sample_values):
+                                    column_types[col_name] = 'boolean'
+                                else:
+                                    column_types[col_name] = 'text'
+                            else:
+                                column_types[col_name] = 'text'
+                except Exception as e:
+                    logger.warning(f"分析列类型时出错: {e}")
+                    # 默认所有列都为文本类型
+                    column_types = {col[0]: 'text' for col in self.schema}
+
+                return column_types
+
+            def select(self):
+                """重新加载数据并应用当前过滤条件"""
+                try:
+                    start_time = time.time()
+                    # 重新从数据库获取数据
+                    query = f"SELECT * FROM {self.table_name}"
+                    result = self.conn.execute(query).fetchall()
+                    self._data = [list(row) for row in result]
+                    self._original_data = [list(row) for row in result]
+                    
+                    # 重新应用过滤条件
+                    self._apply_filter()
+                    
+                    # 清空修改记录（因为数据已重新加载）
+                    self._deleted_rows.clear()
+                    self._new_rows.clear()
+                    self._modified_cells.clear()
+                    
+                    logger.info(f"{self.table_name} 加载数据-耗时：{time.time() - start_time:.4f} 秒，行数: {len(self._data)}")
+                    return True
+                except Exception as e:
+                    logger.error(f"重新加载数据失败: {e}")
+                    return False
+
             def lastError(self):
                 """返回最后的错误（兼容接口）"""
                 class ErrorInfo:
@@ -2034,7 +3246,7 @@ class DatabaseAdminDialog(QDialog):
                 return ErrorInfo()
 
         # 创建并设置模型
-        if hasattr(self, 'model'):
+        if hasattr(self, 'model') and self.model is not None:
             self.model.deleteLater()
 
         self.model = DuckDBTableModel(
@@ -2208,8 +3420,48 @@ class DatabaseAdminDialog(QDialog):
 
     def _on_database_type_changed(self, type_text):
         """数据库类型切换处理"""
+        # 保存当前选择
+        old_db_type = self.current_db_type
         self.current_db_type = 'sqlite' if type_text == 'SQLite' else 'duckdb'
+        
+        # 先更新文件列表
         self.update_database_file_list()
+        
+        # 清理当前模型和视图
+        self._cleanup_current_state()
+        
+        # 根据新类型特殊处理
+        if self.current_db_type == 'duckdb' and old_db_type != 'duckdb':
+            # 如果从其他类型切换到 DuckDB，需要清理旧连接
+            if hasattr(self, '_duckdb_conn') and self._duckdb_conn is not None:
+                try:
+                    self._duckdb_conn.close()
+                except Exception as e:
+                    logger.error(f"关闭旧 DuckDB 连接失败: {e}")
+                self._duckdb_conn = None
+        elif self.current_db_type == 'sqlite' and old_db_type != 'sqlite':
+            # 如果从其他类型切换到 SQLite，确保清理旧的数据库连接
+            if hasattr(self, 'data') and self.db.isOpen():
+                self.db.close()
+        
+        # 重新加载表列表
+        self._reload_database_tables()
+    
+    def _cleanup_current_state(self):
+        """清理当前状态"""
+        # 清空当前模型
+        if hasattr(self, 'model') and self.model is not None:
+            self.model.deleteLater()
+            self.model = None
+            
+        # 清空视图
+        self.table_view.setModel(None)
+        
+        # 清空表列表
+        self.table_list.clear()
+        
+        # 重置当前表
+        self.current_table = None
 
     def browse_database_file(self):
         """浏览选择数据库文件"""

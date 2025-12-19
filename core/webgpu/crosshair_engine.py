@@ -84,7 +84,7 @@ class GPUCrosshairEngine(QObject):
     # 信号
     crosshair_moved = pyqtSignal(object)  # CrosshairState
     crosshair_visibility_changed = pyqtSignal(bool)
-    performance_stats = pyqtSignal(dict)  # 性能统计
+
 
     def __init__(self, webgpu_manager=None):
         super().__init__()
@@ -105,21 +105,11 @@ class GPUCrosshairEngine(QObject):
         self._animation_start_time = 0.0
         self._animation_start_state = None
 
-        # 性能监控
-        self._performance_stats = {
-            'total_updates': 0,
-            'gpu_renders': 0,
-            'cpu_fallbacks': 0,
-            'average_render_time': 0.0,
-            'fps': 0.0,
-            'gpu_acceleration_enabled': bool(webgpu_manager)
-        }
-
         # 数据转换缓存
         self._coord_transform_cache = {}
         self._label_cache = {}
 
-        logger.info(f"GPU十字光标引擎初始化完成 - GPU加速: {self._performance_stats['gpu_acceleration_enabled']}")
+        logger.info("十字光标引擎初始化完成")
 
     def update_mouse_position(self, x: float, y: float, widget: QWidget) -> bool:
         """更新鼠标位置"""
@@ -157,10 +147,6 @@ class GPUCrosshairEngine(QObject):
                 self._current_state = self._target_state.copy()
                 self.crosshair_moved.emit(self._current_state)
 
-            # 更新性能统计
-            self._performance_stats['total_updates'] += 1
-            self._update_fps_stats(current_time)
-
             return True
 
         except Exception as e:
@@ -191,17 +177,10 @@ class GPUCrosshairEngine(QObject):
             # 尝试GPU渲染
             if self._config.use_gpu_rendering and self.webgpu_manager:
                 if self._render_crosshair_gpu(painter, widget):
-                    self._performance_stats['gpu_renders'] += 1
-                    render_time = time.time() - start_time
-                    self._update_performance_stats(render_time)
                     return True
 
             # CPU后备渲染
             self._render_crosshair_cpu(painter, widget)
-            self._performance_stats['cpu_fallbacks'] += 1
-
-            render_time = time.time() - start_time
-            self._update_performance_stats(render_time)
 
             return True
 
@@ -515,33 +494,7 @@ class GPUCrosshairEngine(QObject):
         ]
         return "|".join(key_parts)
 
-    def _update_performance_stats(self, render_time: float):
-        """更新性能统计"""
-        # 更新平均渲染时间
-        total_renders = self._performance_stats['gpu_renders'] + self._performance_stats['cpu_fallbacks']
-        if total_renders > 0:
-            current_avg = self._performance_stats['average_render_time']
-            new_avg = (current_avg * (total_renders - 1) + render_time) / total_renders
-            self._performance_stats['average_render_time'] = new_avg
 
-        # 定期发送性能统计
-        if total_renders % 30 == 0:  # 每30次渲染发送一次
-            self.performance_stats.emit(self._performance_stats.copy())
-
-    def _update_fps_stats(self, current_time: float):
-        """更新FPS统计"""
-        if self._last_render_time > 0:
-            frame_time = current_time - self._last_render_time
-            if frame_time > 0:
-                fps = 1.0 / frame_time
-                # 平滑FPS计算
-                current_fps = self._performance_stats['fps']
-                if current_fps > 0:
-                    self._performance_stats['fps'] = current_fps * 0.9 + fps * 0.1
-                else:
-                    self._performance_stats['fps'] = fps
-
-        self._last_render_time = current_time
 
     def get_current_state(self) -> CrosshairState:
         """获取当前状态"""
@@ -559,9 +512,7 @@ class GPUCrosshairEngine(QObject):
         self._coord_transform_cache.clear()
         self._label_cache.clear()
 
-    def get_performance_stats(self) -> Dict[str, Any]:
-        """获取性能统计"""
-        return self._performance_stats.copy()
+
 
     def clear_cache(self):
         """清除缓存"""

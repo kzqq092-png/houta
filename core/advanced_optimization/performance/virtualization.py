@@ -277,12 +277,13 @@ class ChunkRenderer:
         return 0.5
 
 class VirtualScrollRenderer(QObject):
-    """虚拟滚动渲染器主类"""
+    """虚拟滚动渲染器主类（集成WebGPU加速）"""
     
     # 信号定义
     data_rendered = pyqtSignal(int, object)  # chunk_id, RenderChunk
     rendering_progress = pyqtSignal(float)  # 进度百分比
     performance_warning = pyqtSignal(str, float)  # 警告信息, 数值
+    gpu_acceleration_toggled = pyqtSignal(bool)  # GPU加速启用/禁用状态
     
     def __init__(self, config: Optional[VirtualizationConfig] = None):
         super().__init__()
@@ -291,6 +292,24 @@ class VirtualScrollRenderer(QObject):
         self.viewport_tracker = ViewportTracker(self.config)
         self.data_aggregator = DataAggregator(self.config)
         self.chunk_renderer = ChunkRenderer(self.config, self.data_aggregator)
+        
+        # WebGPU渲染器集成
+        try:
+            from core.webgpu import GPURendererConfig, WebGPURenderer
+            self.webgpu_renderer = WebGPURenderer(GPURendererConfig(
+                preferred_backend="moderngl"  # 尝试使用ModernGL后端
+            ))
+            # 尝试初始化WebGPU渲染器
+            self.gpu_acceleration_enabled = self.webgpu_renderer.initialize()
+            self.gpu_acceleration_toggled.emit(self.gpu_acceleration_enabled)
+            
+            if self.gpu_acceleration_enabled:
+                logger.info("✅ WebGPU渲染器集成成功，将使用GPU加速渲染")
+            else:
+                logger.warning("⚠️ WebGPU渲染器初始化失败，将使用CPU渲染")
+        except Exception as e:
+            logger.warning(f"WebGPU渲染器集成失败: {e}")
+            self.gpu_acceleration_enabled = False
         
         # 性能监控
         self.render_times = deque(maxlen=100)
@@ -301,6 +320,14 @@ class VirtualScrollRenderer(QObject):
         self.is_rendering = False
         self.quality_level = 1
         self.adaptive_quality_enabled = True
+        
+        # WebGPU统计
+        self.gpu_performance_stats = {
+            'rendered_chunks_count': 0,
+            'total_vertices_count': 0,
+            'gpu_utilization': 0.0,  # 0.0-1.0
+            'batch_processing': False
+        }
         
         # 定时器用于渲染循环
         self.render_timer = QTimer()

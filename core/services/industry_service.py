@@ -11,7 +11,15 @@ from datetime import datetime
 from .base_service import CacheableService, ConfigurableService
 from ..events import DataUpdateEvent
 from ..industry_manager import IndustryManager
-# 移除循环导入，在需要时动态导入
+
+# 直接导入管理器工厂以避免动态导入问题
+try:
+    from utils.manager_factory import get_industry_manager
+    IMPORT_SUCCESS = True
+except ImportError as e:
+    logger.warning(f"无法导入 get_industry_manager: {e}")
+    get_industry_manager = None
+    IMPORT_SUCCESS = False
 
 
 class IndustryService(CacheableService, ConfigurableService):
@@ -41,12 +49,24 @@ class IndustryService(CacheableService, ConfigurableService):
     def _do_initialize(self) -> None:
         """初始化行业服务"""
         try:
-            # 获取行业管理器实例 - 动态导入避免循环依赖
-            from utils.manager_factory import get_industry_manager
-            self._industry_manager = get_industry_manager()
-
+            # 检查导入状态
+            if not IMPORT_SUCCESS or get_industry_manager is None:
+                logger.warning("get_industry_manager 导入失败，使用备用模式")
+                self._create_fallback_manager()
+                return
+            
+            # 添加健康检查和重试机制
+            self._industry_manager = self._get_industry_manager_with_retry()
+            
             if self._industry_manager:
                 logger.info("Industry service initialized successfully")
+                
+                # 验证服务可用性
+                if self._validate_service_health():
+                    logger.info("Industry service health check passed")
+                else:
+                    logger.warning("Industry service health check failed, using fallback mode")
+                    self._create_fallback_manager()
             else:
                 logger.warning("Failed to get industry manager, using fallback mode")
                 self._create_fallback_manager()
@@ -54,6 +74,78 @@ class IndustryService(CacheableService, ConfigurableService):
         except Exception as e:
             logger.error(f"Failed to initialize industry service: {e}")
             self._create_fallback_manager()
+
+    def _get_industry_manager_with_retry(self, max_retries: int = 3, retry_delay: float = 1.0) -> 'IndustryManager':
+        """带重试机制的行业管理器获取"""
+        import time
+        
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                logger.debug(f"Attempting to get industry manager (attempt {attempt + 1}/{max_retries})")
+                manager = get_industry_manager()
+                
+                # 验证管理器的基本功能
+                if self._validate_manager_basic_function(manager):
+                    logger.info(f"Industry manager obtained successfully on attempt {attempt + 1}")
+                    return manager
+                else:
+                    logger.warning(f"Industry manager validation failed on attempt {attempt + 1}")
+                    last_error = "Manager validation failed"
+                    
+            except Exception as e:
+                last_error = str(e)
+                logger.warning(f"Failed to get industry manager on attempt {attempt + 1}: {e}")
+                
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    retry_delay *= 1.5  # 指数退避
+        
+        logger.error(f"Failed to get industry manager after {max_retries} attempts. Last error: {last_error}")
+        return None
+
+    def _validate_manager_basic_function(self, manager) -> bool:
+        """验证管理器基本功能"""
+        try:
+            # 验证基本方法是否存在
+            required_methods = ['get_industry_list', 'update_industry_data']
+            for method in required_methods:
+                if not hasattr(manager, method):
+                    logger.warning(f"Industry manager missing required method: {method}")
+                    return False
+            
+            # 测试基本功能
+            test_result = manager.get_industry_list()
+            if not isinstance(test_result, list):
+                logger.warning(f"Industry manager get_industry_list() returned unexpected type: {type(test_result)}")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Industry manager basic function validation failed: {e}")
+            return False
+
+    def _validate_service_health(self) -> bool:
+        """验证服务健康状态"""
+        try:
+            # 测试基本功能
+            industries = self.get_industry_list()
+            if len(industries) == 0:
+                logger.warning("Industry service health check: no industries returned")
+                return False
+            
+            # 测试更新功能
+            update_success = self.update_industry_data()
+            if not update_success:
+                logger.warning("Industry service health check: update failed")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Industry service health check failed: {e}")
+            return False
 
     def _create_fallback_manager(self) -> None:
         """创建备用行业管理器"""

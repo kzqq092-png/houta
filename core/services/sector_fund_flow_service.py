@@ -59,8 +59,8 @@ class SectorFundFlowService(QObject):
         super().__init__()
 
         # 使用数据标准化器替代DataManager
-        from core.data_standardization_engine import DataStandardizer
-        self.data_standardizer = DataStandardizer()
+        from core.utils.data_standardizer import DataStandardizer
+        self.data_standardizer = DataStandardizer  # 直接使用类，而不是实例
         self.config = config or SectorFlowConfig()
         # 纯Loguru架构，移除log_manager依赖
 

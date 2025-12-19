@@ -10,6 +10,8 @@ GPU兼容性检查器模块
 """
 
 import re
+import platform
+import subprocess
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -105,41 +107,31 @@ class GPUCompatibilityChecker:
         }
 
     def check_compatibility(self, capabilities: GPUCapabilities, support_level: GPUSupportLevel) -> CompatibilityReport:
-        """
-        检查兼容性
-
-        Args:
-            capabilities: GPU能力信息
-            support_level: 支持级别
-
-        Returns:
-            兼容性报告
-        """
+        """检查兼容性 - 以显存为核心的评分算法"""
         logger.info(f"开始兼容性检查: {capabilities.adapter_name}")
 
         issues = []
         performance_score = 100.0
         recommendations = []
 
-        # 1. 检查GPU型号兼容性
-        gpu_issues, gpu_score = self._check_gpu_model(capabilities)
-        issues.extend(gpu_issues)
-        performance_score = min(performance_score, gpu_score)
-
-        # 2. 检查内存容量
+        # 1. 检查内存容量（作为主要评分标准）
         memory_issues, memory_score = self._check_memory_capacity(capabilities)
         issues.extend(memory_issues)
         performance_score = min(performance_score, memory_score)
 
+        # 2. 检查GPU型号兼容性
+        gpu_issues, gpu_score = self._check_gpu_model(capabilities)
+        issues.extend(gpu_issues)
+        # GPU型号对评分影响较小，只降低最多10分
+        performance_score = max(performance_score - (100.0 - gpu_score) * 0.1, 0)
+
         # 3. 检查纹理支持
         texture_issues, texture_score = self._check_texture_support(capabilities)
         issues.extend(texture_issues)
-        performance_score = min(performance_score, texture_score)
+        # 纹理支持对评分影响中等，降低最多20分
+        performance_score = max(performance_score - (100.0 - texture_score) * 0.2, 0)
 
-        # 4. 检查驱动版本
-        driver_issues, driver_score = self._check_driver_version(capabilities)
-        issues.extend(driver_issues)
-        performance_score = min(performance_score, driver_score)
+        # 4. 驱动版本检查已删除 - 完全基于显存容量评分
 
         # 5. 确定兼容性级别
         compatibility_level = self._determine_compatibility_level(
@@ -162,6 +154,7 @@ class GPUCompatibilityChecker:
         )
 
         logger.info(f"兼容性检查完成: {compatibility_level.value}, 性能评分: {performance_score:.1f}")
+        logger.info(f"显存评分: {memory_score}, GPU型号评分: {gpu_score}, 纹理评分: {texture_score}")
         return report
 
     def _check_gpu_model(self, capabilities: GPUCapabilities) -> Tuple[List[CompatibilityIssue], float]:
@@ -207,13 +200,23 @@ class GPUCompatibilityChecker:
         return issues, score
 
     def _check_memory_capacity(self, capabilities: GPUCapabilities) -> Tuple[List[CompatibilityIssue], float]:
-        """检查内存容量"""
+        """检查内存容量 - 以显存为核心的评分"""
         issues = []
         score = 100.0
 
         memory_mb = capabilities.memory_mb
+        gpu_name = capabilities.adapter_name.lower()
 
-        if memory_mb < 256:
+        logger.info(f"GPU显存容量检查: {memory_mb}MB (GPU: {capabilities.adapter_name})")
+
+        # 针对GTX 1660 SUPER (6GB)的特殊优化
+        if "gtx 1660" in gpu_name and memory_mb >= 6000:
+            score = 95.0
+            logger.info("检测到GTX 1660 SUPER (6GB)，高性能评分")
+            return issues, score
+
+        # 主要基于显存容量的评分
+        if memory_mb < 512:
             issues.append(CompatibilityIssue(
                 issue_type="memory",
                 severity="critical",
@@ -221,20 +224,93 @@ class GPUCompatibilityChecker:
                 workaround="降低渲染质量或使用软件渲染",
                 affects_performance=True
             ))
-            score = 30.0
-        elif memory_mb < 512:
+            score = 20.0
+        elif memory_mb < 1024:  # 1GB
             issues.append(CompatibilityIssue(
                 issue_type="memory",
                 severity="warning",
                 description=f"GPU内存容量较低: {memory_mb}MB",
-                workaround="限制最大数据点数量",
+                workaround="限制同时显示的数据点数量",
                 affects_performance=True
             ))
-            score = 60.0
-        elif memory_mb < 1024:
-            score = 80.0
+            score = 50.0
+        elif memory_mb < 2048:  # 2GB
+            score = 70.0
+        elif memory_mb < 4096:  # 4GB
+            score = 85.0
+        elif memory_mb < 6144:  # 6GB
+            score = 90.0
+        elif memory_mb < 8192:  # 8GB
+            score = 95.0
+        else:  # 8GB及以上
+            score = 100.0
 
+        # 如果检测到的显存为0MB或异常，使用估算值
+        if memory_mb == 0 or memory_mb < 256:
+            estimated_memory = self._estimate_gpu_memory(capabilities.adapter_name, capabilities.vendor)
+            if estimated_memory > 0:
+                logger.warning(f"显存检测异常 (0MB)，使用估算值: {estimated_memory}MB")
+                memory_mb = estimated_memory
+                # 重新评分
+                if memory_mb >= 6000:
+                    score = 95.0
+                elif memory_mb >= 4096:
+                    score = 85.0
+                elif memory_mb >= 2048:
+                    score = 75.0
+                else:
+                    score = 50.0
+
+        logger.info(f"显存容量评分: {score:.1f}分 (实际: {memory_mb}MB)")
         return issues, score
+
+    def _estimate_gpu_memory(self, gpu_name: str, vendor: str) -> int:
+        """估算GPU显存容量"""
+        gpu_name_lower = gpu_name.lower()
+        
+        # NVIDIA显卡显存估算
+        if "nvidia" in vendor.lower() or "geforce" in gpu_name_lower:
+            # GTX 16系列
+            if "gtx 1660" in gpu_name_lower:
+                return 6144  # 6GB
+            elif "gtx 1650" in gpu_name_lower:
+                return 4096  # 4GB
+            
+            # RTX 20系列
+            elif "rtx 2060" in gpu_name_lower:
+                return 6144  # 6GB
+            elif "rtx 2070" in gpu_name_lower:
+                return 8192  # 8GB
+            elif "rtx 2080" in gpu_name_lower:
+                return 8192  # 8GB
+            
+            # RTX 30系列
+            elif "rtx 3060" in gpu_name_lower:
+                return 12288  # 12GB
+            elif "rtx 3070" in gpu_name_lower:
+                return 8192   # 8GB
+            elif "rtx 3080" in gpu_name_lower:
+                return 10240  # 10GB
+        
+        # AMD显卡显存估算
+        elif "amd" in vendor.lower() or "radeon" in gpu_name_lower:
+            if "rx 580" in gpu_name_lower:
+                return 8192   # 8GB
+            elif "rx 5700" in gpu_name_lower:
+                return 8192   # 8GB
+            elif "rx 6600" in gpu_name_lower:
+                return 8192   # 8GB
+        
+        # Intel集成显卡
+        elif "intel" in vendor.lower():
+            if "uhd" in gpu_name_lower:
+                return 1024   # 1GB共享内存
+            elif "iris" in gpu_name_lower:
+                return 2048   # 2GB共享内存
+        
+        # 默认估算
+        logger.warning(f"未知的GPU型号进行默认显存估算: {gpu_name}")
+        return 2048  # 默认2GB
 
     def _check_texture_support(self, capabilities: GPUCapabilities) -> Tuple[List[CompatibilityIssue], float]:
         """检查纹理支持"""
@@ -265,25 +341,360 @@ class GPUCompatibilityChecker:
         return issues, score
 
     def _check_driver_version(self, capabilities: GPUCapabilities) -> Tuple[List[CompatibilityIssue], float]:
-        """检查驱动版本"""
+        """检查驱动版本 - 作为辅助参考，权重较低"""
         issues = []
         score = 100.0
 
-        # 这里需要实际的驱动版本检测逻辑
-        # 目前使用模拟数据
+        try:
+            driver_version = self._detect_driver_version(capabilities.vendor)
+            
+            if not driver_version:
+                issues.append(CompatibilityIssue(
+                    issue_type="driver",
+                    severity="info",
+                    description="无法检测GPU驱动版本",
+                    workaround="建议更新到最新驱动，但不影响当前使用",
+                    affects_performance=False
+                ))
+                return issues, score  # 返回100分，不影响性能评分
 
-        vendor = capabilities.vendor.lower()
-        if "nvidia" in vendor:
-            # 模拟NVIDIA驱动版本检查
-            pass
-        elif "amd" in vendor or "advanced micro devices" in vendor:
-            # 模拟AMD驱动版本检查
-            pass
-        elif "intel" in vendor:
-            # 模拟Intel驱动版本检查
-            pass
+            vendor_key = capabilities.vendor.lower()
+            if "nvidia" in vendor_key:
+                requirements = self.driver_requirements.get("nvidia", {})
+                version_score, version_issues = self._check_nvidia_version(driver_version, requirements)
+            elif "amd" in vendor_key or "advanced micro devices" in vendor_key:
+                requirements = self.driver_requirements.get("amd", {})
+                version_score, version_issues = self._check_amd_version(driver_version, requirements)
+            elif "intel" in vendor_key:
+                requirements = self.driver_requirements.get("intel", {})
+                version_score, version_issues = self._check_intel_version(driver_version, requirements)
+            else:
+                # 未知厂商，使用通用检查
+                version_score, version_issues = self._check_generic_version(driver_version)
+            
+            issues.extend(version_issues)
+            
+            # 驱动版本检查结果不再直接影响主要性能评分
+            # 只在版本异常低时才作为警告信息
+            if version_score < 30.0:
+                # 只有在极端情况下才轻微影响评分（最多5分）
+                score = 95.0
+            else:
+                # 正常情况下不影响主要评分
+                score = 100.0
+            
+        except Exception as e:
+            logger.warning(f"驱动版本检查失败: {e}")
+            # 驱动检查异常不影响性能评分
+            score = 100.0
 
         return issues, score
+
+    def _detect_driver_version(self, vendor: str) -> Optional[str]:
+        """检测驱动版本"""
+        try:
+            if platform.system() == "Windows":
+                return self._get_windows_driver_version(vendor)
+            elif platform.system() == "Linux":
+                return self._get_linux_driver_version(vendor)
+            else:
+                return self._get_macos_driver_version(vendor)
+        except Exception as e:
+            logger.warning(f"驱动版本检测失败: {e}")
+            return None
+
+    def _get_windows_driver_version(self, vendor: str) -> Optional[str]:
+        """Windows系统驱动版本检测"""
+        import subprocess
+        
+        try:
+            # 使用wmic获取驱动信息
+            result = subprocess.run([
+                'wmic', 'path', 'win32_VideoController', 
+                'get', 'DriverVersion,Name'
+            ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
+            
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')[1:]  # 跳过标题行
+                for line in lines:
+                    if vendor.lower() in line.lower():
+                        parts = line.strip().split()
+                        if len(parts) >= 2:
+                            return parts[0]  # 返回版本号
+        except:
+            pass
+        
+        return None
+
+    def _get_linux_driver_version(self, vendor: str) -> Optional[str]:
+        """Linux系统驱动版本检测"""
+        try:
+            # 检查nvidia-smi
+            if "nvidia" in vendor.lower():
+                result = subprocess.run(['nvidia-smi', '--query-gpu=driver_version', '--format=csv,noheader,nounits'], 
+                                      capture_output=True, text=True)
+                if result.returncode == 0:
+                    return result.stdout.strip()
+            
+            # 检查lspci
+            result = subprocess.run(['lspci', '-v'], capture_output=True, text=True)
+            if result.returncode == 0:
+                # 简单的版本提取逻辑
+                return "unknown"
+        except:
+            pass
+        
+        return None
+
+    def _get_macos_driver_version(self, vendor: str) -> Optional[str]:
+        """macOS系统驱动版本检测"""
+        # macOS驱动版本检测逻辑
+        try:
+            result = subprocess.run(['system_profiler', 'SPDisplaysDataType', '-xml'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                return "unknown"  # 简化实现
+        except:
+            pass
+        
+        return None
+
+    def _check_nvidia_version(self, version: str, requirements: Dict[str, str]) -> Tuple[float, List[CompatibilityIssue]]:
+        """NVIDIA驱动版本检查 - 支持传统和新格式驱动"""
+        issues = []
+        score = 100.0
+        
+        try:
+            # 智能版本号解析 - 支持多种格式
+            version_num = self._parse_nvidia_version(version)
+            
+            if version_num is None:
+                issues.append(CompatibilityIssue(
+                    issue_type="driver",
+                    severity="warning",
+                    description=f"NVIDIA驱动版本格式异常: {version}",
+                    workaround="建议验证驱动版本格式，但系统仍可正常使用",
+                    affects_performance=False
+                ))
+                score = 85.0
+                return score, issues
+            
+            # 检测是否为新格式驱动（GTX 16系列及更新的DCH驱动）
+            is_modern_driver = self._is_modern_nvidia_driver(version)
+            
+            if is_modern_driver:
+                # 对于新格式驱动，使用较低的版本要求
+                min_version = 30.0  # DCH驱动最低要求
+                rec_version = 32.0  # DCH驱动推荐版本
+            else:
+                # 传统驱动格式，使用原有要求
+                min_version = float(requirements.get("min_version", "450.0"))
+                rec_version = float(requirements.get("recommended_version", "470.0"))
+                
+            logger.info(f"NVIDIA驱动版本解析: {version} -> {version_num:.1f} (要求: {min_version}, 推荐: {rec_version})")
+            
+            if version_num < min_version:
+                severity = "warning" if is_modern_driver else "critical"
+                issues.append(CompatibilityIssue(
+                    issue_type="driver",
+                    severity=severity,
+                    description=f"NVIDIA驱动版本可能过旧: {version} (检测版本: {version_num:.1f})",
+                    workaround="建议更新到最新NVIDIA驱动程序",
+                    affects_performance=True
+                ))
+                score = 80.0 if is_modern_driver else 40.0
+            elif version_num < rec_version:
+                issues.append(CompatibilityIssue(
+                    issue_type="driver",
+                    severity="info",
+                    description=f"NVIDIA驱动版本可优化: {version}",
+                    workaround="更新到推荐版本以获得更好性能",
+                    affects_performance=False
+                ))
+                score = 90.0
+            else:
+                # 版本良好，添加性能加分
+                score = 95.0
+                    
+        except Exception as e:
+            logger.warning(f"NVIDIA版本解析异常: {e}")
+            issues.append(CompatibilityIssue(
+                issue_type="driver",
+                severity="warning",
+                description=f"NVIDIA版本解析失败: {str(e)}",
+                workaround="系统将使用通用兼容性设置",
+                affects_performance=False
+            ))
+            score = 85.0
+            
+        return score, issues
+
+    def _parse_nvidia_version(self, version: str) -> Optional[float]:
+        """解析NVIDIA驱动版本号"""
+        try:
+            # 移除可能的后缀
+            version = version.strip()
+            
+            # 检查是否为DCH驱动格式 (如: 32.0.15.8115)
+            if re.match(r'^\d+\.\d+\.\d+\.\d+$', version):
+                parts = version.split('.')
+                if len(parts) >= 2:
+                    major = int(parts[0])
+                    minor = int(parts[1])
+                    return float(major) + float(minor) / 10.0
+            
+            # 检查传统格式 (如: 472.12)
+            elif re.match(r'^\d+\.\d+$', version):
+                parts = version.split('.')
+                major = int(parts[0])
+                minor = int(parts[1])
+                return float(major) + float(minor) / 10.0
+            
+            # 检查简化版本号 (如: 472)
+            elif re.match(r'^\d+$', version):
+                return float(version)
+                
+            return None
+            
+        except Exception:
+            return None
+    
+    def _is_modern_nvidia_driver(self, version: str) -> bool:
+        """判断是否为现代NVIDIA驱动格式"""
+        # DCH驱动通常以30+开始（如32.0.x.x）
+        try:
+            if re.match(r'^\d+\.\d+\.\d+\.\d+$', version):
+                major = int(version.split('.')[0])
+                return major >= 30
+            return False
+        except:
+            return False
+
+    def _check_amd_version(self, version: str, requirements: Dict[str, str]) -> Tuple[float, List[CompatibilityIssue]]:
+        """AMD驱动版本检查"""
+        issues = []
+        score = 100.0
+        
+        try:
+            # 解析AMD版本号格式
+            version_parts = re.findall(r'\d+', version)
+            if version_parts:
+                major = int(version_parts[0])
+                version_num = major
+                
+                min_version = float(requirements.get("min_version", "21.0"))
+                rec_version = float(requirements.get("recommended_version", "22.0"))
+                
+                if version_num < min_version:
+                    issues.append(CompatibilityIssue(
+                        issue_type="driver",
+                        severity="critical",
+                        description=f"AMD驱动版本过低: {version} (要求: {min_version})",
+                        workaround="请更新AMD驱动程序",
+                        affects_performance=True
+                    ))
+                    score = 45.0
+                elif version_num < rec_version:
+                    issues.append(CompatibilityIssue(
+                        issue_type="driver",
+                        severity="warning",
+                        description=f"AMD驱动版本建议更新: {version} (推荐: {rec_version})",
+                        workaround="更新到推荐版本以获得更好性能",
+                        affects_performance=True
+                    ))
+                    score = 80.0
+                else:
+                    score = 95.0
+                    
+        except Exception as e:
+            issues.append(CompatibilityIssue(
+                issue_type="driver",
+                severity="warning",
+                description=f"AMD版本解析失败: {str(e)}",
+                workaround="建议手动验证驱动版本",
+                affects_performance=False
+            ))
+            score = 85.0
+            
+        return score, issues
+
+    def _check_intel_version(self, version: str, requirements: Dict[str, str]) -> Tuple[float, List[CompatibilityIssue]]:
+        """Intel驱动版本检查"""
+        issues = []
+        score = 100.0
+        
+        try:
+            # Intel版本号通常格式比较复杂，简化处理
+            version_parts = re.findall(r'\d+', version)
+            if version_parts:
+                major = int(version_parts[0])
+                version_num = major / 10.0
+                
+                min_version = float(requirements.get("min_version", "27.0"))
+                rec_version = float(requirements.get("recommended_version", "30.0"))
+                
+                if version_num < min_version:
+                    issues.append(CompatibilityIssue(
+                        issue_type="driver",
+                        severity="critical",
+                        description=f"Intel驱动版本过低: {version} (要求: {min_version})",
+                        workaround="请更新Intel显卡驱动程序",
+                        affects_performance=True
+                    ))
+                    score = 50.0
+                elif version_num < rec_version:
+                    issues.append(CompatibilityIssue(
+                        issue_type="driver",
+                        severity="warning",
+                        description=f"Intel驱动版本建议更新: {version} (推荐: {rec_version})",
+                        workaround="更新到推荐版本以获得更好性能",
+                        affects_performance=True
+                    ))
+                    score = 85.0
+                else:
+                    score = 95.0
+                    
+        except Exception as e:
+            issues.append(CompatibilityIssue(
+                issue_type="driver",
+                severity="warning",
+                description=f"Intel版本解析失败: {str(e)}",
+                workaround="建议手动验证驱动版本",
+                affects_performance=False
+            ))
+            score = 85.0
+            
+        return score, issues
+
+    def _check_generic_version(self, version: str) -> Tuple[float, List[CompatibilityIssue]]:
+        """通用驱动版本检查"""
+        issues = []
+        score = 90.0
+        
+        if not version:
+            issues.append(CompatibilityIssue(
+                issue_type="driver",
+                severity="info",
+                description="未知厂商的驱动版本",
+                workaround="建议检查制造商推荐的驱动版本",
+                affects_performance=False
+            ))
+            score = 85.0
+        else:
+            # 简单的版本合理性检查
+            if len(version.split('.')) >= 2:
+                score = 90.0
+            else:
+                issues.append(CompatibilityIssue(
+                    issue_type="driver",
+                    severity="warning",
+                    description=f"驱动版本格式异常: {version}",
+                    workaround="建议验证驱动版本格式",
+                    affects_performance=False
+                ))
+                score = 80.0
+                
+        return score, issues
 
     def _determine_compatibility_level(self, issues: List[CompatibilityIssue],
                                        performance_score: float,
@@ -311,29 +722,71 @@ class GPUCompatibilityChecker:
 
     def _recommend_backend(self, compatibility_level: CompatibilityLevel,
                            current_support: GPUSupportLevel,
-                           issues: List[CompatibilityIssue]) -> GPUSupportLevel:
-        """推荐后端"""
-
+                           issues: List[CompatibilityIssue],
+                           capabilities: GPUCapabilities = None) -> GPUSupportLevel:
+        """推荐后端 - 基于显存容量的智能选择"""
+        
+        # 如果有硬件不兼容问题，直接降级
         if compatibility_level == CompatibilityLevel.INCOMPATIBLE:
             return GPUSupportLevel.BASIC
 
-        # 检查是否有特定的降级建议
-        for issue in issues:
-            if "降级到WebGL" in issue.workaround:
-                return GPUSupportLevel.WEBGL
-            elif "软件渲染" in issue.workaround:
+        # 检查是否有特定的硬件问题
+        hardware_issues = [issue for issue in issues if issue.issue_type == "hardware"]
+        if hardware_issues:
+            for issue in hardware_issues:
+                if "不支持" in issue.description or "不兼容" in issue.description:
+                    return GPUSupportLevel.BASIC
+
+        # 如果没有GPU能力信息，使用兼容性级别判断
+        if capabilities is None:
+            if compatibility_level in [CompatibilityLevel.EXCELLENT, CompatibilityLevel.GOOD]:
+                return current_support
+            elif compatibility_level == CompatibilityLevel.FAIR:
+                return GPUSupportLevel.WEBGL if current_support == GPUSupportLevel.WEBGPU else current_support
+            else:  # POOR
                 return GPUSupportLevel.BASIC
 
-        # 根据兼容性级别推荐
-        if compatibility_level in [CompatibilityLevel.EXCELLENT, CompatibilityLevel.GOOD]:
-            return current_support  # 使用当前最佳支持级别
-        elif compatibility_level == CompatibilityLevel.FAIR:
-            # 如果当前是WebGPU但兼容性一般，降级到WebGL
+        # 基于显存容量的智能后端选择
+        memory_mb = capabilities.memory_mb
+        
+        # 如果显存检测异常，使用估算值
+        if memory_mb == 0 or memory_mb < 256:
+            estimated_memory = self._estimate_gpu_memory(capabilities.adapter_name, capabilities.vendor)
+            if estimated_memory > 0:
+                memory_mb = estimated_memory
+                logger.info(f"使用估算显存容量: {memory_mb}MB")
+
+        # 显存容量决定后端选择
+        if memory_mb >= 6000:  # 6GB及以上（GTX 1660 SUPER级别）
+            # 高性能GPU，优先使用WebGPU
             if current_support == GPUSupportLevel.WEBGPU:
+                logger.info(f"高性能GPU ({memory_mb}MB)，推荐使用WebGPU")
+                return GPUSupportLevel.WEBGPU
+            elif current_support == GPUSupportLevel.WEBGL:
                 return GPUSupportLevel.WEBGL
-            return current_support
-        else:  # POOR
+            else:
+                return GPUSupportLevel.NATIVE
+                
+        elif memory_mb >= 4096:  # 4GB-6GB（中等性能GPU）
+            # 中等性能GPU，根据兼容性选择
+            if compatibility_level in [CompatibilityLevel.EXCELLENT, CompatibilityLevel.GOOD]:
+                return current_support if current_support in [GPUSupportLevel.WEBGPU, GPUSupportLevel.WEBGL] else GPUSupportLevel.WEBGL
+            else:
+                return GPUSupportLevel.WEBGL
+                
+        elif memory_mb >= 2048:  # 2GB-4GB（入门级GPU）
+            # 入门级GPU，使用WebGL
+            return GPUSupportLevel.WEBGL
+            
+        else:  # 2GB以下
+            # 低性能GPU，使用基础渲染
             return GPUSupportLevel.BASIC
+
+    def _get_recommended_backend(self, compatibility_level: CompatibilityLevel, 
+                                support_level: GPUSupportLevel,
+                                capabilities: GPUCapabilities = None) -> GPUSupportLevel:
+        """获取推荐后端 - 兼容性包装"""
+        return self._recommend_backend(compatibility_level, support_level, [], capabilities)
 
     def _generate_recommendations(self, issues: List[CompatibilityIssue],
                                   capabilities: GPUCapabilities,

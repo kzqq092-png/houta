@@ -5,6 +5,57 @@ from collections import Counter
 from scipy import stats
 import warnings
 from loguru import logger
+from typing import Any, Union
+
+def _is_repeat_string(value: Any) -> bool:
+    """检测是否为重复字符串模式"""
+    try:
+        if not isinstance(value, str):
+            return False
+            
+        # 如果字符串长度小于等于10，不是重复模式
+        if len(value) <= 10:
+            return False
+        
+        # 检查是否为基础字符串的重复模式
+        for i in range(1, min(len(value), 20)):
+            unit = value[:i]
+            if len(value) % len(unit) == 0:
+                repeated = unit * (len(value) // len(unit))
+                if value == repeated:
+                    logger.debug(f"检测到重复字符串模式: 单元='{unit}', 长度={i}, 重复次数={len(value) // i}")
+                    return True
+        
+        return False
+        
+    except Exception as e:
+        logger.debug(f"重复字符串检测失败: {e}")
+        return False
+
+def _clean_repeat_strings_series(series: pd.Series, context: str = "") -> pd.Series:
+    """清理Series中的重复字符串"""
+    try:
+        cleaned_series = series.copy()
+        
+        # 检查重复字符串
+        repeat_mask = series.astype(str).apply(_is_repeat_string)
+        if repeat_mask.any():
+            repeat_count = repeat_mask.sum()
+            cleaned_series.loc[repeat_mask] = np.nan
+            
+            # 记录检测到的重复字符串
+            repeat_strings = series.loc[repeat_mask].unique()
+            logger.warning(f"{context}检测到{repeat_count}个重复字符串: {[s[:20]+'...' if len(str(s))>20 else s for s in repeat_strings[:3]]}")
+            
+            logger.info(f"{context}Series清理完成: 共清理{repeat_count}个重复字符串")
+        else:
+            logger.debug(f"{context}Series无需清理: 未检测到重复字符串")
+            
+        return cleaned_series
+        
+    except Exception as e:
+        logger.error(f"{context}Series字符串清理失败: {e}")
+        return series
 
 def optimize_data_quality(df):
     """
@@ -230,12 +281,18 @@ def preprocess_data(df):
     # 排序索引
     result = result.sort_index()
 
-    # 确保数据类型
+    # 确保数据类型 - 先清理重复字符串
     for col in ['open', 'high', 'low', 'close']:
         if col in result.columns:
+            # 先清理重复字符串
+            result[col] = _clean_repeat_strings_series(result[col], f"data_preprocessing-{col}")
+            # 再转换为数值类型
             result[col] = pd.to_numeric(result[col], errors='coerce')
 
     if 'volume' in result.columns:
+        # 先清理重复字符串
+        result['volume'] = _clean_repeat_strings_series(result['volume'], "data_preprocessing-volume")
+        # 再转换为数值类型
         result['volume'] = pd.to_numeric(result['volume'], errors='coerce')
         # 确保交易量非负
         result['volume'] = result['volume'].abs()

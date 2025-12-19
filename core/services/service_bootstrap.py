@@ -377,6 +377,139 @@ class ServiceBootstrap:
             logger.error(f" AI预测服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
+        # 增强指标服务
+        try:
+            from .enhanced_indicator_service import EnhancedIndicatorService
+            if not self._is_service_registered(EnhancedIndicatorService):
+                self.service_container.register(
+                    EnhancedIndicatorService,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: EnhancedIndicatorService()
+                )
+            enhanced_indicator_service = self.service_container.resolve(EnhancedIndicatorService)
+            if hasattr(enhanced_indicator_service, 'initialize'):
+                enhanced_indicator_service.initialize()
+            logger.info("✅ 增强指标服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ 增强指标服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # 注册智能推荐引擎
+        try:
+            from .smart_recommendation_engine import SmartRecommendationEngine
+            if not self._is_service_registered(SmartRecommendationEngine):
+                self.service_container.register(
+                    SmartRecommendationEngine,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: SmartRecommendationEngine()
+                )
+            smart_recommendation_engine = self.service_container.resolve(SmartRecommendationEngine)
+            logger.info("✅ 智能推荐引擎注册完成")
+        except Exception as e:
+            logger.error(f"❌ 智能推荐引擎注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # AI选股集成服务
+        try:
+            from .ai_selection_integration_service import AISelectionIntegrationService
+            if not self._is_service_registered(AISelectionIntegrationService):
+                self.service_container.register(
+                    AISelectionIntegrationService,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: AISelectionIntegrationService(
+                        service_container=self.service_container
+                    )
+                )
+            ai_selection_service = self.service_container.resolve(AISelectionIntegrationService)
+            if hasattr(ai_selection_service, 'initialize'):
+                ai_selection_service.initialize()
+            logger.info("✅ AI选股集成服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ AI选股集成服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # AI可解释性服务
+        try:
+            from .ai_explainability_service import AIExplainabilityService
+            if not self._is_service_registered(AIExplainabilityService):
+                self.service_container.register(
+                    AIExplainabilityService,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: AIExplainabilityService(
+                        service_container=self.service_container
+                    )
+                )
+            ai_explainability_service = self.service_container.resolve(AIExplainabilityService)
+            if hasattr(ai_explainability_service, 'initialize'):
+                ai_explainability_service.initialize()
+            logger.info("✅ AI可解释性服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ AI可解释性服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # AI选股回测服务
+        try:
+            from .ai_selection_backtest_service import AISelectionBacktestService
+            if not self._is_service_registered(AISelectionBacktestService):
+                self.service_container.register(
+                    AISelectionBacktestService,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: AISelectionBacktestService(
+                        database_service=self.service_container.resolve(DatabaseService),
+                        ai_selection_service=self.service_container.resolve(AISelectionIntegrationService),
+                        personalization_engine=None  # 将通过后续步骤注入
+                    )
+                )
+            ai_backtest_service = self.service_container.resolve(AISelectionBacktestService)
+            if hasattr(ai_backtest_service, 'initialize'):
+                ai_backtest_service.initialize()
+            logger.info("✅ AI选股回测服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ AI选股回测服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # AI选股风险控制服务
+        try:
+            from .ai_selection_risk_control_service import AISelectionRiskControlService
+            if not self._is_service_registered(AISelectionRiskControlService):
+                self.service_container.register(
+                    AISelectionRiskControlService,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: AISelectionRiskControlService(
+                        database_service=self.service_container.resolve(DatabaseService),
+                        ai_selection_service=self.service_container.resolve(AISelectionIntegrationService),
+                        ai_backtest_service=self.service_container.resolve(AISelectionBacktestService),
+                        personalization_engine=None,  # 将通过后续步骤注入
+                        indicator_service=self.service_container.resolve(EnhancedIndicatorService),
+                        risk_control_level='standard'  # 默认风险控制级别
+                    )
+                )
+            ai_risk_control_service = self.service_container.resolve(AISelectionRiskControlService)
+            if hasattr(ai_risk_control_service, 'initialize'):
+                ai_risk_control_service.initialize()
+            logger.info("✅ AI选股风险控制服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ AI选股风险控制服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # 注册混合推荐引擎
+        try:
+            from .hybrid_recommendation_engine import HybridRecommendationEngine
+            if not self._is_service_registered(HybridRecommendationEngine):
+                self.service_container.register(
+                    HybridRecommendationEngine,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: HybridRecommendationEngine(event_bus=self.event_bus)
+                )
+            hybrid_recommendation_engine = self.service_container.resolve(HybridRecommendationEngine)
+            # 初始化混合推荐引擎
+            if hasattr(hybrid_recommendation_engine, 'initialize'):
+                hybrid_recommendation_engine.initialize()
+            logger.info("✅ 混合推荐引擎注册完成")
+        except Exception as e:
+            logger.error(f"❌ 混合推荐引擎注册失败: {e}")
+            logger.error(traceback.format_exc())
+
         # 模型训练服务
         try:
             from .model_training_service import ModelTrainingService
@@ -520,6 +653,43 @@ class ServiceBootstrap:
                 if hasattr(stock_service, 'initialize'):
                     stock_service.initialize()
                 logger.info("StockService初始化完成")
+
+            # 阶段5: 初始化AI选股相关服务
+            try:
+                from core.services.ai_selection_integration_service import AISelectionIntegrationService
+                if self.service_container.is_registered(AISelectionIntegrationService):
+                    ai_selection_service = self.service_container.resolve(AISelectionIntegrationService)
+                    if hasattr(ai_selection_service, 'initialize'):
+                        ai_selection_service.initialize()
+                    logger.info("AISelectionIntegrationService初始化完成")
+            except ImportError as e:
+                logger.warning(f"AISelectionIntegrationService未找到: {e}")
+            except Exception as e:
+                logger.error(f"AISelectionIntegrationService初始化失败: {e}")
+
+            try:
+                from core.services.ai_explainability_service import AIExplainabilityService
+                if self.service_container.is_registered(AIExplainabilityService):
+                    ai_explain_service = self.service_container.resolve(AIExplainabilityService)
+                    if hasattr(ai_explain_service, 'initialize'):
+                        ai_explain_service.initialize()
+                    logger.info("AIExplainabilityService初始化完成")
+            except ImportError as e:
+                logger.warning(f"AIExplainabilityService未找到: {e}")
+            except Exception as e:
+                logger.error(f"AIExplainabilityService初始化失败: {e}")
+
+            try:
+                from core.services.ai_selection_backtest_service import AISelectionBacktestService
+                if self.service_container.is_registered(AISelectionBacktestService):
+                    ai_backtest_service = self.service_container.resolve(AISelectionBacktestService)
+                    if hasattr(ai_backtest_service, 'initialize'):
+                        ai_backtest_service.initialize()
+                    logger.info("AISelectionBacktestService初始化完成")
+            except ImportError as e:
+                logger.warning(f"AISelectionBacktestService未找到: {e}")
+            except Exception as e:
+                logger.error(f"AISelectionBacktestService初始化失败: {e}")
 
             logger.info("分阶段初始化完成")
 

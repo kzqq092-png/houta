@@ -841,7 +841,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 3. 存储到中央数据状态 - 增强数据验证和日志
             logger.info(f"=== 准备中央数据状态 ===")
-            logger.info(f"K线数据类型: {type(kline_data)}")
+            logger.info(f"K线数据类型: {type(kline_data).__name__}")
             if hasattr(kline_data, 'shape'):
                 logger.info(f"K线数据形状: {kline_data.shape}")
             elif hasattr(kline_data, '__len__'):
@@ -1106,9 +1106,24 @@ class MainWindowCoordinator(BaseCoordinator):
 
     @pyqtSlot(UIDataReadyEvent)
     def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
-        """处理UI数据就绪事件，更新主窗口状态栏"""
+        """处理UI数据就绪事件，更新主窗口状态栏并重新渲染图表"""
         try:
-            kdata = event.ui_data.get('kline_data')
+            # 兼容两种事件格式：ui_data.kline_data 和 直接的 kline_data
+            kdata = None
+            ui_data = {}
+            
+            # 尝试从 event.ui_data 获取数据（新型事件格式）
+            if hasattr(event, 'ui_data') and event.ui_data:
+                kdata = event.ui_data.get('kline_data')
+                ui_data = event.ui_data
+                logger.debug(f"从event.ui_data获取K线数据: {type(kdata)}")
+            
+            # 如果没有从 ui_data 获取到，尝试从 event.kline_data 获取（传统事件格式）
+            if kdata is None and hasattr(event, 'kline_data') and event.kline_data is not None:
+                kdata = event.kline_data
+                ui_data = {'kline_data': kdata}
+                logger.debug(f"从event.kline_data获取K线数据: {type(kdata)}")
+            
             if kdata is not None and not kdata.empty:
                 # 更新状态标签显示加载数量
                 self._status_label.setText(f"已加载 ({len(kdata)})")
@@ -1120,13 +1135,62 @@ class MainWindowCoordinator(BaseCoordinator):
                 else:
                     time_str = str(latest_date)
                 self._data_time_label.setText(f"数据时间: {time_str}")
+                
+                # 🔧 修复技术指标刷新问题：触发图表更新以重新渲染指标
+                self._trigger_chart_update_with_indicators(ui_data, event.stock_code)
             else:
                 self._status_label.setText("已加载 (0)")
                 self._data_time_label.setText("数据时间: -")
+                logger.warning("未获取到有效的K线数据，无法更新图表")
         except Exception as e:
             logger.error(f"更新主窗口状态栏失败: {e}", exc_info=True)
             self._status_label.setText("状态更新失败")
             self._data_time_label.setText("数据时间: -")
+            
+    def _trigger_chart_update_with_indicators(self, ui_data: dict, stock_code: str) -> None:
+        """触发图表更新并重新渲染指标"""
+        try:
+            # 获取中间面板的图表控件
+            middle_panel = self._panels.get('middle')
+            if not middle_panel or not hasattr(middle_panel, 'chart_widget'):
+                logger.warning("中间面板或图表控件不存在，跳过指标刷新")
+                return
+                
+            chart_widget = middle_panel.chart_widget
+            if not chart_widget:
+                logger.warning("图表控件不存在，跳过指标刷新")
+                return
+            
+            # 🔧 确保在数据更新前保留当前指标状态
+            current_indicators = getattr(chart_widget, 'active_indicators', None)
+            if current_indicators:
+                logger.info(f"保留当前指标状态: {[ind.get('name', 'unknown') for ind in current_indicators]}")
+                
+            # 构建更新数据，确保包含指标数据
+            update_data = {
+                'kline_data': ui_data.get('kline_data'),
+                'stock_code': stock_code,
+                'title': getattr(chart_widget, 'current_stock', stock_code)
+            }
+            
+            # 如果有指标数据，也传递过去
+            indicators_data = ui_data.get('indicators_data', {})
+            if indicators_data:
+                update_data['indicators_data'] = indicators_data
+                logger.info(f"传递指标数据到图表: {list(indicators_data.keys())}")
+            
+            # 🔧 如果没有通过indicators_data传递指标，则通过active_indicators字段传递
+            if not indicators_data and current_indicators:
+                update_data['active_indicators'] = current_indicators
+                logger.info(f"通过active_indicators字段传递指标: {[ind.get('name', 'unknown') for ind in current_indicators]}")
+            
+            # 触发图表更新，这将重新渲染所有指标
+            logger.info(f"触发图表更新，股票代码: {stock_code}")
+            chart_widget.update_chart(update_data)
+            logger.info("✅ 图表更新完成，指标将重新渲染")
+            
+        except Exception as e:
+            logger.error(f"触发图表更新失败: {e}", exc_info=True)
 
     def _on_chart_updated(self, event: ChartUpdateEvent) -> None:
         """处理图表更新事件"""
@@ -1732,6 +1796,98 @@ FactorWeave-Quant  2.0 (重构版本)
             logger.error(f"批量分析失败: {e}")
             QMessageBox.critical(self._main_window, "错误",
                                  f"打开批量分析对话框失败: {str(e)}")
+
+    def _on_intelligent_model_selection(self) -> None:
+        """智能模型选择"""
+        # 防止重复打开 - 检查是否已有智能模型选择对话框实例
+        if hasattr(self, '_intelligent_model_selection_dialog') and self._intelligent_model_selection_dialog is not None:
+            if self._intelligent_model_selection_dialog.isVisible():
+                self._intelligent_model_selection_dialog.raise_()
+                self._intelligent_model_selection_dialog.activateWindow()
+                logger.info("智能模型选择对话框已存在，激活现有窗口")
+                return
+            else:
+                self._intelligent_model_selection_dialog = None
+
+        try:
+            from gui.dialogs.intelligent_model_selection_dialog import IntelligentModelSelectionDialog
+
+            # 创建智能模型选择对话框实例并保存引用
+            self._intelligent_model_selection_dialog = IntelligentModelSelectionDialog(
+                self._main_window, 
+                service_container=self.service_container
+            )
+
+            # 连接对话框的关闭信号
+            self._intelligent_model_selection_dialog.finished.connect(self._on_intelligent_model_selection_dialog_closed)
+
+            # 设置对话框居中显示
+            self.center_dialog(self._intelligent_model_selection_dialog)
+
+            # 显示对话框
+            self._intelligent_model_selection_dialog.exec_()
+
+        except ImportError as e:
+            # 如果对话框不存在，尝试使用控制面板直接创建
+            logger.warning(f"智能模型选择对话框导入失败: {e}，尝试使用控制面板")
+            self._show_intelligent_model_selection_panel()
+        except Exception as e:
+            logger.error(f"智能模型选择失败: {e}")
+            logger.error(traceback.format_exc())
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开智能模型选择失败: {str(e)}")
+
+    def _show_intelligent_model_selection_panel(self) -> None:
+        """显示智能模型选择面板"""
+        try:
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QDialogButtonBox
+            from gui.widgets.intelligent_model_selection.control_panel import IntelligentModelControlPanel
+            from core.ai.intelligent_selection import IntelligentModelSelector
+
+            # 创建对话框
+            dialog = QDialog(self._main_window)
+            dialog.setWindowTitle("智能模型选择")
+            dialog.setMinimumSize(500, 700)
+            
+            # 创建布局
+            layout = QVBoxLayout(dialog)
+            
+            # 创建智能模型选择控制面板
+            control_panel = IntelligentModelControlPanel()
+            layout.addWidget(control_panel)
+            
+            # 尝试创建智能选择器
+            try:
+                intelligent_selector = IntelligentSelector()
+                control_panel.set_intelligent_selector(intelligent_selector)
+                logger.info("智能选择器创建成功")
+            except Exception as e:
+                logger.warning(f"智能选择器创建失败: {e}")
+            
+            # 创建按钮框
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+            )
+            button_box.accepted.connect(dialog.accept)
+            button_box.rejected.connect(dialog.reject)
+            layout.addWidget(button_box)
+            
+            # 设置对话框居中显示
+            self.center_dialog(dialog)
+            
+            # 显示对话框
+            dialog.exec_()
+
+        except Exception as e:
+            logger.error(f"显示智能模型选择面板失败: {e}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开智能模型选择面板失败: {str(e)}")
+
+    def _on_intelligent_model_selection_dialog_closed(self):
+        """智能模型选择对话框关闭时的回调"""
+        logger.info("智能模型选择对话框已关闭，清理引用")
+        if hasattr(self, '_intelligent_model_selection_dialog'):
+            self._intelligent_model_selection_dialog = None
 
     def _on_strategy_management(self) -> None:
         """策略管理"""
@@ -2972,8 +3128,8 @@ FactorWeave-Quant  2.0 (重构版本)
                 default_params = {
                     'professional_level': 'PROFESSIONAL',
                     'engine_type': 'unified',
-                    'use_vectorized': True,
-                    'auto_select': True,
+                    'use_vectorized_engine': True,
+                    'auto_select_engine': True,
                     'monitoring_level': 'STANDARD'
                 }
                 self._backtest_widget.start_backtest(default_params)
@@ -3069,7 +3225,7 @@ FactorWeave-Quant  2.0 (重构版本)
             self._standalone_backtest_window.setGeometry(x, y, window_width, window_height)
 
             # 设置最小窗口大小
-            self._standalone_backtest_window.setMinimumSize(1000, 700)
+            self._standalone_backtest_window.setMinimumSize(1000, 800)
 
             # 设置窗口标志，支持放大缩小和关闭
             self._standalone_backtest_window.setWindowFlags(
@@ -3441,8 +3597,7 @@ FactorWeave-Quant  2.0 (重构版本)
             # 导入增强UI组件
             import_start = time.time()
             from gui.widgets.enhanced_ui import (
-                Level2DataPanel, OrderBookWidget, FundamentalAnalysisTab,
-                DataQualityMonitorTab, SmartRecommendationPanel
+                Level2DataPanel, OrderBookWidget, FundamentalAnalysisTab, SmartRecommendationPanel
             )
             import_time = time.time() - import_start
             logger.info(f"模块导入耗时: {import_time:.3f}秒")

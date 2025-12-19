@@ -107,7 +107,6 @@ class PerformanceMetrics:
     throughput: float  # 每秒处理的数据点数
     memory_usage: float
     cpu_utilization: float
-    gpu_utilization: float
     cache_hit_rate: float
     parallel_efficiency: float
     optimization_level: str
@@ -604,7 +603,6 @@ class UltraPerformanceOptimizer:
                 throughput=throughput,
                 memory_usage=memory_usage,
                 cpu_utilization=psutil.cpu_percent(),
-                gpu_utilization=self._get_gpu_utilization(),
                 cache_hit_rate=cache_hit_rate,
                 parallel_efficiency=self._calculate_parallel_efficiency(
                     execution_time, len(data)),
@@ -653,18 +651,7 @@ class UltraPerformanceOptimizer:
             logger.error(f"数据预处理失败: {e}")
             return data
 
-    def _get_gpu_utilization(self) -> float:
-        """获取GPU使用率"""
-        try:
-            if self.gpu_available:
-                import pynvml
-                pynvml.nvmlInit()
-                handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-                utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
-                return utilization.gpu
-            return 0.0
-        except Exception:
-            return 0.0
+
 
     def _calculate_parallel_efficiency(self, execution_time: float, data_size: int) -> float:
         """计算并行效率"""

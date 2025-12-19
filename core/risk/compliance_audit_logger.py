@@ -13,7 +13,7 @@ import json
 import sqlite3
 import hashlib
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Union, Callable
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from pathlib import Path

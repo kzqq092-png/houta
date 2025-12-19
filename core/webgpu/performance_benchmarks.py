@@ -32,7 +32,6 @@ class BenchmarkType(Enum):
     """基准测试类型"""
     RENDERING = "rendering"      # 渲染性能
     MEMORY = "memory"           # 内存使用
-    GPU_UTILIZATION = "gpu"     # GPU利用率
     FRAME_RATE = "framerate"    # 帧率
     COMPARISON = "comparison"   # 对比测试
 
@@ -56,12 +55,7 @@ class PerformanceMetrics:
 
     # 内存使用
     memory_usage_mb: float = 0.0
-    gpu_memory_mb: float = 0.0
     peak_memory_mb: float = 0.0
-
-    # GPU相关
-    gpu_utilization_percent: float = 0.0
-    gpu_temperature: float = 0.0
 
     # 用户体验
     input_latency_ms: float = 0.0
@@ -144,7 +138,7 @@ class MemoryMonitor:
             self.monitor_thread.join(timeout=1.0)
 
         if not self.memory_samples:
-            return {'avg_memory': 0.0, 'peak_memory': 0.0, 'avg_gpu_memory': 0.0}
+            return {'avg_memory': 0.0, 'peak_memory': 0.0}
 
         memory_stats = {
             'avg_memory': statistics.mean(self.memory_samples),
@@ -152,12 +146,6 @@ class MemoryMonitor:
             'min_memory': min(self.memory_samples),
             'memory_std': statistics.stdev(self.memory_samples) if len(self.memory_samples) > 1 else 0.0
         }
-
-        if self.gpu_memory_samples:
-            memory_stats.update({
-                'avg_gpu_memory': statistics.mean(self.gpu_memory_samples),
-                'peak_gpu_memory': max(self.gpu_memory_samples)
-            })
 
         logger.info(f"内存监控已停止，统计结果: {memory_stats}")
         return memory_stats
@@ -183,21 +171,7 @@ class MemoryMonitor:
                 logger.warning(f"内存监控异常: {e}")
                 time.sleep(0.5)
 
-    def _get_gpu_memory_usage(self) -> Optional[float]:
-        """获取GPU内存使用（MB）"""
-        try:
-            # 尝试使用nvidia-smi获取NVIDIA GPU内存
-            import subprocess
-            result = subprocess.run(['nvidia-smi', '--query-gpu=memory.used', '--format=csv,noheader,nounits'],
-                                    capture_output=True, text=True, timeout=2)
-            if result.returncode == 0:
-                memory_mb = float(result.stdout.strip().split('\n')[0])
-                return memory_mb
-        except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
-            pass
 
-        # TODO: 添加AMD和Intel GPU内存监控支持
-        return None
 
 
 class FrameRateMonitor:
@@ -252,51 +226,7 @@ class FrameRateMonitor:
         return stats
 
 
-class GPUMonitor:
-    """GPU监控器"""
 
-    def __init__(self):
-        self.monitoring = False
-        self.gpu_utilization_samples: List[float] = []
-        self.gpu_temperature_samples: List[float] = []
-        self.monitor_thread: Optional[threading.Thread] = None
-
-    def start_monitoring(self) -> None:
-        """开始GPU监控"""
-        if self.monitoring:
-            return
-
-        self.monitoring = True
-        self.gpu_utilization_samples.clear()
-        self.gpu_temperature_samples.clear()
-
-        self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
-        self.monitor_thread.start()
-        logger.info("GPU监控已启动")
-
-    def stop_monitoring(self) -> Dict[str, float]:
-        """停止GPU监控并返回统计结果"""
-        self.monitoring = False
-
-        if self.monitor_thread:
-            self.monitor_thread.join(timeout=1.0)
-
-        stats = {}
-
-        if self.gpu_utilization_samples:
-            stats.update({
-                'avg_gpu_utilization': statistics.mean(self.gpu_utilization_samples),
-                'max_gpu_utilization': max(self.gpu_utilization_samples),
-                'min_gpu_utilization': min(self.gpu_utilization_samples)
-            })
-
-        if self.gpu_temperature_samples:
-            stats.update({
-                'avg_gpu_temperature': statistics.mean(self.gpu_temperature_samples),
-                'max_gpu_temperature': max(self.gpu_temperature_samples)
-            })
-
-        logger.info(f"GPU监控已停止，统计结果: {stats}")
         return stats
 
     def _monitor_loop(self) -> None:

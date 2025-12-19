@@ -1,396 +1,454 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
-GPU加速管理器服务
+GPU加速管理器
 
-提供统一的GPU加速接口，整合：
-1. WebGPU硬件加速渲染
-2. CUDA/CuPy数值计算加速  
-3. 性能监控和降级处理
+提供GPU硬件加速功能的管理和协调，包括：
+1. GPU检测和初始化
+2. GPU资源管理
+3. GPU加速任务调度
+4. 性能监控和优化
+5. 自动降级处理
 
-作者: FactorWeave-Quant Team
-版本: v2.5
+作者: FactorWeave-Quant团队
+版本: 2.0
 """
 
-from loguru import logger
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
+import os
+import json
 import threading
+import time
+from typing import Dict, Any, List, Optional, Union, Tuple
+from pathlib import Path
+from dataclasses import dataclass, asdict
+from enum import Enum
+from loguru import logger
 
+# 导入基础服务
 from .base_service import BaseService
-from .metrics_base import add_dict_interface
+
+# 导入GPU相关模块
+WEBGPU_AVAILABLE = False
+GPU_DETECTOR_CLASS = None
+WEBGPU_CONTEXT_CLASS = None
+GPU_BACKEND_ENUM = None
+
+try:
+    from ..webgpu.enhanced_gpu_detection import GPUDetector, GPUAdapter, PowerPreference, GPUType
+    from ..webgpu.webgpu_renderer import WebGPUContext, GPURendererConfig, GPUBackend
+    WEBGPU_AVAILABLE = True
+    GPU_DETECTOR_CLASS = GPUDetector
+    WEBGPU_CONTEXT_CLASS = WebGPUContext
+    GPU_BACKEND_ENUM = GPUBackend
+except ImportError as e:
+    logger.warning(f"WebGPU模块导入失败: {e}")
+    WEBGPU_AVAILABLE = False
+
+# 导入配置
+try:
+    from ..config_service import ConfigService
+    CONFIG_SERVICE_AVAILABLE = True
+except ImportError:
+    CONFIG_SERVICE_AVAILABLE = False
+    logger.warning("配置服务不可用，将使用默认配置")
 
 
-class GPUBackendType(Enum):
-    """GPU后端类型"""
-    WEBGPU = "webgpu"           # WebGPU（图表渲染）
-    CUDA = "cuda"               # CUDA（数值计算）
-    OPENCL = "opencl"           # OpenCL（跨平台）
-    METAL = "metal"             # Metal（macOS）
-    CPU_FALLBACK = "cpu"        # CPU降级
-
-
-class GPUAccelerationLevel(Enum):
-    """GPU加速级别"""
-    NONE = 0        # 无加速
-    BASIC = 1       # 基础加速
-    STANDARD = 2    # 标准加速
-    HIGH = 3        # 高级加速
-    ULTRA = 4       # 极致加速
+class GPUAccelerationStatus(Enum):
+    """GPU加速状态"""
+    DISABLED = "disabled"          # 禁用
+    INITIALIZING = "initializing"  # 初始化中
+    READY = "ready"               # 就绪
+    ERROR = "error"               # 错误
+    FALLBACK = "fallback"         # 降级模式
 
 
 @dataclass
-class GPUCapabilities:
-    """GPU能力信息"""
-    webgpu_available: bool = False
-    cuda_available: bool = False
-    opencl_available: bool = False
-    metal_available: bool = False
+class GPUAccelerationConfig:
+    """GPU加速配置"""
+    enabled: bool = True
+    auto_detect: bool = True
+    preferred_backend: str = "auto"
+    memory_limit_mb: int = 512
+    enable_profiling: bool = False
+    auto_fallback_on_error: bool = True
+    cpu_threads: int = 4
+    
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> 'GPUAccelerationConfig':
+        """从字典创建配置"""
+        return cls(**{k: v for k, v in config_dict.items() if hasattr(cls, k)})
+    
+    @classmethod
+    def from_file(cls, config_path: Union[str, Path]) -> 'GPUAccelerationConfig':
+        """从文件加载配置"""
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_dict = json.load(f)
+            
+            # 提取gpu_acceleration部分
+            if 'gpu_acceleration' in config_dict:
+                config_dict = config_dict['gpu_acceleration']
+            
+            return cls.from_dict(config_dict)
+        except Exception as e:
+            logger.warning(f"加载GPU配置失败: {e}，使用默认配置")
+            return cls()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return asdict(self)
 
-    # 详细信息
-    gpu_name: str = "Unknown"
-    gpu_memory_gb: float = 0.0
-    compute_capability: str = "N/A"
-    driver_version: str = "N/A"
 
-    # 支持的功能
-    supports_float16: bool = False
-    supports_float64: bool = False
-    supports_tensor_cores: bool = False
-
-    last_check: datetime = field(default_factory=datetime.now)
-
-
-@add_dict_interface
 @dataclass
-class GPUMetrics:
-    """GPU性能指标"""
-    # 基础指标（来自BaseService）
-    initialization_count: int = 0
-    error_count: int = 0
-    last_error: Optional[str] = None
-    operation_count: int = 0
-
-    # GPU特定指标
-    gpu_utilization: float = 0.0
-    gpu_memory_used_mb: float = 0.0
-    gpu_memory_total_mb: float = 0.0
-    gpu_temperature: float = 0.0
-
-    # 渲染统计
-    total_renders: int = 0
-    successful_renders: int = 0
-    failed_renders: int = 0
-    fallback_count: int = 0
-
-    # 性能统计
-    average_render_time_ms: float = 0.0
-    average_compute_time_ms: float = 0.0
-    peak_memory_usage_mb: float = 0.0
-
-    current_backend: str = "none"
-    acceleration_level: str = "none"
-
-    last_update: datetime = field(default_factory=datetime.now)
+class GPUInfo:
+    """GPU信息"""
+    name: str
+    vendor: str
+    memory_mb: int
+    compute_units: int
+    is_discrete: bool
+    supports_webgpu: bool
+    supports_webgl: bool
+    driver_version: str = ""
+    gpu_type: str = "unknown"
+    
+    @classmethod
+    def from_adapter(cls, adapter) -> 'GPUInfo':
+        """从GPUAdapter创建GPUInfo"""
+        return cls(
+            name=adapter.name,
+            vendor=adapter.vendor,
+            memory_mb=adapter.memory_mb,
+            compute_units=adapter.compute_units,
+            is_discrete=adapter.is_discrete,
+            supports_webgpu=adapter.supports_webgpu,
+            supports_webgl=adapter.supports_webgl,
+            driver_version=adapter.driver_version,
+            gpu_type=adapter.gpu_type.value if adapter.gpu_type else "unknown"
+        )
 
 
 class GPUAccelerationManager(BaseService):
     """
-    GPU加速管理器服务
-
-    统一管理各种GPU加速后端：
-    - WebGPU: 图表渲染加速
-    - CUDA/CuPy: 数值计算加速
-    - 自动降级: GPU不可用时使用CPU
+    GPU加速管理器
+    
+    负责GPU硬件加速功能的管理和协调，包括：
+    - GPU检测和初始化
+    - GPU资源管理
+    - GPU加速任务调度
+    - 性能监控和优化
+    - 自动降级处理
     """
-
-    def __init__(self):
-        super().__init__("GPUAccelerationManager")
-
-        # GPU能力
-        self._capabilities = GPUCapabilities()
-        self._acceleration_level = GPUAccelerationLevel.NONE
-
-        # 后端管理器
-        self._webgpu_manager = None
-        self._cuda_context = None
-        self._fallback_enabled = True
-
-        # 性能监控
-        self._metrics = GPUMetrics()
-        self._metrics_lock = threading.RLock()
-
-        # 配置
-        self._config = {
-            "auto_detect": True,
-            "prefer_webgpu": True,
-            "prefer_cuda": True,
-            "enable_fallback": True,
-            "max_gpu_memory_usage_gb": 4.0,
-        }
-
-    def _do_initialize(self) -> None:
+    
+    def __init__(self, event_bus=None):
         """初始化GPU加速管理器"""
-        logger.info("初始化GPU加速管理器...")
-
-        # 检测GPU能力
-        self._detect_gpu_capabilities()
-
-        # 初始化后端
-        self._initialize_backends()
-
-        # 设置加速级别
-        self._determine_acceleration_level()
-
-        logger.info(f"GPU加速管理器初始化完成 - 加速级别: {self._acceleration_level.name}")
-        logger.info(f"  WebGPU: {'✅' if self._capabilities.webgpu_available else '❌'}")
-        logger.info(f"  CUDA: {'✅' if self._capabilities.cuda_available else '❌'}")
-
-    def _detect_gpu_capabilities(self) -> None:
-        """检测GPU能力"""
-        logger.info("检测GPU能力...")
-
-        # 检测WebGPU
-        self._capabilities.webgpu_available = self._check_webgpu()
-
-        # 检测CUDA
-        self._capabilities.cuda_available = self._check_cuda()
-
-        # 检测OpenCL
-        self._capabilities.opencl_available = self._check_opencl()
-
-        # 检测Metal（macOS）
-        self._capabilities.metal_available = self._check_metal()
-
-        # 更新检测时间
-        self._capabilities.last_check = datetime.now()
-
-    def _check_webgpu(self) -> bool:
-        """检测WebGPU可用性"""
-        try:
-            from core.webgpu import WebGPUManager, get_webgpu_manager
-
-            # 尝试获取WebGPU管理器
-            manager = get_webgpu_manager()
-            if manager and manager.is_available():
-                self._capabilities.gpu_name = "WebGPU Compatible"
-                logger.info("✅ WebGPU可用")
-                return True
-            else:
-                logger.info("⚠️ WebGPU不可用（环境不支持）")
-                return False
-
-        except ImportError as e:
-            logger.debug(f"WebGPU模块导入失败: {e}")
-            return False
-        except Exception as e:
-            logger.debug(f"WebGPU检测失败: {e}")
-            return False
-
-    def _check_cuda(self) -> bool:
-        """检测CUDA可用性"""
-        try:
-            import cupy as cp
-
-            # 检测CUDA设备
-            if cp.cuda.is_available():
-                device = cp.cuda.Device(0)
-                self._capabilities.gpu_name = device.name.decode('utf-8') if isinstance(device.name, bytes) else str(device.name)
-                self._capabilities.gpu_memory_gb = device.mem_info[1] / (1024**3)
-                self._capabilities.compute_capability = f"{device.compute_capability[0]}.{device.compute_capability[1]}"
-
-                logger.info(f"✅ CUDA可用 - {self._capabilities.gpu_name}")
-                logger.info(f"   GPU内存: {self._capabilities.gpu_memory_gb:.1f}GB")
-                return True
-            else:
-                logger.info("⚠️ CUDA不可用（无GPU设备）")
-                return False
-
-        except ImportError:
-            logger.debug("CuPy未安装，CUDA不可用")
-            return False
-        except Exception as e:
-            logger.debug(f"CUDA检测失败: {e}")
-            return False
-
-    def _check_opencl(self) -> bool:
-        """检测OpenCL可用性"""
-        try:
-            import pyopencl as cl
-
-            platforms = cl.get_platforms()
-            if platforms:
-                logger.info(f"✅ OpenCL可用 - {len(platforms)}个平台")
-                return True
-            else:
-                return False
-
-        except ImportError:
-            logger.debug("PyOpenCL未安装")
-            return False
-        except Exception as e:
-            logger.debug(f"OpenCL检测失败: {e}")
-            return False
-
-    def _check_metal(self) -> bool:
-        """检测Metal可用性（macOS）"""
-        import sys
-
-        if sys.platform != 'darwin':
-            return False
-
-        try:
-            # Metal API检测（macOS特定）
-            # 这里可以添加Metal框架的检测逻辑
-            logger.debug("Metal检测需要macOS环境")
-            return False
-        except Exception as e:
-            logger.debug(f"Metal检测失败: {e}")
-            return False
-
-    def _initialize_backends(self) -> None:
-        """初始化GPU后端"""
-        # 初始化WebGPU（如果可用）
-        if self._capabilities.webgpu_available and self._config["prefer_webgpu"]:
+        super().__init__(event_bus)
+        
+        # 配置和状态
+        self._config: Optional[GPUAccelerationConfig] = None
+        self._status = GPUAccelerationStatus.DISABLED
+        self._gpu_info: List[GPUInfo] = []
+        self._active_gpu: Optional[GPUInfo] = None
+        self._webgpu_context: Optional[WebGPUContext] = None
+        self._gpu_detector: Optional[GPUDetector] = None
+        
+        # 性能统计
+        self._performance_stats = {
+            "tasks_processed": 0,
+            "gpu_time_used": 0.0,
+            "cpu_time_used": 0.0,
+            "memory_used_mb": 0,
+            "errors": 0
+        }
+        
+        # 线程安全
+        self._lock = threading.RLock()
+        
+        # 配置路径
+        self._config_path = Path(__file__).parent.parent.parent / "config" / "gpu_acceleration.json"
+        
+        logger.info("GPU加速管理器初始化完成")
+    
+    def initialize(self) -> None:
+        """初始化GPU加速管理器"""
+        with self._lock:
+            if self._initialized:
+                logger.warning("GPU加速管理器已初始化")
+                return
+            
             try:
-                from core.webgpu import get_webgpu_manager
-                self._webgpu_manager = get_webgpu_manager()
-                logger.info("✅ WebGPU后端已初始化")
+                self._status = GPUAccelerationStatus.INITIALIZING
+                start_time = time.time()
+                
+                # 加载配置
+                self._load_config()
+                
+                # 检查是否启用GPU加速
+                if not self._config.enabled:
+                    logger.info("GPU加速已禁用")
+                    self._status = GPUAccelerationStatus.DISABLED
+                    self._initialized = True
+                    self._initialization_time = time.time() - start_time
+                    return
+                
+                # 检测GPU
+                if self._config.auto_detect:
+                    self._detect_gpu()
+                
+                # 初始化WebGPU上下文
+                if WEBGPU_AVAILABLE and self._gpu_info:
+                    self._initialize_webgpu_context()
+                
+                # 设置活动GPU
+                self._select_active_gpu()
+                
+                # 更新状态
+                if self._active_gpu:
+                    self._status = GPUAccelerationStatus.READY
+                    logger.info(f"GPU加速初始化成功，使用GPU: {self._active_gpu.name}")
+                else:
+                    self._status = GPUAccelerationStatus.FALLBACK
+                    logger.warning("GPU加速初始化失败，使用CPU降级模式")
+                
+                self._initialized = True
+                self._initialization_time = time.time() - start_time
+                
+                # 发布初始化完成事件
+                self._publish_event("gpu_acceleration_initialized", {
+                    "status": self._status.value,
+                    "gpu_count": len(self._gpu_info),
+                    "active_gpu": self._active_gpu.name if self._active_gpu else None,
+                    "initialization_time": self._initialization_time
+                })
+                
             except Exception as e:
-                logger.warning(f"WebGPU后端初始化失败: {e}")
-
-        # 初始化CUDA（如果可用）
-        if self._capabilities.cuda_available and self._config["prefer_cuda"]:
-            try:
-                import cupy as cp
-                self._cuda_context = cp.cuda.Device(0)
-                logger.info("✅ CUDA后端已初始化")
-            except Exception as e:
-                logger.warning(f"CUDA后端初始化失败: {e}")
-
-    def _determine_acceleration_level(self) -> None:
-        """确定加速级别"""
-        if self._capabilities.cuda_available and self._capabilities.webgpu_available:
-            self._acceleration_level = GPUAccelerationLevel.ULTRA
-            self._metrics.current_backend = "hybrid"
-        elif self._capabilities.cuda_available:
-            self._acceleration_level = GPUAccelerationLevel.HIGH
-            self._metrics.current_backend = "cuda"
-        elif self._capabilities.webgpu_available:
-            self._acceleration_level = GPUAccelerationLevel.STANDARD
-            self._metrics.current_backend = "webgpu"
-        elif self._capabilities.opencl_available:
-            self._acceleration_level = GPUAccelerationLevel.BASIC
-            self._metrics.current_backend = "opencl"
-        else:
-            self._acceleration_level = GPUAccelerationLevel.NONE
-            self._metrics.current_backend = "cpu_fallback"
-
-        self._metrics.acceleration_level = self._acceleration_level.name.lower()
-
-    def get_capabilities(self) -> GPUCapabilities:
-        """获取GPU能力信息"""
-        return self._capabilities
-
-    def get_acceleration_level(self) -> GPUAccelerationLevel:
-        """获取当前加速级别"""
-        return self._acceleration_level
-
-    def is_gpu_available(self) -> bool:
-        """GPU是否可用"""
-        return (self._capabilities.webgpu_available or
-                self._capabilities.cuda_available or
-                self._capabilities.opencl_available)
-
-    def get_webgpu_manager(self):
-        """获取WebGPU管理器"""
-        return self._webgpu_manager
-
-    def get_cuda_context(self):
-        """获取CUDA上下文"""
-        return self._cuda_context
-
-    def get_metrics(self) -> Dict[str, Any]:
-        """获取GPU指标"""
-        with self._metrics_lock:
-            return {
-                'gpu_available': self.is_gpu_available(),
-                'acceleration_level': self._acceleration_level.name,
-                'current_backend': self._metrics.current_backend,
-                'webgpu_available': self._capabilities.webgpu_available,
-                'cuda_available': self._capabilities.cuda_available,
-                'gpu_name': self._capabilities.gpu_name,
-                'gpu_memory_gb': self._capabilities.gpu_memory_gb,
-                'total_renders': self._metrics.total_renders,
-                'successful_renders': self._metrics.successful_renders,
-                'fallback_count': self._metrics.fallback_count,
-                'average_render_time_ms': self._metrics.average_render_time_ms,
-            }
-
+                logger.error(f"GPU加速管理器初始化失败: {e}")
+                self._status = GPUAccelerationStatus.ERROR
+                if self._config and self._config.auto_fallback_on_error:
+                    self._status = GPUAccelerationStatus.FALLBACK
+                    logger.info("启用自动降级模式")
+                self._initialized = True
+                self._metrics["error_count"] += 1
+                self._metrics["last_error"] = str(e)
+    
     def dispose(self) -> None:
-        """清理GPU资源"""
+        """释放GPU加速管理器资源"""
+        with self._lock:
+            if self._disposed:
+                return
+            
+            try:
+                # 释放WebGPU上下文
+                if self._webgpu_context:
+                    # WebGPU上下文释放逻辑（如果有的话）
+                    self._webgpu_context = None
+                
+                # 清理资源
+                self._gpu_info.clear()
+                self._active_gpu = None
+                self._gpu_detector = None
+                
+                self._disposed = True
+                self._status = GPUAccelerationStatus.DISABLED
+                
+                logger.info("GPU加速管理器资源已释放")
+                
+            except Exception as e:
+                logger.error(f"释放GPU加速管理器资源失败: {e}")
+    
+    def _load_config(self) -> None:
+        """加载GPU加速配置"""
         try:
-            if self._webgpu_manager:
-                # WebGPU清理
-                logger.info("清理WebGPU资源...")
-                self._webgpu_manager = None
-
-            if self._cuda_context:
-                # CUDA清理
-                logger.info("清理CUDA资源...")
-                self._cuda_context = None
-
-            logger.info("GPU加速管理器已清理")
-
+            # 尝试从配置服务加载
+            if CONFIG_SERVICE_AVAILABLE:
+                config_service = self._event_bus.get_service("ConfigService")
+                if config_service:
+                    config_dict = config_service.get("gpu_acceleration", {})
+                    self._config = GPUAccelerationConfig.from_dict(config_dict)
+                    logger.info("从配置服务加载GPU加速配置")
+                    return
+            
+            # 尝试从文件加载
+            if self._config_path.exists():
+                self._config = GPUAccelerationConfig.from_file(self._config_path)
+                logger.info(f"从文件加载GPU加速配置: {self._config_path}")
+            else:
+                # 使用默认配置
+                self._config = GPUAccelerationConfig()
+                logger.info("使用默认GPU加速配置")
+                
         except Exception as e:
-            logger.error(f"GPU资源清理失败: {e}")
-
-
-# 全局单例
-_gpu_manager_instance: Optional[GPUAccelerationManager] = None
-_gpu_manager_lock = threading.Lock()
-
-
-def get_gpu_acceleration_manager() -> Optional[GPUAccelerationManager]:
-    """获取GPU加速管理器单例"""
-    global _gpu_manager_instance
-
-    if _gpu_manager_instance is None:
-        with _gpu_manager_lock:
-            if _gpu_manager_instance is None:
-                try:
-                    _gpu_manager_instance = GPUAccelerationManager()
-                    _gpu_manager_instance.initialize()
-                except Exception as e:
-                    logger.warning(f"GPU加速管理器初始化失败: {e}")
-                    _gpu_manager_instance = None
-
-    return _gpu_manager_instance
-
-
-if __name__ == '__main__':
-    # 测试GPU加速管理器
-    print("="*60)
-    print("GPU加速管理器测试")
-    print("="*60)
-
-    manager = GPUAccelerationManager()
-    manager.initialize()
-
-    caps = manager.get_capabilities()
-    print(f"\nGPU能力:")
-    print(f"  WebGPU: {caps.webgpu_available}")
-    print(f"  CUDA: {caps.cuda_available}")
-    print(f"  OpenCL: {caps.opencl_available}")
-    print(f"  GPU名称: {caps.gpu_name}")
-    print(f"  GPU内存: {caps.gpu_memory_gb:.1f}GB")
-
-    print(f"\n加速级别: {manager.get_acceleration_level().name}")
-    print(f"GPU可用: {manager.is_gpu_available()}")
-
-    metrics = manager.get_metrics()
-    print(f"\n指标:")
-    for key, value in metrics.items():
-        print(f"  {key}: {value}")
-
-    print("\n" + "="*60)
+            logger.warning(f"加载GPU加速配置失败: {e}，使用默认配置")
+            self._config = GPUAccelerationConfig()
+    
+    def _detect_gpu(self) -> None:
+        """检测GPU"""
+        if not WEBGPU_AVAILABLE or GPU_DETECTOR_CLASS is None:
+            logger.warning("WebGPU模块不可用，跳过GPU检测")
+            return
+        
+        try:
+            self._gpu_detector = GPU_DETECTOR_CLASS()
+            
+            # 获取GPU适配器
+            adapters = self._gpu_detector.get_adapters()
+            
+            # 转换为GPUInfo
+            self._gpu_info = [GPUInfo.from_adapter(adapter) for adapter in adapters]
+            
+            logger.info(f"检测到 {len(self._gpu_info)} 个GPU:")
+            for gpu in self._gpu_info:
+                logger.info(f"  - {gpu.name} ({gpu.vendor}, {gpu.memory_mb}MB, 离散显卡: {gpu.is_discrete})")
+                
+        except Exception as e:
+            logger.error(f"GPU检测失败: {e}")
+            self._gpu_info = []
+    
+    def _initialize_webgpu_context(self) -> None:
+        """初始化WebGPU上下文"""
+        if not WEBGPU_AVAILABLE or not self._gpu_info:
+            return
+        
+        try:
+            # 创建渲染器配置
+            backend_map = {
+                "auto": GPUBackend.MODERNGL,
+                "opengl": GPUBackend.OPENGL,
+                "moderngl": GPUBackend.MODERNGL,
+                "cuda": GPUBackend.CUDA,
+                "cpu": GPUBackend.CPU
+            }
+            
+            backend = backend_map.get(
+                self._config.preferred_backend.lower(), 
+                GPUBackend.MODERNGL
+            )
+            
+            renderer_config = GPURendererConfig(
+                backend_type=backend,
+                preferred_backend=backend,
+                fallback_to_opengl=self._config.auto_fallback_on_error,
+                fallback_to_cpu=self._config.auto_fallback_on_error,
+                gpu_memory_limit_mb=self._config.memory_limit_mb
+            )
+            
+            # 创建WebGPU上下文
+            self._webgpu_context = WebGPUContext(renderer_config)
+            
+            # 初始化上下文
+            if self._webgpu_context.initialize():
+                logger.info(f"WebGPU上下文初始化成功，后端: {backend.value}")
+            else:
+                logger.warning("WebGPU上下文初始化失败")
+                self._webgpu_context = None
+                
+        except Exception as e:
+            logger.error(f"WebGPU上下文初始化异常: {e}")
+            self._webgpu_context = None
+    
+    def _select_active_gpu(self) -> None:
+        """选择活动GPU"""
+        if not self._gpu_info:
+            return
+        
+        # 优先选择离散显卡
+        discrete_gpus = [gpu for gpu in self._gpu_info if gpu.is_discrete]
+        
+        if discrete_gpus:
+            # 选择显存最大的离散显卡
+            self._active_gpu = max(discrete_gpus, key=lambda gpu: gpu.memory_mb)
+        else:
+            # 选择显存最大的集成显卡
+            self._active_gpu = max(self._gpu_info, key=lambda gpu: gpu.memory_mb)
+        
+        logger.info(f"选择GPU: {self._active_gpu.name}")
+    
+    def _publish_event(self, event_name: str, data: Dict[str, Any]) -> None:
+        """发布事件"""
+        try:
+            if self._event_bus:
+                self._event_bus.publish(event_name, data)
+        except Exception as e:
+            logger.warning(f"发布事件失败: {e}")
+    
+    # 公共接口
+    
+    def get_status(self) -> GPUAccelerationStatus:
+        """获取GPU加速状态"""
+        return self._status
+    
+    def get_gpu_info(self) -> List[GPUInfo]:
+        """获取GPU信息列表"""
+        return self._gpu_info.copy()
+    
+    def get_active_gpu(self) -> Optional[GPUInfo]:
+        """获取活动GPU信息"""
+        return self._active_gpu
+    
+    def is_gpu_available(self) -> bool:
+        """检查GPU是否可用"""
+        return self._status == GPUAccelerationStatus.READY and self._active_gpu is not None
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """获取性能统计"""
+        with self._lock:
+            return self._performance_stats.copy()
+    
+    def execute_gpu_task(self, task_func, *args, **kwargs) -> Any:
+        """执行GPU加速任务"""
+        if not self.is_gpu_available():
+            logger.warning("GPU不可用，使用CPU执行任务")
+            return task_func(*args, **kwargs)
+        
+        try:
+            start_time = time.time()
+            
+            # 执行任务
+            result = task_func(*args, **kwargs)
+            
+            # 更新统计
+            execution_time = time.time() - start_time
+            with self._lock:
+                self._performance_stats["tasks_processed"] += 1
+                self._performance_stats["gpu_time_used"] += execution_time
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"GPU任务执行失败: {e}")
+            with self._lock:
+                self._performance_stats["errors"] += 1
+            
+            # 如果启用自动降级，使用CPU重试
+            if self._config.auto_fallback_on_error:
+                logger.info("使用CPU降级执行任务")
+                return task_func(*args, **kwargs)
+            else:
+                raise
+    
+    def update_config(self, config: Union[Dict[str, Any], GPUAccelerationConfig]) -> None:
+        """更新配置"""
+        with self._lock:
+            if isinstance(config, dict):
+                self._config = GPUAccelerationConfig.from_dict(config)
+            else:
+                self._config = config
+            
+            # 如果已初始化，重新初始化
+            if self._initialized:
+                self.dispose()
+                self.initialize()
+    
+    def health_check(self) -> Dict[str, Any]:
+        """健康检查"""
+        with self._lock:
+            return {
+                "status": self._status.value,
+                "initialized": self._initialized,
+                "gpu_count": len(self._gpu_info),
+                "active_gpu": self._active_gpu.name if self._active_gpu else None,
+                "webgpu_context_available": self._webgpu_context is not None,
+                "performance_stats": self._performance_stats,
+                "config": self._config.to_dict() if self._config else None
+            }

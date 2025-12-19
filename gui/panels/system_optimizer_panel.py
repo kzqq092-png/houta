@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QTimer
 from PyQt5.QtGui import QFont
 
-from system_optimizer import (
+from core.services.system_optimizer import (
     SystemOptimizerService,
     OptimizationLevel,
     OptimizationConfig,

@@ -40,3 +40,4 @@ data/strategy.db-shm
 nul
 .serena/.gitignore
 .gitignore
+performance_reports/*

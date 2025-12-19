@@ -1464,6 +1464,9 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
     def _process_dataframe_result(self, indicator_name: str, result_df: pd.DataFrame) -> Dict[str, Any]:
         """处理DataFrame结果，转换为统一的字典格式"""
         try:
+            # 首先清理DataFrame中的重复字符串
+            result_df = self._clean_dataframe_strings(result_df, indicator_name)
+            
             processed = {
                 "name": indicator_name,
                 "timestamp": datetime.now(),
@@ -1472,13 +1475,21 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 "summary": {}
             }
 
-            # 查找新增的列（排除原始OHLCV列）
+            # 改进的列名过滤逻辑 - 更精确地识别新增列
             original_columns = {'open', 'high', 'low', 'close', 'volume', 'date', 'datetime'}
-            new_columns = [col for col in result_df.columns if col.lower() not in original_columns]
+            new_columns = []
+            
+            # 第一轮：直接排除原始OHLCV列
+            for col in result_df.columns:
+                col_lower = col.lower().strip()
+                if col_lower not in original_columns:
+                    new_columns.append(col)
+            
+            logger.info(f"指标 {indicator_name} 候选列: {new_columns}")
 
-            logger.info(f"指标 {indicator_name} 新增列: {new_columns}")
-
-            # 处理新增的列
+            # 第二轮：精确匹配和分类处理
+            indicator_lower = indicator_name.lower().strip()
+            
             for col in new_columns:
                 if col in result_df.columns:
                     col_data = result_df[col]
@@ -1486,44 +1497,202 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                         # 去除NaN值
                         valid_data = col_data.dropna()
                         if len(valid_data) > 0:
-                            processed["values"][col] = col_data
-                            logger.info(f"添加列 {col}，有效数据点: {len(valid_data)}")
+                            # 标准化列名映射
+                            standardized_col = self._standardize_column_name(col, indicator_name)
+                            processed["values"][standardized_col] = col_data
+                            logger.info(f"添加列 {col} -> {standardized_col}，有效数据点: {len(valid_data)}")
                         else:
                             logger.warning(f"列 {col} 无有效数据")
 
-            # 如果没有找到新增列，尝试查找与指标名称相关的列
+            # 第三轮：对于没有匹配到的列，尝试模糊匹配
             if not processed["values"]:
                 for col in result_df.columns:
-                    if indicator_name.lower() in col.lower() or col.lower().startswith(indicator_name.lower()):
+                    if any(keyword in col.lower() for keyword in [indicator_lower, 'sma', 'ema', 'rsi', 'macd', 'bbands', 'stoch']):
                         col_data = result_df[col]
                         if isinstance(col_data, pd.Series):
                             valid_data = col_data.dropna()
                             if len(valid_data) > 0:
-                                processed["values"][col] = col_data
-                                logger.info(f"通过名称匹配添加列 {col}")
+                                standardized_col = self._standardize_column_name(col, indicator_name)
+                                processed["values"][standardized_col] = col_data
+                                logger.info(f"模糊匹配添加列 {col} -> {standardized_col}")
 
-            # 生成简单的统计摘要
+            # ✅ 根本性修复：确保summary_stats始终被初始化
+            summary_stats = {}  # 移至if语句外部，确保总是被初始化
+            
+            # 生成改进的统计摘要
             if processed["values"]:
-                processed["summary"] = {
-                    "columns_count": len(processed["values"]),
-                    "data_points": len(result_df),
-                    "calculation_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
+                # 计算更详细的统计信息
+                for col_name, col_data in processed["values"].items():
+                    if isinstance(col_data, pd.Series) and len(col_data) > 0:
+                        # 仅当整列都是数值时才计算统计量
+                        if pd.api.types.is_numeric_dtype(col_data):
+                            valid_data = col_data.dropna()
+                            if len(valid_data) > 0:
+                                summary_stats[col_name] = {
+                                    'mean': float(valid_data.mean()),
+                                    'std': float(valid_data.std()),
+                                    'min': float(valid_data.min()),
+                                    'max': float(valid_data.max()),
+                                    'last': float(valid_data.iloc[-1]),
+                                    'count': len(valid_data)
+                                }
+                        else:
+                            # 非数值列仅记录计数
+                            summary_stats[col_name] = {
+                                'mean': None,
+                                'std': None,
+                                'min': None,
+                                'max': None,
+                                'last': str(col_data.iloc[-1]) if len(col_data) > 0 else None,
+                                'count': len(col_data.dropna())
+                            }
             else:
-                logger.warning(f"指标 {indicator_name} 未产生有效结果列")
+                logger.warning(f"指标 {indicator_name} 未产生有效结果列，统计摘要将为空")
+                
+            # ✅ 根本性修复：确保summary总是存在，避免调用方出现NoneType错误
+            processed["summary"] = {
+                "columns_count": len(processed["values"]),
+                "data_points": len(result_df),
+                "calculation_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "statistics": summary_stats  # 现在summary_stats总是被初始化，不会为None
+            }
 
             return processed
 
         except Exception as e:
             logger.error(f"处理DataFrame结果失败: {str(e)}")
+            # ✅ 根本性修复：确保错误情况下也返回有效的summary结构
             return {
                 "name": indicator_name,
                 "timestamp": datetime.now(),
                 "values": {},
                 "signals": [],
-                "summary": {},
+                "summary": {
+                    "columns_count": 0,
+                    "data_points": 0,
+                    "calculation_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "statistics": {},  # 确保error情况下也返回有效的statistics
+                    "error": str(e)
+                },
                 "error": str(e)
             }
+    
+    def _clean_dataframe_strings(self, df: pd.DataFrame, indicator_name: str) -> pd.DataFrame:
+        """清理DataFrame中的重复字符串，处理数据质量问题"""
+        try:
+            logger.debug(f"开始清理指标 {indicator_name} 的DataFrame字符串数据...")
+            
+            # 复制DataFrame以避免修改原始数据
+            cleaned_df = df.copy()
+            repeat_string_count = 0
+            
+            # 检查每一列中的字符串数据
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    # 检查字符串列中的重复模式
+                    repeat_mask = cleaned_df[col].astype(str).apply(self._is_repeat_string)
+                    if repeat_mask.any():
+                        repeat_count = repeat_mask.sum()
+                        repeat_string_count += repeat_count
+                        
+                        # 记录检测到的重复字符串
+                        repeat_strings = cleaned_df.loc[repeat_mask, col].unique()
+                        logger.warning(f"指标 {indicator_name} 列 {col} 检测到 {repeat_count} 个重复字符串: {[s[:20] + '...' if len(str(s)) > 20 else s for s in repeat_strings[:3]]}")
+                        
+                        # 将重复字符串替换为NaN
+                        cleaned_df.loc[repeat_mask, col] = np.nan
+                        
+                        logger.debug(f"已清理列 {col} 中的 {repeat_count} 个重复字符串")
+            
+            if repeat_string_count > 0:
+                logger.info(f"指标 {indicator_name} DataFrame清理完成: 共清理 {repeat_string_count} 个重复字符串")
+            else:
+                logger.debug(f"指标 {indicator_name} DataFrame无需清理: 未检测到重复字符串")
+                
+            return cleaned_df
+            
+        except Exception as e:
+            logger.error(f"清理DataFrame字符串失败: {e}")
+            return df
+    
+    def _is_repeat_string(self, value: Any) -> bool:
+        """检测是否为重复字符串模式"""
+        try:
+            if not isinstance(value, str):
+                return False
+                
+            # 如果字符串长度小于等于10，不是重复模式
+            if len(value) <= 10:
+                return False
+            
+            # 检查是否为基础字符串的重复模式
+            # 尝试找到最短的重复单元
+            for i in range(1, min(len(value), 20)):
+                unit = value[:i]
+                if len(value) % len(unit) == 0:
+                    repeated = unit * (len(value) // len(unit))
+                    if value == repeated:
+                        logger.debug(f"检测到重复字符串模式: 单元='{unit}', 长度={i}, 重复次数={len(value) // i}")
+                        return True
+            
+            return False
+            
+        except Exception as e:
+            logger.debug(f"重复字符串检测失败: {e}")
+            return False
+    
+    def _standardize_column_name(self, original_col: str, indicator_name: str) -> str:
+        """标准化列名映射，确保正确的显示"""
+        # 常见指标的列名映射
+        mappings = {
+            # MACD相关
+            'macd': 'MACD_1',
+            'signal': 'MACD_2', 
+            'histogram': 'MACD_3',
+            'macd_1': 'MACD_1',
+            'macd_2': 'MACD_2',
+            'macd_3': 'MACD_3',
+            
+            # 布林带相关
+            'upper': 'BBANDS_1',
+            'middle': 'BBANDS_2', 
+            'lower': 'BBANDS_3',
+            'bb_upper': 'BBANDS_1',
+            'bb_middle': 'BBANDS_2',
+            'bb_lower': 'BBANDS_3',
+            
+            # 随机指标相关
+            'slowk': 'STOCH_1',
+            'slowd': 'STOCH_2',
+            'fastk': 'STOCHF_1',
+            'fastd': 'STOCHF_2',
+            
+            # KDJ指标
+            'kdj_k': 'KDJ_1',
+            'kdj_d': 'KDJ_2',
+            'kdj_j': 'KDJ_3',
+            
+            # 移动平均线
+            'sma': f'{indicator_name}_SMA',
+            'ema': f'{indicator_name}_EMA',
+            
+            # RSI
+            'rsi': 'RSI_1'
+        }
+        
+        col_lower = original_col.lower()
+        
+        # 直接映射
+        if col_lower in mappings:
+            return mappings[col_lower]
+        
+        # 模糊匹配
+        for key, value in mappings.items():
+            if key in col_lower:
+                return value
+        
+        # 如果没有匹配到，返回原始列名，但确保大写格式
+        return original_col.upper() if original_col.islower() else original_col
 
     def _process_indicator_result(self, indicator_name: str, result: Any) -> Dict[str, Any]:
         """处理指标计算结果"""
@@ -2096,21 +2265,68 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             return f"{indicator_name}-{value_name}"
 
     def _format_value(self, value) -> str:
-        """格式化数值显示"""
+        """格式化数值显示 - 精确版：确保精度和正确性"""
         try:
+            # 处理None和空值
+            if value is None:
+                return "--"
+            
+            # 检查是否为数值类型
             if isinstance(value, (int, float)):
-                if abs(value) < 0.001:
-                    return f"{value:.6f}"
-                elif abs(value) < 1:
-                    return f"{value:.4f}"
-                elif abs(value) < 100:
-                    return f"{value:.3f}"
+                # 处理特殊情况
+                if np.isnan(value):
+                    return "--"
+                if np.isinf(value):
+                    return "∞" if value > 0 else "-∞"
+                
+                # 转换为浮点数
+                float_value = float(value)
+                
+                # 特殊情况处理
+                if float_value == 0:
+                    return "0.00"
+                
+                # 根据数值大小选择合适的精度
+                abs_value = abs(float_value)
+                
+                # 对于极小数值，保留更多精度但避免过多小数位
+                if abs_value < 0.0001:
+                    # 使用8位小数，然后智能清理尾随零
+                    formatted = f"{float_value:.8f}"
+                    # 移除尾随的零，但保留至少3位有效数字
+                    if '.' in formatted:
+                        # 先移除尾随零
+                        formatted = formatted.rstrip('0')
+                        # 如果移除后只有小数点，添加一个零
+                        if formatted.endswith('.'):
+                            formatted += '0'
+                    return formatted
+                elif abs_value < 0.01:
+                    # 使用6位小数
+                    return f"{float_value:.6f}".rstrip('0').rstrip('.') if not float_value.is_integer() else f"{int(float_value)}"
+                elif abs_value < 1:
+                    # 使用4位小数
+                    return f"{float_value:.4f}".rstrip('0').rstrip('.') if not float_value.is_integer() else f"{int(float_value)}"
+                elif abs_value < 10:
+                    # 使用3位小数
+                    return f"{float_value:.3f}".rstrip('0').rstrip('.') if not float_value.is_integer() else f"{int(float_value)}"
+                elif abs_value < 100:
+                    # 使用2位小数
+                    return f"{float_value:.2f}".rstrip('0').rstrip('.') if not float_value.is_integer() else f"{int(float_value)}"
+                elif abs_value < 1000:
+                    # 使用1位小数
+                    return f"{float_value:.1f}".rstrip('0').rstrip('.') if not float_value.is_integer() else f"{int(float_value)}"
                 else:
-                    return f"{value:.2f}"
+                    # 对于大数值，使用千分位分隔符，去掉小数部分
+                    return f"{float_value:,.0f}"
+                    
             else:
+                # 非数值类型直接转换
                 return str(value)
-        except:
-            return str(value)
+                
+        except (ValueError, TypeError) as e:
+            logger.warning(f"格式化数值时出错: {value} -> {str(e)}")
+            return "--"
 
     def _generate_signal_advice(self, indicator_name: str, value_name: str, current_value: float, trend: str) -> tuple:
         """生成信号和建议"""
@@ -2140,20 +2356,44 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     advice = "观望"
 
             elif "MACD" in indicator_name:
-                if "柱状图" in value_name or "MACD_3" in value_name:
+                # 使用标准化的列名匹配
+                if any(keyword in value_name.upper() for keyword in ["MACD_3", "HISTOGRAM", "柱状图"]):
                     if current_value > 0:
                         signal = "多头"
                         advice = "看涨"
-                    else:
+                    elif current_value < 0:
                         signal = "空头"
                         advice = "看跌"
-                else:
+                    else:
+                        signal = "中性"
+                        advice = "观望"
+                elif any(keyword in value_name.upper() for keyword in ["MACD_1", "MACD"]):
+                    # MACD主线
+                    if current_value > 0:
+                        signal = "看涨"
+                        advice = "关注买入机会"
+                    else:
+                        signal = "看跌"
+                        advice = "注意风险"
+                elif any(keyword in value_name.upper() for keyword in ["MACD_2", "SIGNAL"]):
+                    # 信号线
                     if "上升" in trend:
                         signal = "看涨"
                         advice = "持有/买入"
                     elif "下降" in trend:
                         signal = "看跌"
                         advice = "观望/卖出"
+                    else:
+                        signal = "中性"
+                        advice = "观望"
+                else:
+                    # 默认MACD处理
+                    if "上升" in trend:
+                        signal = "看涨"
+                        advice = "关注买入机会"
+                    elif "下降" in trend:
+                        signal = "看跌"
+                        advice = "注意风险"
                     else:
                         signal = "中性"
                         advice = "观望"

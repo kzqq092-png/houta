@@ -25,7 +25,6 @@ Enhanced UI Components Package
 from .level2_data_panel import Level2DataPanel
 from .order_book_widget import OrderBookWidget
 from .fundamental_analysis_tab import FundamentalAnalysisTab
-from .data_quality_monitor_tab import DataQualityMonitorTab
 from .smart_recommendation_panel import SmartRecommendationPanel, RecommendationCard
 
 __version__ = "1.0.0"
@@ -37,7 +36,7 @@ __all__ = [
     "Level2DataPanel",
     "OrderBookWidget",
     "FundamentalAnalysisTab",
-    "DataQualityMonitorTab",
+    "",
     "SmartRecommendationPanel",
 
     # 辅助组件

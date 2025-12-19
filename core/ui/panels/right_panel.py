@@ -1470,7 +1470,13 @@ class RightPanel(BasePanel):
             active_indicators = []
             for indicator_name in indicator_results.keys():
                 # 根据指标名称判断group：builtin或talib
-                group = 'builtin' if indicator_name in builtin_indicators else 'talib'
+                # 判断指标分组：内置、talib 或自定义（中文名）
+                if indicator_name in builtin_indicators:
+                    group = 'builtin'
+                elif any('\u4e00' <= ch <= '\u9fff' for ch in indicator_name):  # 含中文字符即为自定义
+                    group = 'custom'
+                else:
+                    group = 'talib'
                 active_indicators.append({
                     "name": indicator_name,
                     "params": {},  # 参数已包含在计算结果中

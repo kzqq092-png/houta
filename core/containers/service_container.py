@@ -8,6 +8,10 @@ from loguru import logger
 import threading
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
 from .service_registry import ServiceRegistry, ServiceInfo, ServiceScope
+
+# WebGPU相关导入
+from core.webgpu import get_webgpu_manager
+
 T = TypeVar('T')
 
 
@@ -344,6 +348,9 @@ class ServiceContainer:
         """
         初始化所有已注册的服务（兼容旧API）
         """
+        # 先初始化WebGPU相关服务
+        self._register_webgpu_services()
+        
         for service_info in self._registry.get_all_services():
             try:
                 service = self.resolve(service_info.service_type)
@@ -354,6 +361,23 @@ class ServiceContainer:
             except Exception as e:
                 logger.error(
                     f"Failed to initialize service {service_info.name or service_info.service_type.__name__}: {e}")
+    
+    def _register_webgpu_services(self):
+        """注册WebGPU相关服务到业务框架"""
+        try:
+            # WebGPU管理器服务 - 包含状态监控功能
+            from core.webgpu.manager import WebGPUManager
+            
+            self.register_factory(
+                WebGPUManager,
+                lambda: get_webgpu_manager(),
+                scope=ServiceScope.SINGLETON
+            )
+            
+            logger.info("✅ WebGPU服务注册完成")
+            
+        except Exception as e:
+            logger.error(f"❌ WebGPU服务注册失败: {e}")
 
     def _get_singleton(self, service_info: ServiceInfo) -> Any:
         """获取单例实例"""

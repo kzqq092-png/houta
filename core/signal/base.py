@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from dataclasses import dataclass, field
 
-from core.enhanced_indicator_service import EnhancedIndicatorService
+from core.services.enhanced_indicator_service import EnhancedIndicatorService
 from core.utils.data_standardizer import DataStandardizer
 from core.indicator_adapter import calc_ma, calc_macd, calc_rsi
 from loguru import logger

@@ -15,30 +15,63 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 
-from .environment import GPUSupportLevel
+# 导入虚拟滚动渲染器和数据采样优化器
+try:
+    from core.optimization.volume_virtual_renderer import VolumeVirtualRenderer, VolumeRenderStyle
+    VIRTUAL_SCROLL_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"虚拟滚动渲染器不可用: {e}")
+    VIRTUAL_SCROLL_AVAILABLE = False
+    VolumeVirtualRenderer = None
+    VolumeRenderStyle = None
+
+try:
+    from core.optimization.data_sampling_optimizer import AdaptiveDataOptimizer, SamplingConfig, SamplingStrategy
+    DATA_SAMPLING_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"数据采样优化器不可用: {e}")
+    DATA_SAMPLING_AVAILABLE = False
+    AdaptiveDataOptimizer = None
+    SamplingConfig = None
+    SamplingStrategy = None
+
+try:
+    from core.monitoring.performance_monitor import get_performance_monitor, init_performance_monitor
+    PERFORMANCE_MONITOR_AVAILABLE = True
+    # 初始化全局性能监控
+    _performance_monitor = init_performance_monitor({'auto_report': False})
+except ImportError as e:
+    logger.warning(f"性能监控系统不可用: {e}")
+    PERFORMANCE_MONITOR_AVAILABLE = False
+    get_performance_monitor = None
+    init_performance_monitor = None
+    _performance_monitor = None
+
 from .compatibility import CompatibilityReport
+from .environment import GPUSupportLevel
+from .webgpu_renderer import WebGPURenderer
 
 
 class RenderBackend(Enum):
     """渲染后端类型"""
-    WEBGPU = "webgpu"
     OPENGL = "opengl"
     WEBGL = "webgl"
+    WEBGPU = "webgpu"
     CANVAS2D = "canvas2d"
     MATPLOTLIB = "matplotlib"
 
 class ChartRenderer(Protocol):
     """图表渲染器协议"""
 
-    def render_candlesticks(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染K线图"""
         ...
 
-    def render_volume(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染成交量"""
         ...
 
-    def render_line(self, data: pd.Series, style: Dict[str, Any]) -> bool:
+    def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None) -> bool:
         """渲染线图"""
         ...
 
@@ -70,17 +103,17 @@ class BaseRenderer(ABC):
         pass
 
     @abstractmethod
-    def render_candlesticks(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染K线图"""
         pass
 
     @abstractmethod
-    def render_volume(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染成交量"""
         pass
 
     @abstractmethod
-    def render_line(self, data: pd.Series, style: Dict[str, Any]) -> bool:
+    def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None) -> bool:
         """渲染线图"""
         pass
 
@@ -107,116 +140,7 @@ class BaseRenderer(ABC):
             self._performance_stats['render_count']
         )
 
-class WebGPURenderer(BaseRenderer):
-    """WebGPU渲染器"""
 
-    def __init__(self):
-        super().__init__(RenderBackend.WEBGPU)
-        self._device = None
-        self._context = None
-        self._pipeline = None
-
-    def initialize(self, context: Optional[Any] = None) -> bool:
-        """初始化WebGPU渲染器"""
-        try:
-            logger.info("初始化WebGPU渲染器...")
-
-            # 实际项目中这里会初始化WebGPU设备和上下文
-            # 现在使用模拟实现
-            self._context = context or {"type": "webgpu"}
-
-            # 模拟WebGPU设备创建
-            self._device = {"type": "webgpu_device"}
-
-            # 创建渲染管道
-            self._pipeline = self._create_render_pipeline()
-
-            self._initialized = True
-            logger.info("WebGPU渲染器初始化成功")
-            return True
-
-        except Exception as e:
-            logger.error(f"WebGPU渲染器初始化失败: {e}")
-            return False
-
-    def _create_render_pipeline(self) -> Dict[str, Any]:
-        """创建渲染管道"""
-        # 模拟WebGPU渲染管道创建
-        return {
-            "vertex_shader": "webgpu_vertex_shader",
-            "fragment_shader": "webgpu_fragment_shader",
-            "buffer_layout": "webgpu_buffer_layout"
-        }
-
-    def render_candlesticks(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
-        """渲染K线图"""
-        if not self._initialized:
-            return False
-
-        try:
-            import time
-            start_time = time.time()
-
-            # 模拟WebGPU K线渲染
-            logger.debug(f"WebGPU渲染K线图: {len(data)}个数据点")
-
-            # 实际项目中这里会：
-            # 1. 准备顶点数据
-            # 2. 创建顶点缓冲区
-            # 3. 设置渲染管道
-            # 4. 执行绘制命令
-
-            render_time = time.time() - start_time
-            self._update_performance_stats(render_time)
-
-            return True
-
-        except Exception as e:
-            logger.error(f"WebGPU K线渲染失败: {e}")
-            return False
-
-    def render_volume(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
-        """渲染成交量"""
-        if not self._initialized:
-            return False
-
-        try:
-            start_time = time.time()
-
-            logger.debug(f"WebGPU渲染成交量: {len(data)}个数据点")
-
-            render_time = time.time() - start_time
-            self._update_performance_stats(render_time)
-
-            return True
-
-        except Exception as e:
-            logger.error(f"WebGPU成交量渲染失败: {e}")
-            return False
-
-    def render_line(self, data: pd.Series, style: Dict[str, Any]) -> bool:
-        """渲染线图"""
-        if not self._initialized:
-            return False
-
-        try:
-            start_time = time.time()
-
-            logger.debug(f"WebGPU渲染线图: {len(data)}个数据点")
-
-            render_time = time.time() - start_time
-            self._update_performance_stats(render_time)
-
-            return True
-
-        except Exception as e:
-            logger.error(f"WebGPU线图渲染失败: {e}")
-            return False
-
-    def clear(self) -> None:
-        """清空渲染内容"""
-        if self._initialized:
-            logger.debug("WebGPU清空渲染内容")
 
 class OpenGLRenderer(BaseRenderer):
     """OpenGL渲染器"""
@@ -245,7 +169,7 @@ class OpenGLRenderer(BaseRenderer):
             logger.error(f"OpenGL渲染器初始化失败: {e}")
             return False
 
-    def render_candlesticks(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染K线图"""
         if not self._initialized:
             return False
@@ -266,7 +190,7 @@ class OpenGLRenderer(BaseRenderer):
             logger.error(f"OpenGL K线渲染失败: {e}")
             return False
 
-    def render_volume(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染成交量"""
         if not self._initialized:
             return False
@@ -285,7 +209,7 @@ class OpenGLRenderer(BaseRenderer):
             logger.error(f"OpenGL成交量渲染失败: {e}")
             return False
 
-    def render_line(self, data: pd.Series, style: Dict[str, Any]) -> bool:
+    def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None) -> bool:
         """渲染线图"""
         if not self._initialized:
             return False
@@ -332,7 +256,7 @@ class Canvas2DRenderer(BaseRenderer):
             logger.error(f"Canvas 2D渲染器初始化失败: {e}")
             return False
 
-    def render_candlesticks(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染K线图"""
         if not self._initialized:
             return False
@@ -353,7 +277,7 @@ class Canvas2DRenderer(BaseRenderer):
             logger.error(f"Canvas 2D K线渲染失败: {e}")
             return False
 
-    def render_volume(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染成交量"""
         if not self._initialized:
             return False
@@ -372,7 +296,7 @@ class Canvas2DRenderer(BaseRenderer):
             logger.error(f"Canvas 2D成交量渲染失败: {e}")
             return False
 
-    def render_line(self, data: pd.Series, style: Dict[str, Any]) -> bool:
+    def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None) -> bool:
         """渲染线图"""
         if not self._initialized:
             return False
@@ -397,12 +321,24 @@ class Canvas2DRenderer(BaseRenderer):
             logger.debug("Canvas 2D清空渲染内容")
 
 class MatplotlibRenderer(BaseRenderer):
-    """Matplotlib渲染器（最终后备方案）"""
+    """Matplotlib渲染器 - 集成虚拟滚动优化"""
 
     def __init__(self):
         super().__init__(RenderBackend.MATPLOTLIB)
         self._figure = None
         self._axes = None
+        
+        # 虚拟滚动渲染器
+        self._volume_virtual_renderer = None
+        if VIRTUAL_SCROLL_AVAILABLE:
+            self._volume_virtual_renderer = VolumeVirtualRenderer()
+            logger.info("Matplotlib渲染器已启用成交量虚拟滚动优化")
+        
+        # 数据采样优化器
+        self._data_optimizer = None
+        if DATA_SAMPLING_AVAILABLE:
+            self._data_optimizer = AdaptiveDataOptimizer()
+            logger.info("Matplotlib渲染器已启用数据采样优化")
 
     def initialize(self, context: Optional[Any] = None) -> bool:
         """初始化Matplotlib渲染器"""
@@ -419,6 +355,13 @@ class MatplotlibRenderer(BaseRenderer):
                         'indicator': getattr(context, 'indicator_ax', None)
                     }
 
+            # 初始化虚拟滚动渲染器
+            if self._volume_virtual_renderer and self._axes and self._axes['volume']:
+                # 设置成交量轴数据
+                volume_data = pd.DataFrame({'volume': [0]})  # 初始化空数据
+                self._volume_virtual_renderer.set_volume_data(volume_data, self._axes['volume'])
+                logger.info("成交量虚拟滚动渲染器已配置")
+
             self._initialized = True
             logger.info("Matplotlib渲染器初始化成功")
             return True
@@ -427,50 +370,258 @@ class MatplotlibRenderer(BaseRenderer):
             logger.error(f"Matplotlib渲染器初始化失败: {e}")
             return False
 
-    def render_candlesticks(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
-        """渲染K线图"""
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
+        """渲染K线图 - 使用高效matplotlib实现"""
         if not self._initialized:
             return False
 
+        # 导入必要的模块
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+        from matplotlib.collections import LineCollection, PolyCollection
+        from matplotlib.colors import to_rgba
+        
         try:
             start_time = time.time()
+            
+            # 默认样式
+            if style is None:
+                style = {}
+                
+            up_color = style.get('up_color', '#ff0000')
+            down_color = style.get('down_color', '#00ff00')
+            alpha = style.get('alpha', 1.0)
+            
+            # 使用给定的x参数或根据datetime轴标志选择适当的x轴
+            if x is not None:
+                xvals = x
+            elif use_datetime_axis:
+                # 处理datetime轴
+                try:
+                    if 'datetime' in data.columns:
+                        datetime_series = pd.to_datetime(data['datetime'])
+                        xvals = mdates.date2num(datetime_series)
+                    else:
+                        # 检查索引类型
+                        if hasattr(data.index, 'to_pydatetime'):
+                            xvals = mdates.date2num(data.index.to_pydatetime())
+                        elif pd.api.types.is_datetime64_any_dtype(data.index):
+                            xvals = mdates.date2num(pd.to_datetime(data.index).to_pydatetime())
+                        else:
+                            # 如果不是日期索引，使用序号
+                            logger.debug(f"索引类型不是日期类型: {type(data.index)}，使用序号作为X轴")
+                            xvals = np.arange(len(data))
+                except Exception as e:
+                    logger.debug(f"转换日期失败，使用序号作为X轴: {e}")
+                    xvals = np.arange(len(data))
+            else:
+                xvals = np.arange(len(data))
 
-            logger.debug(f"Matplotlib渲染K线图: {len(data)}个数据点")
+            # 确保必要的列存在
+            required_columns = ['open', 'high', 'low', 'close']
+            missing_columns = [
+                col for col in required_columns if col not in data.columns]
+            if missing_columns:
+                logger.warning(
+                    f"MatplotlibRenderer: 数据缺少必要列: {missing_columns}")
+                return False
 
-            # 使用现有的ChartRenderer实现
-            if self._axes and 'price' in self._axes:
-                ax = self._axes['price']
-                x = np.arange(len(data))
+            verts_up, verts_down, segments_up, segments_down = [], [], [], []
+            for i, (idx, row) in enumerate(data.iterrows()):
+                try:
+                    open_price = row['open']
+                    close = row['close']
+                    high = row['high']
+                    low = row['low']
+                    left = xvals[i] - 0.3
+                    right = xvals[i] + 0.3
+                    if close >= open_price:
+                        verts_up.append([
+                            (left, open_price), (left, close), (right,
+                                                                close), (right, open_price)
+                        ])
+                        segments_up.append([(xvals[i], low), (xvals[i], high)])
+                    else:
+                        verts_down.append([
+                            (left, open_price), (left, close), (right,
+                                                                close), (right, open_price)
+                        ])
+                        segments_down.append(
+                            [(xvals[i], low), (xvals[i], high)])
+                except Exception as e:
+                    logger.warning(f"处理K线数据行 {i} 时出错: {e}")
+                    continue
 
-                # 简化的K线绘制
-                for i, (idx, row) in enumerate(data.iterrows()):
-                    color = 'red' if row['close'] >= row['open'] else 'green'
-                    ax.plot([i, i], [row['low'], row['high']], color=color, linewidth=0.5)
-                    ax.plot([i, i], [row['open'], row['close']], color=color, linewidth=2)
+            # 使用collections进行高效渲染
+            if ax:
+                
+                # 阳线（上涨）：空心，只有红色边框
+                if verts_up:
+                    collection_up = PolyCollection(
+                        verts_up, facecolor='none', edgecolor=up_color, linewidth=1, alpha=alpha)
+                    ax.add_collection(collection_up)
+
+                # 阴线（下跌）：实心绿色
+                if verts_down:
+                    collection_down = PolyCollection(
+                        verts_down, facecolor=down_color, edgecolor=down_color, linewidth=1, alpha=alpha)
+                    ax.add_collection(collection_down)
+
+                # 上涨影线
+                if segments_up:
+                    collection_shadow_up = LineCollection(
+                        segments_up, colors=up_color, linewidth=1, alpha=alpha)
+                    ax.add_collection(collection_shadow_up)
+
+                # 下跌影线
+                if segments_down:
+                    collection_shadow_down = LineCollection(
+                        segments_down, colors=down_color, linewidth=1, alpha=alpha)
+                    ax.add_collection(collection_shadow_down)
+
+                # 更新轴范围
+                if len(data) > 0:
+                    ax.autoscale_view()
 
             render_time = time.time() - start_time
             self._update_performance_stats(render_time)
 
+            logger.debug(f"Matplotlib渲染K线图: {len(data)}个数据点，耗时 {render_time*1000:.2f}ms")
             return True
 
         except Exception as e:
             logger.error(f"Matplotlib K线渲染失败: {e}")
             return False
 
-    def render_volume(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
-        """渲染成交量"""
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
+        """渲染成交量 - 优先使用数据采样优化和虚拟滚动"""
         if not self._initialized:
             return False
 
         try:
             start_time = time.time()
 
-            logger.debug(f"Matplotlib渲染成交量: {len(data)}个数据点")
+            # 获取性能监控器
+            perf_monitor = get_performance_monitor() if PERFORMANCE_MONITOR_AVAILABLE else None
 
-            if self._axes and 'volume' in self._axes and self._axes['volume']:
-                ax = self._axes['volume']
-                x = np.arange(len(data))
-                ax.bar(x, data['volume'], width=0.8)
+            # 首先进行数据采样优化
+            original_data_size = len(data)
+            optimized_data = data
+            
+            if self._data_optimizer and original_data_size > 2000:
+                # 对大数据进行采样优化
+                try:
+                    optimized_data = self._data_optimizer.optimize_for_performance(
+                        data, render_time_target=100.0  # 目标100ms内完成
+                    )
+                    optimization_time = time.time() - start_time
+                    
+                    compression_ratio = len(optimized_data) / original_data_size
+                    logger.info(f"数据采样优化: {original_data_size} -> {len(optimized_data)} "
+                               f"(压缩比: {compression_ratio:.2%}, 优化耗时: {optimization_time*1000:.2f}ms)")
+                    
+                except Exception as opt_error:
+                    logger.warning(f"数据采样优化失败: {opt_error}，使用原始数据")
+                    optimized_data = data
+
+            logger.debug(f"Matplotlib渲染成交量: {len(optimized_data)}个数据点 (原始: {original_data_size})")
+
+            if ax and len(optimized_data) > 0:
+                # 首先尝试使用虚拟滚动渲染器
+                if self._volume_virtual_renderer and self._volume_virtual_renderer.is_enabled:
+                    try:
+                        # 设置或更新成交量数据（使用优化后的数据）
+                        if self._volume_virtual_renderer.volume_data is None:
+                            self._volume_virtual_renderer.set_volume_data(optimized_data, ax)
+                        
+                        # 使用虚拟滚动渲染（使用优化后的数据）
+                        success = self._volume_virtual_renderer.render_volume_with_virtual_scroll(
+                            ax, optimized_data, style, x, use_datetime_axis)
+                        
+                        if success:
+                            render_time = time.time() - start_time
+                            self._update_performance_stats(render_time)
+                            logger.debug(f"✅ 虚拟滚动成交量渲染完成: {len(optimized_data)}个数据点，耗时 {render_time*1000:.2f}ms")
+                            return True
+                        else:
+                            logger.debug("虚拟滚动渲染失败，降级到常规渲染")
+                            
+                    except Exception as virtual_error:
+                        logger.warning(f"虚拟滚动成交量渲染失败: {virtual_error}，降级到常规渲染")
+                        # 继续使用常规渲染
+                
+                # 降级到常规渲染（优化版本）
+                from matplotlib.collections import PolyCollection
+                
+                # 获取数据（使用优化后的数据）
+                x_values = x if x is not None else np.arange(len(optimized_data))
+                volumes = optimized_data['volume'].values
+                
+                # 默认样式
+                if style is None:
+                    style = {}
+                    
+                color = style.get('color', '#1f77b4')
+                alpha = style.get('alpha', 0.7)
+                edge_color = style.get('edge_color', '#000000')
+                edge_width = style.get('edge_width', 0.5)
+                width = style.get('width', 0.8)
+                
+                # 使用PolyCollection进行批量渲染，优化性能
+                verts = []
+                colors = []
+                
+                for i, (x_val, volume) in enumerate(zip(x_values, volumes)):
+                    if volume > 0:  # 只渲染有成交量的柱子
+                        left = x_val - width / 2
+                        right = x_val + width / 2
+                        bottom = 0
+                        top = volume
+                        
+                        # 创建柱子的四个顶点
+                        verts.append([
+                            (left, bottom), (left, top), (right, top), (right, bottom)
+                        ])
+                        
+                        # 设置颜色（可以是基于成交量的渐变色）
+                        if isinstance(color, str):
+                            colors.append(color)
+                        elif callable(color):
+                            # 支持基于成交量大小的颜色变化
+                            normalized_volume = volume / max(volumes) if max(volumes) > 0 else 0
+                            colors.append(color(normalized_volume))
+                        else:
+                            colors.append(color)
+                
+                if verts:
+                    # 使用PolyCollection进行高效批量渲染
+                    if colors and len(colors) == len(verts):
+                        # 支持多彩色渲染
+                        collection = PolyCollection(
+                            verts, 
+                            facecolors=colors, 
+                            edgecolors=edge_color, 
+                            linewidths=edge_width,
+                            alpha=alpha
+                        )
+                    else:
+                        # 单色渲染
+                        collection = PolyCollection(
+                            verts, 
+                            facecolors=color, 
+                            edgecolors=edge_color, 
+                            linewidths=edge_width,
+                            alpha=alpha
+                        )
+                    
+                    ax.add_collection(collection)
+                    
+                    # 优化轴范围更新
+                    ax.autoscale_view()
+                    
+                    logger.debug(f"✅ PolyCollection成交量渲染完成: {len(verts)}个柱子")
+                else:
+                    logger.debug("没有有效的成交量数据需要渲染")
 
             render_time = time.time() - start_time
             self._update_performance_stats(render_time)
@@ -481,7 +632,7 @@ class MatplotlibRenderer(BaseRenderer):
             logger.error(f"Matplotlib成交量渲染失败: {e}")
             return False
 
-    def render_line(self, data: pd.Series, style: Dict[str, Any]) -> bool:
+    def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None) -> bool:
         """渲染线图"""
         if not self._initialized:
             return False
@@ -491,10 +642,9 @@ class MatplotlibRenderer(BaseRenderer):
 
             logger.debug(f"Matplotlib渲染线图: {len(data)}个数据点")
 
-            if self._axes and 'indicator' in self._axes and self._axes['indicator']:
-                ax = self._axes['indicator']
+            if ax:
                 x = np.arange(len(data))
-                color = style.get('color', 'blue')
+                color = style.get('color', 'blue') if style else 'blue'
                 ax.plot(x, data, color=color, linewidth=1.0)
 
             render_time = time.time() - start_time
@@ -522,21 +672,21 @@ class FallbackRenderer:
         self._current_renderer = None
         self._fallback_chain = []
         self._failure_count = {}
+        self._compatibility_report = None  # 保存兼容性报告
 
         # 创建所有渲染器实例
         self._create_renderers()
 
     def _create_renderers(self):
-        """创建所有渲染器实例"""
+        """创建所有渲染器实例（WebGPU渲染器由WebGPUManager单独管理，避免重复创建）"""
         self._renderers = {
-            RenderBackend.WEBGPU: WebGPURenderer(),
             RenderBackend.OPENGL: OpenGLRenderer(),
             RenderBackend.CANVAS2D: Canvas2DRenderer(),
             RenderBackend.MATPLOTLIB: MatplotlibRenderer()
         }
 
-        # 初始化失败计数
-        for backend in RenderBackend:
+        # 初始化失败计数（只针对实际创建的渲染器）
+        for backend in self._renderers.keys():
             self._failure_count[backend] = 0
 
     def initialize(self, compatibility_report: CompatibilityReport, context: Optional[Any] = None) -> bool:
@@ -546,28 +696,41 @@ class FallbackRenderer:
         Args:
             compatibility_report: 兼容性报告
             context: 渲染上下文
-
+            
         Returns:
             是否初始化成功
         """
         logger.info("初始化多层降级渲染器...")
+
+        # 保存兼容性报告以供后续使用
+        self._compatibility_report = compatibility_report
 
         # 确定降级链
         self._fallback_chain = self._determine_fallback_chain(compatibility_report)
 
         # 尝试按照降级链初始化渲染器
         for backend in self._fallback_chain:
+            # 跳过WebGPU后端，因为它由WebGPUManager单独管理
+            if backend == RenderBackend.WEBGPU:
+                continue
+                
+            # 检查渲染器是否存在
+            if backend not in self._renderers:
+                logger.warning(f"渲染器 {backend.value} 不存在，跳过初始化")
+                continue
+                
             renderer = self._renderers[backend]
 
             logger.info(f"尝试初始化 {backend.value} 渲染器...")
 
-            if renderer.initialize(context):
-                self._current_renderer = renderer
-                logger.info(f"使用 {backend.value} 渲染器")
-                return True
-            else:
-                logger.warning(f"{backend.value} 渲染器初始化失败")
-                self._failure_count[backend] += 1
+            if hasattr(renderer, 'initialize'):
+                if renderer.initialize(context):
+                    self._current_renderer = renderer
+                    logger.info(f"使用 {backend.value} 渲染器")
+                    return True
+                else:
+                    logger.warning(f"{backend.value} 渲染器初始化失败")
+                    self._failure_count[backend] += 1
 
         logger.error("所有渲染器初始化失败")
         return False
@@ -575,8 +738,11 @@ class FallbackRenderer:
     def _determine_fallback_chain(self, compatibility_report: CompatibilityReport) -> List[RenderBackend]:
         """确定降级链"""
 
-        # 根据推荐后端确定起始点
-        recommended = compatibility_report.recommended_backend
+        # 如果兼容性报告为None或无效，创建默认推荐后端
+        if compatibility_report is None:
+            recommended = GPUSupportLevel.WEBGPU
+        else:
+            recommended = compatibility_report.recommended_backend
 
         if recommended == GPUSupportLevel.WEBGPU:
             return [RenderBackend.WEBGPU, RenderBackend.OPENGL,
@@ -590,17 +756,17 @@ class FallbackRenderer:
         else:  # BASIC
             return [RenderBackend.MATPLOTLIB]
 
-    def render_candlesticks(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染K线图"""
-        return self._render_with_fallback('render_candlesticks', data, style)
+        return self._render_with_fallback('render_candlesticks', ax, data, style, x, use_datetime_axis)
 
-    def render_volume(self, data: pd.DataFrame, style: Dict[str, Any]) -> bool:
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None, use_datetime_axis: bool = True) -> bool:
         """渲染成交量"""
-        return self._render_with_fallback('render_volume', data, style)
+        return self._render_with_fallback('render_volume', ax, data, style, x, use_datetime_axis)
 
-    def render_line(self, data: pd.Series, style: Dict[str, Any]) -> bool:
+    def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None) -> bool:
         """渲染线图"""
-        return self._render_with_fallback('render_line', data, style)
+        return self._render_with_fallback('render_line', ax, data, style)
 
     def _render_with_fallback(self, method_name: str, *args, **kwargs) -> bool:
         """带降级的渲染"""
@@ -635,6 +801,16 @@ class FallbackRenderer:
         # 尝试后续的渲染器
         for i in range(current_index + 1, len(self._fallback_chain)):
             backend = self._fallback_chain[i]
+            
+            # 跳过WebGPU后端，因为它由WebGPUManager单独管理
+            if backend == RenderBackend.WEBGPU:
+                continue
+                
+            # 检查渲染器是否存在
+            if backend not in self._renderers:
+                logger.warning(f"渲染器 {backend.value} 不存在，跳过降级")
+                continue
+                
             renderer = self._renderers[backend]
 
             logger.info(f"降级到 {backend.value} 渲染器")

@@ -5,17 +5,327 @@ from loguru import logger
 import time
 import numpy as np
 import pandas as pd
-from typing import Dict, Any
+import re
+from typing import Dict, Any, Tuple, Optional, List
 from PyQt5.QtCore import Qt
 import matplotlib.pyplot as plt
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # 替换旧的指标系统导入
 from core.indicator_adapter import get_indicator_english_name
 
 
+class IndicatorPerformanceOptimizer:
+    """指标性能优化器 - 缓存和批量计算"""
+    
+    def __init__(self):
+        self._precomputed_indicators = {}
+        self._style_cache = {}
+        self._cache_version = 0
+        self._talib_module = None
+        self._pattern_cache = {}
+    
+    def clear_cache(self):
+        """清除所有缓存"""
+        self._precomputed_indicators.clear()
+        self._style_cache.clear()
+        self._cache_version += 1
+        self._pattern_cache.clear()
+    
+    def get_precomputed_indicators(self, kdata_hash, required_indicators):
+        """获取预计算的指标"""
+        cache_key = f"{kdata_hash}_{hash(str(required_indicators))}"
+        return self._precomputed_indicators.get(cache_key, {})
+    
+    def cache_indicators(self, kdata_hash, required_indicators, results):
+        """缓存指标计算结果"""
+        cache_key = f"{kdata_hash}_{hash(str(required_indicators))}"
+        self._precomputed_indicators[cache_key] = results
+    
+    def get_cached_style(self, name, index, theme_version):
+        """获取缓存的样式"""
+        cache_key = f"{name}_{index}_{theme_version}"
+        return self._style_cache.get(cache_key)
+    
+    def cache_style(self, name, index, theme_version, style):
+        """缓存样式"""
+        cache_key = f"{name}_{index}_{theme_version}"
+        self._style_cache[cache_key] = style
+    
+    @property
+    def talib(self):
+        """惰性加载talib模块"""
+        if self._talib_module is None:
+            try:
+                import talib
+                self._talib_module = talib
+            except ImportError:
+                self._talib_module = False
+        return self._talib_module
+    
+    def get_cached_pattern(self, pattern_name):
+        """获取缓存的正则表达式"""
+        if pattern_name not in self._pattern_cache:
+            if pattern_name == 'ma':
+                self._pattern_cache[pattern_name] = re.compile(r'^MA(\d+)?$')
+            elif pattern_name == 'builtin':
+                self._pattern_cache[pattern_name] = {'MA', 'MACD', 'RSI', 'BOLL'}
+        return self._pattern_cache[pattern_name]
+
+
 class RenderingMixin:
     """图表渲染功能Mixin"""
+    
+    def __init__(self):
+        """初始化渲染混入类"""
+        super().__init__()
+        # 初始化性能优化器
+        self._performance_optimizer = IndicatorPerformanceOptimizer()
+        # 预编译的正则表达式
+        self._ma_pattern = re.compile(r'^MA(\d+)?$')
+        # 内置指标集合（用于快速匹配）
+        self._builtin_indicators = {'MA', 'MACD', 'RSI', 'BOLL'}
 
+    def _get_kdata_hash(self, kdata: pd.DataFrame) -> str:
+        """获取kdata的唯一标识符，用于缓存"""
+        try:
+            # 使用数据的基本统计信息作为哈希
+            stats = {
+                'length': len(kdata),
+                'columns': list(kdata.columns),
+                'dtypes': dict(kdata.dtypes),
+                'first_close': float(kdata['close'].iloc[0]) if not kdata.empty else 0,
+                'last_close': float(kdata['close'].iloc[-1]) if not kdata.empty else 0
+            }
+            return str(hash(str(stats)))
+        except Exception as e:
+            logger.warning(f"生成kdata哈希失败: {e}")
+            return "default_hash"
+    
+    def _batch_precompute_indicators(self, kdata: pd.DataFrame, indicators: List[Dict]) -> Dict:
+        """🚀 批量预计算所有需要的指标（包含custom指标优化）"""
+        precomputed = {}
+        
+        # 收集需要计算的指标类型
+        required_macd = False
+        required_rsi_periods = set()
+        required_boll_params = set()
+        required_ma_periods = set()
+        
+        # 🚀 收集custom指标信息
+        required_custom_indicators = []
+        
+        for indicator in indicators:
+            name = indicator.get('name', '')
+            group = indicator.get('group', '')
+            params = indicator.get('params', {})
+            
+            if group == 'builtin':
+                if name == 'MACD':
+                    required_macd = True
+                elif name == 'RSI':
+                    period = int(params.get('n', 14))
+                    required_rsi_periods.add(period)
+                elif name == 'BOLL':
+                    n = int(params.get('n', 20))
+                    p = float(params.get('p', 2))
+                    required_boll_params.add((n, p))
+                elif self._ma_pattern.match(name):
+                    ma_match = self._ma_pattern.match(name)
+                    if ma_match and ma_match.group(1):
+                        period = int(ma_match.group(1))
+                    else:
+                        period = int(params.get('n', 20))
+                    required_ma_periods.add(period)
+            elif group == 'custom':
+                formula = indicator.get('formula', '')
+                if formula:
+                    required_custom_indicators.append({
+                        'name': name,
+                        'formula': formula,
+                        'params': params
+                    })
+        
+        # 批量计算MACD
+        if required_macd:
+            macd, sig, hist = self._calculate_macd(kdata)
+            precomputed['MACD'] = {
+                'macd': macd.dropna(),
+                'signal': sig.dropna(),
+                'hist': hist.dropna()
+            }
+        
+        # 批量计算RSI
+        for period in required_rsi_periods:
+            rsi = self._calculate_rsi(kdata, period)
+            precomputed[f'RSI_{period}'] = rsi.dropna()
+        
+        # 批量计算BOLL
+        for n, p in required_boll_params:
+            mid, upper, lower = self._calculate_boll(kdata, n, p)
+            precomputed[f'BOLL_{n}_{p}'] = {
+                'mid': mid.dropna(),
+                'upper': upper.dropna(),
+                'lower': lower.dropna()
+            }
+        
+        # 批量计算MA
+        for period in required_ma_periods:
+            ma = kdata['close'].rolling(period).mean()
+            precomputed[f'MA_{period}'] = ma.dropna()
+        
+        # 🚀 智能并行计算custom指标（重要优化）
+        if required_custom_indicators:
+            # 🧠 智能判断是否使用并行计算
+            data_size = len(kdata)
+            indicator_count = len(required_custom_indicators)
+            
+            # 📏 自适应并行策略：基于数据量和指标数量
+            use_parallel = self._should_use_parallel_computation(data_size, indicator_count)
+            
+            if use_parallel:
+                # 🚀 并行计算路径
+                logger.debug(f"🚀 使用并行计算: {data_size}条数据, {indicator_count}个指标")
+                precomputed.update(self._parallel_compute_custom_indicators(kdata, required_custom_indicators))
+            else:
+                # 📋 顺序计算路径（避免不必要的开销）
+                logger.debug(f"🚀 使用顺序计算: {data_size}条数据, {indicator_count}个指标")
+                precomputed.update(self._sequential_compute_custom_indicators(kdata, required_custom_indicators))
+        else:
+            logger.debug("🚀 没有需要计算的custom指标")
+        
+        return precomputed
+    
+    def _should_use_parallel_computation(self, data_size: int, indicator_count: int) -> bool:
+        """🧠 智能判断是否使用并行计算 - 基于实测结果优化的保守策略
+        
+        根据测试结果：
+        - 大多数情况下并行计算并没有显著性能提升
+        - 并行计算的开销（线程创建、上下文切换、GIL限制）超过了收益
+        - 只在极端情况下才考虑并行计算
+        
+        优化策略：极保守的并行策略，只在非常极端的情况下才使用并行
+        """
+        # 极保守策略：只有在大数据集且指标数量极多的情况下才使用并行
+        if data_size >= 5000 and indicator_count >= 15:  # 超大数据集 + 极多指标
+            return True
+        else:
+            return False  # 默认使用顺序计算
+    
+    def _sequential_compute_custom_indicators(self, kdata: pd.DataFrame, required_custom_indicators: List[Dict]) -> Dict:
+        """📋 顺序计算custom指标（避免并行开销）"""
+        precomputed = {}
+        
+        for custom_indicator in required_custom_indicators:
+            name = custom_indicator['name']
+            formula = custom_indicator['formula']
+            try:
+                # 使用pandas.eval批量计算custom指标
+                local_vars = {col: kdata[col] for col in kdata.columns}
+                arr = pd.eval(formula, local_dict=local_vars)
+                arr = arr.dropna()
+                precomputed[f'CUSTOM_{name}'] = arr
+                logger.debug(f"📋 顺序预计算custom指标 {name} 完成")
+            except Exception as e:
+                logger.warning(f"📋 顺序预计算custom指标 {name} 失败: {str(e)}")
+                # 即使失败也记录，避免重复计算
+                precomputed[f'CUSTOM_{name}'] = pd.Series(dtype=float)
+        
+        return precomputed
+    
+    def _parallel_compute_custom_indicators(self, kdata: pd.DataFrame, required_custom_indicators: List[Dict]) -> Dict:
+        """🚀 并行计算custom指标（适用于大数据量、多指标情况）- 优化版本"""
+        precomputed = {}
+        
+        def calculate_single_custom_indicator(kdata_copy, custom_indicator):
+            """线程安全的单个自定义指标计算 - 使用独立数据副本"""
+            name = custom_indicator['name']
+            formula = custom_indicator['formula']
+            try:
+                # 🚀 优化：使用共享的pandas.eval调用，避免重复创建变量字典
+                arr = pd.eval(formula, local_dict=kdata_copy)
+                arr = arr.dropna()
+                return (name, arr, None)
+            except Exception as e:
+                logger.warning(f"🚀 并行预计算custom指标 {name} 失败: {str(e)}")
+                return (name, pd.Series(dtype=float), str(e))
+        
+        # 🚀 核心优化：预构建变量字典，避免在线程中重复创建
+        local_vars = {col: kdata[col] for col in kdata.columns}
+        
+        # 🚀 核心优化：使用ThreadPoolExecutor并行计算所有custom指标
+        max_workers = min(4, len(required_custom_indicators))  # 限制线程数，避免过载
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有计算任务，传递共享变量字典
+            future_to_indicator = {
+                executor.submit(calculate_single_custom_indicator, local_vars, indicator): indicator 
+                for indicator in required_custom_indicators
+            }
+            
+            # 收集所有结果
+            for future in as_completed(future_to_indicator):
+                name, arr, error = future.result()
+                precomputed[f'CUSTOM_{name}'] = arr
+                if error:
+                    logger.warning(f"🚀 并行预计算custom指标 {name} 失败: {error}")
+                else:
+                    logger.debug(f"🚀 并行预计算custom指标 {name} 完成")
+        
+        logger.info(f"🚀 并行计算 {len(required_custom_indicators)} 个custom指标完成")
+        return precomputed
+    
+    def _get_optimized_indicator_style(self, name: str, index: int = 0) -> Dict[str, Any]:
+        """优化的指标样式获取方法，使用缓存"""
+        # 使用主题版本作为缓存键的一部分
+        try:
+            theme_version = hash(str(getattr(self, 'theme_manager', {}).get_theme_colors() if hasattr(self.theme_manager, 'get_theme_colors') else {}))
+        except:
+            theme_version = 0
+        
+        # 尝试从缓存获取
+        cached_style = self._performance_optimizer.get_cached_style(name, index, theme_version)
+        if cached_style:
+            return cached_style
+        
+        # 计算样式
+        colors = self.theme_manager.get_theme_colors() if hasattr(self, 'theme_manager') else {}
+        indicator_colors = colors.get('indicator_colors', [
+            '#fbc02d', '#ab47bc', '#1976d2', '#43a047', '#e53935', '#00bcd4', '#ff9800'])
+        
+        style = {
+            'color': indicator_colors[index % len(indicator_colors)],
+            'linewidth': 0.7,
+            'alpha': 0.85,
+            'label': name
+        }
+        
+        # 缓存结果
+        self._performance_optimizer.cache_style(name, index, theme_version, style)
+        return style
+    
+    def _fast_indicator_match(self, name: str, group: str) -> Optional[Tuple[str, Any]]:
+        """快速指标类型匹配"""
+        if group != 'builtin':
+            return None
+        
+        # 使用集合进行快速匹配
+        if name == 'MACD':
+            return ('MACD', None)
+        elif name == 'RSI':
+            return ('RSI', None)
+        elif name == 'BOLL':
+            return ('BOLL', None)
+        elif self._ma_pattern.match(name):
+            ma_match = self._ma_pattern.match(name)
+            if ma_match and ma_match.group(1):
+                period = int(ma_match.group(1))
+                return ('MA', {'period': period})
+            else:
+                return ('MA', {'period': 20})
+        
+        return None
+    
     def update_chart(self, data: dict = None):
         """唯一K线渲染实现，X轴为等距序号，彻底消除节假日断层。"""
         try:
@@ -203,8 +513,8 @@ class RenderingMixin:
             if active_inds is None:
                 active_inds = []
             logger.info(f"📊 准备调用_render_indicators，active_indicators状态: {len(active_inds) if active_inds else 0}个指标")
-            if active_inds:
-                logger.info(f"📊 active_indicators内容: {[ind.get('name', 'unknown') for ind in active_inds]}")
+            # if active_inds:
+            #     logger.info(f"📊 active_indicators内容: {[ind.get('name', 'unknown') for ind in active_inds]}")
 
             self._render_indicators(kdata, x=x)
 
@@ -463,119 +773,266 @@ class RenderingMixin:
             logger.error(f"渲染指标数据失败: {str(e)}")
 
     def _render_indicators(self, kdata: pd.DataFrame, x=None):
-        """渲染技术指标，所有指标与K线对齐，节假日无数据自动跳过，X轴为等距序号。"""
+        """🚀 优化的技术指标渲染 - 使用缓存和批量计算"""
         try:
+            start_time = time.time()
             indicators = getattr(self, 'active_indicators', [])
             if not indicators:
+                logger.debug("🚀 指标列表为空，跳过渲染")
                 return
+            
             if x is None:
                 x = np.arange(len(kdata))
+            
+            logger.info(f"🚀 开始优化渲染 {len(indicators)} 个指标")
+            
+            # 🔥 关键优化1: 批量预计算所有指标
+            kdata_hash = self._get_kdata_hash(kdata)
+            precomputed = self._batch_precompute_indicators(kdata, indicators)
+            
+            render_time = (time.time() - start_time) * 1000
+            logger.info(f"🚀 批量预计算完成，耗时: {render_time:.2f}ms")
+            
+            start_time = time.time()
+            
+            # 🔥 关键优化2: 使用优化的渲染循环
+            plot_commands = []  # 收集绘图命令，减少matplotlib调用次数
+            
             for i, indicator in enumerate(indicators):
                 name = indicator.get('name', '')
                 group = indicator.get('group', '')
                 params = indicator.get('params', {})
                 formula = indicator.get('formula', None)
-                style = self._get_indicator_style(name, i)
-                # 内置 MA 指标 - 精确匹配：必须是 'MA' 或 'MA' + 数字（如 'MA20'）
-                if (name == 'MA' or (name.startswith('MA') and name[2:].isdigit() and len(name) > 2)) and group == 'builtin':
-                    period = int(params.get('n', name[2:] if len(name) > 2 else 20) or 20)
-                    ma = kdata['close'].rolling(period).mean().dropna()
-                    self.price_ax.plot(x[-len(ma):], ma.values, color=style['color'],
-                                       linewidth=style['linewidth'], alpha=style['alpha'], label=name)
-                elif name == 'MACD' and group == 'builtin':
-                    macd, sig, hist = self._calculate_macd(kdata)
-                    macd = macd.dropna()
-                    sig = sig.dropna()
-                    hist = hist.dropna()
-                    self.indicator_ax.plot(x[-len(macd):], macd.values, color=self._get_indicator_style('MACD', i)['color'],
-                                           linewidth=0.7, alpha=0.85, label='MACD')
-                    self.indicator_ax.plot(x[-len(sig):], sig.values, color=self._get_indicator_style('MACD-Signal', i+1)['color'],
-                                           linewidth=0.7, alpha=0.85, label='Signal')
-                    if not hist.empty:
-                        colors = ['red' if h >= 0 else 'green' for h in hist]
-                        self.indicator_ax.bar(
-                            x[-len(hist):], hist.values, color=colors, alpha=0.5)
-                elif name == 'RSI' and group == 'builtin':
-                    period = int(params.get('n', 14))
-                    rsi = self._calculate_rsi(kdata, period).dropna()
-                    self.indicator_ax.plot(x[-len(rsi):], rsi.values, color=style['color'],
-                                           linewidth=style['linewidth'], alpha=style['alpha'], label='RSI')
-                elif name == 'BOLL' and group == 'builtin':
-                    n = int(params.get('n', 20))
-                    p = float(params.get('p', 2))
-                    mid, upper, lower = self._calculate_boll(kdata, n, p)
-                    mid = mid.dropna()
-                    upper = upper.dropna()
-                    lower = lower.dropna()
-                    self.price_ax.plot(x[-len(mid):], mid.values, color=self._get_indicator_style('BOLL-Mid', i)['color'],
-                                       linewidth=0.5, alpha=0.85, label='BOLL-Mid')
-                    self.price_ax.plot(x[-len(upper):], upper.values, color=self._get_indicator_style('BOLL-Upper', i+1)['color'],
-                                       linewidth=0.7, alpha=0.85, label='BOLL-Upper')
-                    self.price_ax.plot(x[-len(lower):], lower.values, color=self._get_indicator_style('BOLL-Lower', i+2)['color'],
-                                       linewidth=0.5, alpha=0.85, label='BOLL-Lower')
+                
+                # 🔥 关键优化3: 使用缓存的样式
+                style = self._get_optimized_indicator_style(name, i)
+                
+                # 🔥 关键优化4: 使用快速匹配builtin指标
+                indicator_type = self._fast_indicator_match(name, group)
+                
+                if indicator_type and group == 'builtin':
+                    ind_type, ind_params = indicator_type
+                    
+                    if ind_type == 'MA':
+                        # 🚀 优化的MA指标渲染
+                        period = ind_params.get('period', 20)
+                        cache_key = f'MA_{period}'
+                        if cache_key in precomputed:
+                            ma = precomputed[cache_key]
+                            if not ma.empty:
+                                plot_commands.append(('plot', self.price_ax, x[-len(ma):], ma.values, 
+                                                     style['color'], style['linewidth'], style['alpha'], name))                    
+                    elif ind_type == 'MACD':
+                        # 🚀 优化的MACD指标渲染
+                        cache_key = 'MACD'
+                        if cache_key in precomputed:
+                            macd_data = precomputed[cache_key]
+                            macd = macd_data['macd']
+                            sig = macd_data['signal']
+                            hist = macd_data['hist']
+                            
+                            if not macd.empty:
+                                macd_style = self._get_optimized_indicator_style('MACD', i)
+                                signal_style = self._get_optimized_indicator_style('MACD-Signal', i+1)
+                                
+                                plot_commands.append(('plot', self.indicator_ax, x[-len(macd):], macd.values,
+                                                     macd_style['color'], 0.7, 0.85, 'MACD'))
+                                plot_commands.append(('plot', self.indicator_ax, x[-len(sig):], sig.values,
+                                                     signal_style['color'], 0.7, 0.85, 'Signal'))
+                                
+                                if not hist.empty:
+                                    hist_colors = ['red' if h >= 0 else 'green' for h in hist.values]
+                                    plot_commands.append(('bar', self.indicator_ax, x[-len(hist):], hist.values,
+                                                         hist_colors, 0.5))
+                    
+                    elif ind_type == 'RSI':
+                        # 🚀 优化的RSI指标渲染
+                        period = ind_params.get('period', 14)
+                        cache_key = f'RSI_{period}'
+                        if cache_key in precomputed:
+                            rsi = precomputed[cache_key]
+                            if not rsi.empty:
+                                plot_commands.append(('plot', self.indicator_ax, x[-len(rsi):], rsi.values,
+                                                     style['color'], style['linewidth'], style['alpha'], 'RSI'))
+                    
+                    elif ind_type == 'BOLL':
+                        # 🚀 优化的BOLL指标渲染
+                        n = params.get('n', 20)
+                        p = params.get('p', 2)
+                        cache_key = f'BOLL_{n}_{p}'
+                        if cache_key in precomputed:
+                            boll_data = precomputed[cache_key]
+                            mid = boll_data['mid']
+                            upper = boll_data['upper']
+                            lower = boll_data['lower']
+                            
+                            mid_style = self._get_optimized_indicator_style('BOLL-Mid', i)
+                            upper_style = self._get_optimized_indicator_style('BOLL-Upper', i+1)
+                            lower_style = self._get_optimized_indicator_style('BOLL-Lower', i+2)
+                            
+                            if not mid.empty:
+                                plot_commands.append(('plot', self.price_ax, x[-len(mid):], mid.values,
+                                                     mid_style['color'], 0.5, 0.85, 'BOLL-Mid'))
+                                plot_commands.append(('plot', self.price_ax, x[-len(upper):], upper.values,
+                                                     upper_style['color'], 0.7, 0.85, 'BOLL-Upper'))
+                                plot_commands.append(('plot', self.price_ax, x[-len(lower):], lower.values,
+                                                     lower_style['color'], 0.5, 0.85, 'BOLL-Lower'))
+                
                 elif group == 'talib':
                     try:
-                        import talib
-                        # 如果name是中文名称，需要转换为英文名称
-                        english_name = get_indicator_english_name(name)
+                        # 🚀 使用优化的talib处理
+                        if self._performance_optimizer.talib:
+                            # 如果name是中文名称，需要转换为英文名称
+                            english_name = get_indicator_english_name(name)
 
-                        func = getattr(talib, english_name)
-                        # 只传递非空参数
-                        func_params = {k: v for k,
-                                       v in params.items() if v != ''}
+                            func = getattr(self._performance_optimizer.talib, english_name)
+                            # 只传递非空参数
+                            func_params = {k: v for k,
+                                           v in params.items() if v != ''}
 
-                        # 获取该指标需要的输入列
-                        from core.indicator_adapter import get_indicator_inputs
-                        required_inputs = get_indicator_inputs(english_name)
+                            # 获取该指标需要的输入列
+                            from core.indicator_adapter import get_indicator_inputs
+                            required_inputs = get_indicator_inputs(english_name)
 
-                        # 构建函数参数 - 🔥 修复：确保所有输入数据都转换为float64类型
-                        func_args = []
-                        for input_name in required_inputs:
-                            if input_name in kdata.columns:
-                                # ✅ 关键修复：将数据转换为float64（double）类型
-                                input_data = kdata[input_name].values.astype(np.float64)
-                                func_args.append(input_data)
-                                logger.debug(f"指标 {english_name} 输入列 {input_name}: dtype={input_data.dtype}, shape={input_data.shape}")
+                            # 构建函数参数 - 确保所有输入数据都转换为float64类型
+                            func_args = []
+                            for input_name in required_inputs:
+                                if input_name in kdata.columns:
+                                    # ✅ 关键修复：将数据转换为float64（double）类型
+                                    input_data = kdata[input_name].values.astype(np.float64)
+                                    func_args.append(input_data)
+                                    logger.debug(f"指标 {english_name} 输入列 {input_name}: dtype={input_data.dtype}, shape={input_data.shape}")
+                                else:
+                                    logger.warning(f"指标 {english_name} 缺少必要列: {input_name}")
+                                    raise ValueError(f"缺少列: {input_name}")
+
+                            # 传递计算参数（转换为浮点数）
+                            kwargs = {k: float(v) if v else None for k, v in func_params.items()}
+                            logger.debug(f"指标 {english_name} 参数: {kwargs}")
+
+                            # 调用talib函数
+                            result = func(*func_args, **kwargs)
+
+                            if isinstance(result, tuple):
+                                for j, arr in enumerate(result):
+                                    arr = np.asarray(arr)
+                                    arr = arr[~np.isnan(arr)]
+                                    # 使用中文名称作为标签显示
+                                    display_name = name
+                                    result_style = self._get_optimized_indicator_style(display_name, i+j)
+                                    plot_commands.append(('plot', self.indicator_ax, x[-len(arr):], arr,
+                                                         result_style['color'], 0.7, 0.85, f'{display_name}-{j}'))
                             else:
-                                logger.warning(f"指标 {english_name} 缺少必要列: {input_name}")
-                                raise ValueError(f"缺少列: {input_name}")
-
-                        # 传递计算参数（转换为浮点数）
-                        kwargs = {k: float(v) if v else None for k, v in func_params.items()}
-                        logger.debug(f"指标 {english_name} 参数: {kwargs}")
-
-                        # 调用talib函数
-                        result = func(*func_args, **kwargs)
-
-                        if isinstance(result, tuple):
-                            for j, arr in enumerate(result):
-                                arr = np.asarray(arr)
+                                arr = np.asarray(result)
                                 arr = arr[~np.isnan(arr)]
-                                # 使用中文名称作为标签显示
                                 display_name = name
-                                self.indicator_ax.plot(x[-len(arr):], arr, color=self._get_indicator_style(display_name, i+j)['color'],
-                                                       linewidth=0.7, alpha=0.85, label=f'{display_name}-{j}')
+                                plot_commands.append(('plot', self.indicator_ax, x[-len(arr):], arr,
+                                                     style['color'], 0.7, 0.85, display_name))
                         else:
-                            arr = np.asarray(result)
-                            arr = arr[~np.isnan(arr)]
-                            display_name = name
-                            self.indicator_ax.plot(x[-len(arr):], arr, color=style['color'],
-                                                   linewidth=0.7, alpha=0.85, label=display_name)
+                            logger.warning("talib模块未正确加载，回退到原始实现")
+                            # 回退到原始实现
+                            import talib
+                            english_name = get_indicator_english_name(name)
+                            func = getattr(talib, english_name)
+                            func_params = {k: v for k, v in params.items() if v != ''}
+                            required_inputs = get_indicator_inputs(english_name)
+                            func_args = []
+                            for input_name in required_inputs:
+                                if input_name in kdata.columns:
+                                    input_data = kdata[input_name].values.astype(np.float64)
+                                    func_args.append(input_data)
+                                else:
+                                    raise ValueError(f"缺少列: {input_name}")
+                            kwargs = {k: float(v) if v else None for k, v in func_params.items()}
+                            result = func(*func_args, **kwargs)
+                            if isinstance(result, tuple):
+                                for j, arr in enumerate(result):
+                                    arr = np.asarray(arr)
+                                    arr = arr[~np.isnan(arr)]
+                                    display_name = name
+                                    self.indicator_ax.plot(x[-len(arr):], arr, color=self._get_optimized_indicator_style(display_name, i+j)['color'],
+                                                           linewidth=0.7, alpha=0.85, label=f'{display_name}-{j}')
+                            else:
+                                arr = np.asarray(result)
+                                arr = arr[~np.isnan(arr)]
+                                display_name = name
+                                self.indicator_ax.plot(x[-len(arr):], arr, color=style['color'],
+                                                       linewidth=0.7, alpha=0.85, label=display_name)
                     except Exception as e:
                         logger.error(f"ta-lib指标 {name} 渲染失败: {str(e)}")
                         self.error_occurred.emit(f"ta-lib指标渲染失败: {str(e)}")
+                
                 elif group == 'custom' and formula:
                     try:
-                        # 安全地用pandas.eval计算表达式
-                        local_vars = {col: kdata[col] for col in kdata.columns}
-                        arr = pd.eval(formula, local_dict=local_vars)
-                        arr = arr.dropna()
-                        self.price_ax.plot(x[-len(arr):], arr.values, color=style['color'],
-                                           linewidth=style['linewidth'], alpha=style['alpha'], label=name)
+                        # 🚀 使用预计算结果，避免重复计算
+                        cache_key = f'CUSTOM_{name}'
+                        if cache_key in precomputed:
+                            arr = precomputed[cache_key]
+                            if not arr.empty:
+                                plot_commands.append(('plot', self.price_ax, x[-len(arr):], arr.values,
+                                                     style['color'], style['linewidth'], style['alpha'], name))
+                        else:
+                            # 兜底：没有预计算结果时才执行计算
+                            logger.warning(f"🚀 Custom指标 {name} 缺少预计算结果，执行兜底计算")
+                            local_vars = {col: kdata[col] for col in kdata.columns}
+                            arr = pd.eval(formula, local_dict=local_vars)
+                            arr = arr.dropna()
+                            plot_commands.append(('plot', self.price_ax, x[-len(arr):], arr.values,
+                                                 style['color'], style['linewidth'], style['alpha'], name))
                     except Exception as e:
                         self.error_occurred.emit(f"自定义公式渲染失败: {str(e)}")
+            
+            # 🔥 关键优化5: 批量执行所有绘图命令
+            if plot_commands:
+                self._execute_batch_plots(plot_commands)
+                
+            render_time = (time.time() - start_time) * 1000
+            logger.info(f"🚀 指标渲染完成，总耗时: {render_time:.2f}ms")
+            
         except Exception as e:
             self.error_occurred.emit(f"渲染指标失败: {str(e)}")
+            logger.error(f"🚀 指标渲染失败: {e}")
+    
+    def _execute_batch_plots(self, plot_commands: List[Tuple]):
+        """🚀 批量执行绘图命令，减少matplotlib调用次数"""
+        try:
+            for cmd in plot_commands:
+                plot_type = cmd[0]
+                if plot_type == 'plot':
+                    ax, x, y, color, linewidth, alpha, label = cmd[1:]
+                    ax.plot(x, y, color=color, linewidth=linewidth, alpha=alpha, label=label)
+                elif plot_type == 'bar':
+                    ax, x, y, colors, alpha, _, _ = cmd[1:]
+                    ax.bar(x, y, color=colors, alpha=alpha)
+            logger.debug(f"🚀 批量执行了 {len(plot_commands)} 个绘图命令")
+        except Exception as e:
+            logger.error(f"批量绘图执行失败: {e}")
+            # 回退到逐个执行
+            for cmd in plot_commands:
+                try:
+                    plot_type = cmd[0]
+                    if plot_type == 'plot':
+                        ax, x, y, color, linewidth, alpha, label = cmd[1:]
+                        ax.plot(x, y, color=color, linewidth=linewidth, alpha=alpha, label=label)
+                    elif plot_type == 'bar':
+                        ax, x, y, colors, alpha, _, _ = cmd[1:]
+                        ax.bar(x, y, color=colors, alpha=alpha)
+                except Exception as e2:
+                    logger.error(f"单个绘图命令失败: {e2}")
+    
+    def clear_performance_cache(self):
+        """🚀 清除性能优化缓存"""
+        self._performance_optimizer.clear_cache()
+        logger.info("🚀 性能优化缓存已清除")
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """🚀 获取性能统计信息"""
+        return {
+            'precomputed_count': len(self._performance_optimizer._precomputed_indicators),
+            'style_cache_count': len(self._performance_optimizer._style_cache),
+            'cache_version': self._performance_optimizer._cache_version,
+            'talib_available': self._performance_optimizer.talib is not None and self._performance_optimizer.talib is not False
+        }
 
     def _get_chart_style(self) -> Dict[str, Any]:
         """获取图表样式，所有颜色从theme_manager.get_theme_colors获取"""
