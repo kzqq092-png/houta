@@ -6,6 +6,7 @@
 
 from .trend_following import *
 from .adaptive_strategy import *
+from .moving_average_strategy import *
 
 __all__ = [
     # 趋势跟踪策略
@@ -13,4 +14,7 @@ __all__ = [
 
     # 自适应策略
     'AdaptiveStrategy',
+    
+    # 双均线策略
+    'MovingAverageStrategyPlugin',
 ]

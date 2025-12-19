@@ -19,8 +19,6 @@ import time
 import json
 import os
 
-import datetime
-
 from datetime import datetime
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
